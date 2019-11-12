@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="codecs_array">
+        <item>H265</item>
+        <item>H264</item>
+        <item>VP8</item>
+        <item>VP9</item>
+    </string-array>
+    <string-array name="mime_array">
+        <item>video/hevc</item>
+        <item>video/avc</item>
+        <item>video/x-vnd.on2.vp8</item>
+        <item>video/x-vnd.on2.vp9</item>
+    </string-array>
+    <string-array name="bitrate_array">
+        <item>250</item>
+        <item>500</item>
+        <item>1000</item>
+        <item>1500</item>
+        <item>2000</item>
+        <item>2500</item>
+        <item>3000</item>
+    </string-array>
+    <string-array name="resolutions_array">
+        <item>320x176</item>
+        <item>480x264</item>
+        <item>640x352</item>
+        <item>960x528</item>
+        <item>1280x704</item>
+        <item>1920x1072</item>
+    </string-array>
+    <string-array name="keyframe_interval_array">
+        <item>2</item>
+        <item>3</item>
+        <item>5</item>
+        <item>10</item>
+    </string-array>
+    <string-array name="fps_array">
+        <item>30</item>
+        <item>35</item>
+        <item>25</item>
+        <item>1</item>
+    </string-array>
+</resources>

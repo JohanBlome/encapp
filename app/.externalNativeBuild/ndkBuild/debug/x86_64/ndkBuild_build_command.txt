@@ -1,0 +1,17 @@
+Executable : /home/jblome/Android/Sdk/ndk-bundle/ndk-build
+arguments : 
+NDK_PROJECT_PATH=null
+APP_BUILD_SCRIPT=/media/jblome/jblome-external/for_github/encapp/app/src/main/jni/Android.mk
+NDK_APPLICATION_MK=/media/jblome/jblome-external/for_github/encapp/app/src/main/jni/Application.mk
+APP_ABI=x86_64
+NDK_ALL_ABIS=x86_64
+NDK_DEBUG=1
+APP_PLATFORM=android-26
+NDK_OUT=/media/jblome/jblome-external/for_github/encapp/app/build/intermediates/ndkBuild/debug/obj
+NDK_LIBS_OUT=/media/jblome/jblome-external/for_github/encapp/app/build/intermediates/ndkBuild/debug/lib
+APP_SHORT_COMMANDS=false
+LOCAL_SHORT_COMMANDS=false
+-B
+-n
+jvmArgs : 
+
