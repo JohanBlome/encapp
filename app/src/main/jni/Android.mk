@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_LDFLAGS += -L$(LOCAL_PATH)/lib
 LOCAL_LDLIBS :=  -llog
 
-LOCAL_MODULE    := libvq-encapp
+LOCAL_MODULE    := libencapp
 LOCAL_SRC_FILES := readdata.cpp
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include  \

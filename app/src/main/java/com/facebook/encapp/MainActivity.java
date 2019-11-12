@@ -1,4 +1,4 @@
-package com.facebook.vq.encapp;
+package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
@@ -11,7 +11,7 @@ import android.util.Size;
 import android.view.View;
 import android.widget.TextView;
 
-import com.facebook.vq.encapp.utils.SizeUtils;
+import com.facebook.encapp.utils.SizeUtils;
 
 import java.io.File;
 import java.util.ArrayList;

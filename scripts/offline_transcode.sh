@@ -51,88 +51,83 @@ extra_descr="" #A description used to name the directory to place data
 #       dynamic="ltrm-10-1:ltru-11-1:key-30-0:ltrm-60-0:ltru-61-0:ltrm-90-0:ltru-91-0"
 
 
-function collect_data
-{
-        IFS=',' read -ra resolutions_b <<< "${resolutions}"
-        IFS=',' read -ra i_intervals_b <<< "${i_intervals}"
-        IFS=',' read -ra modes_b <<< "${modes}"
-        IFS=',' read -ra codecs_b <<< "${codecs}"
-        adb shell rm /sdcard/dcim/omx.*
+function collect_data {
+	IFS=',' read -ra resolutions_b <<< "${resolutions}"
+	IFS=',' read -ra i_intervals_b <<< "${i_intervals}"
+	IFS=',' read -ra modes_b <<< "${modes}"
+	IFS=',' read -ra codecs_b <<< "${codecs}"
+	adb shell rm /sdcard/dcim/omx.*
 
-        echo"" > silent.log
-        device_path='/sdcard/'
-        for encoding in "${codecs_b[@]}"
-        do
-                for vbr_cbr in "${modes_b[@]}"
-                do
-                        for i_int in "${i_intervals_b[@]}"
-                        do
-                                if [ "${extra_desc}" ] ; then
-                                        workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
-                                else
-                                        workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
-                                fi
-                                echo "*****"
+	echo"" > silent.log
+	device_path='/sdcard/'
+	for encoding in "${codecs_b[@]}"; do
+		for vbr_cbr in "${modes_b[@]}"; do
+			for i_int in "${i_intervals_b[@]}"; do
+				if [ "${extra_desc}" ] ; then
+					workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
+				else
+					workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
+				fi
+				echo "*****"
 
-                                mkdir "${workdir}"
-                                video_path="${workdir}/video"
-                                tmp_path="${workdir}/tmp"
-                                output_path="${workdir}/output"
+				mkdir "${workdir}"
+				video_path="${workdir}/video"
+				tmp_path="${workdir}/tmp"
+				output_path="${workdir}/output"
 
-                                for loc_res in "${resolutions_b[@]}"
-                                do
-                                        if [[ $loc_res == $raw_resolution ]]; then
-                                                if [[ $rawfile == *.mp4 ]]; then
-                                                      ref="${device_path}ref.mp4"
-                                                      adb push $rawfile ${ref}
-                                                else
-                                                      ref="${device_path}ref.yuv"
-                                                      adb push $rawfile ${ref}
-                                                fi
-                                        else
-                                                echo "Do resize"
-                                                if [[ $rawfile == *.mp4 ]]; then
-                                                      ffmpeg  -nostats -loglevel 0 -y -i ${rawfile} \
-                                                              -s ${loc_res} \
-                                                              resized.yuv
-                                                      ref="${device_path}ref.mp4"
-                                                      adb push resized.yuv ${ref}
-                                                else
-                                                      ffmpeg  -nostats -loglevel 0 -y -f rawvideo -pix_fmt nv12 \
-                                                              -s ${raw_resolution} -framerate 30 -i ${rawfile} \
-                                                              -f rawvideo -pix_fmt nv12 -s ${loc_res} \
-                                                              -framerate 30 resized.yuv
-                                                      ref="${device_path}ref.yuv"
-                                                      adb push resized.yuv ${ref}
-                                               fi
-                                        fi
-                                        gen="-e file ${ref} -e test_timeout 20 -e video_timeout ${test_length} -e res ${loc_res} -e resl ${loc_res} -e bitl ${bitrates} -e skfr false -e debug false"
-                                        args=" -w -r -e key ${i_int} -e encl ${encoding} ${gen} -e ltrc 1"
-                                        if [[ $vbr_cbr == "cbr" ]] ; then
-                                                args="${args} -e mode cbr "
-                                        fi
+				for loc_res in "${resolutions_b[@]}"; do
+					if [[ $loc_res == $raw_resolution ]]; then
+						if [[ $rawfile == *.mp4 ]]; then
+						      ref="${device_path}ref.mp4"
+						      adb push $rawfile ${ref}
+						else
+						      ref="${device_path}ref.yuv"
+						      adb push $rawfile ${ref}
+						fi
+					else
+						echo "Do resize"
+						if [[ $rawfile == *.mp4 ]]; then
+						      ffmpeg  -nostats -loglevel 0 -y -i ${rawfile} \
+							      -s ${loc_res} \
+							      resized.yuv
+						      ref="${device_path}ref.mp4"
+						      adb push resized.yuv ${ref}
+						else
+						      ffmpeg  -nostats -loglevel 0 -y -f rawvideo -pix_fmt nv12 \
+							      -s ${raw_resolution} -framerate 30 -i ${rawfile} \
+							      -f rawvideo -pix_fmt nv12 -s ${loc_res} \
+							      -framerate 30 resized.yuv
+						      ref="${device_path}ref.yuv"
+						      adb push resized.yuv ${ref}
+					       fi
+					fi
+					gen="-e file ${ref} -e test_timeout 20 -e video_timeout ${test_length} -e res ${loc_res} -e resl ${loc_res} -e bitl ${bitrates} -e skfr false -e debug false"
+					args=" -w -r -e key ${i_int} -e encl ${encoding} ${gen} -e ltrc 1"
+					if [[ $vbr_cbr == "cbr" ]] ; then
+						args="${args} -e mode cbr "
+					fi
 
-                                        if [ ${dynamic} ] ; then
-                                                args="$args  -e dyn ${dynamic}"
-                                        fi
+					if [ ${dynamic} ] ; then
+						args="${args} -e dyn ${dynamic}"
+					fi
 
-                                        if [ ${hierplayers} ] ; then
-                                                args="$args  -e hierl ${hierplayers}"
-                                        fi
+					if [ ${hierplayers} ] ; then
+						args="${args} -e hierl ${hierplayers}"
+					fi
 
-                                        echo "adb shell am instrument $args -e class com.facebook.offlinetranscode.CodecValidationInstrumentedTest com.facebook.offlinetranscode.test/android.support.test.runner.AndroidJUnitRunner"
-                                        adb shell am instrument $args -e class com.facebook.offlinetranscode.CodecValidationInstrumentedTest com.facebook.offlinetranscode.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
+					echo "adb shell am instrument ${args} -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner"
+					adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
 
-                                done
-                                nbr_files=$(adb shell ls /sdcard/dcim | wc -l)
-                                echo "- Number of files transcoded: $nbr_files - "
+				done
+				nbr_files=$(adb shell ls /sdcard/dcim | wc -l)
+				echo "- Number of files transcoded: $nbr_files - "
 
-                                adb pull /sdcard/dcim/ .
-                                mv dcim ${video_path}
-                        done
-                done
-        done
-        #rm resized.yuv
-        #adb shell rm /sdcard/ref.yuv
-        echo " - done -"
+				adb pull /sdcard/dcim/ .
+				mv dcim ${video_path}
+			done
+		done
+	done
+	#rm resized.yuv
+	#adb shell rm /sdcard/ref.yuv
+	echo " - done -"
 }

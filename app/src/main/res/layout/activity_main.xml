@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.facebook.offlinetranscode.MainActivity">
+    tools:context="com.facebook.encapp.MainActivity">
 
     <TextView
         android:id="@+id/tv_testrun"
