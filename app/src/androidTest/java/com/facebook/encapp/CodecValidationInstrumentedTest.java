@@ -1,4 +1,4 @@
-package com.facebook.vq.encapp;
+package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
@@ -30,7 +30,7 @@ import static org.junit.Assert.*;
  * Run instrumentation test:
  * adb shell am instrument
  * -w
- * -e class com.facebook.codecvalidate.com.facebook.offlinetranscode.CodecValidationInstrumentedTest
+ * -e class com.facebook.codecvalidate.com.facebook.encapp.CodecValidationInstrumentedTest
  * com.facebook.codecvalidate.test/android.support.test.runner.AndroidJUnitRunner
  *
  * Provide any of the following arguments for a custom test run. Examples below:
@@ -56,7 +56,7 @@ import static org.junit.Assert.*;
 @RunWith(AndroidJUnit4.class)
 @SdkSuppress(minSdkVersion = 26)
 public class CodecValidationInstrumentedTest {
-    private static final String TAG = "offlinetranscode";
+    private static final String TAG = "encapp";
 
     private static final int LAUNCH_TIMEOUT = 5000;
 

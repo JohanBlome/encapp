@@ -1,0 +1,6 @@
+local.properties
+app/.externalNativeBuild/*
+.gradle/
+*.so
+*.o
+*.o.d

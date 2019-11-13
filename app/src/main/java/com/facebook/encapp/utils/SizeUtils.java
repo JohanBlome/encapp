@@ -1,6 +1,6 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
-package com.facebook.vq.encapp.utils;
+package com.facebook.encapp.utils;
 
 import android.util.Size;
 

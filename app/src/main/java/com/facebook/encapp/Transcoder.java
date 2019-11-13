@@ -1,4 +1,4 @@
-package com.facebook.vq.encapp;
+package com.facebook.encapp;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;

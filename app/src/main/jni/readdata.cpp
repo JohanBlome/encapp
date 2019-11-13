@@ -69,7 +69,7 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
     int l_iGetJvmStatus = env->GetJavaVM(&vm);
     g_Transcoder = (jclass) env->NewGlobalRef(
-            env->FindClass("com/facebook/vq/encapp/Transcoder"));
+            env->FindClass("com/facebook/encapp/Transcoder"));
     env->RegisterNatives(g_Transcoder, methods, sizeof(methods) / sizeof(methods[0]));
 
     LOGD("Classes registred? %p", g_Transcoder);
