@@ -3,9 +3,8 @@
 currentDir=$(pwd)
 scriptDir=$(dirname "${BASH_SOURCE[0]}" )
 echo $currentDir
-export VMAF_FOLDER="${scriptDir}/scripts/"
 export PATH="$PATH:${scriptDir}/scripts:$PATH:${scriptDir}"
-export PYTHONPATH="$PYTHONPATH:${scriptDir}/scrips"
+export PYTHONPATH="$PYTHONPATH:${scriptDir}/scripts"
 cd ${scriptDir}
 
 #check ndk path

@@ -11,7 +11,8 @@ Facilitates an encoding mechanism for a large number of combinations in regards 
 I also have support for dynamic changes with fps, bitrate, and ltr.
 This is described in `scripts/offline_transcoding.sh`.
 
-## Prerequisites
+
+## 1. Prerequisites
 
 - adb connection
 - ffmpeg with decoding support for the codecs to be tested
@@ -19,7 +20,7 @@ This is described in `scripts/offline_transcoding.sh`.
 - android ndk
 
 
-## Operation
+## 2. Operation
 
 (1) set up the android SDK and NDK in the `local.properties` file.
 
@@ -34,20 +35,42 @@ sdk.dir: /opt/android_sdk/
 
 Note that this file should not be added to the repo.
 
-(2) run the `setup.sh` script to install encapp in your android device.
+(2) build the encapp app
+
+```
+$ ./gradlew clean
+$ ./gradlew build
+...
+BUILD SUCCESSFUL in 6s
+61 actionable tasks: 5 executed, 56 up-to-date
+```
+
+(3) run the `setup.sh` script to install encapp in your android device.
 
 ```
 $ ./setup.sh
 ...
-Installing APK 'app-debug.apk' on 'Pixel 2 - 10' for app:debug
+Installing APK 'com.facebook.encapp-v1.0-debug.apk' on 'Pixel - 10' for app:debug
 Installed on 4 devices.
 
 BUILD SUCCESSFUL in 14s
 31 actionable tasks: 3 executed, 28 up-to-date
 ```
 
-(3) run an encoding experiment with the app
+(4) run a quick encoding experiment with the app
 
+```
+$ adb install ./app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
+$ adb shell cmd package list package |grep encapp
+package:com.facebook.encapp
+$ ./gradlew installDebugAndroidTest
+
+$ wget http://www.sunrayimage.com/download/image_examples/yuv420/tulips_yuv420_prog_planar_qcif.yuv
+$ adb push tulips_yuv420_prog_planar_qcif.yuv /sdcard/
+$ adb shell am instrument -w -r -e key 10 -e encl OMX.google.vp8.encoder -e file /sdcard/tulips_yuv420_prog_planar_qcif.yuv -e test_timeout 20 -e video_timeout 60 -e resl 128x96 -e bitl 100 -e skfr false -e debug false -e ltrc 1 -e mode cbr -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+```
+
+(5) run a multiple encoding experiment with the app
 
 Copy the `run_test.sh` script to your local directory and edit it.
 

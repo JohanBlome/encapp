@@ -27,7 +27,7 @@ class Transcoder {
     private static final String TAG = "Transcoder";
 
     static {
-        System.loadLibrary("codec-offline");
+        System.loadLibrary("encapp");
     }
 
     private static final long VIDEO_CODEC_WAIT_TIME_US = 1000;
@@ -56,13 +56,13 @@ class Transcoder {
 
         int keyFrameInterval = vc.getKeyframeRate();
 
-        if(dynamic != null) {
+        if (dynamic != null) {
             mDynamicSetting = new Stack<String>();
             String[] changes = dynamic.split(":");
-            if(dynamic.contains("ltrm")) {
+            if (dynamic.contains("ltrm")) {
                 mUseLTR = true;
             }
-            for(int i = changes.length-1; i >= 0; i--) {
+            for (int i = changes.length-1; i >= 0; i--) {
                 String data = changes[i];
                 mDynamicSetting.push(data);
             }
@@ -73,10 +73,10 @@ class Transcoder {
 
         try {
             mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderMime());
-            if(mUseLTR) {
+            if (mUseLTR) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }
-            if(vc.getHierStructLayers() > 0) {
+            if (vc.getHierStructLayers() > 0) {
                 format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
             }
 
@@ -125,7 +125,7 @@ class Transcoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         MediaMuxer muxer = null;
         boolean isVP8 = mCodec.getCodecInfo().getName().toLowerCase().contains("vp8");
-        if(isVP8) {
+        if (isVP8) {
             MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
             oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
@@ -142,7 +142,7 @@ class Transcoder {
                     if (index >= 0) {
                         int size = -1;
                         boolean eos = (inFramesCount == totalFrames - 1);
-                        if(isVP8 && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
+                        if (isVP8 && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
                             Bundle params = new Bundle();
                             params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
                             mCodec.setParameters(params);
@@ -156,7 +156,7 @@ class Transcoder {
                             inFramesCount++;
                         }
                         numBytesSubmitted += size;
-                        if(size == 0) break;
+                        if (size == 0) break;
                     }
                 }catch (Exception ex) {
                     ex.printStackTrace();
@@ -169,7 +169,7 @@ class Transcoder {
                 } else if (index >= 0) {
                     long nowUs = (System.nanoTime() + 500) / 1000;
                     ByteBuffer data = mCodec.getOutputBuffer(index);
-                    if((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         //There seems to be a bug so that this key is no set (but used).
                         oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
@@ -197,11 +197,11 @@ class Transcoder {
             }
 
         }
-        if(mCodec != null) {
+        if (mCodec != null) {
             mCodec.stop();
             mCodec.release();
         }
-        if(muxer != null) {
+        if (muxer != null) {
             muxer.stop();
             muxer.release();
             Log.d(TAG, "muxer released ");
@@ -224,12 +224,12 @@ class Transcoder {
         int read = nativeFillBuffer(buffer, size);
         int currentFrameNbr = (int)((float)(frameCount % mFrameRate) / mKeepInterval);
         int nextFrameNbr = (int)((float)((frameCount + 1) % mFrameRate) / mKeepInterval);
-        if(currentFrameNbr == nextFrameNbr) {
+        if (currentFrameNbr == nextFrameNbr) {
             read = -1; //Skip this and read again
             mSkipped++;
         }
-        if(read > 0) {
-            if(mNextLimit != -1 && frameCount >= mNextLimit) {
+        if (read > 0) {
+            if (mNextLimit != -1 && frameCount >= mNextLimit) {
                 getNextLimit(frameCount);
             }
             mFramesAdded++;
@@ -288,7 +288,7 @@ class Transcoder {
             }
         }
 
-        if(params != null && mCodec != null) {
+        if (params != null && mCodec != null) {
             mCodec.setParameters(params);
         }
 
@@ -309,7 +309,7 @@ class Transcoder {
     private MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format) {
         MediaMuxer muxer = null;
         Log.d(TAG, "Bitrate mode: "+(format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
-        String filename = String.format("/sdcard/dcim/%s_%dfps_%dx%d_%dbps_iint%d.mp4",
+        String filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d.mp4",
             encoder.getCodecInfo().getName().toLowerCase(),
                 (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
                 (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
@@ -317,8 +317,8 @@ class Transcoder {
                 (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
                 (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0));
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
-        if(encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
-            filename = String.format("/sdcard/dcim/%s_%dfps_%dx%d_%dbps_iint%d.webm",
+        if (encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
+            filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d.webm",
             encoder.getCodecInfo().getName().toLowerCase(),
                     (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
                     (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
