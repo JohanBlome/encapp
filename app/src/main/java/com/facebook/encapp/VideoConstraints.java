@@ -18,7 +18,7 @@ class VideoConstraints {
     public final static int OMX_SEC_COLOR_FormatNV12Tiled = 0x7FC00002;
     public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m = 0x7FA30C04;
 
-    private String mVideoEncoderMime;
+    private String mVideoEncoderIdentifier;
     private int mBitRate;
     private Size mVideoSize; // Used for resolution values
     private Size mVideoScaleSize; // Used for resolution values
@@ -97,12 +97,12 @@ class VideoConstraints {
         return mHierStructLayers;
     }
 
-    public String getVideoEncoderMime() {
-        return mVideoEncoderMime;
+    public String getVideoEncoderIdentifier() {
+        return mVideoEncoderIdentifier;
     }
 
-    public void setVideoEncoderMime(String videoEncoderMime) {
-        mVideoEncoderMime = videoEncoderMime;
+    public void setVideoEncoderIdentifier(String videoCodecIdentifier){
+        mVideoEncoderIdentifier = videoCodecIdentifier;
 
     }
 
@@ -170,7 +170,7 @@ class VideoConstraints {
 
     public MediaFormat createEncoderMediaFormat(int width, int height) {
         MediaFormat encoderFormat = MediaFormat.createVideoFormat(
-                getVideoEncoderMime(), width, height);
+                getVideoEncoderIdentifier(), width, height);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         encoderFormat.setInteger(MediaFormat.KEY_BIT_RATE, getBitRate());
         encoderFormat.setInteger(MediaFormat.KEY_FRAME_RATE, (int)getFPS());
@@ -183,7 +183,7 @@ class VideoConstraints {
 
     public MediaFormat createDecoderMediaFormat(int width, int height, ByteBuffer codecCsd0) {
         MediaFormat decoderFormat = MediaFormat.createVideoFormat(
-                getVideoEncoderMime(), width, height);
+                getVideoEncoderIdentifier(), width, height);
         if (codecCsd0.limit() > 0) {
             decoderFormat.setByteBuffer("csd-0", codecCsd0);
         }
@@ -192,6 +192,6 @@ class VideoConstraints {
     }
 
     public String getSettings() {
-        return this.getVideoEncoderMime()+", "+mVideoSize+", "+ mBitRate+", "+mBitrateMode;
+        return this.getVideoEncoderIdentifier()+", "+mVideoSize+", "+ mBitRate+", "+mBitrateMode;
     }
 }

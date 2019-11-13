@@ -2,6 +2,9 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.filters.SdkSuppress;
 import android.support.test.runner.AndroidJUnit4;
@@ -108,6 +111,9 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("ltrc");
     private static final String HIER_STRUCT_LAYER_COUNT =
             InstrumentationRegistry.getArguments().getString("hierl");
+    private static final String LIST_CODECS =
+            InstrumentationRegistry.getArguments().getString("list_codecs");
+
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
     private UiDevice mDevice;
@@ -119,7 +125,6 @@ public class CodecValidationInstrumentedTest {
      */
     public void collectExtraData() {
         mExtraDataHashMap = new HashMap<String, String>();
-
         if (MULTIPLE_TEST != null) {
             mExtraDataHashMap.put("multiple_test", MULTIPLE_TEST);
             Log.e(TAG, "multiple_test: " + MULTIPLE_TEST);
@@ -211,6 +216,11 @@ public class CodecValidationInstrumentedTest {
             }
             mExtraDataHashMap.put("file", FILE);
             Log.e(TAG, "FILE: " + FILE);
+        }
+
+        if (LIST_CODECS != null) {
+            mExtraDataHashMap.put("list_codecs", LIST_CODECS);
+            Log.e(TAG, "LIST_CODECS: " + LIST_CODECS);
         }
     }
 

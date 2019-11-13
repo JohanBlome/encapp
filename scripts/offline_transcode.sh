@@ -56,7 +56,7 @@ function collect_data {
 	IFS=',' read -ra i_intervals_b <<< "${i_intervals}"
 	IFS=',' read -ra modes_b <<< "${modes}"
 	IFS=',' read -ra codecs_b <<< "${codecs}"
-	adb shell rm /sdcard/dcim/omx.*
+	adb shell rm /sdcard/omx.*
 
 	echo"" > silent.log
 	device_path='/sdcard/'
@@ -118,11 +118,14 @@ function collect_data {
 					adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
 
 				done
-				nbr_files=$(adb shell ls /sdcard/dcim | wc -l)
+        file_list=$(adb shell ls /sdcard/omx.*)
+				nbr_files=$(echo $file_list | awk '{print NF}')
 				echo "- Number of files transcoded: $nbr_files - "
-
-				adb pull /sdcard/dcim/ .
-				mv dcim ${video_path}
+        mkdir ${video_path}
+        for file in $file_list; do
+           echo "Pull $file"
+				   adb pull $file ${video_path}/.
+        done
 			done
 		done
 	done

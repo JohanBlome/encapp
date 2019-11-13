@@ -24,7 +24,7 @@ class Transcoder {
     private static final String MEDIA_KEY_LTR_USE_FRAME  = "vendor.qti-ext-enc-ltr.use-frame";
     private static final String MEDIA_KEY_HIER_STRUCT_LAYERS  = "vendor.qti-ext-enc-hier-struct.layers";
 
-    private static final String TAG = "Transcoder";
+    private static final String TAG = "encapp";
 
     static {
         System.loadLibrary("encapp");
@@ -72,7 +72,15 @@ class Transcoder {
         MediaFormat format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
 
         try {
-            mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderMime());
+            try {
+                mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderIdentifier());
+            }
+            catch (Exception ex) {
+                Log.e(TAG, "Configure by type failed: "+ex.getMessage() +
+                         ", try by name: "+vc.getVideoEncoderIdentifier());
+                mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
+            }
+
             if (mUseLTR) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }

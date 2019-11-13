@@ -3,6 +3,8 @@ package com.facebook.encapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -13,7 +15,6 @@ import android.widget.TextView;
 
 import com.facebook.encapp.utils.SizeUtils;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -36,8 +37,9 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
+        TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
         if (getInstrumentedTest()) {
-            TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+
             mTvTestRun.setVisibility(View.VISIBLE);
             (new Thread(new Runnable() {
                 @Override
@@ -46,6 +48,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             })).start();
         }
+
+
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -89,6 +93,37 @@ public class MainActivity extends AppCompatActivity {
     private void performInstrumentedTest() {
         Log.d(TAG, "Intrumentation test - let us start!");
 
+
+
+        if (mExtraDataHashMap.containsKey("list_codecs")) {
+            TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+            mTvTestRun.setVisibility(View.VISIBLE);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+                    TextView logText = (TextView)findViewById(R.id.logText);
+                    logText.append("-- List supported codecs --\n\n");
+                    for (MediaCodecInfo info: codecInfos) {
+                        if (info.isEncoder()) {
+                            //TODO: from Android 10 (api 29) we can check if hw or sw codec
+                            logText.append("\n"+info.getName()+"\n");
+                            Log.d(TAG, "Codec: " + info.getName());
+                            String[] types = info.getSupportedTypes();
+                            for(String tp: types) {
+                                logText.append("  --" + tp + "\n");
+                                Log.d(TAG, " sup type: " + tp);
+                            }
+
+
+                        }
+                    }
+                }
+            });
+
+            return;
+        }
         // Need to set source
         if (!mExtraDataHashMap.containsKey("file")) {
            Log.e(TAG, "Need filename!");
@@ -218,16 +253,17 @@ public class MainActivity extends AppCompatActivity {
                         String[] encs = getResources().getStringArray(R.array.codecs_array);
                         String[] matching_mimes = getResources().getStringArray(R.array.mime_array);
 
-                        String codecMime = matching_mimes[0];//If all fail we will take the first one...
+                        String codecIdentifier = encoders[eC];
                         int c = 0;
                         for (; c < encs.length; c++) {
+                            Log.d(TAG, "check "+ encs[c] + " vs " + encoders[eC].toUpperCase());
                             if (encs[c].equals(encoders[eC].toUpperCase())) {
-                                codecMime = matching_mimes[c];
+                                codecIdentifier = matching_mimes[c];
                                 break;
                             }
                         }
 
-                        constraints.setVideoEncoderMime(codecMime);
+                        constraints.setVideoEncoderIdentifier(codecIdentifier);
 
                         //Check for mode
                         constraints.setConstantBitrate(false);
