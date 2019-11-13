@@ -8,21 +8,19 @@
 #include <stdio.h>
 #include <android/trace.h>
 
-#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, "Aloha", __VA_ARGS__)
+#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, "encapp", __VA_ARGS__)
 
 
-static const char *filename = "/sdcard/ref.yuv";
 FILE *dataFile = NULL;
 
 JNIEXPORT void JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaString) {
     const char *fileName = env->GetStringUTFChars(javaString, 0);
 
-    LOGD("Open ref file...%s ", fileName);
-    dataFile = fopen(filename, "r");
-    LOGD("...OK? %p", dataFile);
-
+    LOGD("opening input file: \"%s\"", fileName);
+    dataFile = fopen(fileName, "r");
     if (dataFile == NULL) {
-        LOGD("Failed to open the reference file, error:%s\n", strerror(errno));
+        LOGD("Failed to open the reference file, error: %s\n", strerror(errno));
+        // TODO(johan): catch this
     }
 
     env->ReleaseStringUTFChars(javaString, fileName);
