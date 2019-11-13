@@ -16,5 +16,6 @@ if [[ ! $ndkpath ]]; then
 else
 	echo "ndk.dir=${ndkpath}"
 fi
+./gradlew installDebugAndroidTest
 ./gradlew installDebug
 cd $currentDir
