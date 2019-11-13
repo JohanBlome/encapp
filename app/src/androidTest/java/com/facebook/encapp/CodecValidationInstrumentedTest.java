@@ -124,106 +124,86 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("multiple_test", MULTIPLE_TEST);
             Log.e(TAG, "multiple_test: " + MULTIPLE_TEST);
         }
-
         if (MODE != null) {
             mExtraDataHashMap.put("mode", MODE);
             Log.e(TAG, "MODE: " + MODE);
         }
-
         if (ENCODER != null) {
             mExtraDataHashMap.put("enc", ENCODER);
             Log.e(TAG, "ENCODER: " + ENCODER);
         }
-
         if (BITRATE != null) {
             mExtraDataHashMap.put("bit", BITRATE);
             Log.e(TAG, "BITRATE: " + BITRATE);
         }
-
         if (RESOLUTION != null) {
             mExtraDataHashMap.put("res", RESOLUTION);
             Log.e(TAG, "RESOLUTION: " + RESOLUTION);
         }
-
         if (KEYFRAME != null) {
             mExtraDataHashMap.put("key", KEYFRAME);
             Log.e(TAG, "KEYFRAME: " + KEYFRAME);
         }
-
         if (KEYFRAMES != null) {
             mExtraDataHashMap.put("keys", KEYFRAMES);
             Log.e(TAG, "KEYFRAME: " + KEYFRAMES);
         }
-
         if (FPS != null) {
             mExtraDataHashMap.put("fps", FPS);
             Log.e(TAG, "FPS: " + FPS);
         }
-
         if (REF_FPS != null) {
             mExtraDataHashMap.put("ref_fps", FPS);
             Log.e(TAG, "REF_FPS: " + REF_FPS);
         }
-
         if (RUN_WITH_METRICS != null) {
             mExtraDataHashMap.put("met", RUN_WITH_METRICS);
             Log.e(TAG, "RUN_WITH_METRICS: " + RUN_WITH_METRICS);
         }
-
         if (ENABLE_UPSCALING != null) {
             mExtraDataHashMap.put("scal", ENABLE_UPSCALING);
             Log.e(TAG, "ENABLE_UPSCALING: " + ENABLE_UPSCALING);
         }
-
         if (WRITE_FILE != null) {
             mExtraDataHashMap.put("write", WRITE_FILE);
             Log.e(TAG, "WRITE_FILE: " + WRITE_FILE);
         }
-
         if (RUN != null) {
             mExtraDataHashMap.put("run", RUN);
             Log.e(TAG, "RUN: " + RUN);
         }
-
-
         if (ENCODERS != null) {
             mExtraDataHashMap.put("encoders", ENCODERS);
-            Log.d(TAG, "Encoders: "+ENCODERS);
+            Log.d(TAG, "Encoders: " + ENCODERS);
         }
         if (RESOLUTIONS != null) {
             mExtraDataHashMap.put("resolutions", RESOLUTIONS);
-            Log.d(TAG, "Resolutions: "+RESOLUTIONS);
+            Log.d(TAG, "Resolutions: " + RESOLUTIONS);
         }
         if (BITRATES != null) {
             mExtraDataHashMap.put("bitrates", BITRATES);
-            Log.d(TAG, "Bitrates: "+BITRATES);
+            Log.d(TAG, "Bitrates: " + BITRATES);
         }
-
         if (VIDEO_TIMEOUT != null) {
             mExtraDataHashMap.put("video_timeout", VIDEO_TIMEOUT);
             Log.e(TAG, "VIDEO_TIMEOUT: " + VIDEO_TIMEOUT);
         }
-
         if (SKIPFRAMES != null) {
             mExtraDataHashMap.put("skip_frames", SKIPFRAMES);
             Log.e(TAG, "SKIP FRAMES: " + SKIPFRAMES);
         }
-
         if (DYNAMIC != null) {
             mExtraDataHashMap.put("dyn", DYNAMIC);
             Log.e(TAG, "DYNAMIC data: " + DYNAMIC);
         }
-
         if (LTR_COUNT != null) {
             mExtraDataHashMap.put("ltrc", LTR_COUNT);
             Log.e(TAG, "Ltr count: " + LTR_COUNT);
         }
-
-        if(HIER_STRUCT_LAYER_COUNT != null) {
+        if (HIER_STRUCT_LAYER_COUNT != null) {
             mExtraDataHashMap.put("hierl",HIER_STRUCT_LAYER_COUNT );
             Log.e(TAG, "Hier p struct layer count: " + HIER_STRUCT_LAYER_COUNT);
         }
-
         if (FILE != null) {
             if (!FILE.contains("/")) {
                 Log.e("Path does not contain \"/\"", FILE);
@@ -232,8 +212,6 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("file", FILE);
             Log.e(TAG, "FILE: " + FILE);
         }
-
-
     }
 
     @Before
@@ -272,8 +250,6 @@ public class CodecValidationInstrumentedTest {
         // Wait for the app to appear
         mDevice.wait(Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)),
                 LAUNCH_TIMEOUT);
-
-
     }
 
     @Test

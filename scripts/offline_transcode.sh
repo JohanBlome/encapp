@@ -48,7 +48,7 @@ extra_descr="" #A description used to name the directory to place data
 #dynamic="ltrm-0-3:ltrm-90-4:ltru-180-3"
 
 #Dynamic ltr with only two iframes
-#       dynamic="ltrm-10-1:ltru-11-1:key-30-0:ltrm-60-0:ltru-61-0:ltrm-90-0:ltru-91-0"
+#  dynamic="ltrm-10-1:ltru-11-1:key-30-0:ltrm-60-0:ltru-61-0:ltrm-90-0:ltru-91-0"
 
 
 function collect_data {
@@ -78,28 +78,27 @@ function collect_data {
 				for loc_res in "${resolutions_b[@]}"; do
 					if [[ $loc_res == $raw_resolution ]]; then
 						if [[ $rawfile == *.mp4 ]]; then
-						      ref="${device_path}ref.mp4"
-						      adb push $rawfile ${ref}
+							ref="${device_path}ref.mp4"
+							adb push $rawfile ${ref}
 						else
-						      ref="${device_path}ref.yuv"
-						      adb push $rawfile ${ref}
+							ref="${device_path}ref.yuv"
+							adb push $rawfile ${ref}
 						fi
 					else
 						echo "Do resize"
 						if [[ $rawfile == *.mp4 ]]; then
-						      ffmpeg  -nostats -loglevel 0 -y -i ${rawfile} \
-							      -s ${loc_res} \
-							      resized.yuv
-						      ref="${device_path}ref.mp4"
-						      adb push resized.yuv ${ref}
+							ffmpeg -nostats -loglevel 0 -y -i ${rawfile} -s ${loc_res} \
+									resized.yuv
+							ref="${device_path}ref.mp4"
+							adb push resized.yuv ${ref}
 						else
-						      ffmpeg  -nostats -loglevel 0 -y -f rawvideo -pix_fmt nv12 \
-							      -s ${raw_resolution} -framerate 30 -i ${rawfile} \
-							      -f rawvideo -pix_fmt nv12 -s ${loc_res} \
-							      -framerate 30 resized.yuv
-						      ref="${device_path}ref.yuv"
-						      adb push resized.yuv ${ref}
-					       fi
+							ffmpeg -nostats -loglevel 0 -y -f rawvideo -pix_fmt nv12 \
+									-s ${raw_resolution} -framerate 30 -i ${rawfile} \
+									-f rawvideo -pix_fmt nv12 -s ${loc_res} \
+									-framerate 30 resized.yuv
+							ref="${device_path}ref.yuv"
+							adb push resized.yuv ${ref}
+						fi
 					fi
 					gen="-e file ${ref} -e test_timeout 20 -e video_timeout ${test_length} -e res ${loc_res} -e resl ${loc_res} -e bitl ${bitrates} -e skfr false -e debug false"
 					args=" -w -r -e key ${i_int} -e encl ${encoding} ${gen} -e ltrc 1"

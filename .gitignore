@@ -1,6 +1,9 @@
 local.properties
 app/.externalNativeBuild/*
 .gradle/
+build/
 *.so
 *.o
 *.o.d
+*.yuv
+*.ivf

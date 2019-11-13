@@ -36,7 +36,6 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
-
         if (getInstrumentedTest()) {
             TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
@@ -46,12 +45,8 @@ public class MainActivity extends AppCompatActivity {
                     performInstrumentedTest();
                 }
             })).start();
-
-
         }
-
     }
-
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
         ArrayList<String> nonGrantedPerms = new ArrayList<>();
@@ -94,15 +89,15 @@ public class MainActivity extends AppCompatActivity {
     private void performInstrumentedTest() {
         Log.d(TAG, "Intrumentation test - let us start!");
 
-        //Need to set source
-        if(!mExtraDataHashMap.containsKey("file")) {
+        // Need to set source
+        if (!mExtraDataHashMap.containsKey("file")) {
            Log.e(TAG, "Need filename!");
            return;
         }
         String filename = mExtraDataHashMap.get("file");
 
-        //Get default resolution
-        if(mExtraDataHashMap.containsKey("res")) {
+        // Get default resolution
+        if (mExtraDataHashMap.containsKey("res")) {
             String resolution = mExtraDataHashMap.get("res");
             mVideoSize = SizeUtils.parseXString(resolution);
             mDefaultWidth = mVideoSize.getWidth();
@@ -116,12 +111,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String dynamicData = null;
-        if(mExtraDataHashMap.containsKey("dyn")) {
+        if (mExtraDataHashMap.containsKey("dyn")) {
             dynamicData = mExtraDataHashMap.get("dyn");
         }
 
         int timeout = 20;
-        if(mExtraDataHashMap.containsKey("video_timeout")) {
+        if (mExtraDataHashMap.containsKey("video_timeout")) {
             timeout = Integer.parseInt(mExtraDataHashMap.get("video_timeout"));
         }
 
@@ -132,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
                 logText.append("\nNumber of encodings: "+vcCombinations.length);
             }
         });
-        for(VideoConstraints vc: vcCombinations) {
+        for (VideoConstraints vc: vcCombinations) {
             final String settings = vc.getSettings();
             runOnUiThread(new Runnable() {
                 @Override
@@ -168,57 +163,57 @@ public class MainActivity extends AppCompatActivity {
 
         if (getInstrumentedTest()) {
             //Check if there are settings
-            if(mExtraDataHashMap.containsKey("resolutions")) {
+            if (mExtraDataHashMap.containsKey("resolutions")) {
                 String data = mExtraDataHashMap.get("resolutions");
                 resolutions = data.split(",");
             }
-            if(mExtraDataHashMap.containsKey("encoders")) {
+            if (mExtraDataHashMap.containsKey("encoders")) {
                 String data = mExtraDataHashMap.get("encoders");
                 encoders = data.split(",");
             }
-            if(mExtraDataHashMap.containsKey("bitrates")) {
+            if (mExtraDataHashMap.containsKey("bitrates")) {
                 String data = mExtraDataHashMap.get("bitrates");
                 bitrates = data.split(",");
             }
-            if(mExtraDataHashMap.containsKey("res")) {
+            if (mExtraDataHashMap.containsKey("res")) {
                 String data = mExtraDataHashMap.get("res");
                 Size videoSize = SizeUtils.parseXString(data);
                 mDefaultWidth = videoSize.getWidth();
                 mDefaultHeight = videoSize.getHeight();
             }
-            if(mExtraDataHashMap.containsKey("keys")) {
+            if (mExtraDataHashMap.containsKey("keys")) {
                 String data = mExtraDataHashMap.get("keys");
                 keys = data.split(",");
             }
 
         }
 
-        VideoConstraints[] allVideoConstrs = new VideoConstraints[encoders.length * bitrates.length * resolutions.length * keys.length];
+        VideoConstraints[] allVideoConstraints = new VideoConstraints[encoders.length * bitrates.length * resolutions.length * keys.length];
         int index = 0;
         for (int kC = 0; kC < keys.length; kC++) {
             for (int eC = 0; eC < encoders.length; eC++) {
                 for (int bC = 0; bC < bitrates.length; bC++) {
                     for (int vC = 0; vC < resolutions.length; vC++) {
-                        VideoConstraints contraints = new VideoConstraints();
+                        VideoConstraints constraints = new VideoConstraints();
                         Size videoSize = SizeUtils.parseXString(resolutions[vC]);
 
-                        contraints.setVideoSize(videoSize);
-                        contraints.setVideoScaleSize(mVideoSize);
+                        constraints.setVideoSize(videoSize);
+                        constraints.setVideoScaleSize(mVideoSize);
 
                         float bitRate = Float.parseFloat(bitrates[bC]) * 1000;
-                        contraints.setBitRate(Math.round(bitRate));
+                        constraints.setBitRate(Math.round(bitRate));
 
                         int keyFrameInterval = Integer.parseInt(keys[kC]);
                         Log.d(TAG, kC + " Set key frame interval to "+keyFrameInterval+" res: "+videoSize+", bitr: "+bitRate);
-                        contraints.setKeyframeRate(keyFrameInterval);
+                        constraints.setKeyframeRate(keyFrameInterval);
                         int fps = (mExtraDataHashMap.get("fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("fps")) : 30;
-                        contraints.setFPS(fps);
+                        constraints.setFPS(fps);
                         int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
-                        contraints.setReferenceFPS(ref_fps);
+                        constraints.setReferenceFPS(ref_fps);
                         int ltrCount = (mExtraDataHashMap.get("ltrc") != null) ? Integer.parseInt(mExtraDataHashMap.get("ltrc")) : 6;
-                        contraints.setLTRCount(ltrCount);
+                        constraints.setLTRCount(ltrCount);
                         int hierLayerCount = (mExtraDataHashMap.get("hierl") != null) ? Integer.parseInt(mExtraDataHashMap.get("hierl")) : 0;
-                        contraints.setHierStructLayerCount(hierLayerCount);
+                        constraints.setHierStructLayerCount(hierLayerCount);
                         //Mime is parsed from the position in the
                         String[] encs = getResources().getStringArray(R.array.codecs_array);
                         String[] matching_mimes = getResources().getStringArray(R.array.mime_array);
@@ -232,27 +227,26 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
 
-                        contraints.setVideoEncoderMime(codecMime);
+                        constraints.setVideoEncoderMime(codecMime);
 
                         //Check for mode
-                        contraints.setConstantBitrate(false);
+                        constraints.setConstantBitrate(false);
 
                         if (mExtraDataHashMap.containsKey("mode")) {
                             String mode = mExtraDataHashMap.get("mode");
                             if (mode.equals("cbr")) {
                                 Log.d(TAG, "Set cbr!");
-                                contraints.setConstantBitrate(true);
+                                constraints.setConstantBitrate(true);
                             }
                         }
                         boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) ? Boolean.parseBoolean( mExtraDataHashMap.get("skip_frames")) : false;
-                        contraints.setSkipFrames(keySkipFrames);
-                        allVideoConstrs[index++] = contraints;
+                        constraints.setSkipFrames(keySkipFrames);
+                        allVideoConstraints[index++] = constraints;
                     }
                 }
             }
         }
 
-        return allVideoConstrs;
+        return allVideoConstraints;
     }
-
 }
