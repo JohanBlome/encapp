@@ -107,16 +107,16 @@ public class MainActivity extends AppCompatActivity {
                     logText.append("-- List supported codecs --\n\n");
                     for (MediaCodecInfo info: codecInfos) {
                         if (info.isEncoder()) {
-                            //TODO: from Android 10 (api 29) we can check if hw or sw codec
-                            logText.append("\n"+info.getName()+"\n");
-                            Log.d(TAG, "Codec: " + info.getName());
+                            // TODO: from Android 10 (api 29) we can check
+                            // codec type (hw or sw codec)
+                            StringBuilder str = new StringBuilder("Codec: ");
+                            str.append(info.getName());
                             String[] types = info.getSupportedTypes();
-                            for(String tp: types) {
-                                logText.append("  --" + tp + "\n");
-                                Log.d(TAG, " sup type: " + tp);
+                            for (String tp: types) {
+                                str.append(" type: " + tp);
                             }
-
-
+                            logText.append("\n" + str + "\n");
+                            Log.d(TAG, str.toString());
                         }
                     }
                 }
