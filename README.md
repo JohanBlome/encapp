@@ -76,6 +76,12 @@ instrumentation:com.facebook.encapp.test/android.support.test.runner.AndroidJUni
 ```
 
 Run the `list_codecs` function.
+
+Note that, for the very first time you run the instrumentation codecs, the
+device will ask you for permission to access to `/sdcard/`.
+
+Figure 1 shows ![an android device asking for permission to run encapp](encapp_permission.jpeg)
+
 ```
 $ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
 INSTRUMENTATION_STATUS: class=com.facebook.encapp.CodecValidationInstrumentedTest
@@ -135,58 +141,15 @@ $ adb logcat |grep encapp |grep Codec:
 
 (5) run a quick encoding experiment with the app
 
+First, choose one of the codecs from step 4.
+
 Prepare the device with an actual file:
 ```
 $ wget http://www.sunrayimage.com/download/image_examples/yuv420/tulips_yuv420_prog_planar_qcif.yuv
 $ adb push tulips_yuv420_prog_planar_qcif.yuv /sdcard/
-$ ./gradlew clean
-$ ./gradlew build
-$ ./gradlew uninstallAll; ./gradlew uninstallRelease; ./gradlew uninstallDebugAndroidTest
-$ ./gradlew installDebug; ./gradlew installDebugAndroidTest
-$ adb shell pm list instrumentation |grep encapp
-instrumentation:com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner (target=com.facebook.encapp)
-
 ```
 
-Check the list of codecs of your android device:
-```
-$ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
-...
-11-13 12:33:24.749  9532  9532 D encapp  : Codec: c2.android.aac.encoder type: audio/mp4a-latm
-11-13 12:33:24.749  9532  9532 D encapp  : Codec: OMX.google.aac.encoder type: audio/mp4a-latm
-11-13 12:33:24.749  9532  9532 D encapp  : Codec: c2.android.amrnb.encoder type: audio/3gpp
-11-13 12:33:24.749  9532  9532 D encapp  : Codec: OMX.google.amrnb.encoder type: audio/3gpp
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: c2.android.amrwb.encoder type: audio/amr-wb
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: OMX.google.amrwb.encoder type: audio/amr-wb
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: c2.android.flac.encoder type: audio/flac
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: OMX.google.flac.encoder type: audio/flac
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: c2.android.opus.encoder type: audio/opus
-11-13 12:33:24.750  9532  9532 D encapp  : Codec: c2.qti.avc.encoder type: video/avc
-11-13 12:33:24.751  9532  9532 D encapp  : Codec: OMX.qcom.video.encoder.avc type: video/avc
-11-13 12:33:24.751  9532  9532 D encapp  : Codec: c2.qti.hevc.encoder type: video/hevc
-11-13 12:33:24.751  9532  9532 D encapp  : Codec: OMX.qcom.video.encoder.hevc type: video/hevc
-11-13 12:33:24.751  9532  9532 D encapp  : Codec: c2.qti.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:33:24.751  9532  9532 D encapp  : Codec: OMX.qcom.video.encoder.vp8 type: video/x-vnd.on2.vp8
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: c2.android.avc.encoder type: video/avc
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: OMX.google.h264.encoder type: video/avc
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: c2.android.h263.encoder type: video/3gpp
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: OMX.google.h263.encoder type: video/3gpp
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: c2.android.hevc.encoder type: video/hevc
-11-13 12:33:24.752  9532  9532 D encapp  : Codec: c2.android.mpeg4.encoder type: video/mp4v-es
-11-13 12:33:24.753  9532  9532 D encapp  : Codec: OMX.google.mpeg4.encoder type: video/mp4v-es
-11-13 12:33:24.753  9532  9532 D encapp  : Codec: c2.android.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:33:24.753  9532  9532 D encapp  : Codec: OMX.google.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:33:24.753  9532  9532 D encapp  : Codec: c2.android.vp9.encoder type: video/x-vnd.on2.vp9
-11-13 12:33:24.753  9532  9532 D encapp  : Codec: OMX.google.vp9.encoder type: video/x-vnd.on2.vp9
-...
-```
-
-Note that, for the very first time you run the instrumentation codecs, the
-device will ask you for permission to access to `/sdcard/`.
-
-Figure 1 shows ![an android device asking for permission to run encapp](encapp_permission.jpeg)
-
-Now run the vp8 encoder:
+Now run the vp8 encoder (`OMX.google.vp8.encoder`):
 ```
 $ adb shell am instrument -w -r -e key 10 -e encl OMX.google.vp8.encoder -e file /sdcard/tulips_yuv420_prog_planar_qcif.yuv -e test_timeout 20 -e resl 176x144 -e bitl 100 -e skfr false -e debug false -e ltrc 1 -e mode cbr -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
 ...
