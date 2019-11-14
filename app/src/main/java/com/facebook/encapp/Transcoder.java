@@ -87,7 +87,10 @@ class Transcoder {
             Vector<MediaCodecInfo> matching = new Vector<>();
             for (MediaCodecInfo info: codecInfos) {
                 if (info.isEncoder() && info.getName().toLowerCase().contains(id.toLowerCase())) {
-                    matching.add(info);
+                    if (info.getSupportedTypes().length > 0 &&
+                            info.getSupportedTypes()[0].toLowerCase().contains("video")) {
+                        matching.add(info);
+                    }
                 }
             }
             if (matching.size() > 1) {

@@ -115,8 +115,10 @@ public class MainActivity extends AppCompatActivity {
                             for (String tp: types) {
                                 str.append(" type: " + tp);
                             }
-                            logText.append("\n" + str + "\n");
-                            Log.d(TAG, str.toString());
+                            if (str.toString().toLowerCase().contains("video")) {
+                                logText.append("\n" + str);
+                                Log.d(TAG, str.toString());
+                            }
                         }
                     }
                 }
