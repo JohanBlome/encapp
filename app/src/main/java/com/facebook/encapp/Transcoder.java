@@ -75,29 +75,37 @@ class Transcoder {
 
             getNextLimit(0);
         }
-        MediaFormat format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
-        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        String id = vc.getVideoEncoderIdentifier();
-        for (MediaCodecInfo info: codecInfos) {
-            if (info.isEncoder() && info.getName().contains(vc.getVideoEncoderIdentifier())) {
-                Log.d(TAG, "Found a candidate");
-                id = info.getSupportedTypes()[0];
-            }
-        }
+        MediaFormat format = null;
         try {
-            try {
-                Log.d(TAG, "Create codec by name: "+vc.getVideoEncoderIdentifier());
-                mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
+            mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderIdentifier());
+           try {
+                if (vc.getVideoEncoderIdentifier().length() > 6) { //Should not be any short names
+                    Log.d(TAG, "Create codec by name: " + vc.getVideoEncoderIdentifier());
+                    mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
+                }
 
             }
             catch (Exception ex) {
-                Log.e(TAG, "Configure by type name: "+ex.getMessage() +
-                         ", try by type: "+id);
-                mCodec = MediaCodec.createEncoderByType(id);
+                Log.e(TAG, "Failed to create Codec by name."+ex.getMessage());
             }
 
+            MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+
+            MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+            String id = vc.getVideoEncoderIdentifier();
+            for (MediaCodecInfo info: codecInfos) {
+                if (info.isEncoder() && info.getName().contains(id)) {
+                    id = info.getSupportedTypes()[0];
+                    //Update format with this mime
+                    vc.setVideoEncoderIdentifier(id);
+                }
+            }
+            if (mCodec == null) {
+                Log.e(TAG,"Try by type: "+id);
+                mCodec = MediaCodec.createEncoderByType(id);
+            }
+            format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             if (mUseLTR) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }

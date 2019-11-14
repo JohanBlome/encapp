@@ -201,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
     private VideoConstraints[] gatherUserSelectionsOnAllResolutions() {
         String[] bitrates = getResources().getStringArray(R.array.bitrate_array);
         String[] resolutions = getResources().getStringArray(R.array.resolutions_array);
-        String[] encoders = getResources().getStringArray(R.array.mime_array);
+        String[] encoders = {};
         String[] keys = {(mExtraDataHashMap.get("key") != null) ?mExtraDataHashMap.get("key") : "2"};
 
         if (getInstrumentedTest()) {
@@ -258,7 +258,6 @@ public class MainActivity extends AppCompatActivity {
                         int hierLayerCount = (mExtraDataHashMap.get("hierl") != null) ? Integer.parseInt(mExtraDataHashMap.get("hierl")) : 0;
                         constraints.setHierStructLayerCount(hierLayerCount);
                         constraints.setVideoEncoderIdentifier(encoders[eC]);
-
                         //Check for mode
                         constraints.setConstantBitrate(false);
 
@@ -279,4 +278,5 @@ public class MainActivity extends AppCompatActivity {
 
         return allVideoConstraints;
     }
+
 }
