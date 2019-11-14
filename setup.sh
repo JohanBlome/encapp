@@ -11,6 +11,7 @@ cd ${scriptDir}
 ./gradlew uninstallAll
 ./gradlew uninstallRelease
 ./gradlew uninstallDebugAndroidTest
+./gradlew clean
 
 #check ndk path
 ndkpath=$(cat local.properties | grep -E 'ndk.dir' | grep -Eo '\/+*\/+.*')
@@ -21,6 +22,7 @@ if [[ ! $ndkpath ]]; then
 else
 	echo "ndk.dir=${ndkpath}"
 fi
+./gradlew build
 ./gradlew installDebugAndroidTest
 ./gradlew installDebug
 cd $currentDir
