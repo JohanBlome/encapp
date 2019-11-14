@@ -13,7 +13,7 @@ import java.nio.ByteBuffer;
 import java.util.Stack;
 import java.util.Vector;
 
-import static junit.framework.Assert.assertTrue;
+import java.util.regex.Pattern;
 
 /**
  * Created by jobl on 2018-02-27.
@@ -109,6 +109,7 @@ class Transcoder {
 
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
+            Log.d(TAG, "Done");
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             if (mUseLTR) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
@@ -162,8 +163,9 @@ class Transcoder {
 
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         MediaMuxer muxer = null;
-        boolean isVP8 = mCodec.getCodecInfo().getName().toLowerCase().contains("vp8");
-        if (isVP8) {
+
+        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase().contains(".vp");
+        if (isVP) {
             MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
             oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
@@ -180,7 +182,7 @@ class Transcoder {
                     if (index >= 0) {
                         int size = -1;
                         boolean eos = (inFramesCount == totalFrames - 1);
-                        if (isVP8 && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
+                        if (isVP && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
                             Bundle params = new Bundle();
                             params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
                             mCodec.setParameters(params);

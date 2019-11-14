@@ -29,8 +29,8 @@ hierplayers="" #
 test_length="" #test length in secs
 rawfile="" #raw file to be used
 extra_descr="" #A description used to name the directory to place data
-
-
+#Some codecs need nv12 and some yuv420p
+pix_fmt="nv12"
 
 #dynamic parameters
 #key-x request key frame at x
@@ -50,13 +50,20 @@ extra_descr="" #A description used to name the directory to place data
 #Dynamic ltr with only two iframes
 #  dynamic="ltrm-10-1:ltru-11-1:key-30-0:ltrm-60-0:ltru-61-0:ltrm-90-0:ltru-91-0"
 
+function find_files {
+  file_list=$(adb shell ls /sdcard/ | grep -E ".*_[0-9]+fps_[0-9]+x[0-9]+_[0-9]+bps_iint[0-9]+\." | grep -E "\.mp4$|\.webm")
+}
 
 function collect_data {
 	IFS=',' read -ra resolutions_b <<< "${resolutions}"
 	IFS=',' read -ra i_intervals_b <<< "${i_intervals}"
 	IFS=',' read -ra modes_b <<< "${modes}"
 	IFS=',' read -ra codecs_b <<< "${codecs}"
-	adb shell rm /sdcard/omx.*
+  find_files
+  for file in $file_list; do
+     adb shell rm "/sdcard/${file}"
+  done
+
 
 	echo"" > silent.log
 	device_path='/sdcard/'
@@ -92,9 +99,9 @@ function collect_data {
 							ref="${device_path}ref.mp4"
 							adb push resized.yuv ${ref}
 						else
-							ffmpeg -nostats -loglevel 0 -y -f rawvideo -pix_fmt nv12 \
+							ffmpeg -nostats -loglevel 0 -y -f rawvideo -pix_fmt ${pix_fmt} \
 									-s ${raw_resolution} -framerate 30 -i ${rawfile} \
-									-f rawvideo -pix_fmt nv12 -s ${loc_res} \
+									-f rawvideo -pix_fmt ${pix_fmt} -s ${loc_res} \
 									-framerate 30 resized.yuv
 							ref="${device_path}ref.yuv"
 							adb push resized.yuv ${ref}
@@ -118,14 +125,13 @@ function collect_data {
 					adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
 
 				done
-        file_list=$(adb shell ls /sdcard/omx.*)
+        			find_files
 				nbr_files=$(echo $file_list | awk '{print NF}')
 				echo "- Number of files transcoded: $nbr_files - "
-        mkdir ${video_path}
-        for file in $file_list; do
-           echo "Pull $file"
-				   adb pull $file ${video_path}/.
-        done
+				mkdir ${video_path}
+				for file in $file_list; do
+					adb pull "/sdcard/${file}" ${video_path}/.
+				done
 			done
 		done
 	done
