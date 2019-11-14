@@ -115,8 +115,10 @@ public class MainActivity extends AppCompatActivity {
                             for (String tp: types) {
                                 str.append(" type: " + tp);
                             }
-                            logText.append("\n" + str + "\n");
-                            Log.d(TAG, str.toString());
+                            if (str.toString().toLowerCase().contains("video")) {
+                                logText.append("\n" + str);
+                                Log.d(TAG, str.toString());
+                            }
                         }
                     }
                 }
@@ -174,11 +176,13 @@ public class MainActivity extends AppCompatActivity {
             int framesToDecode = (int)(timeout * vc.getFPS());
             Log.d(TAG, "frames to transcode: "+framesToDecode);
             Transcoder transcoder = new Transcoder();
-            if(!transcoder.transcode(vc, filename, framesToDecode, dynamicData)) {
+            final String status = transcoder.transcode(vc, filename, framesToDecode, dynamicData);
+            if(status.length() > 0) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         logText.append("\nEncoding failed: "+settings);
+                        logText.append(status);
                     }
                 });
             } else {

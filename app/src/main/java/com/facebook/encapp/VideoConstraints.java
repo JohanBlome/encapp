@@ -98,7 +98,6 @@ class VideoConstraints {
     }
 
     public String getVideoEncoderIdentifier() {
-        Log.d("encapp", "Reading the encoder identifier: "+ mVideoEncoderIdentifier);
         return mVideoEncoderIdentifier;
     }
 
