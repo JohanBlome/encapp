@@ -182,7 +182,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         logText.append("\nEncoding failed: "+settings);
-                        logText.append(status);
+                        logText.append("\n" + status);
                     }
                 });
             } else {
