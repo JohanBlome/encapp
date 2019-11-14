@@ -78,7 +78,6 @@ class Transcoder {
 
         MediaFormat format = null;
         try {
-            mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderIdentifier());
            try {
                 if (vc.getVideoEncoderIdentifier().length() > 6) { //Should not be any short names
                     Log.d(TAG, "Create codec by name: " + vc.getVideoEncoderIdentifier());
