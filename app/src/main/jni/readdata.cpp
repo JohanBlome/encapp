@@ -13,7 +13,7 @@
 
 FILE *dataFile = NULL;
 
-JNIEXPORT void JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaString) {
+JNIEXPORT bool JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaString) {
     const char *fileName = env->GetStringUTFChars(javaString, 0);
 
     LOGD("opening input file: \"%s\"", fileName);
@@ -24,10 +24,18 @@ JNIEXPORT void JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaStri
     }
 
     env->ReleaseStringUTFChars(javaString, fileName);
+    if (dataFile) {
+        return JNI_TRUE;
+    } else {
+        return JNI_FALSE;
+    }
 }
+
 JNIEXPORT void JNICALL closeFile() {
     LOGD("Close ref file");
-    fclose(dataFile);
+    if (dataFile) {
+        fclose(dataFile);
+    }
 }
 
 JNIEXPORT jint JNICALL fillBuffer(JNIEnv *env, jobject obj_this, jobject outputData, jint size) {
@@ -51,7 +59,7 @@ JNIEXPORT jint JNICALL fillBuffer(JNIEnv *env, jobject obj_this, jobject outputD
 
 static const JNINativeMethod methods[] = {
         {"nativeFillBuffer", "(Ljava/nio/ByteBuffer;I)I", (void *) fillBuffer},
-        {"nativeOpenFile", "(Ljava/lang/String;)V", (void *) openFile},
+        {"nativeOpenFile", "(Ljava/lang/String;)Z", (void *) openFile},
         {"nativeCloseFile", "()V", (void *) closeFile},
 };
 

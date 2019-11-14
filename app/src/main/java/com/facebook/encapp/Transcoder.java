@@ -3,6 +3,8 @@ package com.facebook.encapp;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -47,12 +49,16 @@ class Transcoder {
     int mLTRCount = 0;
     private boolean mUseLTR = false;
 
-    public void transcode (
+    public boolean transcode (
             VideoConstraints vc, String filename, int totalFrames, String dynamic) {
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
-        nativeOpenFile(filename);
+        boolean ok = nativeOpenFile(filename);
+        if(!ok) {
+            Log.e(TAG, "Failed to open yuv file");
+            return false;
+        }
 
         int keyFrameInterval = vc.getKeyframeRate();
 
@@ -70,15 +76,26 @@ class Transcoder {
             getNextLimit(0);
         }
         MediaFormat format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
+        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
+        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+        String id = vc.getVideoEncoderIdentifier();
+        for (MediaCodecInfo info: codecInfos) {
+            if (info.isEncoder() && info.getName().contains(vc.getVideoEncoderIdentifier())) {
+                Log.d(TAG, "Found a candidate");
+                id = info.getSupportedTypes()[0];
+            }
+        }
         try {
             try {
-                mCodec = MediaCodec.createEncoderByType(vc.getVideoEncoderIdentifier());
+                Log.d(TAG, "Create codec by name: "+vc.getVideoEncoderIdentifier());
+                mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
+
             }
             catch (Exception ex) {
-                Log.e(TAG, "Configure by type failed: "+ex.getMessage() +
-                         ", try by name: "+vc.getVideoEncoderIdentifier());
-                mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
+                Log.e(TAG, "Configure by type name: "+ex.getMessage() +
+                         ", try by type: "+id);
+                mCodec = MediaCodec.createEncoderByType(id);
             }
 
             if (mUseLTR) {
@@ -95,17 +112,17 @@ class Transcoder {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: "+iox.getMessage());
-            return;
+            return false;
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: "+cex.getMessage());
-            return;
+            return false;
         }
         try {
             mCodec.start();
         }
         catch(Exception ex){
             Log.e(TAG, "Start failed: "+ex.getMessage());
-            return;
+            return false;
         }
 
         MediaFormat inputFormat = mCodec.getInputFormat();
@@ -215,6 +232,7 @@ class Transcoder {
             Log.d(TAG, "muxer released ");
         }
         nativeCloseFile();
+        return true;
     }
 
 
@@ -350,7 +368,7 @@ class Transcoder {
         return muxer;
     }
 
-    private native void nativeOpenFile(String filename);
+    private native boolean nativeOpenFile(String filename);
 
     private native void nativeCloseFile();
 }

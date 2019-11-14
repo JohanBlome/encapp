@@ -174,13 +174,21 @@ public class MainActivity extends AppCompatActivity {
             int framesToDecode = (int)(timeout * vc.getFPS());
             Log.d(TAG, "frames to transcode: "+framesToDecode);
             Transcoder transcoder = new Transcoder();
-            transcoder.transcode(vc, filename, framesToDecode, dynamicData);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    logText.append("\nDone encoding: "+settings);
-                }
-            });
+            if(!transcoder.transcode(vc, filename, framesToDecode, dynamicData)) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        logText.append("\nEncoding failed: "+settings);
+                    }
+                });
+            } else {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        logText.append("\nDone encoding: " + settings);
+                    }
+                });
+            }
         }
         runOnUiThread(new Runnable() {
             @Override
@@ -249,21 +257,7 @@ public class MainActivity extends AppCompatActivity {
                         constraints.setLTRCount(ltrCount);
                         int hierLayerCount = (mExtraDataHashMap.get("hierl") != null) ? Integer.parseInt(mExtraDataHashMap.get("hierl")) : 0;
                         constraints.setHierStructLayerCount(hierLayerCount);
-                        //Mime is parsed from the position in the
-                        String[] encs = getResources().getStringArray(R.array.codecs_array);
-                        String[] matching_mimes = getResources().getStringArray(R.array.mime_array);
-
-                        String codecIdentifier = encoders[eC];
-                        int c = 0;
-                        for (; c < encs.length; c++) {
-                            Log.d(TAG, "check "+ encs[c] + " vs " + encoders[eC].toUpperCase());
-                            if (encs[c].equals(encoders[eC].toUpperCase())) {
-                                codecIdentifier = matching_mimes[c];
-                                break;
-                            }
-                        }
-
-                        constraints.setVideoEncoderIdentifier(codecIdentifier);
+                        constraints.setVideoEncoderIdentifier(encoders[eC]);
 
                         //Check for mode
                         constraints.setConstantBitrate(false);

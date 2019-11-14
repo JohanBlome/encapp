@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string-array name="codecs_array">
-        <item>H265</item>
-        <item>H264</item>
-        <item>VP8</item>
-        <item>VP9</item>
-    </string-array>
-    <string-array name="mime_array">
-        <item>video/hevc</item>
-        <item>video/avc</item>
-        <item>video/x-vnd.on2.vp8</item>
-        <item>video/x-vnd.on2.vp9</item>
-    </string-array>
     <string-array name="bitrate_array">
         <item>250</item>
         <item>500</item>
