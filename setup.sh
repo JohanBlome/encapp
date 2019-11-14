@@ -7,6 +7,11 @@ export PATH="$PATH:${scriptDir}/scripts:$PATH:${scriptDir}"
 export PYTHONPATH="$PYTHONPATH:${scriptDir}/scripts"
 cd ${scriptDir}
 
+# first clean up old code
+./gradlew uninstallAll
+./gradlew uninstallRelease
+./gradlew uninstallDebugAndroidTest
+
 #check ndk path
 ndkpath=$(cat local.properties | grep -E 'ndk.dir' | grep -Eo '\/+*\/+.*')
 if [[ ! $ndkpath ]]; then
