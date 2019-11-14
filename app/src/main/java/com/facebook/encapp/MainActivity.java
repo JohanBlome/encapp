@@ -174,11 +174,13 @@ public class MainActivity extends AppCompatActivity {
             int framesToDecode = (int)(timeout * vc.getFPS());
             Log.d(TAG, "frames to transcode: "+framesToDecode);
             Transcoder transcoder = new Transcoder();
-            if(!transcoder.transcode(vc, filename, framesToDecode, dynamicData)) {
+            final String status = transcoder.transcode(vc, filename, framesToDecode, dynamicData);
+            if(status.length() > 0) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         logText.append("\nEncoding failed: "+settings);
+                        logText.append(status);
                     }
                 });
             } else {

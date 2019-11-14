@@ -11,6 +11,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Stack;
+import java.util.Vector;
 
 import static junit.framework.Assert.assertTrue;
 
@@ -49,7 +50,7 @@ class Transcoder {
     int mLTRCount = 0;
     private boolean mUseLTR = false;
 
-    public boolean transcode (
+    public String transcode (
             VideoConstraints vc, String filename, int totalFrames, String dynamic) {
         mNextLimit = -1;
         mSkipped = 0;
@@ -57,7 +58,7 @@ class Transcoder {
         boolean ok = nativeOpenFile(filename);
         if(!ok) {
             Log.e(TAG, "Failed to open yuv file");
-            return false;
+            return "";
         }
 
         int keyFrameInterval = vc.getKeyframeRate();
@@ -78,32 +79,33 @@ class Transcoder {
 
         MediaFormat format = null;
         try {
-           try {
-                if (vc.getVideoEncoderIdentifier().length() > 6) { //Should not be any short names
-                    Log.d(TAG, "Create codec by name: " + vc.getVideoEncoderIdentifier());
-                    mCodec = MediaCodec.createByCodecName(vc.getVideoEncoderIdentifier());
-                }
-
-            }
-            catch (Exception ex) {
-                Log.e(TAG, "Failed to create Codec by name."+ex.getMessage());
-            }
-
             MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
             MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
             String id = vc.getVideoEncoderIdentifier();
+            String codecName = "";
+            Vector<MediaCodecInfo> matching = new Vector<>();
             for (MediaCodecInfo info: codecInfos) {
-                if (info.isEncoder() && info.getName().contains(id)) {
-                    id = info.getSupportedTypes()[0];
-                    //Update format with this mime
-                    vc.setVideoEncoderIdentifier(id);
+                if (info.isEncoder() && info.getName().toLowerCase().contains(id.toLowerCase())) {
+                    matching.add(info);
                 }
             }
-            if (mCodec == null) {
-                Log.e(TAG,"Try by type: "+id);
-                mCodec = MediaCodec.createEncoderByType(id);
+            if (matching.size() > 1) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("\nAmbigous codecs \n" + matching.size() + " codecs matching.\n");
+                for(MediaCodecInfo info: matching) {
+                    sb.append(info.getName() + "\n");
+                }
+                return sb.toString();
+            } else if (matching.size() == 0) {
+                return "\nNo matching codecs to : " + id;
+            } else {
+                vc.setVideoEncoderIdentifier(matching.elementAt(0).getSupportedTypes()[0]);
+                codecName = matching.elementAt(0).getName();
             }
+
+            Log.d(TAG, "Create codec by name: " + codecName);
+            mCodec = MediaCodec.createByCodecName(codecName);
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             if (mUseLTR) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
@@ -119,17 +121,18 @@ class Transcoder {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: "+iox.getMessage());
-            return false;
+            return "Failed to create codec";
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: "+cex.getMessage());
-            return false;
+            return "Failed to create codec";
         }
+
         try {
             mCodec.start();
         }
         catch(Exception ex){
             Log.e(TAG, "Start failed: "+ex.getMessage());
-            return false;
+            return "Start encoding failed";
         }
 
         MediaFormat inputFormat = mCodec.getInputFormat();
@@ -239,7 +242,7 @@ class Transcoder {
             Log.d(TAG, "muxer released ");
         }
         nativeCloseFile();
-        return true;
+        return "";
     }
 
 
