@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
      *
      */
     private void performInstrumentedTest() {
-        Log.d(TAG, "Intrumentation test - let us start!");
+        Log.d(TAG, "Instrumentation test - let us start!");
 
 
 
