@@ -265,11 +265,12 @@ public class CodecValidationInstrumentedTest {
     @Test
     public void automateValidation() throws Exception {
         Thread.sleep(LAUNCH_TIMEOUT);
+        Log.d(TAG, "Check search criteria: "+TARGET_PACKAGE);
         SearchCondition<Boolean> isGone =
                 Until.gone(By.res(TARGET_PACKAGE, "tv_testrun"));
-        Log.e(TAG, "Wait for : " + UI_TIMEOUT);
+        Log.e(TAG, "Wait for : " + UI_TIMEOUT + " ms ("+(UI_TIMEOUT/(1000*60.0)) +  " min)");
         mDevice.wait(isGone, UI_TIMEOUT);
-        Log.e(TAG, "Done waiting for : " + UI_TIMEOUT);
+        Log.e(TAG, "Done waiting for : " + UI_TIMEOUT + " test: "+isGone);
         Thread.sleep(LAUNCH_TIMEOUT);
     }
 }

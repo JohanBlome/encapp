@@ -189,11 +189,15 @@ class Transcoder {
                         }
                         ByteBuffer buffer = mCodec.getInputBuffer(index);
                         while (size == -1) {
-                            size = queueInputBufferEncoder(
-                                    mCodec, buffer, index, inFramesCount,
-                                    eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, (int) (stride * vstride * 1.5));
+                            try {
+                                size = queueInputBufferEncoder(
+                                        mCodec, buffer, index, inFramesCount,
+                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, (int) (stride * vstride * 1.5));
 
-                            inFramesCount++;
+                                inFramesCount++;
+                            } catch (IllegalStateException isx) {
+                                Log.e(TAG, "Queue encoder failed, " + index+", eos: "+ eos +", mess: "+isx.getMessage());
+                            }
                         }
                         numBytesSubmitted += size;
                         if (size == 0) break;
