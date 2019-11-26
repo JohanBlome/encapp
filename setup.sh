@@ -26,3 +26,6 @@ fi
 ./gradlew installDebugAndroidTest
 ./gradlew installDebug
 cd $currentDir
+#Run a list of codecs so user can set permissions
+adb shell am instrument  -w -r -e list_codecs a -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+
