@@ -147,9 +147,9 @@ public class MainActivity extends AppCompatActivity {
             timeout = Integer.parseInt(mExtraDataHashMap.get("video_timeout"));
         }
 
-        int refFrameSize = (int)(1280 * 720 * 1.5);
+        Size refFrameSize = new Size(1280,720);
         if (mExtraDataHashMap.containsKey("ref_res")) {
-            refFrameSize = Integer.parseInt(mExtraDataHashMap.get("ref_res"));
+            refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
         }
 
         final TextView logText = (TextView)findViewById(R.id.logText);

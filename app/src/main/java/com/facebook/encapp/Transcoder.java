@@ -7,7 +7,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Bundle;
 import android.util.Log;
-
+import android.util.Size;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Stack;
@@ -43,7 +43,7 @@ class Transcoder {
     private int mNextLimit = -1;
     private int mSkipped = 0;
     private int mFramesAdded = 0;
-    private int mRefFramesize = (int)(1280*720*1.5);
+    private int mRefFramesizeInBytes = (int)(1280 * 720 * 1.5);
 
     private Stack<String> mDynamicSetting = null;
 
@@ -52,11 +52,12 @@ class Transcoder {
     private boolean mUseLTR = false;
 
     public String transcode (
-            VideoConstraints vc, String filename, int refFrameSize, int totalFrames, String dynamic) {
+            VideoConstraints vc, String filename, Size refFrameSize, int totalFrames, String dynamic) {
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
-        mRefFramesize = refFrameSize;
+        mRefFramesizeInBytes = (int)(refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
+
         boolean ok = nativeOpenFile(filename);
         if(!ok) {
             Log.e(TAG, "Failed to open yuv file");
@@ -78,8 +79,7 @@ class Transcoder {
 
             getNextLimit(0);
         }
-
-        MediaFormat format = null;
+        MediaFormat format;
         try {
             MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
@@ -194,7 +194,7 @@ class Transcoder {
                             try {
                                 size = queueInputBufferEncoder(
                                         mCodec, buffer, index, inFramesCount,
-                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, mRefFramesize);
+                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, mRefFramesizeInBytes);
 
                                 inFramesCount++;
                             } catch (IllegalStateException isx) {

@@ -129,7 +129,7 @@ public class CodecValidationInstrumentedTest {
             Log.e(TAG, "RESOLUTION: " + RESOLUTION);
         }
         if (REF_RESOLUTION != null) {
-            mExtraDataHashMap.put("res", REF_RESOLUTION);
+            mExtraDataHashMap.put("ref_res", REF_RESOLUTION);
             Log.e(TAG, "REF_RESOLUTION: " + REF_RESOLUTION);
         }
         if (KEYFRAME != null) {

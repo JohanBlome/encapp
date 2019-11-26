@@ -33,7 +33,7 @@ modes='cbr,vbr'
 #dynamic="bit-100-500:bit-200-2000:"
 #dynamic="bit-1-1200:bit-20-1000:bit-301-1200:bit-320-1000:"
 
-rawfile=$1
+raw_file=$1
 raw_resolution=$2
 test_length=$3
 extra_descr=$4
