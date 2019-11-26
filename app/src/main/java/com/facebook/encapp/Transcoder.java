@@ -43,6 +43,7 @@ class Transcoder {
     private int mNextLimit = -1;
     private int mSkipped = 0;
     private int mFramesAdded = 0;
+    private int mRefFramesize = (int)(1280*720*1.5);
 
     private Stack<String> mDynamicSetting = null;
 
@@ -51,10 +52,11 @@ class Transcoder {
     private boolean mUseLTR = false;
 
     public String transcode (
-            VideoConstraints vc, String filename, int totalFrames, String dynamic) {
+            VideoConstraints vc, String filename, int refFrameSize, int totalFrames, String dynamic) {
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
+        mRefFramesize = refFrameSize;
         boolean ok = nativeOpenFile(filename);
         if(!ok) {
             Log.e(TAG, "Failed to open yuv file");
@@ -160,7 +162,6 @@ class Transcoder {
         mKeepInterval = mReferenceFrameRate / (float)mFrameRate;
         int mPts = 132;
         calculateFrameTiming();
-
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         MediaMuxer muxer = null;
 
@@ -169,6 +170,7 @@ class Transcoder {
             MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
             oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+            oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             Log.d(TAG, "Call create muxer");
             muxer = createMuxer(mCodec, oformat);
         }
@@ -192,7 +194,7 @@ class Transcoder {
                             try {
                                 size = queueInputBufferEncoder(
                                         mCodec, buffer, index, inFramesCount,
-                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, (int) (stride * vstride * 1.5));
+                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, mRefFramesize);
 
                                 inFramesCount++;
                             } catch (IllegalStateException isx) {
@@ -218,6 +220,7 @@ class Transcoder {
                         //There seems to be a bug so that this key is no set (but used).
                         oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                         oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
+                        oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
                         muxer = createMuxer(mCodec, oformat);
                         mCodec.releaseOutputBuffer(index, false /* render */);
                     } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -231,7 +234,6 @@ class Transcoder {
                         ++outFramesCount;
 
                         muxer.writeSampleData(0, data, info);
-                        Log.d(TAG, "Wrote to muxer, release: " + index);
                         mCodec.releaseOutputBuffer(index, false /* render */);
                     }
                 }
@@ -267,8 +269,9 @@ class Transcoder {
         buffer.clear();
 
         int read = nativeFillBuffer(buffer, size);
-        int currentFrameNbr = (int)((float)(frameCount % mFrameRate) / mKeepInterval);
-        int nextFrameNbr = (int)((float)((frameCount + 1) % mFrameRate) / mKeepInterval);
+        int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
+        Log.d(TAG, "currentFrameNbr: " + currentFrameNbr);
+        int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr) {
             read = -1; //Skip this and read again
             mSkipped++;
@@ -354,22 +357,24 @@ class Transcoder {
     private MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format) {
         MediaMuxer muxer = null;
         Log.d(TAG, "Bitrate mode: "+(format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
-        String filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d.mp4",
+        String filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
             encoder.getCodecInfo().getName().toLowerCase(),
                 (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
                 (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
                 (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
                 (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0));
+                (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
+                (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
-            filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d.webm",
+            filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
             encoder.getCodecInfo().getName().toLowerCase(),
                     (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
                     (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
                     (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
                     (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0));
+                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
+                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {

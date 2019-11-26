@@ -33,8 +33,8 @@ class VideoConstraints {
     //Bitrate mode 3,4 is
     //OMX_Video_ControlRateVariableSkipFrames,
     //OMX_Video_ControlRateConstantSkipFrames,
-    public static int BITRATE_MODE_VBR_SKIP_FRAMES = 3;
-    public static int BITRATE_MODE_CBR_SKIP_FRAMES = 4;
+    public static final int BITRATE_MODE_VBR_SKIP_FRAMES = 3;
+    public static final int BITRATE_MODE_CBR_SKIP_FRAMES = 4;
 
     private int mProfile = -1;
     private int mProfileLevel = -1;
@@ -57,15 +57,6 @@ class VideoConstraints {
     public Size getVideoSize() {
         return mVideoSize;
     }
-
-    public void setVideoScaleSize(Size videoSize) {
-        this.mVideoScaleSize = videoSize;
-    }
-
-    public Size getVideoScalingSize() {
-        return mVideoScaleSize;
-    }
-
 
     // Keyframe rate
     public void setKeyframeRate(int keyframeRate) {
@@ -177,7 +168,10 @@ class VideoConstraints {
         encoderFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, mBitrateMode);
         encoderFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, getKeyframeRate());
 
-        Log.d("Transcoder", "Create mode: br="+getBitRate()+", mode="+getmBitrateMode()+", fps="+getFPS()+", i int="+getKeyframeRate());
+        Log.d("Transcoder", "Create mode: br="+getBitRate() +
+                ", mode=" + getmBitrateMode() +
+                ", fps="+getFPS() +
+                ", i int="+getKeyframeRate() + " sec");
         return encoderFormat;
     }
 
@@ -192,6 +186,31 @@ class VideoConstraints {
     }
 
     public String getSettings() {
-        return this.getVideoEncoderIdentifier()+", "+mVideoSize+", "+ mBitRate+", "+mBitrateMode;
+        return this.getVideoEncoderIdentifier() + ", " +
+                    mVideoSize + ", " +
+                    mBitRate + " kbps, " +
+                    bitrateModeName() + ", " +
+                    mFPS + " fps, key int:" +
+                    mKeyframeRate;
+    }
+
+    String bitrateModeName() {
+        switch(mBitrateMode) {
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ:
+                return "BITRATE_MODE_CQ";
+
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR:
+                return "BITRATE_MODE_VBR";
+
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR:
+                return "BITRATE_MODE_CBR";
+
+            case BITRATE_MODE_VBR_SKIP_FRAMES:
+                return "BITRATE_MODE_VBR_SKIP_FRAMES";
+
+            case BITRATE_MODE_CBR_SKIP_FRAMES:
+                return "BITRATE_MODE_CBR_SKIP_FRAMES";
+        }
+        return "Unknown bitrate mode: " + mBitrateMode;
     }
 }

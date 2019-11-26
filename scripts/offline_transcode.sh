@@ -14,7 +14,7 @@
 mime_hevc='omx.qcom.video.encoder.hevc'
 mime_vp8='omx.qcom.video.encoder.vp8'
 mime_avc='omx.qcom.video.encoder.avc'
-time=$(date +'%F_%T')
+time=$(date +'%F_%H-%M-%S')
 
 
 # Settings
@@ -31,6 +31,7 @@ rawfile="" #raw file to be used
 extra_descr="" #A description used to name the directory to place data
 #Some codecs need nv12 and some yuv420p
 pix_fmt="nv12"
+fps='30'
 
 #dynamic parameters
 #key-x request key frame at x
@@ -51,91 +52,65 @@ pix_fmt="nv12"
 #  dynamic="ltrm-10-1:ltru-11-1:key-30-0:ltrm-60-0:ltru-61-0:ltrm-90-0:ltru-91-0"
 
 function find_files {
-  file_list=$(adb shell ls /sdcard/ | grep -E ".*_[0-9]+fps_[0-9]+x[0-9]+_[0-9]+bps_iint[0-9]+\." | grep -E "\.mp4$|\.webm")
+  file_list=$(adb shell ls /sdcard/ | grep -E ".*_[0-9]+fps_[0-9]+x[0-9]+_[0-9]+bps_iint[0-9]+_m[0-9]\." | grep -E "\.mp4$|\.webm")
 }
 
 function collect_data {
-	IFS=',' read -ra resolutions_b <<< "${resolutions}"
-	IFS=',' read -ra i_intervals_b <<< "${i_intervals}"
-	IFS=',' read -ra modes_b <<< "${modes}"
-	IFS=',' read -ra codecs_b <<< "${codecs}"
   find_files
   for file in $file_list; do
      adb shell rm "/sdcard/${file}"
   done
+    echo"" > silent.log
+    device_path="/sdcard/${rawfile##*/}"
+    if [ "${extra_desc}" ] ; then
+        workdir="${extra_descr}_${time}"
+    else
+        workdir="${extra_descr}_${time}"
+    fi
+    echo "*****"
+    echo "${workdir}"
+    mkdir "${workdir}"
+    video_path="${workdir}/video"
+    tmp_path="${workdir}/tmp"
+    output_path="${workdir}/output"
 
+    adb push ${rawfile} ${device_path}
 
-	echo"" > silent.log
-	device_path='/sdcard/'
-	for encoding in "${codecs_b[@]}"; do
-		for vbr_cbr in "${modes_b[@]}"; do
-			for i_int in "${i_intervals_b[@]}"; do
-				if [ "${extra_desc}" ] ; then
-					workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
-				else
-					workdir="${extra_descr}_${encoding}_${vbr_cbr}_${time}_${i_int}s"
-				fi
-				echo "*****"
+    gen="-e file ${device_path} -e test_timeout 20 "
+    gen+="-e video_timeout ${test_length} "
+    gen+="-e res ${resolutions} "
+    gen+="-e ref_res ${raw_resolution} "
+    gen+="-e bit ${bitrates} "
+    gen+="-e fps ${fps} "
+    gen+="-e enc ${codecs} "
+    gen+="-e modl ${modes} "
+    gen+="-e key ${i_intervals} "
+    gen+="-e skfr false "
+    gen+="-e debug false "
+    args=" -w -r ${gen} -e ltrc 1"
 
-				mkdir "${workdir}"
-				video_path="${workdir}/video"
-				tmp_path="${workdir}/tmp"
-				output_path="${workdir}/output"
+    if [[ $vbr_cbr == "cbr" ]] ; then
+        args="${args} -e mode cbr "
+    fi
 
-				for loc_res in "${resolutions_b[@]}"; do
-					if [[ $loc_res == $raw_resolution ]]; then
-						if [[ $rawfile == *.mp4 ]]; then
-							ref="${device_path}ref.mp4"
-							adb push $rawfile ${ref}
-						else
-							ref="${device_path}ref.yuv"
-							adb push $rawfile ${ref}
-						fi
-					else
-						echo "Do resize"
-						if [[ $rawfile == *.mp4 ]]; then
-							ffmpeg -nostats -loglevel 0 -y -i ${rawfile} -s ${loc_res} \
-									resized.yuv
-							ref="${device_path}ref.mp4"
-							adb push resized.yuv ${ref}
-						else
-							ffmpeg -nostats -loglevel 0 -y -f rawvideo -pix_fmt ${pix_fmt} \
-									-s ${raw_resolution} -framerate 30 -i ${rawfile} \
-									-f rawvideo -pix_fmt ${pix_fmt} -s ${loc_res} \
-									-framerate 30 resized.yuv
-							ref="${device_path}ref.yuv"
-							adb push resized.yuv ${ref}
-						fi
-					fi
-					gen="-e file ${ref} -e test_timeout 20 -e video_timeout ${test_length} -e res ${loc_res} -e resl ${loc_res} -e bitl ${bitrates} -e skfr false -e debug false"
-					args=" -w -r -e key ${i_int} -e encl ${encoding} ${gen} -e ltrc 1"
-					if [[ $vbr_cbr == "cbr" ]] ; then
-						args="${args} -e mode cbr "
-					fi
+    if [ ${dynamic} ] ; then
+        args="${args} -e dyn ${dynamic}"
+    fi
 
-					if [ ${dynamic} ] ; then
-						args="${args} -e dyn ${dynamic}"
-					fi
+    if [ ${hierplayers} ] ; then
+        args="${args} -e hierl ${hierplayers}"
+    fi
 
-					if [ ${hierplayers} ] ; then
-						args="${args} -e hierl ${hierplayers}"
-					fi
+    echo "adb shell am instrument ${args} -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner"
+    adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
 
-					echo "adb shell am instrument ${args} -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner"
-					adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
+    find_files
+    nbr_files=$(echo $file_list | awk '{print NF}')
+    echo "- Number of files transcoded: $nbr_files - "
+    mkdir ${video_path}
+    for file in $file_list; do
+        adb pull "/sdcard/${file}" ${video_path}/.
+    done
 
-				done
-        			find_files
-				nbr_files=$(echo $file_list | awk '{print NF}')
-				echo "- Number of files transcoded: $nbr_files - "
-				mkdir ${video_path}
-				for file in $file_list; do
-					adb pull "/sdcard/${file}" ${video_path}/.
-				done
-			done
-		done
-	done
-	#rm resized.yuv
-	#adb shell rm /sdcard/ref.yuv
-	echo " - done -"
+    echo " - done -"
 }

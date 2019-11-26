@@ -35,25 +35,24 @@ import static org.junit.Assert.*;
  * -w
  * -e class com.facebook.codecvalidate.com.facebook.encapp.CodecValidationInstrumentedTest
  * com.facebook.codecvalidate.test/android.support.test.runner.AndroidJUnitRunner
- *
+ * <p>
  * Provide any of the following arguments for a custom test run. Examples below:
  * -e test_timeout 60 (Predicted test duration in minutes, default is 60 minutes.
- *                     If the test is predicted to run longer than 1 hour, increase this timeout.)
+ * If the test is predicted to run longer than 1 hour, increase this timeout.)
  * -e video_timeout 20 (In seconds, default is 20 seconds.
- *                      Each video combination will play as long as this timeout.)
+ * Each video combination will play as long as this timeout.)
  * -e key 2 (Keyframe interval. Default = 2)
  * -e fps 30 (Frame Rate. Default = 30)
- * -e scal 1 (0 = do not enable upscaling. Default = 0)
- * -e write 1 (0 = do not save output video files in /sdcard/DCIM/. Default = 0)
  * -e file Download/video_name (Absolute path from sdcard/ to video file to be played)
  * -e run all (all = run all combinations of encoder, bitrate and resolution, default.
- *             single = run one single video combination only.)
- *
+ * single = run one single video combination only.) //TODO: fix
+ * <p>
  * Used for 'single' video run only in combination with above arguments:
  * -e enc H265 (Encoder)
  * -e bit 250 (Bit Rate)
  * -e res 480x384 (Video size)
  * <p>
+ *
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 @RunWith(AndroidJUnit4.class)
@@ -65,28 +64,22 @@ public class CodecValidationInstrumentedTest {
 
     private static final String TARGET_PACKAGE =
             InstrumentationRegistry.getTargetContext().getPackageName();
-    private static final String MULTIPLE_TEST =
-            InstrumentationRegistry.getArguments().getString("multiple-test");
     private static final String MODE =
-            InstrumentationRegistry.getArguments().getString("mode");
+            InstrumentationRegistry.getArguments().getString("mod");
     private static final String ENCODER =
             InstrumentationRegistry.getArguments().getString("enc");
     private static final String BITRATE =
             InstrumentationRegistry.getArguments().getString("bit");
+    private static final String REF_RESOLUTION =
+            InstrumentationRegistry.getArguments().getString("ref_res");
     private static final String RESOLUTION =
             InstrumentationRegistry.getArguments().getString("res");
     private static final String KEYFRAME =
             InstrumentationRegistry.getArguments().getString("key");
-    private static final String KEYFRAMES =
-            InstrumentationRegistry.getArguments().getString("keys");
     private static final String REF_FPS =
             InstrumentationRegistry.getArguments().getString("ref_fps");
     private static final String FPS =
             InstrumentationRegistry.getArguments().getString("fps");
-    private static final String RUN_WITH_METRICS =
-            InstrumentationRegistry.getArguments().getString("met");
-    private static final String ENABLE_UPSCALING =
-            InstrumentationRegistry.getArguments().getString("scal");
     private static final String WRITE_FILE =
             InstrumentationRegistry.getArguments().getString("write");
     private static final String RUN =
@@ -97,12 +90,6 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("test_timeout");
     private static final String VIDEO_TIMEOUT =
             InstrumentationRegistry.getArguments().getString("video_timeout");
-    private static final String RESOLUTIONS =
-            InstrumentationRegistry.getArguments().getString("resl");
-    private static final String BITRATES =
-            InstrumentationRegistry.getArguments().getString("bitl");
-    private static final String ENCODERS =
-            InstrumentationRegistry.getArguments().getString("encl");
     private static final String SKIPFRAMES =
             InstrumentationRegistry.getArguments().getString("skfr");
     private static final String DYNAMIC =
@@ -125,12 +112,8 @@ public class CodecValidationInstrumentedTest {
      */
     public void collectExtraData() {
         mExtraDataHashMap = new HashMap<String, String>();
-        if (MULTIPLE_TEST != null) {
-            mExtraDataHashMap.put("multiple_test", MULTIPLE_TEST);
-            Log.e(TAG, "multiple_test: " + MULTIPLE_TEST);
-        }
         if (MODE != null) {
-            mExtraDataHashMap.put("mode", MODE);
+            mExtraDataHashMap.put("mod", MODE);
             Log.e(TAG, "MODE: " + MODE);
         }
         if (ENCODER != null) {
@@ -145,13 +128,13 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("res", RESOLUTION);
             Log.e(TAG, "RESOLUTION: " + RESOLUTION);
         }
+        if (REF_RESOLUTION != null) {
+            mExtraDataHashMap.put("res", REF_RESOLUTION);
+            Log.e(TAG, "REF_RESOLUTION: " + REF_RESOLUTION);
+        }
         if (KEYFRAME != null) {
             mExtraDataHashMap.put("key", KEYFRAME);
             Log.e(TAG, "KEYFRAME: " + KEYFRAME);
-        }
-        if (KEYFRAMES != null) {
-            mExtraDataHashMap.put("keys", KEYFRAMES);
-            Log.e(TAG, "KEYFRAME: " + KEYFRAMES);
         }
         if (FPS != null) {
             mExtraDataHashMap.put("fps", FPS);
@@ -161,14 +144,6 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("ref_fps", FPS);
             Log.e(TAG, "REF_FPS: " + REF_FPS);
         }
-        if (RUN_WITH_METRICS != null) {
-            mExtraDataHashMap.put("met", RUN_WITH_METRICS);
-            Log.e(TAG, "RUN_WITH_METRICS: " + RUN_WITH_METRICS);
-        }
-        if (ENABLE_UPSCALING != null) {
-            mExtraDataHashMap.put("scal", ENABLE_UPSCALING);
-            Log.e(TAG, "ENABLE_UPSCALING: " + ENABLE_UPSCALING);
-        }
         if (WRITE_FILE != null) {
             mExtraDataHashMap.put("write", WRITE_FILE);
             Log.e(TAG, "WRITE_FILE: " + WRITE_FILE);
@@ -176,18 +151,6 @@ public class CodecValidationInstrumentedTest {
         if (RUN != null) {
             mExtraDataHashMap.put("run", RUN);
             Log.e(TAG, "RUN: " + RUN);
-        }
-        if (ENCODERS != null) {
-            mExtraDataHashMap.put("encoders", ENCODERS);
-            Log.d(TAG, "Encoders: " + ENCODERS);
-        }
-        if (RESOLUTIONS != null) {
-            mExtraDataHashMap.put("resolutions", RESOLUTIONS);
-            Log.d(TAG, "Resolutions: " + RESOLUTIONS);
-        }
-        if (BITRATES != null) {
-            mExtraDataHashMap.put("bitrates", BITRATES);
-            Log.d(TAG, "Bitrates: " + BITRATES);
         }
         if (VIDEO_TIMEOUT != null) {
             mExtraDataHashMap.put("video_timeout", VIDEO_TIMEOUT);
@@ -206,7 +169,7 @@ public class CodecValidationInstrumentedTest {
             Log.e(TAG, "Ltr count: " + LTR_COUNT);
         }
         if (HIER_STRUCT_LAYER_COUNT != null) {
-            mExtraDataHashMap.put("hierl",HIER_STRUCT_LAYER_COUNT );
+            mExtraDataHashMap.put("hierl", HIER_STRUCT_LAYER_COUNT);
             Log.e(TAG, "Hier p struct layer count: " + HIER_STRUCT_LAYER_COUNT);
         }
         if (FILE != null) {
@@ -265,12 +228,12 @@ public class CodecValidationInstrumentedTest {
     @Test
     public void automateValidation() throws Exception {
         Thread.sleep(LAUNCH_TIMEOUT);
-        Log.d(TAG, "Check search criteria: "+TARGET_PACKAGE);
+        Log.d(TAG, "Check search criteria: " + TARGET_PACKAGE);
         SearchCondition<Boolean> isGone =
                 Until.gone(By.res(TARGET_PACKAGE, "tv_testrun"));
-        Log.e(TAG, "Wait for : " + UI_TIMEOUT + " ms ("+(UI_TIMEOUT/(1000*60.0)) +  " min)");
+        Log.e(TAG, "Wait for : " + UI_TIMEOUT + " ms (" + (UI_TIMEOUT / (1000 * 60.0)) + " min)");
         mDevice.wait(isGone, UI_TIMEOUT);
-        Log.e(TAG, "Done waiting for : " + UI_TIMEOUT + " test: "+isGone);
+        Log.e(TAG, "Done waiting for : " + UI_TIMEOUT + " test: " + isGone);
         Thread.sleep(LAUNCH_TIMEOUT);
     }
 }
