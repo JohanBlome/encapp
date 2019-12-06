@@ -3,14 +3,19 @@ package com.facebook.encapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.media.MediaFormat;
+import android.net.Uri;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import java.util.Vector;
+
+import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
@@ -22,7 +27,7 @@ import java.util.HashMap;
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
     private HashMap<String, String> mExtraDataHashMap;
-
+    TextureView mTextureView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -45,8 +50,69 @@ public class MainActivity extends AppCompatActivity {
                     performInstrumentedTest();
                 }
             })).start();
+        } else {
+            mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+            mTvTestRun.setVisibility(View.VISIBLE);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+                    TextView logText = (TextView)findViewById(R.id.logText);
+                    logText.append("-- List supported codecs --\n\n");
+                    for (MediaCodecInfo info: codecInfos) {
+                        if (info.isEncoder()) {
+                            String str = codecInfoToText(info);
+                            if (str.toString().toLowerCase().contains("video")) {
+                                logText.append("\n" + str);
+                                Log.d(TAG, str.toString());
+                            }
+                        }
+                    }
+                }
+            });
         }
 
+
+    }
+
+    String codecInfoToText(MediaCodecInfo info) {
+        // TODO: from Android 10 (api 29) we can check
+        // codec type (hw or sw codec)
+        StringBuilder str = new StringBuilder("\n---\nCodec: ");
+        str.append(info.getName());
+        String[] types = info.getSupportedTypes();
+        for (String tp: types) {
+            str.append(" type: " + tp);
+            MediaCodecInfo.CodecCapabilities cap = info.getCapabilitiesForType(tp);
+            str.append("\nMax supported instances: "+cap.getMaxSupportedInstances());
+            int[] colforms = cap.colorFormats;
+            MediaCodecInfo.CodecProfileLevel[] proflevels = cap.profileLevels;
+            for (int col: colforms) {
+                str.append("\n -col: " + col + " - ");
+                if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) != 0 ) {
+                    str.append("COLOR_FormatYUV420Flexible");
+                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) != 0 ) {
+                    str.append("COLOR_FormatYUV420SemiPlanar");
+                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface) != 0 ) {
+                    str.append("COLOR_FormatSurface");
+                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888) != 0 ) {
+                    str.append("COLOR_Format24bitBGR888");
+                }
+            }
+
+            for (MediaCodecInfo.CodecProfileLevel prof: proflevels) {
+                str.append("\n -profile: " + prof.profile + ", level: "+prof.level);
+            }
+            MediaFormat format = cap.getDefaultFormat();
+            //Odds are that if there is no default profile - nothing else will have defaults anyway...
+            if (format.getString(MediaFormat.KEY_PROFILE) != null) {
+                str.append("\nDefault settings:");
+                str.append(VideoConstraints.getFormatInfo(format));
+            }
+
+        }
+        return str.toString();
 
     }
 
@@ -105,14 +171,7 @@ public class MainActivity extends AppCompatActivity {
                     logText.append("-- List supported codecs --\n\n");
                     for (MediaCodecInfo info: codecInfos) {
                         if (info.isEncoder()) {
-                            // TODO: from Android 10 (api 29) we can check
-                            // codec type (hw or sw codec)
-                            StringBuilder str = new StringBuilder("Codec: ");
-                            str.append(info.getName());
-                            String[] types = info.getSupportedTypes();
-                            for (String tp: types) {
-                                str.append(" type: " + tp);
-                            }
+                            String str = codecInfoToText(info);
                             if (str.toString().toLowerCase().contains("video")) {
                                 logText.append("\n" + str);
                                 Log.d(TAG, str.toString());
@@ -169,8 +228,15 @@ public class MainActivity extends AppCompatActivity {
             });
 
             int framesToDecode = (int)(timeout * vc.getFPS());
+            Transcoder transcoder;
             Log.d(TAG, "frames to transcode: "+framesToDecode);
-            Transcoder transcoder = new Transcoder();
+            if (filename.toLowerCase().contains(".raw") ||
+                filename.toLowerCase().contains(".yuv")) {
+                transcoder = new Transcoder();
+            } else {
+                transcoder = new SurfaceTranscoder();
+            }
+
             final String status = transcoder.transcode(vc, filename, refFrameSize, framesToDecode, dynamicData);
             if(status.length() > 0) {
                 runOnUiThread(new Runnable() {

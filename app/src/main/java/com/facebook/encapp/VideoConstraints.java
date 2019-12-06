@@ -9,8 +9,8 @@ import android.util.Size;
 
 import java.nio.ByteBuffer;
 
-class VideoConstraints {
-
+public class VideoConstraints {
+    final static String TAG = "encapp";
     // QCOM specific
     public final static int OMX_TI_COLOR_FormatYUV420PackedSemiPlanar = 0x7F000100;
     public final static int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
@@ -212,5 +212,54 @@ class VideoConstraints {
                 return "BITRATE_MODE_CBR_SKIP_FRAMES";
         }
         return "Unknown bitrate mode: " + mBitrateMode;
+    }
+
+    public static String getFormatInfo(MediaFormat format) {
+
+        StringBuilder str = new StringBuilder();
+        String[] keys = {
+                MediaFormat.KEY_BIT_RATE,
+                MediaFormat.KEY_FRAME_RATE,
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaFormat.KEY_COLOR_RANGE,
+                MediaFormat.KEY_COLOR_STANDARD,
+                MediaFormat.KEY_COLOR_TRANSFER,
+                MediaFormat.KEY_I_FRAME_INTERVAL,
+                MediaFormat.KEY_LATENCY,
+                MediaFormat.KEY_LEVEL,
+                MediaFormat.KEY_PROFILE,
+                MediaFormat.KEY_SLICE_HEIGHT,
+                MediaFormat.KEY_SLICE_HEIGHT,
+                MediaFormat.KEY_TEMPORAL_LAYERING,
+                };
+
+        for (String key : keys) {
+            if (format.containsKey(key)) {
+                String val="";
+                try {
+                    val = format.getString(key);
+                } catch (ClassCastException ex1) {
+                    try {
+                        val = Integer.toString(format.getInteger(key));
+                    } catch (ClassCastException ex2) {
+                        try {
+                            val = Float.toString(format.getFloat(key));
+                        } catch (ClassCastException ex3) {
+                            try {
+                                val = Long.toString(format.getLong(key));
+                            } catch (ClassCastException ex4) {
+                                    Log.d(TAG, "Failed to get key: " + key);
+                            }
+                        }
+
+                    }
+                }
+                if (val != null && val.length() > 0) {
+                    str.append("\n" + key + ": " + val);
+                }
+            }
+        }
+
+        return str.toString();
     }
 }

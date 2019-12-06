@@ -72,26 +72,68 @@ function collect_data {
     video_path="${workdir}/video"
     tmp_path="${workdir}/tmp"
     output_path="${workdir}/output"
-    IFS=',' read -ra resolutions_b <<< "${resolutions}"
-    for loc_res in "${resolutions_b[@]}"; do
-        if [[ $loc_res != $raw_resolution ]]; then
-            ffmpeg -y -nostats -loglevel 0 \
-                   -f rawvideo -pix_fmt nv12 -s ${raw_resolution} \
-                   -i ${raw_file} \
-                   -f rawvideo -pix_fmt nv12 -s ${loc_res} resize.yuv
-            device_path="/sdcard/resize.yuv"
-            adb push resize.yuv ${device_path}
-            ref_resolution=$loc_res
-        else
-            device_path="/sdcard/${raw_file##*/}"
-            adb push ${raw_file} ${device_path}
-            ref_resolution=$raw_resolution
-        fi
+    suffix=${raw_file##*.}
+    if [[ $suffix == "raw" ]] || [[ $suffix == "yuv" ]] ; then
+        IFS=',' read -ra resolutions_b <<< "${resolutions}"
+        for loc_res in "${resolutions_b[@]}"; do
+            if [[ $loc_res != $raw_resolution ]]; then
+                ffmpeg -y -nostats -loglevel 0 \
+                       -f rawvideo -pix_fmt nv12 -s ${raw_resolution} \
+                       -i ${raw_file} \
+                       -f rawvideo -pix_fmt nv12 -s ${loc_res} resize.yuv
+                device_path="/sdcard/resize.yuv"
+                adb push resize.yuv ${device_path}
+                ref_resolution=$loc_res
+            else
+                device_path="/sdcard/${raw_file##*/}"
+                adb push ${raw_file} ${device_path}
+                ref_resolution=$raw_resolution
+            fi
 
-        gen="-e file ${device_path} -e test_timeout 20 "
+            gen="-e file ${device_path} -e test_timeout 60 "
+            gen+="-e video_timeout ${test_length} "
+            gen+="-e res ${loc_res} "
+            gen+="-e ref_res ${ref_resolution} "
+            gen+="-e bit ${bitrates} "
+            gen+="-e fps ${fps} "
+            gen+="-e enc ${codecs} "
+            gen+="-e mod ${modes} "
+            gen+="-e key ${i_intervals} "
+            gen+="-e skfr false "
+            gen+="-e debug false "
+            args=" -w -r ${gen} -e ltrc 1"
+
+            if [[ $vbr_cbr == "cbr" ]] ; then
+                args="${args} -e mode cbr "
+            fi
+
+            if [ ${dynamic} ] ; then
+                args="${args} -e dyn ${dynamic}"
+            fi
+
+            if [ ${hierplayers} ] ; then
+                args="${args} -e hierl ${hierplayers}"
+            fi
+
+            echo "adb shell am instrument ${args} -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner"
+            adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
+            adb shell rm ${device_path}
+        done
+        find_files
+        nbr_files=$(echo $file_list | awk '{print NF}')
+        echo "- Number of files transcoded: $nbr_files - "
+        mkdir ${video_path}
+        for file in $file_list; do
+            adb pull "/sdcard/${file}" ${video_path}/.
+        done
+        rm -f resized.yuv
+    else
+        device_path="/sdcard/${raw_file##*/}"
+        adb push ${raw_file} ${device_path}
+        gen="-e file ${device_path} -e test_timeout 60 "
         gen+="-e video_timeout ${test_length} "
-        gen+="-e res ${loc_res} "
-        gen+="-e ref_res ${ref_resolution} "
+        gen+="-e res ${resolutions} "
+        gen+="-e ref_res ${raw_resolution} "
         gen+="-e bit ${bitrates} "
         gen+="-e fps ${fps} "
         gen+="-e enc ${codecs} "
@@ -115,16 +157,13 @@ function collect_data {
 
         echo "adb shell am instrument ${args} -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner"
         adb shell am instrument $args -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner >> silent.log
-        adb shell rm ${device_path}
-    done
-    find_files
-    nbr_files=$(echo $file_list | awk '{print NF}')
-    echo "- Number of files transcoded: $nbr_files - "
-    mkdir ${video_path}
-    for file in $file_list; do
-        adb pull "/sdcard/${file}" ${video_path}/.
-    done
-    rm -f resized.yuv
-
+        find_files
+        nbr_files=$(echo $file_list | awk '{print NF}')
+        echo "- Number of files transcoded: $nbr_files - "
+        mkdir ${video_path}
+        for file in $file_list; do
+            adb pull "/sdcard/${file}" ${video_path}/.
+        done
+    fi
     echo " - done -"
 }
