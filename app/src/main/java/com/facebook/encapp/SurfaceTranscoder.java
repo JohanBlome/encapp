@@ -181,17 +181,14 @@ public class SurfaceTranscoder extends Transcoder{
                     if (info.size > 0) {
                         ByteBuffer data = mDecoder.getOutputBuffer(index);
                         int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
-                        Log.d(TAG, "currentFrameNbr: " + currentFrameNbr);
                         int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);
                         if (currentFrameNbr == nextFrameNbr) {
-                            mDecoder.releaseOutputBuffer(index, true); //Skip this and read again
+                            mDecoder.releaseOutputBuffer(index, false); //Skip this and read again
                             mSkipped++;
                         } else {
                             mDecoder.releaseOutputBuffer(index, true);
-                        }
-                        mOutputSurface.awaitNewImage();
-                        mOutputSurface.drawImage();
-                        if (currentFrameNbr != nextFrameNbr) {
+                            mOutputSurface.awaitNewImage();
+                            mOutputSurface.drawImage();
                             //egl have time in ns
                             mInputSurface.setPresentationTime(info.presentationTimeUs * 1000);
                             mInputSurface.swapBuffers();

@@ -335,6 +335,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+        if (vc.size() == 0) {
+            Log.d(TAG, "No test created");
+            Log.d(TAG, "encoders: "+ encoders.length);
+            Log.d(TAG, "mod: "+ mod.length);
+            Log.d(TAG, "resolutions: "+ resolutions.length);
+            Log.d(TAG, "fps: "+ fps.length);
+            Log.d(TAG, "bitrates: "+ bitrates.length);
+            Log.d(TAG, "keys: "+ keys.length);
+        }
         return vc.toArray(new VideoConstraints[0]);
     }
 

@@ -177,3 +177,9 @@ $ ./local_copy.sh original.yuv 1280x720 xx_seconds functional_description
 
 But those arguments could be set in the scripts as well (use bash, not sh).
 
+Arguments needed to be on the command line except when querying for codecs:
+-e enc CODEC i.e. hevc
+-e res WxH  i.e. 1280x720          
+-e fps FPS i.e. 30 (fps)
+-e mod BITRATE_MODE i.e. vbr
+-e key KEY_INTERVAL i.e. 10 (sec)
