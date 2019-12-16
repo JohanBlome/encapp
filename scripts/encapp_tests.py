@@ -117,11 +117,11 @@ class VideoAnalyzer:
 
         if video_file.endswith('.mp4'):
             ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries \
-                          stream=bit_rate -of default=noprint_wrappers=1:nokey=1 '\
-                          + video_file
+                stream=bit_rate -of default=noprint_wrappers=1:nokey=1 ' \
+                    + video_file
         else:
             ffprobe_cmd = 'ffprobe -v error -show_entries format=bit_rate \
-                          -of default=noprint_wrappers=1:nokey=1 '\
+                -of default=noprint_wrappers=1:nokey=1 '\
                           + video_file
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout == '':
@@ -133,7 +133,7 @@ class VideoAnalyzer:
     @staticmethod
     def get_resolution(mp4_file):
         ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries \
-                       stream=height,width -of csv=s=x:p=0 ' + mp4_file
+            stream=height,width -of csv=s=x:p=0 ' + mp4_file
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout == '':
             raise Exception('Failed to extract video resolution')
@@ -296,6 +296,7 @@ class EncodeJobs:
                 bitrate = video_analyzer.get_bitrate(job_info.output_file)
                 score = video_analyzer.get_vmaf_score(job_info.input_file,
                                                       job_info.output_file)
+                # print("bitrate: " + str(bitrate) + "vmaf_score: " + str(score))
                 bitrates.append(bitrate)
                 vmaf_scores.append(score)
 
@@ -320,7 +321,7 @@ def build_tests(tests_json, device_model):
 
     # get date and time and format it
     now = datetime.now()
-    dt_string = now.strftime('%m-%d-%Y_%H:%M')
+    dt_string = now.strftime('%m-%d-%Y_%H_%M')
     workdir = device_model + '_' + dt_string
     os.system('mkdir -p ' + workdir)
 
@@ -350,7 +351,8 @@ def build_tests(tests_json, device_model):
                 for res in enc_resolutions:
                     for mode in rc_modes:
                         for i_interval in i_intervals:
-                            sub_dir = '_'.join([in_file, codec, res,
+                            sub_dir = '_'.join([in_file.strip('.mp4'),
+                                                codec, res,
                                                 mode,
                                                 str(i_interval)+'s'])
                             output_dir = workdir + '/' + sub_dir
