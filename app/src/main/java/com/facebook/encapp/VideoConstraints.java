@@ -29,6 +29,9 @@ public class VideoConstraints {
     private boolean mSkipFrames = false;
     private int mLtrCount = 4;
     private int mHierStructLayers = 0;
+    private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
+    private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
+    private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
 
     //Bitrate mode 3,4 is
     //OMX_Video_ControlRateVariableSkipFrames,
@@ -133,6 +136,30 @@ public class VideoConstraints {
         return mProfile;
     }
 
+    public void setColorRange(int colorRange) {
+        mColorFormat = colorRange;
+    }
+
+    public int getColorRange() {
+        return mColorRange;
+    }
+
+    public void setColorTransfer(int colorTransfer) {
+        mColorTransfer = colorTransfer;
+    }
+
+    public int getColorTrnasfer() {
+        return mColorTransfer;
+    }
+
+    public void setColorStandard(int colorStandard) {
+        mColorStandard = colorStandard;
+    }
+
+    public int getColorStandard() {
+        return mColorStandard;
+    }
+
     /**
      * Sets encoder profile. Can be one of constants declared in
      * {@link MediaCodecInfo.CodecProfileLevel}.
@@ -167,11 +194,18 @@ public class VideoConstraints {
         encoderFormat.setInteger(MediaFormat.KEY_FRAME_RATE, (int)getFPS());
         encoderFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, mBitrateMode);
         encoderFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, getKeyframeRate());
-
-        Log.d("Transcoder", "Create mode: br="+getBitRate() +
+        encoderFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, mColorRange);
+        encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
+        encoderFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, mColorStandard);
+        encoderFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, mColorTransfer);
+        Log.d(TAG, "Create mode: br="+getBitRate() +
                 ", mode=" + getmBitrateMode() +
-                ", fps="+getFPS() +
-                ", i int="+getKeyframeRate() + " sec");
+                ", fps=" + getFPS() +
+                ", i int=" + getKeyframeRate() + " sec" +
+                ", color range: " + mColorRange +
+                ", color format: " + mColorFormat +
+                ", color standard: " + mColorStandard +
+                ", color transfer: " + mColorTransfer);
         return encoderFormat;
     }
 

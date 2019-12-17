@@ -46,6 +46,27 @@ public class SurfaceTranscoder extends Transcoder{
 
             getNextLimit(0);
         }
+        mExtractor = new MediaExtractor();
+        MediaFormat inputFormat = null;
+        try {
+            mExtractor.setDataSource(filename);
+            int trackNum = 0;
+	    int tracks = mExtractor.getTrackCount();
+            for (int track = 0; track < tracks; track++) {
+                inputFormat = mExtractor.getTrackFormat(track);
+                if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
+                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase().contains("video")) {
+                    Log.d(TAG, "Found video track at " + track + " " + inputFormat.getString(MediaFormat.KEY_MIME));
+                    trackNum = track;
+                }
+            }
+            mExtractor.selectTrack(trackNum);
+            inputFormat = mExtractor.getTrackFormat(trackNum);
+            mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         MediaFormat format;
         try {
             MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
@@ -80,6 +101,25 @@ public class SurfaceTranscoder extends Transcoder{
             mCodec = MediaCodec.createByCodecName(codecName);
 
             Log.d(TAG, "Done");
+            if (inputFormat == null) {
+                Log.e(TAG, "no input format");
+                return "no input format";
+            }
+            //Use same color settings as the input
+            Log.d(TAG, "Check decoder settings");
+            if(inputFormat.containsKey(MediaFormat.KEY_COLOR_RANGE)) {
+                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_RANGE));
+                Log.d(TAG, "Color range set: " + vc.getColorRange());
+            }
+            if(inputFormat.containsKey(MediaFormat.KEY_COLOR_TRANSFER)) {
+                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER));
+                Log.d(TAG, "Color transfer set: " + vc.getColorRange());
+            }
+            if(inputFormat.containsKey(MediaFormat.KEY_COLOR_STANDARD)) {
+                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD));
+                Log.d(TAG, "Color standard set: " + vc.getColorRange());
+            }
+            // We explicitly set the color format
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             if (mUseLTR) {
@@ -88,6 +128,7 @@ public class SurfaceTranscoder extends Transcoder{
             if (vc.getHierStructLayers() > 0) {
                 format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
             }
+            Log.d(TAG, "Everything set. " + vc.getSettings());
 
             mInputSurfaceReference = new AtomicReference<>();
             mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
@@ -99,6 +140,10 @@ public class SurfaceTranscoder extends Transcoder{
             mInputSurfaceReference.set(mCodec.createInputSurface());
             mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mInputSurface.makeCurrent();
+
+            mOutputSurface = new OutputSurface();
+            mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
+            mDecoder.start();
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: "+iox.getMessage());
             return "Failed to create codec";
@@ -115,22 +160,6 @@ public class SurfaceTranscoder extends Transcoder{
             return "Start encoding failed";
         }
 
-        mExtractor = new MediaExtractor();
-        MediaFormat inputFormat = null;
-        try {
-            mExtractor.setDataSource(filename);
-            int trackNum = 0;
-            mExtractor.selectTrack(trackNum);
-
-            inputFormat = mExtractor.getTrackFormat(trackNum);
-
-            mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        mOutputSurface = new OutputSurface();
-        mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
-        mDecoder.start();
 
         int inFramesCount = 0;
         int outFramesCount = 0;
@@ -143,11 +172,10 @@ public class SurfaceTranscoder extends Transcoder{
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase().contains(".vp");
         if (isVP) {
-            MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
-            oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-            oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-            mMuxer = createMuxer(mCodec, oformat);
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+            format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+            mMuxer = createMuxer(mCodec, format);
         }
         long totalTime = 0;
         while (mFramesAdded < totalFrames) {
@@ -210,12 +238,11 @@ public class SurfaceTranscoder extends Transcoder{
                 } else if (index >= 0) {
                     ByteBuffer data = mCodec.getOutputBuffer(index);
                     if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                        MediaFormat oformat = mCodec.getOutputFormat();
                         //There seems to be a bug so that this key is no set (but used)
-                        oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                        oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
-                        oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                        mMuxer = createMuxer(mCodec, oformat);
+                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+                        format.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
+                        format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+                        mMuxer = createMuxer(mCodec, format);
                         mCodec.releaseOutputBuffer(index, false /* render */);
                     } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
 
