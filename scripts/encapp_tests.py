@@ -54,55 +54,6 @@ def run_cmd(cmd):
     return ret, stdout.decode(), stderr.decode()
 
 
-def check_device(serial_no):
-    # check for devices
-    adb_cmd = 'adb devices -l'
-    ret, stdout, stderr = run_cmd(adb_cmd)
-    if ret is False:
-        print('Failed to get adb devices')
-        sys.exit()
-    device_serials = []
-
-    for line in stdout.split('\n'):
-        if line == 'List of devices attached' or line == '':
-            continue
-        serial = line.split()[0]
-        device_serials.append(serial)
-
-    if len(device_serials) == 0:
-        print('No device connected')
-        exit(0)
-    elif len(device_serials) > 1:
-        if (serial_no is None):
-            print('More than one devices connected. \
-                   Please specifiy a device serial number')
-            exit(0)
-        elif (serial_no not in device_serials):
-            print('Specified serial number {} is invalid.'.format(serial_no))
-            exit(0)
-    else:
-        serial_no = serial
-
-    # get device model
-    line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
-    model_re = re.compile(r'model:(?P<model>\S+)')
-    match = model_re.search(line[0])
-    device_model = match.group('model')
-
-    # remove any files that are generated in previous runs
-    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd)
-    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
-    for file in output_files:
-        if file == '':
-            continue
-        # remove the output
-        adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
-        run_cmd(adb_cmd)
-
-    return device_model, serial_no
-
-
 class VideoAnalyzer:
     def __init__(self):
         self.temp_dir = 'temp'
@@ -381,9 +332,7 @@ def build_tests(tests_json, device_model):
     return enc_jobs
 
 
-def run_encode_tests(tests_json, serial_no):
-
-    device_model, serial_no = check_device(serial_no)
+def run_encode_tests(tests_json, device_model, serial_no):
 
     # build tests
     enc_jobs = build_tests(tests_json, device_model)
@@ -396,6 +345,59 @@ def run_encode_tests(tests_json, serial_no):
     rd_plot = RDPlot('Test RD Curve')
     rd_plot.plot_rd_curve(enc_jobs.workdir+'/'+RD_RESULT_FILE_NAME)
 
+def check_device(serial_no):
+    # check for devices
+    adb_cmd = 'adb devices -l'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    if ret is False:
+        print('Failed to get adb devices')
+        sys.exit()
+    device_serials = []
+
+    for line in stdout.split('\n'):
+        if line == 'List of devices attached' or line == '':
+            continue
+        serial = line.split()[0]
+        device_serials.append(serial)
+
+    if len(device_serials) == 0:
+        print('No device connected')
+        exit(0)
+    elif len(device_serials) > 1:
+        if (serial_no is None):
+            print('More than one devices connected. \
+                   Please specifiy a device serial number')
+            exit(0)
+        elif (serial_no not in device_serials):
+            print('Specified serial number {} is invalid.'.format(serial_no))
+            exit(0)
+    else:
+        serial_no = serial
+
+    # get device model
+    line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
+    model_re = re.compile(r'model:(?P<model>\S+)')
+    match = model_re.search(line[0])
+    device_model = match.group('model')
+
+    # remove any files that are generated in previous runs
+    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
+    for file in output_files:
+        if file == '':
+            continue
+        # remove the output
+        adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
+        run_cmd(adb_cmd)
+
+    return device_model, serial_no
+def list_codecs(serial_no):
+    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument  -w -r ' +\
+        '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
+            ' ' + JUNIT_RUNNER_NAME
+    run_cmd(adb_cmd)
+
 
 def main(args):
     if args.config is not None:
@@ -405,10 +407,14 @@ def main(args):
             json.dump(sample_config_json_data, fp, indent=4)
             fp.close()
     else:
-        with open(args.test, 'r') as fp:
-            tests_json = json.load(fp)
-            fp.close()
-            run_encode_tests(tests_json, args.serial)
+        device_model, serial_no = check_device(args.serial)
+        if args.list_codecs is not None:
+            list_codecs(serial_no)
+        else:
+            with open(args.test, 'r') as fp:
+                tests_json = json.load(fp)
+                fp.close()
+                run_encode_tests(tests_json, device_model, serial_no)
 
 
 if __name__ == '__main__':
@@ -420,6 +426,7 @@ if __name__ == '__main__':
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('--config', help='Generate a sample config \
                          file in json format')
+    parser.add_argument('--list_codecs', action='store_true', help='List codecs the devices support')
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
