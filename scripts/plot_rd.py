@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import argparse
 import json
+import numpy as np
 
 
 class RDPlot:
@@ -13,8 +14,8 @@ class RDPlot:
                         'p', '*', 'h', 'H', 'D', 'd', 'P', 'X']
         self.lines = ['-', '--', '-.']
         self.x_min = 0
-        self.x_max = 3000
-        self.y_min = 0
+        self.x_max = 0
+        self.y_min = 100
         self.y_max = 100
         plt.figure()
         plt.title(title)
@@ -31,11 +32,14 @@ class RDPlot:
         return color+marker+line
 
     def draw(self, bitrates, scores, curve_label):
+        self.x_max = max(self.x_max, np.amax(bitrates))
+        self.y_min = min(self.y_min, np.amin(scores))
         plt.plot(bitrates, scores, self.get_style(), label=str(curve_label))
         plt.legend()
 
     def finish(self):
-        plt.axis([self.x_min, self.x_max, self.y_min, self.y_max])
+        plt.axis([self.x_min, self.x_max+100, self.y_min-5, self.y_max])
+        print ('y min=' +str(self.y_min))
         plt.grid()
         plt.show()
 

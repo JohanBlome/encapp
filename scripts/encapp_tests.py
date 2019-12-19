@@ -154,6 +154,7 @@ class JobInfo:
         self.device_workdir = '/sdcard/'  # raw file to be used
         self.use_surface_enc = use_surface_enc
         self.input_yuv_file = 'ref.yuv'
+        self.pix_fmt = 'nv12' #nv12 for hw encoder yuv420p for sw encoder
 
 
 class EncodeJobs:
@@ -185,7 +186,7 @@ class EncodeJobs:
                 input_file = job_info.input_yuv_file
                 ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
-                             ' -pix_fmt nv12 ' + input_file
+                             ' -pix_fmt ' + job_info.pix_fmt + ' '  + input_file
                 run_cmd(ffmpeg_cmd)
             adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
                       ' ' + job_info.device_workdir + input_file
@@ -310,14 +311,17 @@ def build_tests(tests_json, device_model):
                             os.system('mkdir -p ' + output_dir)
                             job_info_group = []
 
-                            job_desc = group_desc if group_desc != '' \
-                                else '_'.join([device_model,
-                                               in_file.strip('.mp4'),
-                                               codec,
-                                               res,
-                                               mode,
-                                               'iint',
-                                               str(i_interval)])
+                            desc_array = []
+                            if group_desc != '':
+                                desc_array.append(group_desc)
+                            desc_array.append(device_model)
+                            desc_array.append(in_file.strip('.mp4'))
+                            desc_array.append(codec)
+                            desc_array.append(res)
+                            desc_array.append(mode)
+                            desc_array.append('iint')
+                            desc_array.append(str(i_interval))
+                            job_desc =  '_'.join(desc_array)
                             for br in bitrates:
                                 job_info = JobInfo(job_desc, in_file,
                                                    output_dir,
@@ -408,7 +412,7 @@ def main(args):
             fp.close()
     else:
         device_model, serial_no = check_device(args.serial)
-        if args.list_codecs is not None:
+        if args.list_codecs is True:
             list_codecs(serial_no)
         else:
             with open(args.test, 'r') as fp:
