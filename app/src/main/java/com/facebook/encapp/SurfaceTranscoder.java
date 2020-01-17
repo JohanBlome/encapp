@@ -128,6 +128,24 @@ public class SurfaceTranscoder extends Transcoder{
             if (vc.getHierStructLayers() > 0) {
                 format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
             }
+            Log.d(TAG, "Set iframe preset: " + vc.getIframeSizePreset());
+            switch (vc.getIframeSizePreset()) {
+                case DEFAULT:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 0);
+                    break;
+                case MEDIUM:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 1);
+                    break;
+                case HUGE:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 2);
+                    break;
+                case UNLIMITED:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 3);
+                    break;
+                default:
+                    //Not possible
+            }
+
             Log.d(TAG, "Everything set. " + vc.getSettings());
 
             mInputSurfaceReference = new AtomicReference<>();
@@ -264,15 +282,19 @@ public class SurfaceTranscoder extends Transcoder{
             }
 
         }
-        if (mCodec != null) {
-            mCodec.stop();
-            mCodec.release();
+        try {
+            if (mCodec != null) {
+                mCodec.stop();
+                mCodec.release();
+            }
+            if (mMuxer != null) {
+                mMuxer.stop();
+                mMuxer.release();
+            }
         }
-        if (mMuxer != null) {
-            mMuxer.stop();
-            mMuxer.release();
+        catch(IllegalStateException iex) {
+            Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage()) ;
         }
-
 
         return "";
     }

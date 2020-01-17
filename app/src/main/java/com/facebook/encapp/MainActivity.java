@@ -325,6 +325,8 @@ public class MainActivity extends AppCompatActivity {
                                 if (mod[mC].equals("cbr")) {
                                     constraints.setConstantBitrate(true);
                                 }
+                                String iframesize = (mExtraDataHashMap.get("ifsize") != null) ? mExtraDataHashMap.get("ifsize") : "DEFAULT";
+                                constraints.setIframeSizePreset(VideoConstraints.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase()));
                                 Log.e(TAG, constraints.getSettings());
                                 boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) ? Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames")) : false;
                                 constraints.setSkipFrames(keySkipFrames);
