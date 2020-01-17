@@ -17,12 +17,16 @@ KEY_NAME_BITRATES = 'bitrates'
 KEY_NAME_I_INTERVALS = 'i_intervals'
 KEY_NAME_DURATION = 'duration'
 KEY_NAME_USE_SURFACE_ENC = 'use_surface_enc'
+KEY_NAME_INPUT_FORMAT = 'input_format'
+KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
 
 sample_config_json_data = [
     {
         KEY_NAME_DISCRIPTION: 'sample',
         KEY_NAME_INPUT_FILES: [''],
         KEY_NAME_USE_SURFACE_ENC: 1,
+        KEY_NAME_INPUT_FORMAT: 'mp4',
+        KEY_NAME_INPUT_RESOLUTION: '1280x720',
         KEY_NAME_CODECS: ['hevc'],
         KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
         KEY_NAME_RC_MODES: ['cbr'],
@@ -108,8 +112,8 @@ class VideoAnalyzer:
         return input_yuv_file, res
 
     def get_vmaf_score(self, mp4_file_ref, mp4_file_out):
-        output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
         input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
+        output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
         ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
                      ' -pix_fmt yuv420p -vsync 0 -s ' + src_res + \
                      ' ' + output_yuv_file
@@ -131,10 +135,32 @@ class VideoAnalyzer:
                 return round(float(vmaf_score), 2)
         return None
 
+    def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res, mp4_file_out):
+        output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
+        ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
+                     ' -pix_fmt ' + ref_format + ' -vsync 0 -s ' + ref_res + \
+                     ' ' + output_yuv_file
+        run_cmd(ffmpeg_cmd)
+
+        sizes = ref_res.split('x')
+        vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
+                   ' ' + ref_yuv + ' ' + output_yuv_file +\
+                   ' --out-fmt json'
+        ret, stdout, stderr = run_cmd(vmaf_cmd)
+        # remove the output yuv file
+        os.system('rm ' + output_yuv_file)
+        vmaf_result = json.loads(stdout)
+
+        if vmaf_result:
+            if vmaf_result.get('aggregate') is not None and \
+               vmaf_result.get('aggregate').get('VMAF_score') is not None:
+                vmaf_score = vmaf_result['aggregate']['VMAF_score']
+                return round(float(vmaf_score), 2)
+        return None
 
 class JobInfo:
     def __init__(self, desc, in_file, output_dir, codec, res, mode,
-                 i_interval, br, duration, use_surface_enc):
+                 i_interval, br, duration, use_surface_enc,input_format, input_res):
         print('in_file:' + in_file, 'codec:'+codec, 'enc_resolution:'+res,
               'rc_mode:'+mode, 'i_interval:'+i_interval, 'bitrate:'+br,
               'duration:'+duration, sep=',')
@@ -153,15 +179,17 @@ class JobInfo:
         self.duration = duration  # test duration in secs
         self.device_workdir = '/sdcard/'  # raw file to be used
         self.use_surface_enc = use_surface_enc
-        self.input_yuv_file = 'ref.yuv'
+        self.input_file_on_device = 'ref.mp4' if use_surface_enc else 'ref.yuv'
+        self.input_format = input_format
+        self.input_res = input_res
         self.pix_fmt = 'nv12' #nv12 for hw encoder yuv420p for sw encoder
 
 
 class EncodeJobs:
     def __init__(self, device_model):
         self.job_info_groups = []
-        self.in_file_dict = []
-        self.rd_results = []
+        self.prev_file = None
+        self.rd_results = {}
         self.workdir = ''
 
     def add_job_info_group(self, job_info_group):
@@ -173,34 +201,31 @@ class EncodeJobs:
                 self.run_one_encode(job_info, serial_no)
 
         # clear this before running vmaf
-        self.in_file_dict = []
+        self.in_file_dict = None
 
     # run one encode job
     def run_one_encode(self, job_info, serial_no):
         # push input file to the device
-        if job_info.input_file not in self.in_file_dict:
-            self.in_file_dict.append(job_info.input_file)
-            if job_info.use_surface_enc:
-                input_file = job_info.input_file
+        if job_info.input_file != self.prev_file:
+            self.prev_file = job_info.input_file
+            if job_info.use_surface_enc or job_info.input_format != 'mp4':
+                adb_cmd = 'adb -s ' + serial_no + ' push ' + job_info.input_file +\
+                      ' ' + job_info.device_workdir + job_info.input_file_on_device
+                run_cmd(adb_cmd)
             else:
-                input_file = job_info.input_yuv_file
+                input_file = 'ref.yuv'
                 ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
                              ' -pix_fmt ' + job_info.pix_fmt + ' '  + input_file
                 run_cmd(ffmpeg_cmd)
-            adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
-                      ' ' + job_info.device_workdir + input_file
-            run_cmd(adb_cmd)
-        else:
-            if job_info.use_surface_enc:
-                input_file = job_info.input_file
-            else:
-                input_file = job_info.input_yuv_file
+                adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
+                      ' ' + job_info.device_workdir + job_info.input_file_on_device
+                run_cmd(adb_cmd)
 
         adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r'\
                   + ' -e key ' + job_info.i_interval\
                   + ' -e enc ' + job_info.codec\
-                  + ' -e file ' + job_info.device_workdir + input_file\
+                  + ' -e file ' + job_info.device_workdir + job_info.input_file_on_device\
                   + ' -e test_timeout 20'\
                   + ' -e video_timeout ' + job_info.duration\
                   + ' -e res ' + job_info.enc_res\
@@ -246,9 +271,13 @@ class EncodeJobs:
             for job_info in group:
                 # get video bitrate and vmaf score
                 bitrate = video_analyzer.get_bitrate(job_info.output_file)
-                score = video_analyzer.get_vmaf_score(job_info.input_file,
-                                                      job_info.output_file)
-                # print("bitrate: " + str(bitrate) + "vmaf_score: " + str(score))
+                if job_info.input_format == 'mp4':
+                    score = video_analyzer.get_vmaf_score(
+                        job_info.input_file,job_info.output_file)
+                else:
+                    score = video_analyzer.get_vmaf_score_yuv(
+                        job_info.input_file,job_info.input_format,
+                        job_info.input_res,job_info.output_file)
                 bitrates.append(bitrate)
                 vmaf_scores.append(score)
 
@@ -259,7 +288,9 @@ class EncodeJobs:
                 group_result = {'description': desc,
                                 'bitrates': bitrates,
                                 'vmaf_scores': vmaf_scores}
-                self.rd_results.append(group_result)
+                if self.rd_results.get(job_info.input_file) == None:
+                    self.rd_results[job_info.input_file] = []
+                self.rd_results[job_info.input_file].append(group_result)
             group_index += 1
 
         with open(self.workdir+'/'+RD_RESULT_FILE_NAME, 'w') as fp:
@@ -297,13 +328,16 @@ def build_tests(tests_json, device_model):
             use_surface_enc = True
         else:
             use_surface_enc = False
+        input_format = test.get(KEY_NAME_INPUT_FORMAT)
+        input_res = test.get(KEY_NAME_INPUT_RESOLUTION)
         job_info_group = []
         for in_file in input_files:
             for codec in codecs:
                 for res in enc_resolutions:
                     for mode in rc_modes:
                         for i_interval in i_intervals:
-                            sub_dir = '_'.join([in_file.strip('.mp4'),
+                            base_file_name = os.path.basename(in_file)
+                            sub_dir = '_'.join([base_file_name,
                                                 codec, res,
                                                 mode,
                                                 str(i_interval)+'s'])
@@ -315,7 +349,6 @@ def build_tests(tests_json, device_model):
                             if group_desc != '':
                                 desc_array.append(group_desc)
                             desc_array.append(device_model)
-                            desc_array.append(in_file.strip('.mp4'))
                             desc_array.append(codec)
                             desc_array.append(res)
                             desc_array.append(mode)
@@ -328,7 +361,10 @@ def build_tests(tests_json, device_model):
                                                    codec, res, mode,
                                                    str(i_interval), str(br),
                                                    str(duration),
-                                                   use_surface_enc)
+                                                   use_surface_enc,
+                                                   input_format,
+                                                   input_res
+                                                   )
                                 job_info_group.append(job_info)
 
                             enc_jobs.add_job_info_group(job_info_group)
@@ -346,7 +382,7 @@ def run_encode_tests(tests_json, device_model, serial_no):
 
     enc_jobs.get_rate_distortion()
 
-    rd_plot = RDPlot('Test RD Curve')
+    rd_plot = RDPlot()
     rd_plot.plot_rd_curve(enc_jobs.workdir+'/'+RD_RESULT_FILE_NAME)
 
 def check_device(serial_no):
