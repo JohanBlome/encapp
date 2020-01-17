@@ -100,6 +100,8 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("hierl");
     private static final String LIST_CODECS =
             InstrumentationRegistry.getArguments().getString("list_codecs");
+    private static final String IFRAME_SIZE_PRESET =
+            InstrumentationRegistry.getArguments().getString("ifsize");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
@@ -185,6 +187,11 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("list_codecs", LIST_CODECS);
             Log.e(TAG, "LIST_CODECS: " + LIST_CODECS);
         }
+        if (IFRAME_SIZE_PRESET != null) {
+            mExtraDataHashMap.put("ifsize", IFRAME_SIZE_PRESET);
+            Log.e(TAG, "iframe size set: " + IFRAME_SIZE_PRESET);
+        }
+
     }
 
     @Before

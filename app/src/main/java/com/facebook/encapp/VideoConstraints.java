@@ -18,6 +18,13 @@ public class VideoConstraints {
     public final static int OMX_SEC_COLOR_FormatNV12Tiled = 0x7FC00002;
     public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m = 0x7FA30C04;
 
+    enum IFRAME_SIZE_PRESETS{
+        DEFAULT,
+        MEDIUM,
+        HUGE,
+        UNLIMITED,
+    }
+
     private String mVideoEncoderIdentifier;
     private int mBitRate;
     private Size mVideoSize; // Used for resolution values
@@ -32,7 +39,7 @@ public class VideoConstraints {
     private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
     private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
     private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
-
+    private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
     //Bitrate mode 3,4 is
     //OMX_Video_ControlRateVariableSkipFrames,
     //OMX_Video_ControlRateConstantSkipFrames,
@@ -295,5 +302,14 @@ public class VideoConstraints {
         }
 
         return str.toString();
+    }
+
+
+    public void setIframeSizePreset(IFRAME_SIZE_PRESETS preset) {
+        mIframeSize = preset;
+    }
+
+    public IFRAME_SIZE_PRESETS getIframeSizePreset() {
+        return mIframeSize;
     }
 }
