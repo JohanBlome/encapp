@@ -125,6 +125,24 @@ class Transcoder {
                 format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
             }
 
+            Log.d(TAG, "Set iframe preset: " + vc.getIframeSizePreset());
+            switch (vc.getIframeSizePreset()) {
+                case DEFAULT:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 0);
+                    break;
+                case MEDIUM:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 1);
+                    break;
+                case HUGE:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 2);
+                    break;
+                case UNLIMITED:
+                    format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 3);
+                    break;
+                default:
+                    //Not possible
+            }
+
             mCodec.configure(
                     format,
                     null /* surface */,
