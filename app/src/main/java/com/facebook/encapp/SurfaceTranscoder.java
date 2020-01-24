@@ -181,7 +181,6 @@ public class SurfaceTranscoder extends Transcoder{
 
         int inFramesCount = 0;
         int outFramesCount = 0;
-
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = vc.getmReferenceFPS();
         mKeepInterval = mReferenceFrameRate / (float)mFrameRate;
@@ -198,95 +197,99 @@ public class SurfaceTranscoder extends Transcoder{
         long totalTime = 0;
         while (mFramesAdded < totalFrames) {
             int index;
-            Log.d(TAG, "Frames: "+mFramesAdded+'/'+totalFrames);
-            if (mFramesAdded < totalFrames) { //Count not decoded frames but frames added to the output
-                try {
-                    index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+            Log.d(TAG, "Frames: "+mFramesAdded+'/'+totalFrames + " - inframes: "+inFramesCount);
+            try {
+                index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
-                    if (index >= 0) {
-                        boolean eos = (inFramesCount == totalFrames - 1);
-                        ByteBuffer buffer = mDecoder.getInputBuffer(index);
-                        int size = mExtractor.readSampleData(buffer, 0);
-                        if (size > 0) {
-                            mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), mExtractor.getSampleFlags());
-                        }
-                        boolean eof = !mExtractor.advance();
-                        if (eof) {
-                            mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                        }
+                if (index >= 0) {
+                    boolean eos = (inFramesCount == totalFrames - 1);
+                    ByteBuffer buffer = mDecoder.getInputBuffer(index);
+                    int size = mExtractor.readSampleData(buffer, 0);
+                    if (size > 0) {
+                        mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), mExtractor.getSampleFlags());
                     }
-                }catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-
-                index = mDecoder.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    //Just ignore
-                    continue;
-                } else if (index >= 0) {
-                    if (info.size > 0) {
-                        ByteBuffer data = mDecoder.getOutputBuffer(index);
-                        int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
-                        int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);
-                        if (currentFrameNbr == nextFrameNbr) {
-                            mDecoder.releaseOutputBuffer(index, false); //Skip this and read again
-                            mSkipped++;
-                        } else {
-                            mDecoder.releaseOutputBuffer(index, true);
-                            mOutputSurface.awaitNewImage();
-                            mOutputSurface.drawImage();
-                            //egl have time in ns
-                            mInputSurface.setPresentationTime(info.presentationTimeUs * 1000);
-                            mInputSurface.swapBuffers();
-                        }
-
-                    }
-
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0){
-                        ///Done
-                        mCodec.signalEndOfInputStream();
-                    }
-                    inFramesCount++;
-                }
-
-                index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
-                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    //Just ignore
-                } else if (index >= 0) {
-                    ByteBuffer data = mCodec.getOutputBuffer(index);
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                        //There seems to be a bug so that this key is no set (but used)
-                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                        format.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
-                        format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                        mMuxer = createMuxer(mCodec, format);
-                        mCodec.releaseOutputBuffer(index, false /* render */);
-                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-
-                        break;
-                    } else if (mMuxer != null){
-                        if ((info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
-                            Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
-                        }
-                        ++outFramesCount;
-                        mFramesAdded += 1;
-                        totalTime += info.presentationTimeUs;
-                        mMuxer.writeSampleData(0, data, info);
-                        mCodec.releaseOutputBuffer(index, false /* render */);
+                    boolean eof = !mExtractor.advance();
+                    if (eof) {
+                        mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                     }
                 }
-            } else {
-                Log.d(TAG, "Done transcoding");
-                break;
+            }catch (Exception ex) {
+                ex.printStackTrace();
             }
 
+            index = mDecoder.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+            if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                //Just ignore
+                continue;
+            } else if (index >= 0) {
+                if (info.size > 0) {
+                    ByteBuffer data = mDecoder.getOutputBuffer(index);
+                    int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
+                    int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);
+                    if (currentFrameNbr == nextFrameNbr) {
+                        mDecoder.releaseOutputBuffer(index, false); //Skip this and read again
+                        mSkipped++;
+                    } else {
+                        mDecoder.releaseOutputBuffer(index, true);
+                        mOutputSurface.awaitNewImage();
+                        mOutputSurface.drawImage();
+                        //egl have time in ns
+                        mInputSurface.setPresentationTime(info.presentationTimeUs * 1000);
+                        mInputSurface.swapBuffers();
+                    }
+
+                }
+
+                if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0){
+                    ///Done
+                    mCodec.signalEndOfInputStream();
+                }
+                inFramesCount++;
+            }
+
+            index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+
+            if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                //Just ignore
+            } else if (index >= 0) {
+                ByteBuffer data = mCodec.getOutputBuffer(index);
+                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                    Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: "+format);
+                    MediaFormat oformat = mCodec.getOutputFormat();
+                    //There seems to be a bug so that this key is no set (but used).
+                    oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
+                    oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+                    mMuxer = createMuxer(mCodec, oformat);
+                    mCodec.releaseOutputBuffer(index, false /* render */);
+                } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+
+                    break;
+                } else if (mMuxer != null){
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
+                        Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
+                    }
+
+                    ++outFramesCount;
+                    mFramesAdded += 1;
+                    totalTime += info.presentationTimeUs;
+                    mMuxer.writeSampleData(0, data, info);
+                    mCodec.releaseOutputBuffer(index, false /* render */);
+                }
+            }
         }
+
+
+        Log.d(TAG, "Done transcoding");
         try {
             if (mCodec != null) {
                 mCodec.stop();
                 mCodec.release();
             }
+        } catch(IllegalStateException iex) {
+                Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage()) ;
+        }
+        try {
             if (mMuxer != null) {
                 mMuxer.stop();
                 mMuxer.release();
