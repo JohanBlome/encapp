@@ -166,20 +166,83 @@ $ ffmpeg -i /tmp/omx.google.vp8.encoder_30fps_176x144_100000bps_iint10.webm
 
 
 (6) run a multiple encoding experiment with the app
+Run
+$ encapp_tests.py --config sample_config.json
 
-Copy the `run_test.sh` script to your local directory and edit it.
+Open the sample_config.json file in a editor and edit the test.
+example, mp4 file:
+ [
+    {
+        "description": "sample",
+        "input_files": [
+            "red_short_hq_x264_yuv420p.mp4"
+        ],
+        "use_surface_enc": 1,
+        "input_format": "mp4",
+        "input_resolution": "1280x720",
+        "codecs": [
+            "hevc"
+        ],
+        "encode_resolutions": [
+            "1280x720"
+        ],
+        "rc_modes": [
+            "cbr"
+        ],
+        "bitrates": [
+            3000,
+            7000,
+            10000
+        ],
+        "i_intervals": [
+            0,
+            1,
+            10
+        ],
+        "i_frame_sizes": [
+            "unlimited"
+        ],
+        "duration": 30
+    }
+]
 
-The example is using some command line arguments i.e.
+raw file:
+[
+    {
+        "description": "sample",
+        "input_files": [
+            "red_short_720p_nv12_2_35sec_gop-10sec.yuv"
+        ],
+        "use_surface_enc": 0,
+        "input_format": "nv12",
+        "input_resolution": "1280x720",
+        "codecs": [
+            "hevc"
+        ],
+        "encode_resolutions": [
+            "1280x720"
+        ],
+        "rc_modes": [
+            "cbr"
+        ],
+        "bitrates": [
+            3000,
+            7000,
+            10000
+        ],
+        "i_intervals": [
+            0,
+            1,
+            10
+        ],
+        "i_frame_sizes": [
+            "unlimited"
+        ],
+        "duration": 30
+    }
+]
 
-```
-$ ./local_copy.sh original.yuv 1280x720 xx_seconds functional_description
-```
 
-But those arguments could be set in the scripts as well (use bash, not sh).
-
-Arguments needed to be on the command line except when querying for codecs:
--e enc CODEC i.e. hevc
--e res WxH  i.e. 1280x720          
--e fps FPS i.e. 30 (fps)
--e mod BITRATE_MODE i.e. vbr
--e key KEY_INTERVAL i.e. 10 (sec)
+Run 
+$ encapp_tests.py --test sample_config.json
+The script assumes that the input file(s) are in the working directory and will automatically push it to the device. 

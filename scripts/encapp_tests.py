@@ -60,6 +60,55 @@ def run_cmd(cmd):
     return ret, stdout.decode(), stderr.decode()
 
 
+def check_device(serial_no):
+    # check for devices
+    adb_cmd = 'adb devices -l'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    if ret is False:
+        print('Failed to get adb devices')
+        sys.exit()
+    device_serials = []
+
+    for line in stdout.split('\n'):
+        if line == 'List of devices attached' or line == '':
+            continue
+        serial = line.split()[0]
+        device_serials.append(serial)
+
+    if len(device_serials) == 0:
+        print('No device connected')
+        exit(0)
+    elif len(device_serials) > 1:
+        if (serial_no is None):
+            print('More than one devices connected. \
+                   Please specifiy a device serial number')
+            exit(0)
+        elif (serial_no not in device_serials):
+            print('Specified serial number {} is invalid.'.format(serial_no))
+            exit(0)
+    else:
+        serial_no = serial
+
+    # get device model
+    line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
+    model_re = re.compile(r'model:(?P<model>\S+)')
+    match = model_re.search(line[0])
+    device_model = match.group('model')
+
+    # remove any files that are generated in previous runs
+    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
+    for file in output_files:
+        if file == '':
+            continue
+        # remove the output
+        adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
+        run_cmd(adb_cmd)
+
+    return device_model, serial_no
+
+
 class VideoAnalyzer:
     def __init__(self, id):
         self.temp_dir = 'temp' + id
@@ -116,36 +165,48 @@ class VideoAnalyzer:
             res = source_info.get('resolution')
         return input_yuv_file, res
 
-    def get_vmaf_score(self, mp4_file_ref, mp4_file_out):
-        input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
-        output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
-        ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
-                     ' -pix_fmt yuv420p -vsync 0 -s ' + src_res + \
-                     ' ' + output_yuv_file
-        run_cmd(ffmpeg_cmd)
+    def get_vmaf_score(self, mp4_file_ref, mp4_file_out, duration):
+        ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
+        log_file = mp4_file_out.strip('.mp4')+'_vmaf.json'
+        if (len(stdout) > 0):
+            vmaf_cmd = 'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out +\
+                        ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
+                        ':log_fmt=json" -t ' + duration + ' -f null -'
+            ret, stdout, stderr = run_cmd(vmaf_cmd)
+            # VMAF score = 89.176951
+            match = re.search('(?<=VMAF score = )[0-9.]+', stdout) 
+            vmaf_score = match.group(0)
+            return round(float(vmaf_score), 2)
+        else:
+            input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
+            output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
+            ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
+                         ' -pix_fmt yuv420p -vsync 0 -s ' + src_res + \
+                         ' ' + output_yuv_file
+            run_cmd(ffmpeg_cmd)
 
-        sizes = src_res.split('x')
-        vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
-                   ' ' + input_yuv_file + ' ' + output_yuv_file +\
-                   ' --out-fmt json'
-        ret, stdout, stderr = run_cmd(vmaf_cmd)
-        # remove the output yuv file
-        os.system('rm ' + output_yuv_file)
-        vmaf_result = json.loads(stdout)
+            sizes = src_res.split('x')
+            vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
+                       ' ' + input_yuv_file + ' ' + output_yuv_file +\
+                       ' --out-fmt json'
+            ret, stdout, stderr = run_cmd(vmaf_cmd)
+            # remove the output yuv file
+            os.system('rm ' + output_yuv_file)
+            vmaf_result = json.loads(stdout)
 
-        # save vmaf results to a json file
-        with open(mp4_file_out.strip('.mp4')+'_vmaf.json', 'w') as fp:
-            json.dump(vmaf_result, fp, indent=4)
-            fp.close()
+            # save vmaf results to a json file
+            with open(log_file, 'w') as fp:
+                json.dump(vmaf_result, fp, indent=4)
+                fp.close()
 
-        if vmaf_result:
-            if vmaf_result.get('aggregate') is not None and \
-               vmaf_result.get('aggregate').get('VMAF_score') is not None:
-                vmaf_score = vmaf_result['aggregate']['VMAF_score']
-                return round(float(vmaf_score), 2)
+            if vmaf_result:
+                if vmaf_result.get('aggregate') is not None and \
+                   vmaf_result.get('aggregate').get('VMAF_score') is not None:
+                    vmaf_score = vmaf_result['aggregate']['VMAF_score']
+                    return round(float(vmaf_score), 2)
         return None
 
-    def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res, mp4_file_out):
+    def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res, mp4_file_out, duration):
         output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
         ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
                      ' -pix_fmt ' + ref_format + ' -vsync 0 -s ' + ref_res + \
@@ -153,24 +214,40 @@ class VideoAnalyzer:
         run_cmd(ffmpeg_cmd)
 
         sizes = ref_res.split('x')
-        vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
-                   ' ' + ref_yuv + ' ' + output_yuv_file +\
-                   ' --out-fmt json'
-        ret, stdout, stderr = run_cmd(vmaf_cmd)
-        # remove the output yuv file
-        os.system('rm ' + output_yuv_file)
-        vmaf_result = json.loads(stdout)
+        ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
+        log_file = mp4_file_out.strip('.mp4')+'_vmaf.json'
+        if (len(stdout) > 0):
+            vmaf_cmd = 'ffmpeg -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
+                       ref_format + ' -i  ' + ref_yuv +\
+                       ' -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
+                       ref_format + ' -i ' + output_yuv_file +\
+                       ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
+                       ':log_fmt=json" -t ' + duration + ' -f null -'
+            ret, stdout, stderr = run_cmd(vmaf_cmd)
+            os.system('rm ' + output_yuv_file)
+            # VMAF score = 89.176951
+            match = re.search('(?<=VMAF score = )[0-9.]+', stdout) 
+            vmaf_score = match.group(0)
+            return round(float(vmaf_score), 2)
+        else:
+            vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
+                       ' ' + ref_yuv + ' ' + output_yuv_file +\
+                       ' --out-fmt json'
+            ret, stdout, stderr = run_cmd(vmaf_cmd)
+            # remove the output yuv file
+            os.system('rm ' + output_yuv_file)
+            vmaf_result = json.loads(stdout)
 
-        # save vmaf results to a json file
-        with open(mp4_file_out.strip('.mp4')+'_vmaf.json', 'w') as fp:
-            json.dump(vmaf_result, fp, indent=4)
-            fp.close()
+            # save vmaf results to a json file
+            with open(log_file, 'w') as fp:
+                json.dump(vmaf_result, fp, indent=4)
+                fp.close()
 
-        if vmaf_result:
-            if vmaf_result.get('aggregate') is not None and \
-               vmaf_result.get('aggregate').get('VMAF_score') is not None:
-                vmaf_score = vmaf_result['aggregate']['VMAF_score']
-                return round(float(vmaf_score), 2)
+            if vmaf_result:
+                if vmaf_result.get('aggregate') is not None and \
+                   vmaf_result.get('aggregate').get('VMAF_score') is not None:
+                    vmaf_score = vmaf_result['aggregate']['VMAF_score']
+                    return round(float(vmaf_score), 2)
         return None
 
 
@@ -297,11 +374,11 @@ class EncodeJobs:
                 bitrate = video_analyzer.get_bitrate(job_info.output_file)
                 if job_info.input_format == 'mp4':
                     score = video_analyzer.get_vmaf_score(
-                        job_info.input_file, job_info.output_file)
+                        job_info.input_file, job_info.output_file, job_info.duration)
                 else:
                     score = video_analyzer.get_vmaf_score_yuv(
                         job_info.input_file, job_info.input_format,
-                        job_info.input_res, job_info.output_file)
+                        job_info.input_res, job_info.output_file, job_info.duration)
                 bitrates.append(bitrate)
                 vmaf_scores.append(score)
 
