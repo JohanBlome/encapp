@@ -55,7 +55,11 @@ class VMAFPlot:
                 frame_nums = []
                 vmaf_scores = []
                 for frame in rd_results['frames']:
-                    vmaf_scores.append(frame['VMAF_score'])
+                    if 'VMAF_score' in frame:
+                        val = frame['VMAF_score']
+                    else:
+                        val = frame['metrics']['vmaf']
+                    vmaf_scores.append(val)
                     frame_nums.append(frame['frameNum'])
                 self.draw(frame_nums, vmaf_scores, file)
                 self.finish()
