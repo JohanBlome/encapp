@@ -1,4 +1,4 @@
-#!/usr/local/bin/ python3
+#!/usr/local/bin/python3
 
 import matplotlib.pyplot as plt
 import argparse
@@ -24,7 +24,7 @@ class RDPlot:
 
         return color+marker+line
 
-    def new_figure(self,title):
+    def new_figure(self, title):
         plt.figure()
         plt.title(os.path.basename(title))
         plt.xlabel('Bitrate (kbps)')
@@ -55,10 +55,11 @@ class RDPlot:
                 self.new_figure(key)
                 for result in rd_results[key]:
                     self.draw(result['bitrates'],
-                            result['vmaf_scores'],
-                            result['description'])
+                              result['vmaf_scores'],
+                              result['description'])
                 self.finish()
         plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='A Python script \
