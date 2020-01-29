@@ -243,6 +243,10 @@ raw file:
 ]
 
 
-Run 
+Run
 $ encapp_tests.py --test sample_config.json
-The script assumes that the input file(s) are in the working directory and will automatically push it to the device. 
+
+To run on a specific device, use
+$ encapp_tests.py --test sample_config.json --serial [device serial number]
+The script will automatically push the input files to the device.
+If the input file(s) are not in the working directory, use absolute path(s)
