@@ -135,7 +135,7 @@ public class VideoConstraints {
         return mLtrCount;
     }
 
-    private int getmBitrateMode() {
+    public int getmBitrateMode() {
         return mBitrateMode;
     }
 
