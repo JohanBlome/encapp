@@ -1,23 +1,24 @@
 # encapp
 Easy way to test video encoders in Android in large scale.
 
-Facilitates an encoding mechanism for a large number of combinations in regards to
-- codecs
-- bitrate
-- framerate
-- i-frame interval
-- coding mode
+This tool provides an easy way to test an android video encoder by easily combining parameters like:
 
-I also have support for dynamic changes with fps, bitrate, and ltr.
+* codecs
+* bitrate
+* framerate
+* i-frame interval
+* coding mode
+
+encapp also has support for dynamically changing framerate, bitrate, and ltr.
 This is described in `scripts/offline_transcoding.sh`.
 
 
 ## 1. Prerequisites
 
-- adb connection
-- ffmpeg with decoding support for the codecs to be tested
-- android sdk setup and environment variables set
-- android ndk
+* adb connection to the device being tested.
+* ffmpeg with decoding support for the codecs to be tested
+* android sdk setup and environment variables set
+* android ndk
 
 
 ## 2. Operation
