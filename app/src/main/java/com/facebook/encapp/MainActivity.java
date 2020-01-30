@@ -19,6 +19,7 @@ import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
+import com.facebook.encapp.R;
 import com.facebook.encapp.utils.SizeUtils;
 
 import java.util.ArrayList;
