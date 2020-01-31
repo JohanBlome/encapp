@@ -31,10 +31,9 @@ import static org.junit.Assert.*;
  * Instrumentation test, which will execute on an Android device.
  * <p>
  * Run instrumentation test:
- * adb shell am instrument
- * -w
- * -e class com.facebook.codecvalidate.com.facebook.encapp.CodecValidationInstrumentedTest
- * com.facebook.codecvalidate.test/android.support.test.runner.AndroidJUnitRunner
+ * adb shell am instrument \
+ *   -w -e class com.facebook.encapp.CodecValidationInstrumentedTest \
+ *   com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
  * <p>
  * Provide any of the following arguments for a custom test run. Examples below:
  * -e test_timeout 60 (Predicted test duration in minutes, default is 60 minutes.
