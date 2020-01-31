@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from plot_rd import RDPlot
 
-KEY_NAME_DISCRIPTION = 'description'
+KEY_NAME_DESCRIPTION = 'description'
 KEY_NAME_INPUT_FILES = 'input_files'
 KEY_NAME_CODECS = 'codecs'
 KEY_NAME_ENCODE_RESOLUTIONS = 'encode_resolutions'
@@ -23,7 +23,7 @@ KEY_NAME_I_FRAME_SIZES = 'i_frame_sizes'
 
 sample_config_json_data = [
     {
-        KEY_NAME_DISCRIPTION: 'sample',
+        KEY_NAME_DESCRIPTION: 'sample',
         KEY_NAME_INPUT_FILES: [''],
         KEY_NAME_USE_SURFACE_ENC: 1,
         KEY_NAME_INPUT_FORMAT: 'mp4',
@@ -466,7 +466,7 @@ def build_tests(tests_json, device_model):
         bitrates = test.get(KEY_NAME_BITRATES)
         i_intervals = test.get(KEY_NAME_I_INTERVALS)
         duration = str(test.get(KEY_NAME_DURATION))
-        group_desc = test.get(KEY_NAME_DISCRIPTION)
+        group_desc = test.get(KEY_NAME_DESCRIPTION)
         i_frame_sizes = test.get(KEY_NAME_I_FRAME_SIZES)
         if i_frame_sizes is None:
             i_frame_sizes = ['default']
