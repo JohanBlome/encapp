@@ -5,6 +5,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -74,15 +75,8 @@ public class SurfaceTranscoder extends Transcoder{
             MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
             String id = vc.getVideoEncoderIdentifier();
             String codecName = "";
-            Vector<MediaCodecInfo> matching = new Vector<>();
-            for (MediaCodecInfo info: codecInfos) {
-                if (info.isEncoder() && info.getName().toLowerCase().contains(id.toLowerCase())) {
-                    if (info.getSupportedTypes().length > 0 &&
-                            info.getSupportedTypes()[0].toLowerCase().contains("video")) {
-                        matching.add(info);
-                    }
-                }
-            }
+            Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, id);
+
             if (matching.size() > 1) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("\nAmbigous codecs \n" + matching.size() + " codecs matching.\n");
@@ -304,5 +298,6 @@ public class SurfaceTranscoder extends Transcoder{
 
         return "";
     }
+
 
 }

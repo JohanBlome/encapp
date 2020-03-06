@@ -6,6 +6,7 @@ import android.media.MediaMuxer;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Size;
 
@@ -90,15 +91,8 @@ class Transcoder {
             MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
             String id = vc.getVideoEncoderIdentifier();
             String codecName = "";
-            Vector<MediaCodecInfo> matching = new Vector<>();
-            for (MediaCodecInfo info: codecInfos) {
-                if (info.isEncoder() && info.getName().toLowerCase().contains(id.toLowerCase())) {
-                    if (info.getSupportedTypes().length > 0 &&
-                            info.getSupportedTypes()[0].toLowerCase().contains("video")) {
-                        matching.add(info);
-                    }
-                }
-            }
+            Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, id);
+
             if (matching.size() > 1) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("\nAmbigous codecs \n" + matching.size() + " codecs matching.\n");
@@ -417,6 +411,29 @@ class Transcoder {
         mMuxer.start();
 
         return mMuxer;
+    }
+
+    @NonNull
+    protected Vector<MediaCodecInfo> getMediaCodecInfos(MediaCodecInfo[] codecInfos, String id) {
+        Vector<MediaCodecInfo> matching = new Vector<>();
+        for (MediaCodecInfo info: codecInfos) {
+            //Handle special case of codecs with naming schemes consisting of substring of another
+
+            if (info.isEncoder()) {
+                if (info.getSupportedTypes().length > 0 &&
+                        info.getSupportedTypes()[0].toLowerCase().contains("video")) {
+                    if (info.getName().toLowerCase().equals(id.toLowerCase())) {
+                        //Break on exact match
+                        matching.add(info);
+                        break;
+                    }
+                    else if (info.getName().toLowerCase().contains(id.toLowerCase())) {
+                        matching.add(info);
+                    }
+                }
+            }
+        }
+        return matching;
     }
 
     private native boolean nativeOpenFile(String filename);
