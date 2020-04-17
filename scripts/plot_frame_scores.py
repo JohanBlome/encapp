@@ -14,6 +14,10 @@ class VMAFPlot:
         self.markers = ['o', 'v', '^', '<', '>', '8', 's',
                         'p', '*', 'h', 'H', 'D', 'd', 'P', 'X']
         self.lines = ['-', '--', '-.']
+        self.x_min = 0
+        self.x_max = 0
+        self.y_min = 100
+        self.y_max = 100
 
     def get_style(self):
         index = self.curve_index
@@ -39,16 +43,27 @@ class VMAFPlot:
         self.y_min = min(self.y_min, np.amin(scores))
         plt.plot(frame_nums, scores, self.get_style(), label=str(curve_label))
         plt.legend()
-
-    def finish(self):
         plt.axis([self.x_min, self.x_max+1, self.y_min-5, self.y_max])
-        plt.grid()
+        plt.grid(True)
         plt.draw()
 
-    def plot_rd_curve(self, rd_results_json_files):
+    def finish(self,fig_file):
+        if fig_file is None:
+            plt.show()
+        else:
+            plt.savefig(fig_file,format='png')
+
+    def plot_rd_curve(self, rd_results_json_files, labels, fig_file):
         rd_results = None
         self.new_figure('VMAF')
+        label_id = 0
         for file in rd_results_json_files:
+            if (labels is not None and
+               len(labels) == len(rd_results_json_files)):
+                label = labels[label_id]
+            else:
+                label = file
+            label_id += 1
             with open(file, "r") as fp:
                 rd_results = json.load(fp)
                 fp.close()
@@ -61,9 +76,8 @@ class VMAFPlot:
                         val = frame['metrics']['vmaf']
                     vmaf_scores.append(val)
                     frame_nums.append(frame['frameNum'])
-                self.draw(frame_nums, vmaf_scores, file)
-                self.finish()
-        plt.show()
+                self.draw(frame_nums, vmaf_scores, label)
+        self.finish(fig_file)
 
 
 if __name__ == '__main__':
@@ -71,10 +85,13 @@ if __name__ == '__main__':
         description='A Python script to plot VMAF scores of every frame')
     parser.add_argument('--vfiles', required=True, nargs='+',
                         help='VMAF Files', type=str)
+    parser.add_argument('--labels', nargs='+',
+                        help='Curve labels', type=str)
+    parser.add_argument('--fig',help='Specify a file name to save figure', type=str)
     args = parser.parse_args()
     rd_plot = VMAFPlot()
     vmaf_files = []
     for file in args.vfiles:
         vmaf_files.append(file)
     if len(vmaf_files) > 0:
-        rd_plot.plot_rd_curve(vmaf_files)
+        rd_plot.plot_rd_curve(vmaf_files,args.labels, args.fig)

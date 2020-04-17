@@ -20,6 +20,7 @@ KEY_NAME_USE_SURFACE_ENC = 'use_surface_enc'
 KEY_NAME_INPUT_FORMAT = 'input_format'
 KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
 KEY_NAME_I_FRAME_SIZES = 'i_frame_sizes'
+KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
 
 sample_config_json_data = [
     {
@@ -33,7 +34,10 @@ sample_config_json_data = [
         KEY_NAME_RC_MODES: ['cbr'],
         KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
         KEY_NAME_I_INTERVALS: [2],
-        KEY_NAME_I_FRAME_SIZES:['unlimited'],  # DEFAULT, MEDIUM, HUGE, UNLIMITED
+        # DEFAULT, MEDIUM, HUGE, UNLIMITED
+        KEY_NAME_I_FRAME_SIZES:['unlimited'],
+        # Upto 3 temporal layers
+        KEY_NAME_TEMPORAL_LAYER_COUNTS: [1],
         KEY_NAME_DURATION: 10
     }
 ]
@@ -111,7 +115,7 @@ def check_device(serial_no):
 
 class VideoAnalyzer:
     def __init__(self, id):
-        self.temp_dir = 'temp' + id
+        self.temp_dir = 'temp' + '_' + id
         self.source_file_infos = {}
         os.system('mkdir -p ' + self.temp_dir)
 
@@ -123,6 +127,26 @@ class VideoAnalyzer:
 
         if video_file is None:
             raise Exception('Video file does not exist')
+
+        if video_file.endswith('.webm'):
+            webm_info_cmd = 'webm_info -i ' + video_file +\
+                    ' -clusters -clusters_size'
+            ret, stdout, stderr = run_cmd(webm_info_cmd)
+            if ret is False:
+                raise Exception('Failed to extract video bitrate')
+            duration = 0.0
+            for line in stdout.split('\n'):
+                if 'Duration (sec)' in line:
+                    duration_str = line.split(':')[1]
+                    duration += float(duration_str.strip())
+                if 'Clusters (size):' in line:
+                    total_bytes_str = line.split(':')[1]
+                    total_bytes = int(total_bytes_str.strip())
+
+            bitrate = 0,
+            if duration != 0:
+                bitrate = int(total_bytes*8/duration/1024)
+            return bitrate
 
         if video_file.endswith('.mp4'):
             ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries \
@@ -141,12 +165,26 @@ class VideoAnalyzer:
 
     @staticmethod
     def get_resolution(mp4_file):
-        ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries \
-            stream=height,width -of csv=s=x:p=0 ' + mp4_file
+        ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries '\
+            + 'stream=width,height -of default=noprint_wrappers=1:nokey=1 ' \
+            + mp4_file
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout == '':
             raise Exception('Failed to extract video resolution')
-        return stdout.strip('\n')
+        lines = stdout.split('\n')
+        width = lines[0]
+        height = lines[1]
+
+        ffprobe_cmd = 'ffprobe -v error -select_streams v:0  -show_entries '\
+            + 'stream_tags=rotate  -of default=noprint_wrappers=1:nokey=1 '\
+            + mp4_file
+        ret, stdout, stderr = run_cmd(ffprobe_cmd)
+        if stdout != '':
+            rotation = abs(int(stdout.strip('\n')))
+            if rotation == 90 or rotation == 270:
+                return height+'x'+width
+
+        return width+'x'+height
 
     def get_source_info(self, mp4_file_ref):
         source_info = self.source_file_infos.get(mp4_file_ref)
@@ -154,7 +192,7 @@ class VideoAnalyzer:
             input_yuv_file = self.temp_dir+'/' +\
                              mp4_file_ref.strip('.mp4')+'.yuv'
             ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_ref + \
-                         ' -pix_fmt yuv420p -vsync 0 ' + input_yuv_file
+                         ' -pix_fmt yuv420p ' + input_yuv_file
             run_cmd(ffmpeg_cmd)
             res = self.get_resolution(mp4_file_ref)
             source_info = {'input_yuv_file': input_yuv_file,
@@ -174,14 +212,14 @@ class VideoAnalyzer:
                         ':log_fmt=json" -t ' + duration + ' -f null -'
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             # VMAF score = 89.176951
-            match = re.search('(?<=VMAF score = )[0-9.]+', stdout) 
+            match = re.search('(?<=VMAF score = )[0-9.]+', stdout)
             vmaf_score = match.group(0)
             return round(float(vmaf_score), 2)
         else:
             input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
             output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
             ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
-                         ' -pix_fmt yuv420p -vsync 0 -s ' + src_res + \
+                         ' -pix_fmt yuv420p -s ' + src_res + \
                          ' ' + output_yuv_file
             run_cmd(ffmpeg_cmd)
 
@@ -206,10 +244,11 @@ class VideoAnalyzer:
                     return round(float(vmaf_score), 2)
         return None
 
-    def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res, mp4_file_out, duration):
+    def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res,
+                           mp4_file_out, duration):
         output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
         ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
-                     ' -pix_fmt ' + ref_format + ' -vsync 0 -s ' + ref_res + \
+                     ' -pix_fmt ' + ref_format + ' -s ' + ref_res + \
                      ' ' + output_yuv_file
         run_cmd(ffmpeg_cmd)
 
@@ -226,7 +265,7 @@ class VideoAnalyzer:
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             os.system('rm ' + output_yuv_file)
             # VMAF score = 89.176951
-            match = re.search('(?<=VMAF score = )[0-9.]+', stdout) 
+            match = re.search('(?<=VMAF score = )[0-9.]+', stdout)
             vmaf_score = match.group(0)
             return round(float(vmaf_score), 2)
         else:
@@ -254,7 +293,7 @@ class VideoAnalyzer:
 class JobInfo:
     def __init__(self, desc, in_file, output_dir, codec, res, mode,
                  i_interval, br, duration, use_surface_enc,
-                 input_format, input_res, i_frame_size):
+                 input_format, input_res, i_frame_size, temporal_layer_count):
         print('in_file:' + in_file, 'codec:'+codec, 'enc_resolution:'+res,
               'rc_mode:'+mode, 'i_interval:'+i_interval, 'bitrate:'+br,
               'duration:'+duration, 'i_frame_size:'+i_frame_size, sep=',')
@@ -276,7 +315,12 @@ class JobInfo:
         self.input_file_on_device = 'ref.mp4' if use_surface_enc else 'ref.yuv'
         self.input_format = input_format
         self.input_res = input_res
-        self.pix_fmt = 'nv12'  # nv12 for hw encoder yuv420p for sw encoder
+        self.temporal_layer_count = temporal_layer_count
+        if 'qcom' in codec:
+            self.pix_fmt = 'nv12'
+        else:
+            # nv12 for hw encoder yuv420p for sw encoder
+            self.pix_fmt = 'yuv420p'
         self.i_frame_size = i_frame_size
 
 
@@ -284,6 +328,8 @@ class EncodeJobs:
     def __init__(self, device_model):
         self.job_info_groups = []
         self.prev_file = None
+        self.prev_enc_res = None
+        self.prev_pix_fmt = None
         self.rd_results = {}
         self.workdir = ''
 
@@ -301,16 +347,19 @@ class EncodeJobs:
     # run one encode job
     def run_one_encode(self, job_info, serial_no):
         # push input file to the device
-        if job_info.input_file != self.prev_file:
-            self.prev_file = job_info.input_file
-            if job_info.use_surface_enc or job_info.input_format != 'mp4':
+        if job_info.use_surface_enc or job_info.input_format != 'mp4':
+            if job_info.input_file != self.prev_file:
                 adb_cmd = 'adb -s ' + serial_no + ' push ' + \
                             job_info.input_file + ' ' \
                             + job_info.device_workdir\
                             + job_info.input_file_on_device
                 run_cmd(adb_cmd)
-            else:
-                input_file = 'ref.yuv'
+            self.prev_file = job_info.input_file
+        else:
+            if (job_info.input_file != self.prev_file or
+                    job_info.enc_res != self.prev_enc_res or
+                    job_info.pix_fmt != self.prev_pix_fmt):
+                input_file = self.workdir + '/' + 'ref.yuv'
                 ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
                              ' -pix_fmt ' + job_info.pix_fmt + ' '\
@@ -320,6 +369,9 @@ class EncodeJobs:
                           ' ' + job_info.device_workdir \
                           + job_info.input_file_on_device
                 run_cmd(adb_cmd)
+            self.prev_file = job_info.input_file
+            self.prev_enc_res = job_info.enc_res
+            self.prev_pix_fmt = job_info.pix_fmt
 
         adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r'\
                   + ' -e key ' + job_info.i_interval\
@@ -334,6 +386,7 @@ class EncodeJobs:
                   + ' -e mod ' + job_info.mode\
                   + ' -e fps 30'\
                   + ' -e ifsize ' + job_info.i_frame_size\
+                  + ' -e tlc ' + job_info.temporal_layer_count\
                   + ' -e skfr false -e debug false -e ltrc 1'
 
         if job_info.dynamic is not None:
@@ -370,15 +423,20 @@ class EncodeJobs:
             bitrates = []
             vmaf_scores = []
             for job_info in group:
+                if job_info.output_file is None:
+                    continue
                 # get video bitrate and vmaf score
                 bitrate = video_analyzer.get_bitrate(job_info.output_file)
-                if job_info.input_format == 'mp4':
+                if (job_info.input_format == 'mp4' or
+                        job_info.input_format == 'webm'):
                     score = video_analyzer.get_vmaf_score(
-                        job_info.input_file, job_info.output_file, job_info.duration)
+                        job_info.input_file, job_info.output_file,
+                        job_info.duration)
                 else:
                     score = video_analyzer.get_vmaf_score_yuv(
                         job_info.input_file, job_info.input_format,
-                        job_info.input_res, job_info.output_file, job_info.duration)
+                        job_info.input_res, job_info.output_file,
+                        job_info.duration)
                 bitrates.append(bitrate)
                 vmaf_scores.append(score)
 
@@ -405,10 +463,11 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                       res, mode, i_interval, i_frame_size,
                       duration, group_desc, bitrates,
                       use_surface_enc, input_format,
-                      input_res):
+                      input_res, temporal_layer_count):
     base_file_name = os.path.basename(in_file)
     sub_dir = '_'.join([base_file_name, codec, res, mode,
-                        str(i_interval)+'s', i_frame_size])
+                        str(i_interval)+'s', i_frame_size,
+                        'tlc'+temporal_layer_count])
     output_dir = workdir + '/' + sub_dir
     os.system('mkdir -p ' + output_dir)
     job_info_group = []
@@ -423,6 +482,7 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
     desc_array.append('iint')
     desc_array.append(str(i_interval))
     desc_array.append(i_frame_size)
+    desc_array.append('tlc' + str(temporal_layer_count))
     job_desc = '_'.join(desc_array)
     for br in bitrates:
         job_info = JobInfo(job_desc,
@@ -435,20 +495,22 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                            use_surface_enc,
                            input_format,
                            input_res,
-                           i_frame_size)
+                           i_frame_size,
+                           temporal_layer_count
+                           )
         job_info_group.append(job_info)
 
     enc_jobs.add_job_info_group(job_info_group)
 
 
-def build_tests(tests_json, device_model):
+def build_tests(tests_json, device_model, test_desc):
     if tests_json is None:
         raise Exception('Test file is empty')
 
     # get date and time and format it
     now = datetime.now()
     dt_string = now.strftime('%m-%d-%Y_%H_%M')
-    workdir = device_model + '_' + dt_string
+    workdir = device_model + '_' + dt_string + '_' + test_desc
     os.system('mkdir -p ' + workdir)
 
     enc_jobs = EncodeJobs(device_model)
@@ -474,38 +536,42 @@ def build_tests(tests_json, device_model):
             use_surface_enc = True
         else:
             use_surface_enc = False
+        temporal_layer_counts = test.get(KEY_NAME_TEMPORAL_LAYER_COUNTS)
+        if temporal_layer_counts is None:
+            temporal_layer_counts = [1]
         input_format = test.get(KEY_NAME_INPUT_FORMAT)
         input_res = test.get(KEY_NAME_INPUT_RESOLUTION)
-        job_info_group = []
         for in_file in input_files:
             for codec in codecs:
                 for res in enc_resolutions:
                     for mode in rc_modes:
                         for i_interval in i_intervals:
                             for i_frame_size in i_frame_sizes:
-                                build_one_enc_job(workdir,
-                                                  device_model,
-                                                  enc_jobs,
-                                                  in_file,
-                                                  codec,
-                                                  res,
-                                                  mode,
-                                                  i_interval,
-                                                  i_frame_size,
-                                                  duration,
-                                                  group_desc,
-                                                  bitrates,
-                                                  use_surface_enc,
-                                                  input_format,
-                                                  input_res)
+                                for tl_count in temporal_layer_counts:
+                                    build_one_enc_job(workdir,
+                                                      device_model,
+                                                      enc_jobs,
+                                                      in_file,
+                                                      codec,
+                                                      res,
+                                                      mode,
+                                                      i_interval,
+                                                      i_frame_size,
+                                                      duration,
+                                                      group_desc,
+                                                      bitrates,
+                                                      use_surface_enc,
+                                                      input_format,
+                                                      input_res,
+                                                      str(tl_count))
 
     return enc_jobs
 
 
-def run_encode_tests(tests_json, device_model, serial_no):
+def run_encode_tests(tests_json, device_model, serial_no, test_desc):
 
     # build tests
-    enc_jobs = build_tests(tests_json, device_model)
+    enc_jobs = build_tests(tests_json, device_model, test_desc)
 
     # run encode jobs
     enc_jobs.run_encodes(serial_no)
@@ -514,55 +580,6 @@ def run_encode_tests(tests_json, device_model, serial_no):
 
     rd_plot = RDPlot()
     rd_plot.plot_rd_curve(enc_jobs.workdir+'/'+RD_RESULT_FILE_NAME)
-
-
-def check_device(serial_no):
-    # check for devices
-    adb_cmd = 'adb devices -l'
-    ret, stdout, stderr = run_cmd(adb_cmd)
-    if ret is False:
-        print('Failed to get adb devices')
-        sys.exit()
-    device_serials = []
-
-    for line in stdout.split('\n'):
-        if line == 'List of devices attached' or line == '':
-            continue
-        serial = line.split()[0]
-        device_serials.append(serial)
-
-    if len(device_serials) == 0:
-        print('No device connected')
-        exit(0)
-    elif len(device_serials) > 1:
-        if (serial_no is None):
-            print('More than one devices connected. \
-                   Please specifiy a device serial number')
-            exit(0)
-        elif (serial_no not in device_serials):
-            print('Specified serial number {} is invalid.'.format(serial_no))
-            exit(0)
-    else:
-        serial_no = serial
-
-    # get device model
-    line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
-    model_re = re.compile(r'model:(?P<model>\S+)')
-    match = model_re.search(line[0])
-    device_model = match.group('model')
-
-    # remove any files that are generated in previous runs
-    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd)
-    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
-    for file in output_files:
-        if file == '':
-            continue
-        # remove the output
-        adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
-        run_cmd(adb_cmd)
-
-    return device_model, serial_no
 
 
 def list_codecs(serial_no):
@@ -587,7 +604,9 @@ def main(args):
             with open(args.test, 'r') as fp:
                 tests_json = json.load(fp)
                 fp.close()
-                run_encode_tests(tests_json, device_model, serial_no)
+                run_encode_tests(tests_json, device_model,
+                                 serial_no,
+                                 args.desc if args.desc is not None else '')
 
 
 if __name__ == '__main__':
@@ -601,6 +620,7 @@ if __name__ == '__main__':
                          file in json format')
     parser.add_argument('--list_codecs', action='store_true',
                         help='List codecs the devices support')
+    parser.add_argument('--desc', help='Test description')
     args = parser.parse_args()
 
     if len(sys.argv) == 1:

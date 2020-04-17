@@ -92,9 +92,13 @@ class Transcoder {
             String codecName = "";
             Vector<MediaCodecInfo> matching = new Vector<>();
             for (MediaCodecInfo info: codecInfos) {
-                if (info.isEncoder() && info.getName().toLowerCase().contains(id.toLowerCase())) {
-                    if (info.getSupportedTypes().length > 0 &&
-                            info.getSupportedTypes()[0].toLowerCase().contains("video")) {
+                if (info.isEncoder() && info.getSupportedTypes().length > 0 &&
+                        info.getSupportedTypes()[0].toLowerCase().contains("video")) {
+                    if (info.getName().toLowerCase().equals(id.toLowerCase())) {
+                        matching.clear();
+                        matching.add(info);
+                        break;
+                    } else if (info.getName().toLowerCase().contains(id.toLowerCase())) {
                         matching.add(info);
                     }
                 }
@@ -144,6 +148,18 @@ class Transcoder {
                     default:
                         //Not possible
                 }
+            }
+
+            int temporalLayerCount = vc.getTemporalLayerCount();
+            if (temporalLayerCount > 1) {
+                String temporalLayerValue;
+                if (codecName.contains("vp8")) {
+                    temporalLayerValue = "webrtc.vp8." + temporalLayerCount + "-layer";
+                } else {
+                    temporalLayerValue = "android.generic." + temporalLayerCount;
+                }
+                format.setString(MediaFormat.KEY_TEMPORAL_LAYERING, temporalLayerValue);
+                Log.d(TAG, "Set temporal layers to " + temporalLayerValue);
             }
 
             mCodec.configure(
@@ -296,7 +312,6 @@ class Transcoder {
 
         int read = nativeFillBuffer(buffer, size);
         int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
-        Log.d(TAG, "currentFrameNbr: " + currentFrameNbr);
         int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr) {
             read = -1; //Skip this and read again

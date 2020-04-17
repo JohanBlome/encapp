@@ -298,7 +298,6 @@ public class MainActivity extends AppCompatActivity {
                 String data = mExtraDataHashMap.get("mod");
                 mod = data.split(",");
             }
-
         }
 
         int index = 0;
@@ -328,6 +327,9 @@ public class MainActivity extends AppCompatActivity {
                                 }
                                 String iframesize = (mExtraDataHashMap.get("ifsize") != null) ? mExtraDataHashMap.get("ifsize") : "DEFAULT";
                                 constraints.setIframeSizePreset(VideoConstraints.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase()));
+                                if (mExtraDataHashMap.containsKey("tlc")) {
+                                    constraints.setTemporalLayerCount(Integer.parseInt(mExtraDataHashMap.get("tlc")));
+                                }
                                 Log.e(TAG, constraints.getSettings());
                                 boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) ? Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames")) : false;
                                 constraints.setSkipFrames(keySkipFrames);
