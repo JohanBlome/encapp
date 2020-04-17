@@ -435,6 +435,7 @@ class Transcoder {
                         info.getSupportedTypes()[0].toLowerCase().contains("video")) {
                     if (info.getName().toLowerCase().equals(id.toLowerCase())) {
                         //Break on exact match
+                        matching.clear();
                         matching.add(info);
                         break;
                     }
