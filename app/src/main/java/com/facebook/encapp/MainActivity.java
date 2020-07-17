@@ -3,24 +3,26 @@ package com.facebook.encapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
-import android.net.Uri;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Vector;
 
 import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
-import com.facebook.encapp.R;
 import com.facebook.encapp.utils.SizeUtils;
+import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.VideoConstraints;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -212,6 +214,16 @@ public class MainActivity extends AppCompatActivity {
             refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
         }
 
+        int loop = 1;
+        if (mExtraDataHashMap.containsKey("loop")) {
+            loop = Integer.parseInt(mExtraDataHashMap.get("loop"));
+        }
+
+        boolean writeOutput = true;
+        if (mExtraDataHashMap.containsKey("write")) {
+            writeOutput = (mExtraDataHashMap.get("write").equals("false"))? false: true;
+        }
+
         final TextView logText = (TextView)findViewById(R.id.logText);
         runOnUiThread(new Runnable() {
             @Override
@@ -228,17 +240,22 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            int framesToDecode = (int)(timeout * vc.getFPS());
-            Transcoder transcoder;
-            Log.d(TAG, "frames to transcode: "+framesToDecode);
+            int framesToDecode = -1;
+            final Transcoder transcoder;
+
             if (filename.toLowerCase().contains(".raw") ||
                 filename.toLowerCase().contains(".yuv")) {
                 transcoder = new Transcoder();
             } else {
                 transcoder = new SurfaceTranscoder();
             }
-
-            final String status = transcoder.transcode(vc, filename, refFrameSize, framesToDecode, dynamicData);
+            Log.d(TAG, "frames to transcode: "+framesToDecode);
+            final String status = transcoder.transcode(vc,
+                                                       filename,
+                                                       refFrameSize,
+                                                       dynamicData,
+                                                       loop,
+                                                       writeOutput);
             if(status.length() > 0) {
                 runOnUiThread(new Runnable() {
                     @Override
@@ -251,6 +268,18 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        Statistics stats = transcoder.getStatistics();
+                        try {
+                            FileWriter fw = new FileWriter("/sdcard/stats.json" , true);
+                            stats.writeJSON(fw);
+                            fw.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        Log.d(TAG, "Total time: " + stats.getProcessingTime());
+                        Log.d(TAG, "Total frames: " + stats.getFrameCount());
+                        Log.d(TAG, "Time per frame: " + (long)(stats.getProcessingTime()/stats.getFrameCount()));
+
                         logText.append("\nDone encoding: " + settings);
                     }
                 });
