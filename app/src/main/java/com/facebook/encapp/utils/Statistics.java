@@ -116,7 +116,7 @@ public class Statistics {
             json.put("description", mDesc);
             json.put("date", mStartDate.toString());
             json.put("proctime", getProcessingTime());
-            json.put("framecount", getProcessingTime());
+            json.put("framecount", getFrameCount());
             json.put("encodedfile", mEncodedfile);
 
             JSONObject settings = new JSONObject();
@@ -155,9 +155,6 @@ public class Statistics {
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
                 obj.put("proctime", (int)(info.getProcessingTime()));
-                obj.put("frame", (int)(counter++));
-
-
                 jsonArray.put(obj);
             }
             json.put("frames", jsonArray);
