@@ -429,7 +429,7 @@ class Transcoder {
                     (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
                     (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
         } else {
-            mFilename = "/sdcard/" + mStats.getId() + ".mp4";
+            mFilename = mStats.getId() + ".mp4";
         }
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
@@ -443,13 +443,13 @@ class Transcoder {
                         (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
                         (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
             } else {
-                mFilename = "/sdcard/" + mStats.getId() + ".webm";
+                mFilename = mStats.getId() + ".webm";
             }
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
             Log.d(TAG, "Create mMuxer with type "+type+" and filename: " + mFilename);
-            mMuxer = new MediaMuxer(mFilename, type);
+            mMuxer = new MediaMuxer("/sdcard/" + mFilename, type);
         } catch (IOException e) {
             Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: " + mFilename);
             e.printStackTrace();
@@ -460,7 +460,7 @@ class Transcoder {
         Log.d(TAG,"**\nSettings: " + formatTxt + "\n**");
         Log.d(TAG, "Start mMuxer");
         mMuxer.start();
-
+        mStats.setEncodedfile(mFilename);
         return mMuxer;
     }
 

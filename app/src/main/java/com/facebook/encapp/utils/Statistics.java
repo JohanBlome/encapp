@@ -18,6 +18,7 @@ import org.json.JSONObject;
 public class Statistics {
     private String mId;
     private String mDesc;
+    private String mEncodedfile = "";
     private long mStartTime;
     private long mStopTime;
     private HashMap<Long,FrameInfo> mFrames;
@@ -103,6 +104,10 @@ public class Statistics {
         return (int)(Math.round(8 * totalSize/(totalTime))); // bytes/Secs -> bit/sec
     }
 
+    public void  setEncodedfile(String filename) {
+        mEncodedfile = filename;
+    }
+
     public void writeJSON(Writer writer) throws IOException {
         try {
             JSONObject json = new JSONObject();
@@ -112,6 +117,7 @@ public class Statistics {
             json.put("date", mStartDate.toString());
             json.put("proctime", getProcessingTime());
             json.put("framecount", getProcessingTime());
+            json.put("encodedfile", mEncodedfile);
 
             JSONObject settings = new JSONObject();
             settings.put("codec",mVc.getVideoEncoderIdentifier());
