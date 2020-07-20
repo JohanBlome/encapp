@@ -270,7 +270,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         Statistics stats = transcoder.getStatistics();
                         try {
-                            FileWriter fw = new FileWriter("/sdcard/stats.json" , true);
+                            FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json" , false);
                             stats.writeJSON(fw);
                             fw.close();
                         } catch (IOException e) {

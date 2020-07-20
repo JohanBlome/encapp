@@ -199,7 +199,7 @@ public class SurfaceTranscoder extends Transcoder{
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             if (mWriteFile)
-                mMuxer = createMuxer(mCodec, format);
+                mMuxer = createMuxer(mCodec, format, true);
         }
         long totalTime = 0;
         long last_pts = 0;
@@ -283,7 +283,7 @@ public class SurfaceTranscoder extends Transcoder{
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(   MediaFormat.KEY_FRAME_RATE));
                     oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
                     if (mWriteFile)
-                        mMuxer = createMuxer(mCodec, oformat);
+                        mMuxer = createMuxer(mCodec, oformat, true);
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;

@@ -55,7 +55,7 @@ public class VideoConstraints {
         this.mBitRate = bitRate;
     }
 
-    private int getBitRate() {
+    public int getBitRate() {
         return mBitRate;
     }
 
@@ -155,7 +155,7 @@ public class VideoConstraints {
         mColorTransfer = colorTransfer;
     }
 
-    public int getColorTrnasfer() {
+    public int getColorTransfer() {
         return mColorTransfer;
     }
 

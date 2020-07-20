@@ -16,6 +16,7 @@ import com.facebook.encapp.utils.VideoConstraints;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.Vector;
 
 /**
@@ -57,6 +58,7 @@ class Transcoder {
     protected boolean mUseLTR = false;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
+    protected String mFilename;
 
     public String transcode (
             VideoConstraints vc,
@@ -201,7 +203,7 @@ class Transcoder {
             oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             Log.d(TAG, "Call create mMuxer");
             if (mWriteFile)
-                mMuxer = createMuxer(mCodec, oformat);
+                mMuxer = createMuxer(mCodec, oformat, true);
         }
 
         long last_pts = 0;
@@ -238,7 +240,6 @@ class Transcoder {
 
                         if (size <= 0) {
                             nativeCloseFile();
-                            nativeOpenFile(filename);
                             current_loop++;
                             if (current_loop > loop) {
                                 try {
@@ -256,6 +257,7 @@ class Transcoder {
                                 }
                                 break;
                             }
+                            nativeOpenFile(filename);
                             Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                         }
                     }
@@ -280,7 +282,7 @@ class Transcoder {
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
                     oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
                     if (mWriteFile)
-                        mMuxer = createMuxer(mCodec, oformat);
+                        mMuxer = createMuxer(mCodec, oformat, true);
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
@@ -415,33 +417,41 @@ class Transcoder {
     }
 
 
-    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format) {
-        Log.d(TAG, "Bitrate mode: "+(format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
-        String filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
-            encoder.getCodecInfo().getName().toLowerCase(),
-                (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
-                (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
-                (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
-                (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
-                (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
+    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
+        if (!useStatId) {
+            Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+            mFilename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
+                    encoder.getCodecInfo().getName().toLowerCase(),
+                    (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
+                    (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
+                    (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
+                    (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
+                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
+                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+        } else {
+            mFilename = "/sdcard/" + mStats.getId() + ".mp4";
+        }
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
-            filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
-            encoder.getCodecInfo().getName().toLowerCase(),
-                    (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
-                    (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
-                    (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
-                    (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
-                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
+            if (!useStatId) {
+                mFilename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
+                        encoder.getCodecInfo().getName().toLowerCase(),
+                        (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
+                        (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
+                        (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
+                        (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
+                        (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
+                        (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+            } else {
+                mFilename = "/sdcard/" + mStats.getId() + ".webm";
+            }
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
-            Log.d(TAG, "Create mMuxer with type "+type+" and filename: "+filename);
-            mMuxer = new MediaMuxer(filename, type);
+            Log.d(TAG, "Create mMuxer with type "+type+" and filename: " + mFilename);
+            mMuxer = new MediaMuxer(mFilename, type);
         } catch (IOException e) {
-            Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: "+filename);
+            Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: " + mFilename);
             e.printStackTrace();
         }
 
@@ -452,6 +462,10 @@ class Transcoder {
         mMuxer.start();
 
         return mMuxer;
+    }
+
+    public String getOutputFilename() {
+        return mFilename;
     }
 
     @NonNull

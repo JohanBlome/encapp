@@ -6,22 +6,34 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import android.util.JsonWriter;
+import java.util.UUID;
+
+import android.util.Log;
 import android.util.Size;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class Statistics {
     private String mId;
+    private String mDesc;
     private long mStartTime;
     private long mStopTime;
     private HashMap<Long,FrameInfo> mFrames;
     VideoConstraints mVc;
     Date mStartDate;
 
-    public Statistics(String id, VideoConstraints vc) {
-        mId = id;
+    public Statistics(String desc, VideoConstraints vc) {
+        mDesc = desc;
         mFrames = new HashMap<>();
         mVc = vc;
         mStartDate = new Date();
+        mId = "encapp_" + UUID.randomUUID().toString();
+    }
+
+    public String getId(){
+        return mId;
     }
 
     public String toString() {
@@ -74,58 +86,79 @@ public class Statistics {
         return mFrames.size();
     }
 
-    public void writeJSON(Writer writer) throws IOException {
-        JsonWriter json = new JsonWriter(writer);
-        json.setIndent("  ");
-        json.beginObject();
-        json.name("id");
-        json.value(mId);
-        json.name("date");
-        json.value(mStartDate.toString());
-        json.name("proctime");
-        json.value(getProcessingTime());
-        json.name("framecount");
-        json.value(getFrameCount());
-
-        json.name("settings");
-        json.beginObject();
-        json.name("codec");
-        json.value(mVc.getVideoEncoderIdentifier());
-        json.name("gop");
-        json.value(mVc.getKeyframeRate());
-        json.name("fps");
-        json.value(mVc.getFPS());
-
-        Size s = mVc.getVideoSize();
-        json.name("width");
-        json.value(s.getWidth());
-        json.name("height");
-        json.value(s.getHeight());
-        json.endObject();
-
-        json.name("frames");
-        json.beginObject();
-
+    public int getAverageBitrate() {
         ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
         Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
         Collections.sort(allFrames, compareByPts);
-        int counter = 0;
+        int framecount = allFrames.size();
+        long startPts = allFrames.get(0).mPts;
+        //We just ignore the last frame, for the average does not mean much.
+        long lastTime = allFrames.get(allFrames.size() - 1).mPts;
+        double totalTime =  ((double)(lastTime - startPts)) / 1000000.0;
+        long totalSize = 0;
         for (FrameInfo info: allFrames) {
-            json.name("frame");
-            json.beginObject();
-            json.name("id");
-            json.value(counter++);
-            json.name("iframe");
-            json.value(info.isIFrame());
-            json.name("size");
-            json.value(info.getSize());
-            json.name("pts");
-            json.value(info.getPts());
-            json.name("proctime");
-            json.value((int)(info.getProcessingTime()));
-            json.endObject();
+            totalSize += info.getSize();
         }
-        json.endObject();
-        json.endObject();
+        totalSize -= allFrames.get(framecount - 1).mSize;
+        return (int)(Math.round(8 * totalSize/(totalTime))); // bytes/Secs -> bit/sec
+    }
+
+    public void writeJSON(Writer writer) throws IOException {
+        try {
+            JSONObject json = new JSONObject();
+
+            json.put("id", mId);
+            json.put("description", mDesc);
+            json.put("date", mStartDate.toString());
+            json.put("proctime", getProcessingTime());
+            json.put("framecount", getProcessingTime());
+
+            JSONObject settings = new JSONObject();
+            settings.put("codec",mVc.getVideoEncoderIdentifier());
+            settings.put("gop", mVc.getKeyframeRate());
+            settings.put("fps", mVc.getFPS());
+            settings.put("bitrate", mVc.getBitRate());
+            settings.put("meanbitrate", getAverageBitrate());
+            Size s = mVc.getVideoSize();
+            settings.put("width", s.getWidth());
+            settings.put("height", s.getHeight());
+            settings.put("encmode",mVc.bitrateModeName());
+            settings.put("keyrate",mVc.getKeyframeRate());
+            settings.put("iframepreset",mVc.getIframeSizePreset());
+            settings.put("colorformat",mVc.getColorFormat());
+            settings.put("colorrange",mVc.getColorRange());
+            settings.put("colorstandard",mVc.getColorStandard());
+            settings.put("colortransfer",mVc.getColorTransfer());
+            settings.put("hierplayers",mVc.getHierStructLayers());
+            settings.put("ltrcount",mVc.getLTRCount());
+
+            json.put("settings", settings);
+
+            ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
+            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
+            Collections.sort(allFrames, compareByPts);
+            int counter = 0;
+            JSONArray jsonArray = new JSONArray();
+
+            JSONObject obj = null;
+            for (FrameInfo info: allFrames) {
+                obj = new JSONObject();
+
+                obj.put("frame", (int)(counter++));
+                obj.put("iframe", (info.isIFrame())? 1: 0);
+                obj.put("size", info.getSize());
+                obj.put("pts", info.getPts());
+                obj.put("proctime", (int)(info.getProcessingTime()));
+                obj.put("frame", (int)(counter++));
+
+
+                jsonArray.put(obj);
+            }
+            json.put("frames", jsonArray);
+
+            writer.write(json.toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 }
