@@ -19,6 +19,7 @@ public class Statistics {
     private String mId;
     private String mDesc;
     private String mEncodedfile = "";
+    private String mCodec;
     private long mStartTime;
     private long mStopTime;
     private HashMap<Long,FrameInfo> mFrames;
@@ -87,6 +88,10 @@ public class Statistics {
         return mFrames.size();
     }
 
+    public void setCodec(String codec) {
+        mCodec = codec;
+    }
+
     public int getAverageBitrate() {
         ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
         Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
@@ -120,7 +125,7 @@ public class Statistics {
             json.put("encodedfile", mEncodedfile);
 
             JSONObject settings = new JSONObject();
-            settings.put("codec",mVc.getVideoEncoderIdentifier());
+            settings.put("codec", mCodec);
             settings.put("gop", mVc.getKeyframeRate());
             settings.put("fps", mVc.getFPS());
             settings.put("bitrate", mVc.getBitRate());

@@ -198,7 +198,7 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("loop", LOOP_INPUT);
             Log.e(TAG, "loop input: " + LOOP_INPUT);
         }
-        if (LOOP_INPUT != null) {
+        if (MULTIPLE_CONC_SESSIONS != null) {
             mExtraDataHashMap.put("conc", MULTIPLE_CONC_SESSIONS);
             Log.e(TAG, "concurrent sessions: " + MULTIPLE_CONC_SESSIONS);
         }

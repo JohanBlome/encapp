@@ -176,7 +176,6 @@ class VideoAnalyzer:
 
             with open(log_file, 'r') as fp:
                 text = fp.read()
-                print(text)
                 match = re.search('(?<="VMAF score":)[0-9.]+', text)
                 vmaf_score = match.group(0)
                 return round(float(vmaf_score), 2)
@@ -230,9 +229,11 @@ class VideoAnalyzer:
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             os.system('rm ' + output_yuv_file)
             # VMAF score = 89.176951
-            match = re.search('(?<=VMAF score = )[0-9.]+', stdout) 
-            vmaf_score = match.group(0)
-            return round(float(vmaf_score), 2)
+            with open(log_file, 'r') as fp:
+                text = fp.read()
+                match = re.search('(?<="VMAF score":)[0-9.]+', text)
+                vmaf_score = match.group(0)
+                return round(float(vmaf_score), 2)
         else:
             vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
                        ' ' + ref_yuv + ' ' + output_yuv_file +\

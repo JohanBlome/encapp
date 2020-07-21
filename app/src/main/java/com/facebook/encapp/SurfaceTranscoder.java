@@ -99,7 +99,8 @@ public class SurfaceTranscoder extends Transcoder{
                 vc.setVideoEncoderIdentifier(matching.elementAt(0).getSupportedTypes()[0]);
                 codecName = matching.elementAt(0).getName();
             }
-
+    
+            mStats.setCodec(codecName);
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 

@@ -118,6 +118,7 @@ class Transcoder {
                 codecName = matching.elementAt(0).getName();
             }
 
+            mStats.setCodec(codecName);
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 
