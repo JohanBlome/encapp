@@ -364,7 +364,7 @@ class EncodeJobs:
             run_cmd(adb_cmd)
 
             with open(job_info.output_dir + '/' + file) as json_file:
-                data = data = json.load(json_file)
+                data = json.load(json_file)
                 job_info.data = data
 
             # get the media file as well
