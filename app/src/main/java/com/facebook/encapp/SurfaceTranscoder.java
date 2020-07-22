@@ -5,13 +5,15 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
+
+import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.VideoConstraints;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,13 +28,20 @@ public class SurfaceTranscoder extends Transcoder{
     InputSurface mInputSurface;
     OutputSurface mOutputSurface;
 
-    public String transcode(VideoConstraints vc, String filename, Size refFrameSize, int totalFrames, String dynamic) {
+    public String transcode(VideoConstraints vc,
+                            String filename,
+                            Size refFrameSize,
+                            String dynamic,
+                            int loop,
+                            boolean writeFile) {
         Log.d(TAG, "**** SURFACE TRANSCODE ***");
         int keyFrameInterval = vc.getKeyframeRate();
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
         mRefFramesizeInBytes = (int)(refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
+        mWriteFile = writeFile;
+        mStats = new Statistics("surface encoder", vc);
 
         if (dynamic != null) {
             mDynamicSetting = new Stack<String>();
@@ -90,7 +99,8 @@ public class SurfaceTranscoder extends Transcoder{
                 vc.setVideoEncoderIdentifier(matching.elementAt(0).getSupportedTypes()[0]);
                 codecName = matching.elementAt(0).getName();
             }
-
+    
+            mStats.setCodec(codecName);
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 
@@ -200,17 +210,18 @@ public class SurfaceTranscoder extends Transcoder{
             //There seems to be a bug so that this key is no set (but used).
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-            mMuxer = createMuxer(mCodec, format);
+            if (mWriteFile)
+                mMuxer = createMuxer(mCodec, format, true);
         }
         long totalTime = 0;
-        while (mFramesAdded < totalFrames) {
+        long last_pts = 0;
+        int current_loop = 1;
+        while (loop >= current_loop) {
             int index;
-            Log.d(TAG, "Frames: "+mFramesAdded+'/'+totalFrames + " - inframes: "+inFramesCount);
+            Log.d(TAG, "Frames: "+mFramesAdded + " - inframes: "+inFramesCount + ", current loop: " + current_loop);
             try {
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
                 if (index >= 0) {
-                    boolean eos = (inFramesCount == totalFrames - 1);
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     if (size > 0) {
@@ -218,7 +229,15 @@ public class SurfaceTranscoder extends Transcoder{
                     }
                     boolean eof = !mExtractor.advance();
                     if (eof) {
-                        mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                        current_loop++;
+
+                        if (current_loop > loop) {
+                            Log.d(TAG, "End of stream!");
+                            mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            break;
+                        }
+                        Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
                     }
                 }
             }catch (Exception ex) {
@@ -241,9 +260,17 @@ public class SurfaceTranscoder extends Transcoder{
                         mDecoder.releaseOutputBuffer(index, true);
                         mOutputSurface.awaitNewImage();
                         mOutputSurface.drawImage();
+                        long pts = info.presentationTimeUs;
+                        if (pts > last_pts) {
+                            last_pts = pts;
+                        } else {
+                            // Loop
+                            pts = (current_loop - 1) * last_pts + pts;
+                        }
                         //egl have time in ns
-                        mInputSurface.setPresentationTime(info.presentationTimeUs * 1000);
+                        mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
+                        mStats.startFrame(pts);
                     }
 
                 }
@@ -256,7 +283,6 @@ public class SurfaceTranscoder extends Transcoder{
             }
 
             index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
             } else if (index >= 0) {
@@ -266,28 +292,32 @@ public class SurfaceTranscoder extends Transcoder{
                     MediaFormat oformat = mCodec.getOutputFormat();
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
+                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(   MediaFormat.KEY_FRAME_RATE));
                     oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                    mMuxer = createMuxer(mCodec, oformat);
+                    if (mWriteFile)
+                        mMuxer = createMuxer(mCodec, oformat, true);
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-
                     break;
-                } else if (mMuxer != null){
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
+                } else {
+                    boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
+                    mStats.stopFrame(info.presentationTimeUs, info.size, keyFrame);
+
+                    if (keyFrame) {
                         Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
                     }
 
                     ++outFramesCount;
                     mFramesAdded += 1;
                     totalTime += info.presentationTimeUs;
-                    mMuxer.writeSampleData(0, data, info);
+                    if (mMuxer != null)
+                        mMuxer.writeSampleData(0, data, info);
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }
         }
 
-
+        mStats.stop();
         Log.d(TAG, "Done transcoding");
         try {
             if (mCodec != null) {

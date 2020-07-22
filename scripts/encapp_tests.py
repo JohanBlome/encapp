@@ -44,8 +44,7 @@ sample_config_json_data = [
 TEST_CLASS_NAME = 'com.facebook.encapp.CodecValidationInstrumentedTest'
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
-ENCAPP_OUTPUT_FILE_NAME_RE = r'.*_[0-9]+fps_[0-9]+x[0-9]+_[0-9]+' + \
-                             r'bps_iint[0-9]+_m[0-9]+(?:\.mp4$|\.webm)'
+ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*(?:\.json$)'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
 
@@ -97,7 +96,7 @@ def check_device(serial_no):
     line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
     model_re = re.compile(r'model:(?P<model>\S+)')
     match = model_re.search(line[0])
-    device_model = match.group('model')
+    device_model = match.group('model') if match.group('model') else 'generic'
 
     # remove any files that are generated in previous runs
     adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
@@ -211,10 +210,14 @@ class VideoAnalyzer:
                         ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
                         ':log_fmt=json" -t ' + duration + ' -f null -'
             ret, stdout, stderr = run_cmd(vmaf_cmd)
-            # VMAF score = 89.176951
-            match = re.search('(?<=VMAF score = )[0-9.]+', stdout)
-            vmaf_score = match.group(0)
-            return round(float(vmaf_score), 2)
+            #"VMAF score":93.45996777752221,
+
+            with open(log_file, 'r') as fp:
+                text = fp.read()
+                match = re.search('(?<="VMAF score":)[0-9.]+', text)
+                vmaf_score = match.group(0)
+                return round(float(vmaf_score), 2)
+            return None
         else:
             input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
             output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
@@ -265,9 +268,11 @@ class VideoAnalyzer:
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             os.system('rm ' + output_yuv_file)
             # VMAF score = 89.176951
-            match = re.search('(?<=VMAF score = )[0-9.]+', stdout)
-            vmaf_score = match.group(0)
-            return round(float(vmaf_score), 2)
+            with open(log_file, 'r') as fp:
+                text = fp.read()
+                match = re.search('(?<="VMAF score":)[0-9.]+', text)
+                vmaf_score = match.group(0)
+                return round(float(vmaf_score), 2)
         else:
             vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
                        ' ' + ref_yuv + ' ' + output_yuv_file +\
@@ -411,10 +416,26 @@ class EncodeJobs:
             adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/' + file + \
                       ' ' + job_info.output_dir
             run_cmd(adb_cmd)
-            # remove the output
-            adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
-            run_cmd(adb_cmd)
-            job_info.output_file = job_info.output_dir + '/' + file
+
+            with open(job_info.output_dir + '/' + file) as json_file:
+                data = json.load(json_file)
+                job_info.data = data
+
+            # get the media file as well
+            fid = job_info.data['id']
+            settings = job_info.data['settings']
+            print("fid {:s} - br: {:d}, mean br: {:d}, res: {:d}x{:d}, codec: {:s}".format(fid, settings['bitrate'], settings['meanbitrate'], settings['width'], settings['height'],  settings['codec']))
+            encoded_file = job_info.data['encodedfile']
+            if len(encoded_file) > 0:
+                adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/' + encoded_file  + \
+                          ' ' + job_info.output_dir
+                run_cmd(adb_cmd)
+                # remove the output
+                adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + encoded_file
+                run_cmd(adb_cmd)
+                job_info.output_file = job_info.output_dir + '/' +  encoded_file
+            else:
+                job_info.output_file = None
 
     def get_rate_distortion(self, serial_no):
         video_analyzer = VideoAnalyzer(serial_no)
@@ -465,9 +486,8 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                       use_surface_enc, input_format,
                       input_res, temporal_layer_count):
     base_file_name = os.path.basename(in_file)
-    sub_dir = '_'.join([base_file_name, codec, res, mode,
-                        str(i_interval)+'s', i_frame_size,
-                        'tlc'+temporal_layer_count])
+    sub_dir = '_'.join([base_file_name, "files"])
+
     output_dir = workdir + '/' + sub_dir
     os.system('mkdir -p ' + output_dir)
     job_info_group = []

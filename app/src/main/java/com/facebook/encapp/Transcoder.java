@@ -10,12 +10,14 @@ import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.Size;
 
+import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.VideoConstraints;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.Vector;
-
-import java.util.regex.Pattern;
 
 /**
  * Created by jobl on 2018-02-27.
@@ -54,15 +56,24 @@ class Transcoder {
     protected long mFrameTime = 0;
     int mLTRCount = 0;
     protected boolean mUseLTR = false;
-
+    protected boolean mWriteFile = true;
+    protected Statistics mStats;
+    protected String mFilename;
 
     public String transcode (
-            VideoConstraints vc, String filename, Size refFrameSize, int totalFrames, String dynamic) {
+            VideoConstraints vc,
+            String filename,
+            Size refFrameSize,
+            String dynamic,
+            int loop,
+            boolean writeFile) {
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
         mRefFramesizeInBytes = (int)(refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
-
+        mWriteFile = writeFile;
+        mStats = new Statistics("raw encoder", vc);
+        mStats.start();
         boolean ok = nativeOpenFile(filename);
         if(!ok) {
             Log.e(TAG, "Failed to open yuv file");
@@ -107,6 +118,7 @@ class Transcoder {
                 codecName = matching.elementAt(0).getName();
             }
 
+            mStats.setCodec(codecName);
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 
@@ -203,78 +215,107 @@ class Transcoder {
             oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
             oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             Log.d(TAG, "Call create mMuxer");
-            mMuxer = createMuxer(mCodec, oformat);
+            if (mWriteFile)
+                mMuxer = createMuxer(mCodec, oformat, true);
         }
 
-        while (true) {
+        long last_pts = 0;
+        int current_loop = 1;
+        while (loop >= current_loop) {
             int index;
-            if (mFramesAdded < totalFrames) { //Count not decoded frames but frames added to the output
-                try {
-                    index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+            Log.d(TAG, "Frames: "+mFramesAdded + " - inframes: "+inFramesCount + ", current loop: " + current_loop);
+            try {
+                index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
-                    if (index >= 0) {
-                        int size = -1;
-                        boolean eos = (inFramesCount == totalFrames - 1);
-                        if (isVP && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
-                            Bundle params = new Bundle();
-                            params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                            mCodec.setParameters(params);
+                if (index >= 0) {
+                    int size = -1;
+                    if (isVP && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
+                        Bundle params = new Bundle();
+                        params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                        mCodec.setParameters(params);
+                    }
+
+                    ByteBuffer buffer = mCodec.getInputBuffer(index);
+                    while (size == -1) {
+
+                        try {
+                            size = queueInputBufferEncoder(
+                                    mCodec,
+                                    buffer,
+                                    index,inFramesCount,
+                                    0,
+                                    mRefFramesizeInBytes);
+
+                            inFramesCount++;
+                        } catch (IllegalStateException isx) {
+                            Log.e(TAG, "Queue encoder failed, " + index+", mess: "+isx.getMessage());
                         }
 
-                        ByteBuffer buffer = mCodec.getInputBuffer(index);
-                        while (size == -1) {
-                            try {
-                                size = queueInputBufferEncoder(
-                                        mCodec, buffer, index, inFramesCount,
-                                        eos ? MediaCodec.BUFFER_FLAG_END_OF_STREAM : 0, mRefFramesizeInBytes);
-
-                                inFramesCount++;
-                            } catch (IllegalStateException isx) {
-                                Log.e(TAG, "Queue encoder failed, " + index+", eos: "+ eos +", mess: "+isx.getMessage());
+                        if (size <= 0) {
+                            nativeCloseFile();
+                            current_loop++;
+                            if (current_loop > loop) {
+                                try {
+                                    size = queueInputBufferEncoder(
+                                            mCodec,
+                                            buffer,
+                                            index,
+                                            inFramesCount,
+                                            MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                                            0);
+                                    Log.d(TAG, "End of stream");
+                                    inFramesCount++;
+                                } catch (IllegalStateException isx) {
+                                    Log.e(TAG, "Queue encoder failed, " + index+", mess: "+isx.getMessage());
+                                }
+                                break;
                             }
+                            nativeOpenFile(filename);
+                            Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                         }
-                        numBytesSubmitted += size;
-                        if (size == 0) break;
                     }
-                }catch (Exception ex) {
-                    ex.printStackTrace();
+                    numBytesSubmitted += size;
+                   // if (size == 0) break;
                 }
-
-                index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
-                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    //Just ignore
-                } else if (index >= 0) {
-                    long nowUs = (System.nanoTime() + 500) / 1000;
-                    ByteBuffer data = mCodec.getOutputBuffer(index);
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                        MediaFormat oformat = mCodec.getOutputFormat();
-                        //There seems to be a bug so that this key is no set (but used).
-                        oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                        oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
-                        oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                        mMuxer = createMuxer(mCodec, oformat);
-                        mCodec.releaseOutputBuffer(index, false /* render */);
-                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-
-                        break;
-                    } else if (mMuxer != null){
-                        if ((info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
-                            Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
-                        }
-                        numBytesDequeued += info.size;
-                        ++outFramesCount;
-
-                        mMuxer.writeSampleData(0, data, info);
-                        mCodec.releaseOutputBuffer(index, false /* render */);
-                    }
-                }
-            } else {
-                Log.d(TAG, "Done transcoding");
-                break;
+            }catch (Exception ex) {
+                ex.printStackTrace();
             }
 
+            index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+
+            if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                //Just ignore
+            } else if (index >= 0) {
+                long nowUs = (System.nanoTime() + 500) / 1000;
+                ByteBuffer data = mCodec.getOutputBuffer(index);
+                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                    MediaFormat oformat = mCodec.getOutputFormat();
+                    //There seems to be a bug so that this key is no set (but used).
+                    oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
+                    oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+                    if (mWriteFile)
+                        mMuxer = createMuxer(mCodec, oformat, true);
+                    mCodec.releaseOutputBuffer(index, false /* render */);
+                } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                    break;
+                } else {
+                    boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
+                    mStats.stopFrame(info.presentationTimeUs, info.size, keyFrame);
+                    if (keyFrame) {
+                        Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
+                    }
+                    numBytesDequeued += info.size;
+                    ++outFramesCount;
+                    if (mMuxer != null)
+                        mMuxer.writeSampleData(0, data, info);
+                    mCodec.releaseOutputBuffer(index, false /* render */);
+                }
+            }
+
+            Log.d(TAG, "End of main loop" + current_loop);
         }
+        mStats.stop();
         if (mCodec != null) {
             mCodec.stop();
             mCodec.release();
@@ -307,13 +348,16 @@ class Transcoder {
             read = -1; //Skip this and read again
             mSkipped++;
         }
-        if (read > 0) {
+        if (read == size) {
             if (mNextLimit != -1 && frameCount >= mNextLimit) {
                 getNextLimit(frameCount);
             }
             mFramesAdded++;
             long ptsUsec = computePresentationTime(mFramesAdded);
+            mStats.startFrame(ptsUsec);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+        } else {
+            read =  -1;
         }
         return read;
     }
@@ -385,33 +429,41 @@ class Transcoder {
     }
 
 
-    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format) {
-        Log.d(TAG, "Bitrate mode: "+(format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
-        String filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
-            encoder.getCodecInfo().getName().toLowerCase(),
-                (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
-                (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
-                (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
-                (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
-                (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
+    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
+        if (!useStatId) {
+            Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+            mFilename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
+                    encoder.getCodecInfo().getName().toLowerCase(),
+                    (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
+                    (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
+                    (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
+                    (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
+                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
+                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+        } else {
+            mFilename = mStats.getId() + ".mp4";
+        }
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase().contains("vp")) {
-            filename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
-            encoder.getCodecInfo().getName().toLowerCase(),
-                    (format.containsKey(MediaFormat.KEY_FRAME_RATE)? format.getInteger(MediaFormat.KEY_FRAME_RATE): 0),
-                    (format.containsKey(MediaFormat.KEY_WIDTH)? format.getInteger(MediaFormat.KEY_WIDTH): 0),
-                    (format.containsKey(MediaFormat.KEY_HEIGHT)? format.getInteger(MediaFormat.KEY_HEIGHT): 0),
-                    (format.containsKey(MediaFormat.KEY_BIT_RATE)? format.getInteger(MediaFormat.KEY_BIT_RATE): 0),
-                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL)? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL): 0),
-                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE)? format.getInteger(MediaFormat.KEY_BITRATE_MODE): 0));
+            if (!useStatId) {
+                mFilename = String.format("/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
+                        encoder.getCodecInfo().getName().toLowerCase(),
+                        (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
+                        (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
+                        (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
+                        (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
+                        (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
+                        (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+            } else {
+                mFilename = mStats.getId() + ".webm";
+            }
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
-            Log.d(TAG, "Create mMuxer with type "+type+" and filename: "+filename);
-            mMuxer = new MediaMuxer(filename, type);
+            Log.d(TAG, "Create mMuxer with type "+type+" and filename: " + mFilename);
+            mMuxer = new MediaMuxer("/sdcard/" + mFilename, type);
         } catch (IOException e) {
-            Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: "+filename);
+            Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: " + mFilename);
             e.printStackTrace();
         }
 
@@ -420,8 +472,12 @@ class Transcoder {
         Log.d(TAG,"**\nSettings: " + formatTxt + "\n**");
         Log.d(TAG, "Start mMuxer");
         mMuxer.start();
-
+        mStats.setEncodedfile(mFilename);
         return mMuxer;
+    }
+
+    public String getOutputFilename() {
+        return mFilename;
     }
 
     @NonNull
@@ -446,6 +502,10 @@ class Transcoder {
             }
         }
         return matching;
+    }
+
+    public Statistics getStatistics(){
+        return mStats;
     }
 
     private native boolean nativeOpenFile(String filename);

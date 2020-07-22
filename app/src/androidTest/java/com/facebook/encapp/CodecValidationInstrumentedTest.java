@@ -103,6 +103,10 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("ifsize");
     private static final String TEMPORAL_LAYER_COUNT =
             InstrumentationRegistry.getArguments().getString("tlc");
+    private static final String LOOP_INPUT =
+            InstrumentationRegistry.getArguments().getString("loop");
+    private static final String MULTIPLE_CONC_SESSIONS =
+            InstrumentationRegistry.getArguments().getString("conc");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
@@ -196,7 +200,14 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("tlc", TEMPORAL_LAYER_COUNT);
             Log.e(TAG, "Temporal layer count: " + TEMPORAL_LAYER_COUNT);
         }
-
+        if (LOOP_INPUT != null) {
+            mExtraDataHashMap.put("loop", LOOP_INPUT);
+            Log.e(TAG, "loop input: " + LOOP_INPUT);
+        }
+        if (MULTIPLE_CONC_SESSIONS != null) {
+            mExtraDataHashMap.put("conc", MULTIPLE_CONC_SESSIONS);
+            Log.e(TAG, "concurrent sessions: " + MULTIPLE_CONC_SESSIONS);
+        }
     }
 
     @Before

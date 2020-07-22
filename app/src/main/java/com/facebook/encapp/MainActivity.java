@@ -3,32 +3,39 @@ package com.facebook.encapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
-import android.net.Uri;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Vector;
 
 import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
-import com.facebook.encapp.R;
 import com.facebook.encapp.utils.SizeUtils;
+import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.VideoConstraints;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import static java.lang.Thread.*;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
     private HashMap<String, String> mExtraDataHashMap;
     TextureView mTextureView;
+    private int mEncodingsRunning = 0;
+    private Object mEncodingLockObject = new Object();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
-        TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+        TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
         if (getInstrumentedTest()) {
 
             mTvTestRun.setVisibility(View.VISIBLE);
@@ -52,16 +59,16 @@ public class MainActivity extends AppCompatActivity {
                 }
             })).start();
         } else {
-            mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+            mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
                     MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = (TextView)findViewById(R.id.logText);
+                    TextView logText = (TextView) findViewById(R.id.logText);
                     logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info: codecInfos) {
+                    for (MediaCodecInfo info : codecInfos) {
                         if (info.isEncoder()) {
                             String str = codecInfoToText(info);
                             if (str.toString().toLowerCase().contains("video")) {
@@ -83,27 +90,27 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder str = new StringBuilder("\n---\nCodec: ");
         str.append(info.getName());
         String[] types = info.getSupportedTypes();
-        for (String tp: types) {
+        for (String tp : types) {
             str.append(" type: " + tp);
             MediaCodecInfo.CodecCapabilities cap = info.getCapabilitiesForType(tp);
-            str.append("\nMax supported instances: "+cap.getMaxSupportedInstances());
+            str.append("\nMax supported instances: " + cap.getMaxSupportedInstances());
             int[] colforms = cap.colorFormats;
             MediaCodecInfo.CodecProfileLevel[] proflevels = cap.profileLevels;
-            for (int col: colforms) {
+            for (int col : colforms) {
                 str.append("\n -col: " + col + " - ");
-                if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) != 0 ) {
+                if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) != 0) {
                     str.append("COLOR_FormatYUV420Flexible");
-                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) != 0 ) {
+                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) != 0) {
                     str.append("COLOR_FormatYUV420SemiPlanar");
-                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface) != 0 ) {
+                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface) != 0) {
                     str.append("COLOR_FormatSurface");
-                } else if ( (col & MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888) != 0 ) {
+                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888) != 0) {
                     str.append("COLOR_Format24bitBGR888");
                 }
             }
 
-            for (MediaCodecInfo.CodecProfileLevel prof: proflevels) {
-                str.append("\n -profile: " + prof.profile + ", level: "+prof.level);
+            for (MediaCodecInfo.CodecProfileLevel prof : proflevels) {
+                str.append("\n -profile: " + prof.profile + ", level: " + prof.level);
             }
             MediaFormat format = cap.getDefaultFormat();
             //Odds are that if there is no default profile - nothing else will have defaults anyway...
@@ -138,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
 
         return nonGrantedPerms.toArray(new String[nonGrantedPerms.size()]);
     }
+
     /**
      * Check if a test has fired up this activity.
      *
@@ -150,27 +158,36 @@ public class MainActivity extends AppCompatActivity {
         return mExtraDataHashMap != null;
     }
 
+    public void increaseEncodingsInflight() {
+        synchronized (mEncodingLockObject) {
+            mEncodingsRunning++;
+        }
+    }
+
+    public void decreaseEncodingsInflight() {
+        synchronized (mEncodingLockObject) {
+            mEncodingsRunning--;
+        }
+    }
+
     /**
      * Start automated test run.
-     *
-     *
      */
     private void performInstrumentedTest() {
         Log.d(TAG, "Instrumentation test - let us start!");
 
 
-
         if (mExtraDataHashMap.containsKey("list_codecs")) {
-            TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+            TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
                     MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = (TextView)findViewById(R.id.logText);
+                    TextView logText = (TextView) findViewById(R.id.logText);
                     logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info: codecInfos) {
+                    for (MediaCodecInfo info : codecInfos) {
                         if (info.isEncoder()) {
                             String str = codecInfoToText(info);
                             if (str.toString().toLowerCase().contains("video")) {
@@ -186,8 +203,8 @@ public class MainActivity extends AppCompatActivity {
         }
         // Need to set source
         if (!mExtraDataHashMap.containsKey("file")) {
-           Log.e(TAG, "Need filename!");
-           return;
+            Log.e(TAG, "Need filename!");
+            return;
         }
         String filename = mExtraDataHashMap.get("file");
 
@@ -207,70 +224,87 @@ public class MainActivity extends AppCompatActivity {
             timeout = Integer.parseInt(mExtraDataHashMap.get("video_timeout"));
         }
 
-        Size refFrameSize = new Size(1280,720);
+        Size refFrameSize = new Size(1280, 720);
         if (mExtraDataHashMap.containsKey("ref_res")) {
             refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
         }
 
-        final TextView logText = (TextView)findViewById(R.id.logText);
+        int loop = 1;
+        if (mExtraDataHashMap.containsKey("loop")) {
+            loop = Integer.parseInt(mExtraDataHashMap.get("loop"));
+        }
+
+        int concurrent = 1;
+        if (mExtraDataHashMap.containsKey("conc")) {
+            concurrent = Integer.parseInt(mExtraDataHashMap.get("conc"));
+        }
+
+        boolean writeOutput = true;
+        if (mExtraDataHashMap.containsKey("write")) {
+            writeOutput = (mExtraDataHashMap.get("write").equals("false")) ? false : true;
+        }
+
+        final TextView logText = (TextView) findViewById(R.id.logText);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                logText.append("\nNumber of encodings: "+vcCombinations.length);
+                logText.append("\nNumber of encodings: " + vcCombinations.length);
             }
         });
-        for (VideoConstraints vc: vcCombinations) {
-            final String settings = vc.getSettings();
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    logText.append("\n\nStart encoding: "+settings);
-                }
-            });
+        final String ffilename = filename;
+        final Size frefFrameSize = refFrameSize;
+        final String fdynamicData = dynamicData;
+        final int floop = loop;
+        final boolean fwriteOutput = writeOutput;
 
-            int framesToDecode = (int)(timeout * vc.getFPS());
-            Transcoder transcoder;
-            Log.d(TAG, "frames to transcode: "+framesToDecode);
-            if (filename.toLowerCase().contains(".raw") ||
-                filename.toLowerCase().contains(".yuv")) {
-                transcoder = new Transcoder();
-            } else {
-                transcoder = new SurfaceTranscoder();
-            }
-
-            final String status = transcoder.transcode(vc, filename, refFrameSize, framesToDecode, dynamicData);
-            if(status.length() > 0) {
-                runOnUiThread(new Runnable() {
+        for (VideoConstraints vc : vcCombinations) {
+            if (concurrent > 1) {
+                // TODO: moderate number of concurrent encodings
+                (new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        logText.append("\nEncoding failed: "+settings);
-                        logText.append("\n" + status);
+                        Log.d(TAG, "Start threaded encoding");
+                        RunEncoding(vc, logText, filename, ffilename, frefFrameSize, fdynamicData, floop, fwriteOutput);
+                        Log.d(TAG, "Done threaded encoding");
                     }
-                });
+
+                })).start();
             } else {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        logText.append("\nDone encoding: " + settings);
-                    }
-                });
+                Log.d(TAG,"start encoding, no sep thread");
+                RunEncoding(vc, logText, filename, ffilename, frefFrameSize, fdynamicData, floop, fwriteOutput);
+                Log.d(TAG,"Done encoding");
             }
         }
+
+
+        // Wait for all transcoding to be finished
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                TextView mTvTestRun = (TextView)findViewById(R.id.tv_testrun);
+                do {
+                    try {
+                        Log.d(TAG, "Sleep for test check");
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Log.d(TAG, "number of encodings running:" + mEncodingsRunning);
+
+                } while (mEncodingsRunning > 0);
+                Log.d(TAG, "Done with encodings");
+                TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
                 mTvTestRun.setVisibility(View.GONE);
             }
         });
     }
+
     private VideoConstraints[] gatherUserSelectionsOnAllResolutions() {
         String[] bitrates = {};
         String[] resolutions = {};
         String[] encoders = {};
         String[] keys = {};
-        String[] fps={};
-        String[] mod={};
+        String[] fps = {};
+        String[] mod = {};
         if (getInstrumentedTest()) {
             //Check if there are settings
             if (mExtraDataHashMap.containsKey("enc")) {
@@ -311,7 +345,7 @@ public class MainActivity extends AppCompatActivity {
                                 VideoConstraints constraints = new VideoConstraints();
                                 Size videoSize = SizeUtils.parseXString(resolutions[vC]);
                                 constraints.setVideoSize(videoSize);
-                                constraints.setBitRate(Math.round( Float.parseFloat(bitrates[bC]) * 1000));
+                                constraints.setBitRate(Math.round(Float.parseFloat(bitrates[bC]) * 1000));
                                 constraints.setKeyframeRate(Integer.parseInt(keys[kC]));
                                 constraints.setFPS(Integer.parseInt(fps[fC]));
                                 int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
@@ -342,14 +376,74 @@ public class MainActivity extends AppCompatActivity {
         }
         if (vc.size() == 0) {
             Log.d(TAG, "No test created");
-            Log.d(TAG, "encoders: "+ encoders.length);
-            Log.d(TAG, "mod: "+ mod.length);
-            Log.d(TAG, "resolutions: "+ resolutions.length);
-            Log.d(TAG, "fps: "+ fps.length);
-            Log.d(TAG, "bitrates: "+ bitrates.length);
-            Log.d(TAG, "keys: "+ keys.length);
+            Log.d(TAG, "encoders: " + encoders.length);
+            Log.d(TAG, "mod: " + mod.length);
+            Log.d(TAG, "resolutions: " + resolutions.length);
+            Log.d(TAG, "fps: " + fps.length);
+            Log.d(TAG, "bitrates: " + bitrates.length);
+            Log.d(TAG, "keys: " + keys.length);
         }
         return vc.toArray(new VideoConstraints[0]);
     }
 
+    private void RunEncoding(VideoConstraints vc, TextView logText, String filename, String ffilename, Size frefFrameSize, String fdynamicData, int floop, boolean fwriteOutput) {
+        final String settings = vc.getSettings();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                logText.append("\n\nStart encoding: " + settings);
+            }
+        });
+
+        int framesToDecode = -1;
+        final Transcoder transcoder;
+
+        if (filename.toLowerCase().contains(".raw") ||
+                filename.toLowerCase().contains(".yuv")) {
+            transcoder = new Transcoder();
+        } else {
+            transcoder = new SurfaceTranscoder();
+        }
+        Log.d(TAG, "frames to transcode: " + framesToDecode);
+        increaseEncodingsInflight();
+        final String status = transcoder.transcode(vc,
+                ffilename,
+                frefFrameSize,
+                fdynamicData,
+                floop,
+                fwriteOutput);
+        final Statistics stats = transcoder.getStatistics();
+        try {
+            FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
+            stats.writeJSON(fw);
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        decreaseEncodingsInflight();
+        Log.d(TAG, "Done one encoding: " + mEncodingsRunning);
+        if (status.length() > 0) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    logText.append("\nEncoding failed: " + settings);
+                    logText.append("\n" + status);
+                }
+            });
+        } else {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+
+                    Log.d(TAG, "Total time: " + stats.getProcessingTime());
+                    Log.d(TAG, "Total frames: " + stats.getFrameCount());
+                    Log.d(TAG, "Time per frame: " + (long) (stats.getProcessingTime() / stats.getFrameCount()));
+
+                    logText.append("\nDone encoding: " + settings);
+
+                }
+            });
+        }
+    }
 }
+

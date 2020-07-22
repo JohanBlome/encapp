@@ -1,6 +1,6 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
-package com.facebook.encapp;
+package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -18,7 +18,7 @@ public class VideoConstraints {
     public final static int OMX_SEC_COLOR_FormatNV12Tiled = 0x7FC00002;
     public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m = 0x7FA30C04;
 
-    enum IFRAME_SIZE_PRESETS{
+    public enum IFRAME_SIZE_PRESETS{
         DEFAULT,
         MEDIUM,
         HUGE,
@@ -56,7 +56,7 @@ public class VideoConstraints {
         this.mBitRate = bitRate;
     }
 
-    private int getBitRate() {
+    public int getBitRate() {
         return mBitRate;
     }
 
@@ -156,7 +156,7 @@ public class VideoConstraints {
         mColorTransfer = colorTransfer;
     }
 
-    public int getColorTrnasfer() {
+    public int getColorTransfer() {
         return mColorTransfer;
     }
 
