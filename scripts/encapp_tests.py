@@ -5,8 +5,8 @@ import json
 import sys
 import argparse
 import re
+from pathlib import Path
 from datetime import datetime
-from plot_rd import RDPlot
 
 KEY_NAME_DESCRIPTION = 'description'
 KEY_NAME_INPUT_FILES = 'input_files'
@@ -21,6 +21,7 @@ KEY_NAME_INPUT_FORMAT = 'input_format'
 KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
 KEY_NAME_I_FRAME_SIZES = 'i_frame_sizes'
 KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
+KEY_NAME_ENC_LOOP = 'enc_loop'
 
 sample_config_json_data = [
     {
@@ -38,7 +39,8 @@ sample_config_json_data = [
         KEY_NAME_I_FRAME_SIZES:['unlimited'],
         # Upto 3 temporal layers
         KEY_NAME_TEMPORAL_LAYER_COUNTS: [1],
-        KEY_NAME_DURATION: 10
+        KEY_NAME_DURATION: 10,
+        KEY_NAME_ENC_LOOP: 0
     }
 ]
 TEST_CLASS_NAME = 'com.facebook.encapp.CodecValidationInstrumentedTest'
@@ -204,13 +206,14 @@ class VideoAnalyzer:
 
     def get_vmaf_score(self, mp4_file_ref, mp4_file_out, duration):
         ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
-        log_file = mp4_file_out.strip('.mp4')+'_vmaf.json'
-        if (len(stdout) > 0):
+        log_file = str(Path(mp4_file_out).with_suffix(''))+'_vmaf.json'
+        mp4_file_ref_res = self.get_resolution(mp4_file_ref)
+        mp4_file_out_res = self.get_resolution(mp4_file_out)
+        if mp4_file_ref_res == mp4_file_out_res and (len(stdout) > 0):
             vmaf_cmd = 'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out +\
                         ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
                         ':log_fmt=json" -t ' + duration + ' -f null -'
             ret, stdout, stderr = run_cmd(vmaf_cmd)
-            #"VMAF score":93.45996777752221,
 
             with open(log_file, 'r') as fp:
                 text = fp.read()
@@ -257,7 +260,7 @@ class VideoAnalyzer:
 
         sizes = ref_res.split('x')
         ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
-        log_file = mp4_file_out.strip('.mp4')+'_vmaf.json'
+        log_file = str(Path(mp4_file_out).with_suffix(''))+'_vmaf.json'
         if (len(stdout) > 0):
             vmaf_cmd = 'ffmpeg -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
                        ref_format + ' -i  ' + ref_yuv +\
@@ -298,7 +301,8 @@ class VideoAnalyzer:
 class JobInfo:
     def __init__(self, desc, in_file, output_dir, codec, res, mode,
                  i_interval, br, duration, use_surface_enc,
-                 input_format, input_res, i_frame_size, temporal_layer_count):
+                 input_format, input_res, i_frame_size, temporal_layer_count,
+                 enc_loop):
         print('in_file:' + in_file, 'codec:'+codec, 'enc_resolution:'+res,
               'rc_mode:'+mode, 'i_interval:'+i_interval, 'bitrate:'+br,
               'duration:'+duration, 'i_frame_size:'+i_frame_size, sep=',')
@@ -327,6 +331,7 @@ class JobInfo:
             # nv12 for hw encoder yuv420p for sw encoder
             self.pix_fmt = 'yuv420p'
         self.i_frame_size = i_frame_size
+        self.enc_loop = 0 if enc_loop is None else enc_loop
 
 
 class EncodeJobs:
@@ -367,6 +372,7 @@ class EncodeJobs:
                 input_file = self.workdir + '/' + 'ref.yuv'
                 ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
+                             ' -t ' + job_info.duration + \
                              ' -pix_fmt ' + job_info.pix_fmt + ' '\
                              + input_file
                 run_cmd(ffmpeg_cmd)
@@ -393,6 +399,10 @@ class EncodeJobs:
                   + ' -e ifsize ' + job_info.i_frame_size\
                   + ' -e tlc ' + job_info.temporal_layer_count\
                   + ' -e skfr false -e debug false -e ltrc 1'
+
+        if job_info.enc_loop > 0:
+            adb_cmd += ' -e loop ' + str(job_info.enc_loop) +\
+                        ' -e write false'
 
         if job_info.dynamic is not None:
             adb_cmd += ' -e dyn ' + job_info.dynamic
@@ -424,7 +434,9 @@ class EncodeJobs:
             # get the media file as well
             fid = job_info.data['id']
             settings = job_info.data['settings']
-            print("fid {:s} - br: {:d}, mean br: {:d}, res: {:d}x{:d}, codec: {:s}".format(fid, settings['bitrate'], settings['meanbitrate'], settings['width'], settings['height'],  settings['codec']))
+            print("fid {:s} - br: {:d}, mean br: {:d}, res: {:d}x{:d}, codec: {:s}".format(
+                fid, settings['bitrate'], settings['meanbitrate'], settings['width'],
+                settings['height'],  settings['codec']))
             encoded_file = job_info.data['encodedfile']
             if len(encoded_file) > 0:
                 adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/' + encoded_file  + \
@@ -444,7 +456,7 @@ class EncodeJobs:
             bitrates = []
             vmaf_scores = []
             for job_info in group:
-                if job_info.output_file is None:
+                if job_info.output_file is None or job_info.enc_loop > 0:
                     continue
                 # get video bitrate and vmaf score
                 bitrate = video_analyzer.get_bitrate(job_info.output_file)
@@ -484,7 +496,7 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                       res, mode, i_interval, i_frame_size,
                       duration, group_desc, bitrates,
                       use_surface_enc, input_format,
-                      input_res, temporal_layer_count):
+                      input_res, temporal_layer_count, enc_loop):
     base_file_name = os.path.basename(in_file)
     sub_dir = '_'.join([base_file_name, "files"])
 
@@ -516,7 +528,8 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                            input_format,
                            input_res,
                            i_frame_size,
-                           temporal_layer_count
+                           temporal_layer_count,
+                           enc_loop
                            )
         job_info_group.append(job_info)
 
@@ -550,6 +563,7 @@ def build_tests(tests_json, device_model, test_desc):
         duration = str(test.get(KEY_NAME_DURATION))
         group_desc = test.get(KEY_NAME_DESCRIPTION)
         i_frame_sizes = test.get(KEY_NAME_I_FRAME_SIZES)
+        enc_loop = test.get(KEY_NAME_ENC_LOOP)
         if i_frame_sizes is None:
             i_frame_sizes = ['default']
         if test.get(KEY_NAME_USE_SURFACE_ENC) == 1:
@@ -583,7 +597,8 @@ def build_tests(tests_json, device_model, test_desc):
                                                       use_surface_enc,
                                                       input_format,
                                                       input_res,
-                                                      str(tl_count))
+                                                      str(tl_count),
+                                                      enc_loop)
 
     return enc_jobs
 
@@ -597,9 +612,6 @@ def run_encode_tests(tests_json, device_model, serial_no, test_desc):
     enc_jobs.run_encodes(serial_no)
 
     enc_jobs.get_rate_distortion(serial_no)
-
-    rd_plot = RDPlot()
-    rd_plot.plot_rd_curve(enc_jobs.workdir+'/'+RD_RESULT_FILE_NAME)
 
 
 def list_codecs(serial_no):
