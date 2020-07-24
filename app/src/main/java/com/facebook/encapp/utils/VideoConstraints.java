@@ -49,6 +49,7 @@ public class VideoConstraints {
     private int mProfile = -1;
     private int mProfileLevel = -1;
     private int mColorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible;
+    private int mTemporalLayerCount = 1;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -311,5 +312,12 @@ public class VideoConstraints {
 
     public IFRAME_SIZE_PRESETS getIframeSizePreset() {
         return mIframeSize;
+    }
+
+    public void setTemporalLayerCount( int temporalLayerCount ) {
+        mTemporalLayerCount = temporalLayerCount;
+    }
+    public int getTemporalLayerCount() {
+        return mTemporalLayerCount;
     }
 }

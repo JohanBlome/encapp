@@ -32,10 +32,11 @@ class RDPlot:
         self.x_min = 0
         self.x_max = 0
         self.y_min = 100
-        self.y_max = 100
+        self.y_max = 0
 
     def draw(self, bitrates, scores, curve_label):
         self.x_max = max(self.x_max, np.amax(bitrates))
+        self.y_max = max(self.y_max, np.amax(scores))
         self.y_min = min(self.y_min, np.amin(scores))
         plt.plot(bitrates, scores, self.get_style(), label=str(curve_label))
         plt.legend(loc='lower right')
@@ -44,6 +45,7 @@ class RDPlot:
         plt.axis([self.x_min, self.x_max+100, self.y_min-5, self.y_max])
         plt.grid()
         plt.draw()
+
 
     def plot_rd_curve(self, rd_results_json_file):
         rd_results = None

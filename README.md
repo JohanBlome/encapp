@@ -261,11 +261,33 @@ raw file:
 ]
 ```
 
+Definitions of the keys in the sample json file
+'description':  Description of the test. It can be empty
+'input_files':  A list of input files
+'codecs':       A list of encoders
+'encode_resolutions': A list of encoding resolutions
+'rc_modes': A list of rate control modes
+'bitrates': A list of encoding bitrates
+'i_intervals': A list of I frame intervals
+'duration':    Duration of the encoding. This is ignored when enc loop > 0
+'use_surface_enc': Set to 1 use Android Mediacodec surface encoder. Default is 0
+'input_format': Input video format: mp4, nv12, yuv420p
+'input_resolution': Input video resolution
+'i_frame_sizes': An optional parameter.
+'temporal_layer_counts': Number of temporal layers
+'enc_loop': The number of time looping encoding. This is used for encoding time profiling. When enc_loop is greater than 1, there is no output video
 
-Run 
-
-```
+Run
 $ encapp_tests.py --test sample_config.json
-```
 
-The script assumes that the input file(s) are in the working directory and will automatically push it to the device. 
+To run on a specific device, use
+
+$ encapp_tests.py --test sample_config.json --serial [device serial number]
+The script will automatically push the input files to the device.
+If the input file(s) are not in the working directory, use absolute path(s)
+
+The script saves all encoded videos and stats in an output directory per run.
+Stat files are in JSON format.
+
+To check the performance test result, run
+$ parse_encapp_stats.py --proctime --label "my funny session"  {encoder stat file}
