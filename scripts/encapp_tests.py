@@ -427,6 +427,10 @@ class EncodeJobs:
                       ' ' + job_info.output_dir
             run_cmd(adb_cmd)
 
+            # remove the json file on the device too
+            adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
+            run_cmd(adb_cmd)
+
             with open(job_info.output_dir + '/' + file) as json_file:
                 data = json.load(json_file)
                 job_info.data = data
