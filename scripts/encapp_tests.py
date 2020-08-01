@@ -363,7 +363,7 @@ class EncodeJobs:
     # run one encode job
     def run_one_encode(self, job_info, serial_no):
         # push input file to the device
-        if job_info.use_surface_enc or job_info.input_format != 'mp4':
+        if job_info.use_surface_enc:
             if job_info.input_file != self.prev_file:
                 adb_cmd = 'adb -s ' + serial_no + ' push ' + \
                             job_info.input_file + ' ' \
@@ -375,13 +375,26 @@ class EncodeJobs:
             if (job_info.input_file != self.prev_file or
                     job_info.enc_res != self.prev_enc_res or
                     job_info.pix_fmt != self.prev_pix_fmt):
-                input_file = self.workdir + '/' + 'ref.yuv'
-                ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
+                input_file = job_info.input_file
+                if (job_info.input_format != job_info.pix_fmt or
+                    job_info.input_res != job_info.enc_res):
+
+                    input_file = self.workdir + '/' + 'ref.yuv'
+                    if job_info.input_format == 'mp4':
+                        ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
+                                    ' -s ' + job_info.enc_res + \
+                                    ' -t ' + job_info.duration + \
+                                    ' -pix_fmt ' + job_info.pix_fmt + ' '\
+                                    + input_file
+                    else:
+                        ffmpeg_cmd = 'ffmpeg -y' + ' -s ' + job_info.input_res + \
+                             ' -pix_fmt ' + job_info.input_format + \
+                             ' -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
                              ' -t ' + job_info.duration + \
                              ' -pix_fmt ' + job_info.pix_fmt + ' '\
                              + input_file
-                run_cmd(ffmpeg_cmd)
+                    run_cmd(ffmpeg_cmd)
                 adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
                           ' ' + job_info.device_workdir \
                           + job_info.input_file_on_device
