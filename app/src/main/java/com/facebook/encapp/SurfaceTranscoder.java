@@ -239,6 +239,9 @@ public class SurfaceTranscoder extends Transcoder{
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
+                    if (mNextLimit != -1 && inFramesCount >= mNextLimit) {
+                        getNextLimit(inFramesCount);
+                    }
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);

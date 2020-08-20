@@ -197,6 +197,7 @@ class Transcoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase().contains(".vp");
+        boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase().contains(".qcom");
         if (isVP) {
             MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
@@ -217,20 +218,21 @@ class Transcoder {
 
                 if (index >= 0) {
                     int size = -1;
-                    if (isVP && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
+                    if (isVP && isQCom && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
                         Bundle params = new Bundle();
                         params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
                         mCodec.setParameters(params);
                     }
 
                     ByteBuffer buffer = mCodec.getInputBuffer(index);
-                    while (size == -1) {
-
+                    while (size < 0) {
+                        Log.d(TAG, "Queue buffer");
                         try {
                             size = queueInputBufferEncoder(
                                     mCodec,
                                     buffer,
-                                    index,inFramesCount,
+                                    index,
+                                    inFramesCount,
                                     0,
                                     mRefFramesizeInBytes);
 
@@ -238,8 +240,11 @@ class Transcoder {
                         } catch (IllegalStateException isx) {
                             Log.e(TAG, "Queue encoder failed, " + index+", mess: "+isx.getMessage());
                         }
-
-                        if (size <= 0) {
+                        Log.d(TAG, "size = " + size);
+                        if (size == -2) {
+                            Log.d(TAG, "continue");
+                         continue;
+                        } else if (size <= 0) {
                             nativeCloseFile();
                             current_loop++;
                             if (current_loop > loop) {
@@ -300,8 +305,6 @@ class Transcoder {
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }
-
-            Log.d(TAG, "End of main loop" + current_loop);
         }
         mStats.stop();
         if (mCodec != null) {
@@ -331,18 +334,18 @@ class Transcoder {
 
         int read = nativeFillBuffer(buffer, size);
         int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
-        Log.d(TAG, "currentFrameNbr: " + currentFrameNbr);
         int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr) {
-            read = -1; //Skip this and read again
+            Log.d(TAG,"skip");
             mSkipped++;
+            return -2;
         }
         if (read == size) {
             if (mNextLimit != -1 && frameCount >= mNextLimit) {
                 getNextLimit(frameCount);
             }
             mFramesAdded++;
-            long ptsUsec = computePresentationTime(mFramesAdded);
+            long ptsUsec = computePresentationTime(frameCount);
             mStats.startFrame(ptsUsec);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {
