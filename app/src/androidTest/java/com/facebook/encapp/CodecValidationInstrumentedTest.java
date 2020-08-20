@@ -55,7 +55,7 @@ import static org.junit.Assert.*;
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 @RunWith(AndroidJUnit4.class)
-@SdkSuppress(minSdkVersion = 26)
+@SdkSuppress(minSdkVersion = 25)
 public class CodecValidationInstrumentedTest {
     private static final String TAG = "encapp";
 
@@ -101,6 +101,8 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("list_codecs");
     private static final String IFRAME_SIZE_PRESET =
             InstrumentationRegistry.getArguments().getString("ifsize");
+    private static final String TEMPORAL_LAYER_COUNT =
+            InstrumentationRegistry.getArguments().getString("tlc");
     private static final String LOOP_INPUT =
             InstrumentationRegistry.getArguments().getString("loop");
     private static final String MULTIPLE_CONC_SESSIONS =
@@ -193,6 +195,10 @@ public class CodecValidationInstrumentedTest {
         if (IFRAME_SIZE_PRESET != null) {
             mExtraDataHashMap.put("ifsize", IFRAME_SIZE_PRESET);
             Log.e(TAG, "iframe size set: " + IFRAME_SIZE_PRESET);
+        }
+        if (TEMPORAL_LAYER_COUNT != null) {
+            mExtraDataHashMap.put("tlc", TEMPORAL_LAYER_COUNT);
+            Log.e(TAG, "Temporal layer count: " + TEMPORAL_LAYER_COUNT);
         }
         if (LOOP_INPUT != null) {
             mExtraDataHashMap.put("loop", LOOP_INPUT);

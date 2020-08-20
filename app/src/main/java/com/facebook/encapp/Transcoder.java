@@ -152,6 +152,18 @@ class Transcoder {
                 }
             }
 
+            int temporalLayerCount = vc.getTemporalLayerCount();
+            if (temporalLayerCount > 1) {
+                String temporalLayerValue;
+                if (codecName.contains("vp8")) {
+                    temporalLayerValue = "webrtc.vp8." + temporalLayerCount + "-layer";
+                } else {
+                    temporalLayerValue = "android.generic." + temporalLayerCount;
+                }
+                format.setString(MediaFormat.KEY_TEMPORAL_LAYERING, temporalLayerValue);
+                Log.d(TAG, "Set temporal layers to " + temporalLayerValue);
+            }
+
             mCodec.configure(
                     format,
                     null /* surface */,
@@ -483,6 +495,7 @@ class Transcoder {
                         info.getSupportedTypes()[0].toLowerCase().contains("video")) {
                     if (info.getName().toLowerCase().equals(id.toLowerCase())) {
                         //Break on exact match
+                        matching.clear();
                         matching.add(info);
                         break;
                     }
