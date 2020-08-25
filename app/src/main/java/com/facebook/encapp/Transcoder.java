@@ -59,6 +59,7 @@ class Transcoder {
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
+    protected boolean mDropNext;
 
     public String transcode (
             VideoConstraints vc,
@@ -238,7 +239,6 @@ class Transcoder {
 
                     ByteBuffer buffer = mCodec.getInputBuffer(index);
                     while (size < 0) {
-                        Log.d(TAG, "Queue buffer");
                         try {
                             size = queueInputBufferEncoder(
                                     mCodec,
@@ -344,25 +344,27 @@ class Transcoder {
             MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
         buffer.clear();
 
+        if (mNextLimit != -1 && frameCount >= mNextLimit) {
+            getNextLimit(frameCount);
+        }
         int read = nativeFillBuffer(buffer, size);
         int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
         int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
-        if (currentFrameNbr == nextFrameNbr) {
-            Log.d(TAG,"skip");
+        if (currentFrameNbr == nextFrameNbr || mDropNext) {
+            Log.d(TAG,"Skip frame: " + frameCount);
             mSkipped++;
-            return -2;
-        }
-        if (read == size) {
-            if (mNextLimit != -1 && frameCount >= mNextLimit) {
-                getNextLimit(frameCount);
-            }
+            mDropNext = false;
+            read = -2;
+        } else if (read == size) {
             mFramesAdded++;
             long ptsUsec = computePresentationTime(frameCount);
             mStats.startFrame(ptsUsec);
+            Log.d(TAG, "Queue frame " + frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {
             read =  -1;
         }
+
         return read;
     }
 
@@ -388,7 +390,6 @@ class Transcoder {
                     int ltr = Integer.parseInt(data[2]);
                     Log.d(TAG, "Mark ltr frame " + currentFrame + ", @ " + mFrameTime+ " mark as: "+ltr);
                     params.putInt(MEDIA_KEY_LTR_MARK_FRAME, ltr);
-
                 } else if (command.equals("ltru") && data.length >= 2) {
                     int mLTRRef = Integer.parseInt(data[2]);
                     Log.d(TAG, "Use ltr frame id " + mLTRRef +" @ "+ currentFrame);
@@ -396,6 +397,9 @@ class Transcoder {
                 } else if (command.equals("key")) {
                     Log.d(TAG, "Request new key frame at " + currentFrame);
                     params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 1); //Always ref a key frame?
+                } else if (command.equals("drp") && data.length >= 1) {
+                    Log.d(TAG, "Drop frame @ " +  data[1]);
+                    mDropNext = true;
                 }
             }
 
@@ -418,7 +422,6 @@ class Transcoder {
         if (params != null && mCodec != null) {
             mCodec.setParameters(params);
         }
-
     }
 
     /**

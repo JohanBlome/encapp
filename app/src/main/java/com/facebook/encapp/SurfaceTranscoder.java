@@ -256,8 +256,9 @@ public class SurfaceTranscoder extends Transcoder{
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);
-                    if (currentFrameNbr == nextFrameNbr) {
+                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
                         mDecoder.releaseOutputBuffer(index, false); //Skip this and read again
+                        mDropNext = false;
                         mSkipped++;
                     } else {
                         mDecoder.releaseOutputBuffer(index, true);
