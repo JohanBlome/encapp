@@ -1,18 +1,15 @@
 package com.facebook.encapp;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.filters.SdkSuppress;
+import android.support.test.rule.ActivityTestRule;
 import android.support.test.runner.AndroidJUnit4;
 import android.support.test.uiautomator.By;
 import android.support.test.uiautomator.SearchCondition;
 import android.support.test.uiautomator.UiDevice;
-import android.support.test.uiautomator.UiObject;
-import android.support.test.uiautomator.UiSelector;
 import android.support.test.uiautomator.Until;
 import android.util.Log;
 
@@ -20,12 +17,10 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 
 import static org.hamcrest.core.IsNull.notNullValue;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 /**
  * Instrumentation test, which will execute on an Android device.
@@ -238,10 +233,11 @@ public class CodecValidationInstrumentedTest {
         Log.d(TAG, "Collect extra data");
         collectExtraData();
         intent.putExtra("map", mExtraDataHashMap);
-
+        ActivityTestRule<MainActivity> mainActivityTestRule =
+                new ActivityTestRule<>(MainActivity.class);
         // Clear out any previous instances
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        context.startActivity(intent);
+        Activity activity = mainActivityTestRule.launchActivity(intent);
 
         // Wait for the app to appear
         mDevice.wait(Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)),
