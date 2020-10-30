@@ -144,9 +144,11 @@ $ adb logcat |grep encapp |grep Codec:
 
 (5) run a quick encoding experiment with the app
 
-First, choose one of the codecs from step 4.
+(5.a) small qcif encoding
 
-Prepare the device with an actual file:
+First, choose one of the codecs from step 4. In this case, we will use `OMX.google.vp8.encoder`.
+
+Push the (raw) video file to be encoded into the device. Note that we are using a QCIF video (176x144).
 ```
 $ wget https://media.xiph.org/video/derf/y4m/akiyo_qcif.y4m -O /tmp/akiyo_qcif.y4m
 $ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt yuv420p /tmp/akiyo_qcif.yuv
@@ -168,9 +170,18 @@ $ ffprobe -i /tmp/omx.google.vp8.encoder_30fps_176x144_100000bps_iint10_m2.webm
     Stream #0:0: Video: vp8, yuv420p(tv, smpte170m/smpte170m/bt709, progressive), 176x144, SAR 1:1 DAR 11:9, 30 fps, 30 tbr, 1k tbn, 1k tbc (default)
 ```
 
-You can also run the h264 encoder.
+(5.b) hd encoding
+
+Now, let's run the h264 encoder in an HD file. We will just select the codec ("h264"), and let encapp choose the actual encoder.
+
 ```
-$ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/akiyo_qcif.yuv -e test_timeout 20 -e video_timeout 3 -e res 176x144 -e ref_res 176x144 -e bit 100 -e mod cbr -e fps 30 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+$ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m
+$ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tmp/KristenAndSara_1280x720_60.yuv
+$ adb push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
+```
+
+```
+$ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/KristenAndSara_1280x720_60.yuv -e test_timeout 20 -e video_timeout 3 -e res 1280x720 -e ref_res 1280x720 -e bit 100 -e mod cbr -e fps 60 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
 ...
 ```
 
