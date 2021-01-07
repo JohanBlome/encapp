@@ -332,7 +332,13 @@ class JobInfo:
             self.pix_fmt = 'yuv420p'
         self.i_frame_size = i_frame_size
         self.enc_loop = 0 if enc_loop is None else enc_loop
-
+        #surface encoding without decoding is not possible at the moment
+        if not (self.input_format == 'mp4' or self.input_format == 'webm') and self.use_surface_enc:
+                print("ERROR: Surface encoding with raw input is no possible")
+                exit(0)
+        elif (self.input_format == 'mp4' or self.input_format == 'webm') and not self.use_surface_enc:
+                print("ERROR: Surface encoding required with encoded input")
+                exit(0)
 
 class EncodeJobs:
     def __init__(self, device_model):

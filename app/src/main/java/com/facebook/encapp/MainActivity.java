@@ -6,16 +6,11 @@ import android.content.pm.PackageManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
+import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
-
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Vector;
-
 import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
@@ -24,10 +19,11 @@ import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VideoConstraints;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import static java.lang.Thread.*;
+import java.util.Vector;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
@@ -259,7 +255,14 @@ public class MainActivity extends AppCompatActivity {
 
         for (VideoConstraints vc : vcCombinations) {
             if (concurrent > 1) {
-                // TODO: moderate number of concurrent encodings
+                while ( mEncodingsRunning >= concurrent) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                increaseEncodingsInflight();
                 (new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -270,6 +273,7 @@ public class MainActivity extends AppCompatActivity {
 
                 })).start();
             } else {
+                increaseEncodingsInflight();
                 Log.d(TAG,"start encoding, no sep thread");
                 RunEncoding(vc, logText, filename, ffilename, frefFrameSize, fdynamicData, floop, fwriteOutput);
                 Log.d(TAG,"Done encoding");
@@ -334,6 +338,25 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // We can have some defaults
+        // If there is a reference resolution - use that
+        int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
+        if (resolutions.length == 0) {
+            if (mExtraDataHashMap.containsKey("ref_res")) {
+                resolutions = new String[]{mExtraDataHashMap.get("ref_res")};
+            } else {
+                resolutions = new String[]{"1280x720"};
+            }
+        }
+        if (mod.length == 0) {
+            mod = new String[]{"cbr"};
+        }
+        if (keys.length == 0) {
+            keys = new String[]{"10"};
+        }
+        if (fps.length == 0) {
+            fps = new String[]{"30"};
+        }
         int index = 0;
         Vector<VideoConstraints> vc = new Vector<>();
         for (int eC = 0; eC < encoders.length; eC++) {
@@ -348,7 +371,6 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setBitRate(Math.round(Float.parseFloat(bitrates[bC]) * 1000));
                                 constraints.setKeyframeRate(Integer.parseInt(keys[kC]));
                                 constraints.setFPS(Integer.parseInt(fps[fC]));
-                                int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
                                 constraints.setReferenceFPS(ref_fps);
                                 int ltrCount = (mExtraDataHashMap.get("ltrc") != null) ? Integer.parseInt(mExtraDataHashMap.get("ltrc")) : 6;
                                 constraints.setLTRCount(ltrCount);
@@ -387,62 +409,65 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void RunEncoding(VideoConstraints vc, TextView logText, String filename, String ffilename, Size frefFrameSize, String fdynamicData, int floop, boolean fwriteOutput) {
-        final String settings = vc.getSettings();
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                logText.append("\n\nStart encoding: " + settings);
-            }
-        });
-
-        int framesToDecode = -1;
-        final Transcoder transcoder;
-
-        if (filename.toLowerCase().contains(".raw") ||
-                filename.toLowerCase().contains(".yuv")) {
-            transcoder = new Transcoder();
-        } else {
-            transcoder = new SurfaceTranscoder();
-        }
-        Log.d(TAG, "frames to transcode: " + framesToDecode);
-        increaseEncodingsInflight();
-        final String status = transcoder.transcode(vc,
-                ffilename,
-                frefFrameSize,
-                fdynamicData,
-                floop,
-                fwriteOutput);
-        final Statistics stats = transcoder.getStatistics();
         try {
-            FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
-            stats.writeJSON(fw);
-            fw.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        decreaseEncodingsInflight();
-        Log.d(TAG, "Done one encoding: " + mEncodingsRunning);
-        if (status.length() > 0) {
+            final String settings = vc.getSettings();
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    logText.append("\nEncoding failed: " + settings);
-                    logText.append("\n" + status);
+                    logText.append("\n\nStart encoding: " + settings);
                 }
             });
-        } else {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
 
-                    Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                    Log.d(TAG, "Total frames: " + stats.getFrameCount());
-                    Log.d(TAG, "Time per frame: " + (long) (stats.getProcessingTime() / stats.getFrameCount()));
+            int framesToDecode = -1;
+            final Transcoder transcoder;
 
-                    logText.append("\nDone encoding: " + settings);
+            if (filename.toLowerCase().contains(".raw") ||
+                    filename.toLowerCase().contains(".yuv")) {
+                transcoder = new Transcoder();
+            } else {
+                transcoder = new SurfaceTranscoder();
+            }
+            Log.d(TAG, "frames to transcode: " + framesToDecode);
+            final String status = transcoder.transcode(vc,
+                    ffilename,
+                    frefFrameSize,
+                    fdynamicData,
+                    floop,
+                    fwriteOutput);
+            final Statistics stats = transcoder.getStatistics();
+            try {
+                FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
+                stats.writeJSON(fw);
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-                }
-            });
+            Log.d(TAG, "Done one encoding: " + mEncodingsRunning);
+            if (status.length() > 0) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        logText.append("\nEncoding failed: " + settings);
+                        logText.append("\n" + status);
+                    }
+                });
+            } else {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        Log.d(TAG, "Total time: " + stats.getProcessingTime());
+                        Log.d(TAG, "Total frames: " + stats.getFrameCount());
+                        Log.d(TAG, "Time per frame: " + (long) (stats.getProcessingTime() / stats.getFrameCount()));
+
+                        logText.append("\nDone encoding: " + settings);
+
+                    }
+                });
+            }
+        } finally {
+            decreaseEncodingsInflight();
         }
     }
 }
