@@ -111,6 +111,7 @@ class Transcoder {
                 for(MediaCodecInfo info: matching) {
                     sb.append(info.getName() + "\n");
                 }
+                Log.e(TAG, sb.toString());
                 return sb.toString();
             } else if (matching.size() == 0) {
                 return "\nNo matching codecs to : " + id;

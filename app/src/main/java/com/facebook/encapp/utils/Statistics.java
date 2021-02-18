@@ -97,16 +97,20 @@ public class Statistics {
         Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
         Collections.sort(allFrames, compareByPts);
         int framecount = allFrames.size();
-        long startPts = allFrames.get(0).mPts;
-        //We just ignore the last frame, for the average does not mean much.
-        long lastTime = allFrames.get(allFrames.size() - 1).mPts;
-        double totalTime =  ((double)(lastTime - startPts)) / 1000000.0;
-        long totalSize = 0;
-        for (FrameInfo info: allFrames) {
-            totalSize += info.getSize();
+        if (framecount > 0) {
+            long startPts = allFrames.get(0).mPts;
+            //We just ignore the last frame, for the average does not mean much.
+            long lastTime = allFrames.get(allFrames.size() - 1).mPts;
+            double totalTime =  ((double)(lastTime - startPts)) / 1000000.0;
+            long totalSize = 0;
+            for (FrameInfo info: allFrames) {
+                totalSize += info.getSize();
+            }
+            totalSize -= allFrames.get(framecount - 1).mSize;
+            return (int)(Math.round(8 * totalSize/(totalTime))); // bytes/Secs -> bit/sec
+        } else {
+            return 0;
         }
-        totalSize -= allFrames.get(framecount - 1).mSize;
-        return (int)(Math.round(8 * totalSize/(totalTime))); // bytes/Secs -> bit/sec
     }
 
     public void  setEncodedfile(String filename) {
