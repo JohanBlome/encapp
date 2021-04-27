@@ -8,12 +8,15 @@ import numpy as np
 
 
 class RDPlot:
-    def __init__(self):
+    def __init__(self, outdir):
         self.curve_index = 0
         self.colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
         self.markers = ['o', 'v', '^', '<', '>', '8', 's',
                         'p', '*', 'h', 'H', 'D', 'd', 'P', 'X']
         self.lines = ['-', '--', '-.']
+        self.outdir = ""
+        if outdir is not None:
+            self.outdir = outdir + '/'
 
     def get_style(self):
         index = self.curve_index
@@ -29,6 +32,7 @@ class RDPlot:
         plt.title(os.path.basename(title))
         plt.xlabel('Bitrate (kbps)')
         plt.ylabel('VMAF Score')
+        self.curve_index = 0
         self.x_min = 0
         self.x_max = 0
         self.y_min = 100
@@ -46,6 +50,8 @@ class RDPlot:
         plt.grid()
         plt.draw()
 
+    def save(self, title):
+        plt.savefig(self.outdir + os.path.basename(title) + ".png", format="png")
 
     def plot_rd_curve(self, rd_results_json_file):
         rd_results = None
@@ -59,6 +65,7 @@ class RDPlot:
                     self.draw(result['bitrates'],
                               result['vmaf_scores'],
                               result['description'])
+                self.save(key)
                 self.finish()
         plt.show()
 
@@ -67,6 +74,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='A Python script \
         to plot Rate Distortion curves')
     parser.add_argument('--file', required=True, help='Rate Distortion file')
+    parser.add_argument('--outdir', help='Output dir')
     args = parser.parse_args()
-    rd_plot = RDPlot()
+    rd_plot = RDPlot(args.outdir)
     rd_plot.plot_rd_curve(args.file)
