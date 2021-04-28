@@ -11,41 +11,42 @@
 #define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, "encapp", __VA_ARGS__)
 
 
-FILE *dataFile = NULL;
 
-JNIEXPORT bool JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaString) {
+
+JNIEXPORT long JNICALL openFile(JNIEnv *env, jobject obj_this,  jstring javaString) {
     const char *fileName = env->GetStringUTFChars(javaString, 0);
-
     LOGD("opening input file: \"%s\"", fileName);
-    dataFile = fopen(fileName, "r");
+    FILE *dataFile = fopen(fileName, "r");
     if (dataFile == NULL) {
         LOGD("Failed to open the reference file, error: %s\n", strerror(errno));
-        // TODO(johan): catch this
+        return 0;
     }
 
     env->ReleaseStringUTFChars(javaString, fileName);
     if (dataFile) {
-        return JNI_TRUE;
+        return (jlong)dataFile;
     } else {
-        return JNI_FALSE;
+        return 0;
     }
 }
 
-JNIEXPORT void JNICALL closeFile() {
-    LOGD("Close ref file");
-    if (dataFile) {
+JNIEXPORT void JNICALL closeFile(JNIEnv *env, jobject obj_this, jlong fid) {
+    FILE *dataFile = (FILE*)fid;
+    LOGD("Close ref file: %ld", fid);
+    if (dataFile != 0) {
         fclose(dataFile);
     }
 }
 
-JNIEXPORT jint JNICALL fillBuffer(JNIEnv *env, jobject obj_this, jobject outputData, jint size) {
+JNIEXPORT jint JNICALL fillBuffer(JNIEnv *env, jobject obj_this, jobject outputData, jint size, jlong fid) {
     (void) obj_this;
     size_t read = 0;
+    FILE *dataFile = (FILE*)fid;
 
     uint8_t *outputBuffer = 0;
 
     outputBuffer = (uint8_t *) env->GetDirectBufferAddress(outputData);
-
+    LOGD("Fill buffer %ld", fid);
     if (dataFile == NULL) {
        LOGD("Forgot to open file?");
         goto out;
@@ -58,9 +59,9 @@ JNIEXPORT jint JNICALL fillBuffer(JNIEnv *env, jobject obj_this, jobject outputD
 }
 
 static const JNINativeMethod methods[] = {
-        {"nativeFillBuffer", "(Ljava/nio/ByteBuffer;I)I", (void *) fillBuffer},
-        {"nativeOpenFile", "(Ljava/lang/String;)Z", (void *) openFile},
-        {"nativeCloseFile", "()V", (void *) closeFile},
+        {"nativeFillBuffer", "(Ljava/nio/ByteBuffer;IJ)I", (void *) fillBuffer},
+        {"nativeOpenFile", "(Ljava/lang/String;)J", (void *) openFile},
+        {"nativeCloseFile", "(J)V", (void *) closeFile},
 };
 
 jclass g_Transcoder;

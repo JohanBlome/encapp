@@ -1,10 +1,10 @@
 package com.facebook.encapp;
 
 import android.media.MediaCodec;
-import android.media.MediaFormat;
-import android.media.MediaMuxer;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.util.Log;
@@ -16,7 +16,6 @@ import com.facebook.encapp.utils.VideoConstraints;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Stack;
-import java.util.UUID;
 import java.util.Vector;
 
 /**
@@ -61,6 +60,8 @@ class Transcoder {
     protected String mFilename;
     protected boolean mDropNext;
 
+    private long mFilePntr;
+
     public String transcode (
             VideoConstraints vc,
             String filename,
@@ -75,8 +76,8 @@ class Transcoder {
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
-        boolean ok = nativeOpenFile(filename);
-        if(!ok) {
+        mFilePntr = nativeOpenFile(filename);
+        if(mFilePntr == 0) {
             Log.e(TAG, "Failed to open yuv file");
             return "";
         }
@@ -258,7 +259,9 @@ class Transcoder {
                             Log.d(TAG, "continue");
                          continue;
                         } else if (size <= 0) {
-                            nativeCloseFile();
+                            nativeCloseFile(mFilePntr);
+                            mFilePntr = 0;
+
                             current_loop++;
                             if (current_loop > loop) {
                                 try {
@@ -276,7 +279,8 @@ class Transcoder {
                                 }
                                 break;
                             }
-                            nativeOpenFile(filename);
+                            Log.d(TAG, " *********** OPEN FILE SECOND TIME *******");
+                            mFilePntr = nativeOpenFile(filename);
                             Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                         }
                     }
@@ -329,12 +333,15 @@ class Transcoder {
             mMuxer.release();
             Log.d(TAG, "mMuxer released ");
         }
-        nativeCloseFile();
+
+        if (mFilePntr != 0)
+            nativeCloseFile(mFilePntr);
+
         return "";
     }
 
 
-    private native int nativeFillBuffer(ByteBuffer buffer, int size);
+    private native int nativeFillBuffer(ByteBuffer buffer, int size, long filepntr);
 
 
     /**
@@ -348,7 +355,7 @@ class Transcoder {
         if (mNextLimit != -1 && frameCount >= mNextLimit) {
             getNextLimit(frameCount);
         }
-        int read = nativeFillBuffer(buffer, size);
+        int read = nativeFillBuffer(buffer, size, mFilePntr);
         int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
         int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
@@ -516,7 +523,7 @@ class Transcoder {
         return mStats;
     }
 
-    private native boolean nativeOpenFile(String filename);
+    private native long nativeOpenFile(String filename);
 
-    private native void nativeCloseFile();
+    private native void nativeCloseFile(long filepntr);
 }
