@@ -48,7 +48,7 @@ JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*(?:\.json$)'
 RD_RESULT_FILE_NAME = 'rd_results.json'
-
+VMAF_2_0_MODEL_FILE = "/usr/local/share/model/vmaf_v0.6.1.json"
 
 def run_cmd(cmd):
     ret = True
@@ -210,17 +210,22 @@ class VideoAnalyzer:
         mp4_file_ref_res = self.get_resolution(mp4_file_ref)
         mp4_file_out_res = self.get_resolution(mp4_file_out)
         if mp4_file_ref_res == mp4_file_out_res and (len(stdout) > 0):
-            vmaf_cmd = 'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out +\
-                        ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
-                        ':log_fmt=json" -t ' + duration + ' -f null -'
+            vmaf_cmd = 'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out + \
+                        ' -lavfi libvmaf="model_path=' + VMAF_2_0_MODEL_FILE + \
+                        ':psnr=1:log_path=' + log_file + ':log_fmt=json" -t ' + \
+                        duration + ' -f null -'
             ret, stdout, stderr = run_cmd(vmaf_cmd)
 
             with open(log_file, 'r') as fp:
-                text = fp.read()
-                match = re.search('(?<="VMAF score":)[0-9.]+', text)
-                vmaf_score = match.group(0)
+                vmaf_result = json.load(fp)
+                fp.close()
+
+            if vmaf_result:
+                if vmaf_result.get('pooled_metrics') is not None and \
+                   vmaf_result.get('pooled_metrics').get('vmaf') is not None and \
+                   vmaf_result.get('pooled_metrics').get('vmaf').get('mean') is not None:
+                    vmaf_score = vmaf_result.get('pooled_metrics').get('vmaf').get('mean')
                 return round(float(vmaf_score), 2)
-            return None
         else:
             input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
             output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
@@ -266,15 +271,21 @@ class VideoAnalyzer:
                        ref_format + ' -i  ' + ref_yuv +\
                        ' -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
                        ref_format + ' -i ' + output_yuv_file +\
-                       ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
-                       ':log_fmt=json" -t ' + duration + ' -f null -'
+                        ' -lavfi libvmaf="model_path=' + VMAF_2_0_MODEL_FILE + \
+                        ':psnr=1:log_path=' + log_file + ':log_fmt=json" -t ' + \
+                        duration + ' -f null -'
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             os.system('rm ' + output_yuv_file)
-            # VMAF score = 89.176951
+
             with open(log_file, 'r') as fp:
-                text = fp.read()
-                match = re.search('(?<="VMAF score":)[0-9.]+', text)
-                vmaf_score = match.group(0)
+                vmaf_result = json.load(fp)
+                fp.close()
+
+            if vmaf_result:
+                if vmaf_result.get('pooled_metrics') is not None and \
+                   vmaf_result.get('pooled_metrics').get('vmaf') is not None and \
+                   vmaf_result.get('pooled_metrics').get('vmaf').get('mean') is not None:
+                    vmaf_score = vmaf_result.get('pooled_metrics').get('vmaf').get('mean')
                 return round(float(vmaf_score), 2)
         else:
             vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
@@ -363,7 +374,7 @@ class EncodeJobs:
     # run one encode job
     def run_one_encode(self, job_info, serial_no):
         # push input file to the device
-        if job_info.use_surface_enc or job_info.input_format != 'mp4':
+        if job_info.use_surface_enc:
             if job_info.input_file != self.prev_file:
                 adb_cmd = 'adb -s ' + serial_no + ' push ' + \
                             job_info.input_file + ' ' \
@@ -375,13 +386,26 @@ class EncodeJobs:
             if (job_info.input_file != self.prev_file or
                     job_info.enc_res != self.prev_enc_res or
                     job_info.pix_fmt != self.prev_pix_fmt):
-                input_file = self.workdir + '/' + 'ref.yuv'
-                ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
+                input_file = job_info.input_file
+                if (job_info.input_format != job_info.pix_fmt or
+                    job_info.input_res != job_info.enc_res):
+
+                    input_file = self.workdir + '/' + 'ref.yuv'
+                    if job_info.input_format == 'mp4':
+                        ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
+                                    ' -s ' + job_info.enc_res + \
+                                    ' -t ' + job_info.duration + \
+                                    ' -pix_fmt ' + job_info.pix_fmt + ' '\
+                                    + input_file
+                    else:
+                        ffmpeg_cmd = 'ffmpeg -y' + ' -s ' + job_info.input_res + \
+                             ' -pix_fmt ' + job_info.input_format + \
+                             ' -i ' + job_info.input_file + \
                              ' -s ' + job_info.enc_res + \
                              ' -t ' + job_info.duration + \
                              ' -pix_fmt ' + job_info.pix_fmt + ' '\
                              + input_file
-                run_cmd(ffmpeg_cmd)
+                    run_cmd(ffmpeg_cmd)
                 adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
                           ' ' + job_info.device_workdir \
                           + job_info.input_file_on_device
