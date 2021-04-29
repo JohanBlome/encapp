@@ -12,6 +12,7 @@ import android.util.Size;
 
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VideoConstraints;
+import com.facebook.encapp.utils.FileReader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,18 +26,13 @@ import java.util.Vector;
 class Transcoder {
     // Qualcomm added extended omx parameters
     protected static final String MEDIA_KEY_LTR_NUM_FRAMES = "vendor.qti-ext-enc-ltr-count.num-ltr-frames";
-    protected static String MEDIA_KEY_LTR_MAX_COUNT  = "vendor.qti-ext-enc-caps-ltr.max-count";
+    protected static String MEDIA_KEY_LTR_MAX_COUNT = "vendor.qti-ext-enc-caps-ltr.max-count";
     protected static final String MEDIA_KEY_LTR_MARK_FRAME = "vendor.qti-ext-enc-ltr.mark-frame";
-    protected static final String MEDIA_KEY_LTR_USE_FRAME  = "vendor.qti-ext-enc-ltr.use-frame";
-    protected static final String MEDIA_KEY_HIER_STRUCT_LAYERS  = "vendor.qti-ext-enc-hier-struct.layers";
+    protected static final String MEDIA_KEY_LTR_USE_FRAME = "vendor.qti-ext-enc-ltr.use-frame";
+    protected static final String MEDIA_KEY_HIER_STRUCT_LAYERS = "vendor.qti-ext-enc-hier-struct.layers";
     public static final String MEDIA_KEY_IFRAME_SIZE_PRESET = "vendor.qti-ext-enc-iframe-size.iframesize";
 
     protected static final String TAG = "encapp";
-
-    static {
-        System.loadLibrary("encapp");
-    }
-
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000;
 
     protected int mFrameRate = 30;
@@ -48,7 +44,7 @@ class Transcoder {
     protected int mNextLimit = -1;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
-    protected int mRefFramesizeInBytes = (int)(1280 * 720 * 1.5);
+    protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
 
     protected Stack<String> mDynamicSetting = null;
 
@@ -61,8 +57,9 @@ class Transcoder {
     protected boolean mDropNext;
 
     private long mFilePntr;
+    private FileReader mYuvReader;
 
-    public String transcode (
+    public String transcode(
             VideoConstraints vc,
             String filename,
             Size refFrameSize,
@@ -72,15 +69,12 @@ class Transcoder {
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
-        mRefFramesizeInBytes = (int)(refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
+        mRefFramesizeInBytes = (int) (refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
-        mFilePntr = nativeOpenFile(filename);
-        if(mFilePntr == 0) {
-            Log.e(TAG, "Failed to open yuv file");
-            return "";
-        }
+        mYuvReader = new FileReader();
+        mYuvReader.openFile(filename);
 
         int keyFrameInterval = vc.getKeyframeRate();
 
@@ -90,7 +84,7 @@ class Transcoder {
             if (dynamic.contains("ltrm")) {
                 mUseLTR = true;
             }
-            for (int i = changes.length-1; i >= 0; i--) {
+            for (int i = changes.length - 1; i >= 0; i--) {
                 String data = changes[i];
                 mDynamicSetting.push(data);
             }
@@ -109,7 +103,7 @@ class Transcoder {
             if (matching.size() > 1) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("\nAmbigous codecs \n" + matching.size() + " codecs matching.\n");
-                for(MediaCodecInfo info: matching) {
+                for (MediaCodecInfo info : matching) {
                     sb.append(info.getName() + "\n");
                 }
                 Log.e(TAG, sb.toString());
@@ -173,18 +167,17 @@ class Transcoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
         } catch (IOException iox) {
-            Log.e(TAG, "Failed to create codec: "+iox.getMessage());
+            Log.e(TAG, "Failed to create codec: " + iox.getMessage());
             return "Failed to create codec";
         } catch (MediaCodec.CodecException cex) {
-            Log.e(TAG, "Configure failed: "+cex.getMessage());
+            Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
         }
 
         try {
             mCodec.start();
-        }
-        catch(Exception ex){
-            Log.e(TAG, "Start failed: "+ex.getMessage());
+        } catch (Exception ex) {
+            Log.e(TAG, "Start failed: " + ex.getMessage());
             return "Start encoding failed";
         }
 
@@ -206,7 +199,7 @@ class Transcoder {
 
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = vc.getmReferenceFPS();
-        mKeepInterval = mReferenceFrameRate / (float)mFrameRate;
+        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
         int mPts = 132;
         calculateFrameTiming();
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -218,7 +211,6 @@ class Transcoder {
             //There seems to be a bug so that this key is no set (but used).
             oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
             oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-            Log.d(TAG, "Call create mMuxer");
             if (mWriteFile)
                 mMuxer = createMuxer(mCodec, oformat, true);
         }
@@ -227,7 +219,7 @@ class Transcoder {
         int current_loop = 1;
         while (loop >= current_loop) {
             int index;
-            Log.d(TAG, "Frames: "+mFramesAdded + " - inframes: "+inFramesCount + ", current loop: " + current_loop);
+            Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
             try {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
@@ -252,14 +244,14 @@ class Transcoder {
 
                             inFramesCount++;
                         } catch (IllegalStateException isx) {
-                            Log.e(TAG, "Queue encoder failed, " + index+", mess: "+isx.getMessage());
+                            Log.e(TAG, "Queue encoder failed, " + index + ", mess: " + isx.getMessage());
                         }
                         Log.d(TAG, "size = " + size);
                         if (size == -2) {
                             Log.d(TAG, "continue");
-                         continue;
+                            continue;
                         } else if (size <= 0) {
-                            nativeCloseFile(mFilePntr);
+                            mYuvReader.closeFile();
                             mFilePntr = 0;
 
                             current_loop++;
@@ -275,19 +267,19 @@ class Transcoder {
                                     Log.d(TAG, "End of stream");
                                     inFramesCount++;
                                 } catch (IllegalStateException isx) {
-                                    Log.e(TAG, "Queue encoder failed, " + index+", mess: "+isx.getMessage());
+                                    Log.e(TAG, "Queue encoder failed, " + index + ", mess: " + isx.getMessage());
                                 }
                                 break;
                             }
                             Log.d(TAG, " *********** OPEN FILE SECOND TIME *******");
-                            mFilePntr = nativeOpenFile(filename);
+                            mYuvReader.openFile(filename);
                             Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                         }
                     }
                     numBytesSubmitted += size;
-                   // if (size == 0) break;
+                    // if (size == 0) break;
                 }
-            }catch (Exception ex) {
+            } catch (Exception ex) {
                 ex.printStackTrace();
             }
 
@@ -298,14 +290,20 @@ class Transcoder {
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
+                Log.d(TAG, "info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG = "+(info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                    Log.d(TAG, "hm...");
                     MediaFormat oformat = mCodec.getOutputFormat();
+                    Log.d(TAG, "hm2...");
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
                     oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                    if (mWriteFile)
+                    Log.d(TAG, "hm3...");
+                    if (mWriteFile) {
+                        Log.d(TAG, "Create muxer");
                         mMuxer = createMuxer(mCodec, oformat, true);
+                    }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
@@ -313,39 +311,44 @@ class Transcoder {
                     boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
                     mStats.stopFrame(info.presentationTimeUs, info.size, keyFrame);
                     if (keyFrame) {
-                        Log.d(TAG, "Out buffer has KEY_FRAME @ " +outFramesCount );
+                        Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);
                     }
                     numBytesDequeued += info.size;
                     ++outFramesCount;
+
                     if (mMuxer != null)
-                        mMuxer.writeSampleData(0, data, info);
+                        Log.d(TAG, "Write to muxer: " + data.remaining());
+
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }
         }
         mStats.stop();
+
+        Log.d(TAG, "Close muxer and streams");
         if (mCodec != null) {
             mCodec.stop();
             mCodec.release();
         }
         if (mMuxer != null) {
-            mMuxer.stop();
-            mMuxer.release();
-            Log.d(TAG, "mMuxer released ");
+            try {
+                mMuxer.release(); //Release calls stop
+            } catch (IllegalStateException ise) {
+                //Most likely mean that the muxer is already released. Stupid API
+                Log.e(TAG, "Illegal state exception when trying to release the muxer");
+            }
         }
 
-        if (mFilePntr != 0)
-            nativeCloseFile(mFilePntr);
+        if (mFilePntr != 0) {
+            mYuvReader.closeFile();
+        }
 
         return "";
     }
 
-
-    private native int nativeFillBuffer(ByteBuffer buffer, int size, long filepntr);
-
-
     /**
      * Fills input buffer for encoder from YUV buffers.
+     *
      * @return size of enqueued data.
      */
     private int queueInputBufferEncoder(
@@ -355,11 +358,11 @@ class Transcoder {
         if (mNextLimit != -1 && frameCount >= mNextLimit) {
             getNextLimit(frameCount);
         }
-        int read = nativeFillBuffer(buffer, size, mFilePntr);
-        int currentFrameNbr = (int)((float)(frameCount) / mKeepInterval);
-        int nextFrameNbr = (int)((float)((frameCount + 1)) / mKeepInterval);
+        int read = mYuvReader.fillBuffer(buffer, size);
+        int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
+        int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
-            Log.d(TAG,"Skip frame: " + frameCount);
+            Log.d(TAG, "Skip frame: " + frameCount);
             mSkipped++;
             mDropNext = false;
             read = -2;
@@ -370,7 +373,7 @@ class Transcoder {
             Log.d(TAG, "Queue frame " + frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {
-            read =  -1;
+            read = -1;
         }
 
         return read;
@@ -389,24 +392,24 @@ class Transcoder {
                 if (command.equals("fps") && data.length >= 2) {
                     int tmpFps = Integer.parseInt(data[2]);
                     Log.d(TAG, "Set fps to " + tmpFps);
-                    mKeepInterval = (float)mFrameRate / (float)tmpFps;
+                    mKeepInterval = (float) mFrameRate / (float) tmpFps;
                 } else if (command.equals("bit") && data.length >= 2) {
                     int bitrate = Integer.parseInt(data[2]);
                     Log.d(TAG, "Set bitrate to " + bitrate);
                     params.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bitrate * 1000); //In kbps
                 } else if (command.equals("ltrm") && data.length >= 2) {
                     int ltr = Integer.parseInt(data[2]);
-                    Log.d(TAG, "Mark ltr frame " + currentFrame + ", @ " + mFrameTime+ " mark as: "+ltr);
+                    Log.d(TAG, "Mark ltr frame " + currentFrame + ", @ " + mFrameTime + " mark as: " + ltr);
                     params.putInt(MEDIA_KEY_LTR_MARK_FRAME, ltr);
                 } else if (command.equals("ltru") && data.length >= 2) {
                     int mLTRRef = Integer.parseInt(data[2]);
-                    Log.d(TAG, "Use ltr frame id " + mLTRRef +" @ "+ currentFrame);
+                    Log.d(TAG, "Use ltr frame id " + mLTRRef + " @ " + currentFrame);
                     params.putInt(MEDIA_KEY_LTR_USE_FRAME, mLTRRef);
                 } else if (command.equals("key")) {
                     Log.d(TAG, "Request new key frame at " + currentFrame);
                     params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 1); //Always ref a key frame?
                 } else if (command.equals("drp") && data.length >= 1) {
-                    Log.d(TAG, "Drop frame @ " +  data[1]);
+                    Log.d(TAG, "Drop frame @ " + data[1]);
                     mDropNext = true;
                 }
             }
@@ -475,16 +478,16 @@ class Transcoder {
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
-            Log.d(TAG, "Create mMuxer with type "+type+" and filename: " + mFilename);
+            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + mFilename);
             mMuxer = new MediaMuxer("/sdcard/" + mFilename, type);
         } catch (IOException e) {
-            Log.d(TAG, "FAILED Create mMuxer with type "+type+" and filename: " + mFilename);
+            Log.d(TAG, "FAILED Create mMuxer with type " + type + " and filename: " + mFilename);
             e.printStackTrace();
         }
 
         mMuxer.addTrack(format);
         String formatTxt = VideoConstraints.getFormatInfo(format);
-        Log.d(TAG,"**\nSettings: " + formatTxt + "\n**");
+        Log.d(TAG, "**\nSettings: " + formatTxt + "\n**");
         Log.d(TAG, "Start mMuxer");
         mMuxer.start();
         mStats.setEncodedfile(mFilename);
@@ -498,7 +501,7 @@ class Transcoder {
     @NonNull
     protected Vector<MediaCodecInfo> getMediaCodecInfos(MediaCodecInfo[] codecInfos, String id) {
         Vector<MediaCodecInfo> matching = new Vector<>();
-        for (MediaCodecInfo info: codecInfos) {
+        for (MediaCodecInfo info : codecInfos) {
             //Handle special case of codecs with naming schemes consisting of substring of another
 
             if (info.isEncoder()) {
@@ -509,8 +512,7 @@ class Transcoder {
                         matching.clear();
                         matching.add(info);
                         break;
-                    }
-                    else if (info.getName().toLowerCase().contains(id.toLowerCase())) {
+                    } else if (info.getName().toLowerCase().contains(id.toLowerCase())) {
                         matching.add(info);
                     }
                 }
@@ -519,11 +521,7 @@ class Transcoder {
         return matching;
     }
 
-    public Statistics getStatistics(){
+    public Statistics getStatistics() {
         return mStats;
     }
-
-    private native long nativeOpenFile(String filename);
-
-    private native void nativeCloseFile(long filepntr);
 }
