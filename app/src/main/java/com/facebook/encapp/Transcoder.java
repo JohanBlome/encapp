@@ -290,7 +290,7 @@ class Transcoder {
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
-                Log.d(TAG, "info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG = "+(info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG));
+                Log.d(TAG, "flags = "+(info.flags));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     Log.d(TAG, "hm...");
                     MediaFormat oformat = mCodec.getOutputFormat();
@@ -299,6 +299,7 @@ class Transcoder {
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
                     oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+                    oformat.setInteger(MediaFormat.KEY_BIT_RATE, format.getInteger(MediaFormat.KEY_BIT_RATE));
                     Log.d(TAG, "hm3...");
                     if (mWriteFile) {
                         Log.d(TAG, "Create muxer");
@@ -316,9 +317,10 @@ class Transcoder {
                     numBytesDequeued += info.size;
                     ++outFramesCount;
 
-                    if (mMuxer != null)
+                    if (mMuxer != null) {
                         Log.d(TAG, "Write to muxer: " + data.remaining());
-
+                        mMuxer.writeSampleData(0, data, info);
+                    }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }
