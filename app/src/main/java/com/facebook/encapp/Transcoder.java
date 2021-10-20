@@ -396,11 +396,11 @@ class Transcoder {
                     int bitrate = Integer.parseInt(data[2]);
                     Log.d(TAG, "Set bitrate to " + bitrate);
                     params.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bitrate * 1000); //In kbps
-                } else if (command.equals("ltrm") && data.length >= 2) {
+                } else if (command.equals("ltrmark") && data.length >= 2) {
                     int ltr = Integer.parseInt(data[2]);
                     Log.d(TAG, "Mark ltr frame " + currentFrame + ", @ " + mFrameTime + " mark as: " + ltr);
                     params.putInt(MEDIA_KEY_LTR_MARK_FRAME, ltr);
-                } else if (command.equals("ltru") && data.length >= 2) {
+                } else if (command.equals("ltruse") && data.length >= 2) {
                     int mLTRRef = Integer.parseInt(data[2]);
                     Log.d(TAG, "Use ltr frame id " + mLTRRef + " @ " + currentFrame);
                     params.putInt(MEDIA_KEY_LTR_USE_FRAME, mLTRRef);
