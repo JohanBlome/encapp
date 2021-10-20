@@ -46,9 +46,7 @@ public class SurfaceTranscoder extends Transcoder{
         if (dynamic != null) {
             mDynamicSetting = new Stack<String>();
             String[] changes = dynamic.split(":");
-            if (dynamic.contains("ltrm")) {
-                mUseLTR = true;
-            }
+
             for (int i = changes.length-1; i >= 0; i--) {
                 String data = changes[i];
                 mDynamicSetting.push(data);
@@ -126,7 +124,7 @@ public class SurfaceTranscoder extends Transcoder{
             // We explicitly set the color format
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-            if (mUseLTR) {
+            if (vc.getLTRCount() > 1) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }
             if (vc.getHierStructLayers() > 0) {

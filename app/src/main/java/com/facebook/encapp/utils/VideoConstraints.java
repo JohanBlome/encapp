@@ -34,7 +34,7 @@ public class VideoConstraints {
     private float mReferenceFPS;
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
-    private int mLtrCount = 4;
+    private int mLtrCount = 1;
     private int mHierStructLayers = 0;
     private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
     private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
