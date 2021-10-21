@@ -144,7 +144,6 @@ public class Statistics {
             settings.put("colorrange",mVc.getColorRange());
             settings.put("colorstandard",mVc.getColorStandard());
             settings.put("colortransfer",mVc.getColorTransfer());
-            settings.put("hierplayers",mVc.getHierStructLayers());
             settings.put("ltrcount",mVc.getLTRCount());
 
             json.put("settings", settings);

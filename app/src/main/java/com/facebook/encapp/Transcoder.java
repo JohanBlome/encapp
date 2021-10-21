@@ -29,7 +29,6 @@ class Transcoder {
     protected static String MEDIA_KEY_LTR_MAX_COUNT = "vendor.qti-ext-enc-caps-ltr.max-count";
     protected static final String MEDIA_KEY_LTR_MARK_FRAME = "vendor.qti-ext-enc-ltr.mark-frame";
     protected static final String MEDIA_KEY_LTR_USE_FRAME = "vendor.qti-ext-enc-ltr.use-frame";
-    protected static final String MEDIA_KEY_HIER_STRUCT_LAYERS = "vendor.qti-ext-enc-hier-struct.layers";
     public static final String MEDIA_KEY_IFRAME_SIZE_PRESET = "vendor.qti-ext-enc-iframe-size.iframesize";
 
     protected static final String TAG = "encapp";
@@ -118,12 +117,11 @@ class Transcoder {
 
             Log.d(TAG, "Done");
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
+
             if (vc.getLTRCount() > 1) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }
-            if (vc.getHierStructLayers() > 0) {
-                format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
-            }
+
 
             //IFrame size preset only valid for cbr on qcomm
             if (vc.getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
@@ -210,6 +208,7 @@ class Transcoder {
             oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             if (mWriteFile)
                 mMuxer = createMuxer(mCodec, oformat, true);
+
         }
 
         long last_pts = 0;
@@ -398,11 +397,11 @@ class Transcoder {
                     params.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bitrate * 1000); //In kbps
                 } else if (command.equals("ltrmark") && data.length >= 2) {
                     int ltr = Integer.parseInt(data[2]);
-                    Log.d(TAG, "Mark ltr frame " + currentFrame + ", @ " + mFrameTime + " mark as: " + ltr);
+                    Log.d(TAG, "ltr.mark-frame: frame: " + currentFrame + " time: " + mFrameTime + " mark: " + ltr);
                     params.putInt(MEDIA_KEY_LTR_MARK_FRAME, ltr);
                 } else if (command.equals("ltruse") && data.length >= 2) {
                     int mLTRRef = Integer.parseInt(data[2]);
-                    Log.d(TAG, "Use ltr frame id " + mLTRRef + " @ " + currentFrame);
+                    Log.d(TAG, "ltr.use-frame: id: " + mLTRRef + " frame: " + currentFrame);
                     params.putInt(MEDIA_KEY_LTR_USE_FRAME, mLTRRef);
                 } else if (command.equals("key")) {
                     Log.d(TAG, "Request new key frame at " + currentFrame);

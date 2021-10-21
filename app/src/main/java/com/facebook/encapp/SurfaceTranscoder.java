@@ -127,9 +127,6 @@ public class SurfaceTranscoder extends Transcoder{
             if (vc.getLTRCount() > 1) {
                 format.setInteger(MEDIA_KEY_LTR_NUM_FRAMES, vc.getLTRCount());
             }
-            if (vc.getHierStructLayers() > 0) {
-                format.setInteger(MEDIA_KEY_HIER_STRUCT_LAYERS, vc.getHierStructLayers());
-            }
             //IFrame size preset only valid for cbr on qcomm
             if (vc.getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
                 Log.d(TAG, "Set iframe preset: " + vc.getIframeSizePreset());

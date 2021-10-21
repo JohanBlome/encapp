@@ -90,8 +90,6 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("dyn");
     private static final String LTR_COUNT =
             InstrumentationRegistry.getArguments().getString("ltrc");
-    private static final String HIER_STRUCT_LAYER_COUNT =
-            InstrumentationRegistry.getArguments().getString("hierl");
     private static final String LIST_CODECS =
             InstrumentationRegistry.getArguments().getString("list_codecs");
     private static final String IFRAME_SIZE_PRESET =
@@ -169,10 +167,6 @@ public class CodecValidationInstrumentedTest {
         if (LTR_COUNT != null) {
             mExtraDataHashMap.put("ltrc", LTR_COUNT);
             Log.e(TAG, "Ltr count: " + LTR_COUNT);
-        }
-        if (HIER_STRUCT_LAYER_COUNT != null) {
-            mExtraDataHashMap.put("hierl", HIER_STRUCT_LAYER_COUNT);
-            Log.e(TAG, "Hier p struct layer count: " + HIER_STRUCT_LAYER_COUNT);
         }
         if (FILE != null) {
             if (!FILE.contains("/")) {

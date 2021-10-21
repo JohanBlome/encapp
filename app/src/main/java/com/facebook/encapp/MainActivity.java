@@ -114,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
                 str.append("\nDefault settings:");
                 str.append(VideoConstraints.getFormatInfo(format));
             }
-
         }
         return str.toString();
 
@@ -374,8 +373,6 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setReferenceFPS(ref_fps);
                                 int ltrCount = (mExtraDataHashMap.get("ltrc") != null) ? Integer.parseInt(mExtraDataHashMap.get("ltrc")) : 6;
                                 constraints.setLTRCount(ltrCount);
-                                int hierLayerCount = (mExtraDataHashMap.get("hierl") != null) ? Integer.parseInt(mExtraDataHashMap.get("hierl")) : 0;
-                                constraints.setHierStructLayerCount(hierLayerCount);
                                 constraints.setVideoEncoderIdentifier(encoders[eC]);
                                 constraints.setConstantBitrate(false);
                                 if (mod[mC].equals("cbr")) {

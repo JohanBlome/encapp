@@ -35,7 +35,6 @@ public class VideoConstraints {
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
     private int mLtrCount = 1;
-    private int mHierStructLayers = 0;
     private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
     private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
     private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
@@ -95,10 +94,6 @@ public class VideoConstraints {
         return mReferenceFPS;
     }
 
-    public int getHierStructLayers() {
-        return mHierStructLayers;
-    }
-
     public String getVideoEncoderIdentifier() {
         return mVideoEncoderIdentifier;
     }
@@ -125,10 +120,6 @@ public class VideoConstraints {
 
     public void setLTRCount(int count) {
         mLtrCount = count;
-    }
-
-    public void setHierStructLayerCount(int count) {
-        mHierStructLayers = count;
     }
 
 
