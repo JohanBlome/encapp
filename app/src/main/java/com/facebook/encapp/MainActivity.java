@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
+import static junit.framework.Assert.assertTrue;
+
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
     private HashMap<String, String> mExtraDataHashMap;
@@ -356,6 +358,8 @@ public class MainActivity extends AppCompatActivity {
         if (fps.length == 0) {
             fps = new String[]{"30"};
         }
+        String encSettings = mExtraDataHashMap.get("econf");
+        Log.d(TAG, "encsett: "+encSettings);
         int index = 0;
         Vector<VideoConstraints> vc = new Vector<>();
         for (int eC = 0; eC < encoders.length; eC++) {
@@ -447,6 +451,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         logText.append("\nEncoding failed: " + settings);
                         logText.append("\n" + status);
+                        assertTrue(status, false);
                     }
                 });
             } else {
@@ -459,7 +464,6 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Time per frame: " + (long) (stats.getProcessingTime() / stats.getFrameCount()));
 
                         logText.append("\nDone encoding: " + settings);
-
                     }
                 });
             }
@@ -467,5 +471,6 @@ public class MainActivity extends AppCompatActivity {
             decreaseEncodingsInflight();
         }
     }
+
 }
 

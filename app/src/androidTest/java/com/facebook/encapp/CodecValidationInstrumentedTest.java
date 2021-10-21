@@ -19,6 +19,8 @@ import org.junit.runner.RunWith;
 
 import java.util.HashMap;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
 
@@ -100,11 +102,13 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("loop");
     private static final String MULTIPLE_CONC_SESSIONS =
             InstrumentationRegistry.getArguments().getString("conc");
+    private static final String ECODEC_CONFIG =
+            InstrumentationRegistry.getArguments().getString("econf");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
     private UiDevice mDevice;
-
+    private MainActivity mMainActivity;
     private HashMap<String, String> mExtraDataHashMap;
 
     /**
@@ -197,6 +201,10 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("conc", MULTIPLE_CONC_SESSIONS);
             Log.e(TAG, "concurrent sessions: " + MULTIPLE_CONC_SESSIONS);
         }
+        if (ECODEC_CONFIG != null) {
+            mExtraDataHashMap.put("econf", ECODEC_CONFIG);
+            Log.e(TAG, "econf config: " + ECODEC_CONFIG);
+        }
     }
 
     @Before
@@ -231,11 +239,11 @@ public class CodecValidationInstrumentedTest {
                 new ActivityTestRule<>(MainActivity.class);
         // Clear out any previous instances
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        Activity activity = mainActivityTestRule.launchActivity(intent);
+        mMainActivity = mainActivityTestRule.launchActivity(intent);
 
         // Wait for the app to appear
         mDevice.wait(Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)),
-                LAUNCH_TIMEOUT);
+                LAUNCH_TIMEOUT);        
     }
 
     @Test

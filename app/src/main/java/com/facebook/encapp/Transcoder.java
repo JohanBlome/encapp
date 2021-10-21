@@ -72,7 +72,9 @@ class Transcoder {
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
         mYuvReader = new FileReader();
-        mYuvReader.openFile(filename);
+        if (!mYuvReader.openFile(filename)) {
+            return "\nCould not open file";
+        }
 
         int keyFrameInterval = vc.getKeyframeRate();
 
@@ -521,5 +523,8 @@ class Transcoder {
 
     public Statistics getStatistics() {
         return mStats;
+    }
+    
+    public void addEncoderConfigParameters(MediaFormat format, String cconf) {
     }
 }
