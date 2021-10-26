@@ -5,65 +5,51 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
-import android.util.Log;
-import android.util.Size;
-import android.view.Surface;
-
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
+import android.util.Log;
+import android.view.Surface;
 
 import com.facebook.encapp.utils.Statistics;
-import com.facebook.encapp.utils.VideoConstraints;
+import com.facebook.encapp.utils.TestParams;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Locale;
 
-public class SurfaceTranscoder extends Transcoder{
+public class SurfaceTranscoder extends BufferEncoder {
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     AtomicReference<Surface> mInputSurfaceReference;
     InputSurface mInputSurface;
     OutputSurface mOutputSurface;
 
-    public String transcode(VideoConstraints vc,
-                            String filename,
-                            Size refFrameSize,
-                            String dynamic,
-                            int loop,
-                            boolean writeFile) {
+    public String encode(TestParams vc,
+                         boolean writeFile) {
         Log.d(TAG, "**** SURFACE TRANSCODE ***");
+        mRuntimeParams = vc.getRuntimeParameters();
         int keyFrameInterval = vc.getKeyframeRate();
         mNextLimit = -1;
         mSkipped = 0;
         mFramesAdded = 0;
-        mRefFramesizeInBytes = (int)(refFrameSize.getWidth() * refFrameSize.getHeight() * 1.5);
+
         mWriteFile = writeFile;
         mStats = new Statistics("surface encoder", vc);
 
-        if (dynamic != null) {
-            mDynamicSetting = new Stack<String>();
-            String[] changes = dynamic.split(":");
+        int loop = vc.getLoopCount();
 
-            for (int i = changes.length-1; i >= 0; i--) {
-                String data = changes[i];
-                mDynamicSetting.push(data);
-            }
-
-            getNextLimit(0);
-        }
         mExtractor = new MediaExtractor();
         MediaFormat inputFormat = null;
         try {
-            mExtractor.setDataSource(filename);
+            mExtractor.setDataSource(vc.getInputfile());
             int trackNum = 0;
-	    int tracks = mExtractor.getTrackCount();
+	        int tracks = mExtractor.getTrackCount();
             for (int track = 0; track < tracks; track++) {
                 inputFormat = mExtractor.getTrackFormat(track);
                 if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
-                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase().contains("video")) {
+                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
                     Log.d(TAG, "Found video track at " + track + " " + inputFormat.getString(MediaFormat.KEY_MIME));
                     trackNum = track;
                 }
@@ -200,7 +186,7 @@ public class SurfaceTranscoder extends Transcoder{
         int mPts = 132;
         calculateFrameTiming();
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase().contains(".vp");
+        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
             //There seems to be a bug so that this key is no set (but used).
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
@@ -211,12 +197,13 @@ public class SurfaceTranscoder extends Transcoder{
         long totalTime = 0;
         long last_pts = 0;
         int current_loop = 1;
-        while (loop >= current_loop) {
+        while (loop + 1 >= current_loop) {
             int index;
             Log.d(TAG, "Frames: "+mFramesAdded + " - inframes: "+inFramesCount + ", current loop: " + current_loop);
             try {
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 if (index >= 0) {
+
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     if (size > 0) {
@@ -245,9 +232,9 @@ public class SurfaceTranscoder extends Transcoder{
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    if (mNextLimit != -1 && inFramesCount >= mNextLimit) {
-                        getNextLimit(inFramesCount);
-                    }
+
+                    setRuntimeParameters(inFramesCount);
+
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int)((float)(inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int)((float)((inFramesCount + 1)) / mKeepInterval);
@@ -270,7 +257,7 @@ public class SurfaceTranscoder extends Transcoder{
                         mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
                         mStats.startFrame(pts);
-                    }
+                    };
 
                 }
 
@@ -338,6 +325,7 @@ public class SurfaceTranscoder extends Transcoder{
 
         return "";
     }
+
 
 
 }

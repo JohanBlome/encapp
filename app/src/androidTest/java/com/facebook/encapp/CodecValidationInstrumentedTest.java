@@ -1,6 +1,5 @@
 package com.facebook.encapp;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.support.test.InstrumentationRegistry;
@@ -19,8 +18,6 @@ import org.junit.runner.RunWith;
 
 import java.util.HashMap;
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
 
@@ -102,8 +99,8 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("loop");
     private static final String MULTIPLE_CONC_SESSIONS =
             InstrumentationRegistry.getArguments().getString("conc");
-    private static final String ECODEC_CONFIG =
-            InstrumentationRegistry.getArguments().getString("econf");
+    private static final String TEST_CONFIG =
+            InstrumentationRegistry.getArguments().getString("test");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
@@ -201,9 +198,9 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("conc", MULTIPLE_CONC_SESSIONS);
             Log.e(TAG, "concurrent sessions: " + MULTIPLE_CONC_SESSIONS);
         }
-        if (ECODEC_CONFIG != null) {
-            mExtraDataHashMap.put("econf", ECODEC_CONFIG);
-            Log.e(TAG, "econf config: " + ECODEC_CONFIG);
+        if (TEST_CONFIG != null) {
+            mExtraDataHashMap.put("test", TEST_CONFIG);
+            Log.e(TAG, "test config: " + TEST_CONFIG);
         }
     }
 

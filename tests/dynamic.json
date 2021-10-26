@@ -1,0 +1,169 @@
+[{
+		"description": "Dynamic Framerate",
+		"input_files": [
+			"../media/320x180_900fr_nv12.yuv",
+            "../media/320x180_900fr_avc.mp4"
+		],
+		"use_surface_enc": 0,
+		"input_resolution": "320x180",
+        "input_fps": "30",
+		"codecs": [
+			"encoder.avc"
+		],
+		"encode_resolutions": [
+			"1280x720"
+		],
+		"rc_modes": [
+			"vbc"
+		],
+		"bitrates": [
+			1000
+		],
+		"i_intervals": [
+			2
+		],
+		"i_frame_sizes": [
+			"unlimited"
+		],
+        "runtime_parameters": [            
+            {
+                "name": "fps" ,
+                "type": "int",
+                "settings": [
+                    {"20" : "15"},
+                    {"40" : "5"},
+                    {"60" : "20"},
+                    {"80" : "30"}
+                ]           
+            }
+        ],
+		"enc_loop": 0
+	},
+    {
+		"description": "Dynamic Bitrate",
+		"input_files": [
+			"../media/320x180_900fr_nv12.yuv",
+			"../media/320x180_900fr_avc.mp4"
+		],
+		"use_surface_enc": 0,
+		"input_format": "raw",
+		"input_resolution": "320x180",
+        "input_fps": "30",
+		"codecs": [
+			"encoder.avc"
+		],
+		"encode_resolutions": [
+			"1280x720"
+		],
+		"rc_modes": [
+			"vbc"
+		],
+		"bitrates": [
+			1000
+		],
+		"i_intervals": [
+			2
+		],
+		"i_frame_sizes": [
+			"unlimited"
+		],
+        "set_parameters": [            
+            {
+                "name": "video-bitrate" ,
+                "type": "int",
+                "settings": [
+                    {"30" : "100"},
+                    {"60" : "50"},
+                    {"90" : "200"},
+                    {"120" : "1000"}
+                ]           
+            }
+        ],
+		"enc_loop": 0
+	},
+	{
+		"description": "Dynamic Frame Drop",
+		"input_files": [
+		"../media/320x180_900fr_nv12.yuv",
+		"../media/320x180_900fr_avc.mp4"
+		],
+			"use_surface_enc": 0,
+			"input_format": "raw",
+			"input_resolution": "320x180",
+			"input_fps": "30",
+			"codecs": [
+			"encoder.avc"
+		],
+			"encode_resolutions": [
+			"1280x720"
+		],
+			"rc_modes": [
+			"vbc"
+		],
+			"bitrates": [
+			1000
+		],
+			"i_intervals": [
+			2
+		],
+			"i_frame_sizes": [
+			"unlimited"
+		],
+			"set_parameters": [
+			{
+				"name": "drop" ,
+				"type": "int",
+				"settings": [
+					"30",
+					"60",
+					"90",
+					"120"
+				]
+			}
+		],
+		"enc_loop": 0
+	},
+	{
+		"description": "Dynamic Request Sync",
+		"input_files": [
+			"../media/320x180_900fr_nv12.yuv",
+			"../media/320x180_900fr_avc.mp4"
+		],
+		"use_surface_enc": 0,
+		"input_format": "raw",
+		"input_resolution": "320x180",
+		"input_fps": "30",
+		"codecs": [
+			"encoder.avc"
+		],
+		"encode_resolutions": [
+			"1280x720"
+		],
+		"rc_modes": [
+			"vbc"
+		],
+		"bitrates": [
+			1000
+		],
+		"i_intervals": [
+			2
+		],
+		"i_frame_sizes": [
+			"unlimited"
+		],
+		"set_parameters": [
+			{
+				"name": "request-sync" ,
+				"type": "int",
+				"settings": [
+					"30",
+					"60",
+					"90",
+					"120"
+				]
+			}
+		],
+		"enc_loop": 0
+	}
+]
+

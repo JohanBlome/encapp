@@ -1,4 +1,10 @@
 package com.facebook.encapp.utils;
+import android.util.Size;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -8,13 +14,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.UUID;
 
-import android.util.Log;
-import android.util.Size;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 public class Statistics {
     private String mId;
     private String mDesc;
@@ -23,10 +22,10 @@ public class Statistics {
     private long mStartTime;
     private long mStopTime;
     private HashMap<Long,FrameInfo> mFrames;
-    VideoConstraints mVc;
+    TestParams mVc;
     Date mStartDate;
 
-    public Statistics(String desc, VideoConstraints vc) {
+    public Statistics(String desc, TestParams vc) {
         mDesc = desc;
         mFrames = new HashMap<>();
         mVc = vc;
@@ -40,7 +39,7 @@ public class Statistics {
 
     public String toString() {
         ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
-        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
+        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
         Collections.sort(allFrames, compareByPts);
 
         StringBuffer buffer = new StringBuffer();
@@ -68,11 +67,11 @@ public class Statistics {
     public void startFrame(long pts) {
         FrameInfo frame = new FrameInfo(pts);
         frame.start();
-        mFrames.put(new Long(pts), frame);
+        mFrames.put(Long.valueOf(pts), frame);
     }
 
     public void stopFrame(long pts, long size, boolean isIFrame) {
-        FrameInfo frame = mFrames.get(new Long(pts));
+        FrameInfo frame = mFrames.get(Long.valueOf(pts));
         if (frame != null) {
             frame.stop();
             frame.setSize(size);
@@ -94,7 +93,7 @@ public class Statistics {
 
     public int getAverageBitrate() {
         ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
-        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
+        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
         Collections.sort(allFrames, compareByPts);
         int framecount = allFrames.size();
         if (framecount > 0) {
@@ -123,6 +122,7 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
+            json.put("test", mVc.getDescription());
             json.put("date", mStartDate.toString());
             json.put("proctime", getProcessingTime());
             json.put("framecount", getFrameCount());
@@ -149,7 +149,7 @@ public class Statistics {
             json.put("settings", settings);
 
             ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
-            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> new Long(o1.getPts()).compareTo( new Long(o2.getPts() ));
+            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
             Collections.sort(allFrames, compareByPts);
             int counter = 0;
             JSONArray jsonArray = new JSONArray();

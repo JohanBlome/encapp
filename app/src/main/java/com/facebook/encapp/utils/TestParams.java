@@ -8,8 +8,10 @@ import android.util.Log;
 import android.util.Size;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
 
-public class VideoConstraints {
+public class TestParams {
     final static String TAG = "encapp";
     // QCOM specific
     public final static int OMX_TI_COLOR_FormatYUV420PackedSemiPlanar = 0x7F000100;
@@ -49,6 +51,13 @@ public class VideoConstraints {
     private int mProfileLevel = -1;
     private int mColorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible;
     private int mTemporalLayerCount = 1;
+    private String mInputfile = null;
+    private Size mRefSize = null;
+    private String mDynamic = "";
+    private int mLoopCount = 0;
+    private String mDescription = "";
+    private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
+    ArrayList<RuntimeParam> mRuntimeParams;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -69,7 +78,7 @@ public class VideoConstraints {
     }
 
     // Keyframe rate
-    public void setKeyframeRate(int keyframeRate) {
+    public void setKeyframeInterval(int keyframeRate) {
         this.mKeyframeRate = keyframeRate;
     }
 
@@ -252,6 +261,8 @@ public class VideoConstraints {
         StringBuilder str = new StringBuilder();
         String[] keys = {
                 MediaFormat.KEY_BIT_RATE,
+                MediaFormat.KEY_BITRATE_MODE,
+                MediaFormat.KEY_MIME,
                 MediaFormat.KEY_FRAME_RATE,
                 MediaFormat.KEY_COLOR_FORMAT,
                 MediaFormat.KEY_COLOR_RANGE,
@@ -311,4 +322,80 @@ public class VideoConstraints {
     public int getTemporalLayerCount() {
         return mTemporalLayerCount;
     }
+
+    public void setRuntimeParameters(ArrayList<RuntimeParam> params) {
+        mRuntimeParams = params;
+    }
+
+    public HashMap<Integer, ArrayList<RuntimeParam>> getRuntimeParameters() {
+        //Sort and return a HashMap
+        HashMap<Integer, ArrayList<RuntimeParam>> map = new HashMap<>();
+        if (mRuntimeParams == null) {
+            Log.w(TAG, "Runtime parameters are null. No cli runtime parameters supported.");
+            return map;
+        }
+        for (RuntimeParam param: mRuntimeParams) {
+            Integer frame = Integer.valueOf(param.frame);
+            ArrayList<RuntimeParam> list = map.get(frame);
+            if (list == null) {
+                list = new ArrayList<RuntimeParam>();
+                map.put(frame, list);
+            }
+            Log.d(TAG, "Add " + param.name + " @ "+frame + " val: " + (Integer)param.value);
+            list.add(param);
+        }
+        return map;
+    }
+
+    public void setInputfile(String inputfile) {
+        // Assume that the file is in the root of /sdcard/
+        String[] splits = inputfile.split("/");
+        mInputfile = "/sdcard/" + splits[splits.length-1];
+    }
+
+    public String getInputfile() {
+        return mInputfile;
+    }
+
+
+    public void setReferenceSize(Size ref) {
+        mRefSize = ref;
+    }
+
+    public Size getReferenceSize() {
+        return mRefSize;
+    }
+
+    public void setDynamic(String dynamic) {
+        mDynamic = dynamic;
+    }
+
+    public String getDynamic() {
+        return mDynamic;
+    }
+
+    public void setLoopCount(int count) {
+        mLoopCount = count;
+    }
+    public int getLoopCount() {
+        return mLoopCount;
+    }
+
+    public void setDescription(String description) {
+        mDescription = description;
+    }
+
+    public String getDescription(){
+        return mDescription;
+    }
+
+    public void setExtraConfigure(ArrayList<ConfigureParam> extra) {
+        mExtraConfigure = extra;
+    }
+
+    public ArrayList<ConfigureParam> getExtraConfigure() {
+        return mExtraConfigure;
+    }
 }
+
+
