@@ -464,6 +464,7 @@ class BufferEncoder {
                         }  if (param.name.equals("fps")) {
                             mDropNext = true;
                         } else {
+                            Log.d(TAG, param.name + " @ " + frameCount + " - " +  param.value);
                             params.putInt(param.name, (Integer) param.value);
                         }
                     } else {
