@@ -289,16 +289,17 @@ Definitions of the keys in the sample json file
 'enc_loop': The number of time looping encoding. This is used for encoding time profiling. When enc_loop is greater than 1, there is no output video
 
 Run
-$ encapp_tests.py --test sample_config.json
+This will install a prebuild apk, push the videofile and run the test.
+$ encapp.py sample_config.json
 
 To run on a specific device, use
 
-$ encapp_tests.py --test sample_config.json --serial [device serial number]
+$ encapp.py --test sample_config.json --serial [device serial number]
 The script will automatically push the input files to the device.
 If the input file(s) are not in the working directory, use absolute path(s)
 
 The script saves all encoded videos and stats in an output directory per run.
 Stat files are in JSON format.
 
-To check the performance test result, run
-$ parse_encapp_stats.py --proctime --label "my funny session"  {encoder stat file}
+If you do not want to install the prebuild apk, run
+$ encapp.py --install false sample_config.json
