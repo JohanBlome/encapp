@@ -12,7 +12,7 @@
 			"encoder.avc"
 		],
 		"encode_resolutions": [
-			"212x160"
+			"320x180"
 		],
 		"rc_modes": [
 			"vbc"
@@ -52,7 +52,7 @@
 			"encoder.hevc"
 		],
 		"encode_resolutions": [
-			"212x160"
+			"320x180"
 		],
 		"rc_modes": [
 			"vbc"
@@ -88,7 +88,7 @@
 			"encoder.avc"
 		],
 		"encode_resolutions": [
-			"212x160"
+			"320x180"
 		],
 		"rc_modes": [
 			"vbc"
