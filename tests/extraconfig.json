@@ -119,7 +119,7 @@
             "type": "int",
             "setting" : "2"            
         }],
-		"set_parameters": [
+		"runtime_parameters": [
 			{
 				"name": "vendor.qti-ext-enc-ltr.mark-frame",
 				"type" : "int",

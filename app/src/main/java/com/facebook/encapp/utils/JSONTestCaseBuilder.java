@@ -121,9 +121,9 @@ public class JSONTestCaseBuilder {
                                         }
                                     }
 
-                                } else if (key.equals("set_parameters")) {
+                                } else if (key.equals("runtime_parameters")) {
                                 /*
-                                 "set_parameters": [
+                                 "runtime_parameters": [
                                     {
                                         "name": "vendor.qti-ext-enc-ltr.mark-frame",
                                         "type" : "int",

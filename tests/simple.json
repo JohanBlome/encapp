@@ -27,7 +27,7 @@
 		"i_frame_sizes": [
 			"unlimited"
 		],
-		"extensions": [{
+		"configure": [{
 				"tl-schema": "android.generic.2"
 			},
 			{
@@ -117,7 +117,7 @@
             "type": "int",
             "setting" : "2"            
         }],
-        "set_parameters": [
+        "runtime_parameters": [
             {
                 "name": "vendor.qti-ext-enc-ltr.mark-frame",                
                 "type" : "int",

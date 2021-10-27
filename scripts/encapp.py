@@ -18,18 +18,17 @@ KEY_NAME_RC_MODES = 'rc_modes'
 KEY_NAME_BITRATES = 'bitrates'
 KEY_NAME_I_INTERVALS = 'i_intervals'
 KEY_NAME_DURATION = 'duration'
-KEY_NAME_USE_SURFACE_ENC = 'use_surface_enc'
 KEY_NAME_INPUT_FORMAT = 'input_format'
 KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
 KEY_NAME_I_FRAME_SIZES = 'i_frame_sizes'
 KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
 KEY_NAME_ENC_LOOP = 'enc_loop'
-
+KEY_NAME_CONFIGURE = 'configure'
+KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
 sample_config_json_data = [
-    {
+    [{
         KEY_NAME_DESCRIPTION: 'sample',
         KEY_NAME_INPUT_FILES: [''],
-        KEY_NAME_USE_SURFACE_ENC: 1,
         KEY_NAME_INPUT_FORMAT: 'mp4',
         KEY_NAME_INPUT_RESOLUTION: '1280x720',
         KEY_NAME_CODECS: ['hevc'],
@@ -40,9 +39,11 @@ sample_config_json_data = [
         # DEFAULT, MEDIUM, HUGE, UNLIMITED
         KEY_NAME_I_FRAME_SIZES:['unlimited'],        
         KEY_NAME_DURATION: 10,
-        KEY_NAME_ENC_LOOP: 0
+        KEY_NAME_ENC_LOOP: 0,
+        KEY_NAME_CONFIGURE: [''],
+        KEY_NAME_RUNTIME_PARAMETER: ['']
     }
-]
+]]
 
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     ENCAPP tests on Android and collect results. \
     The script will create a directory based on device model and date, \
     and save encoded video and rate distortion results in the directory')
-    parser.add_argument('test', nargs='+', help='Test cases in JSON format.')    
+    parser.add_argument('test', nargs='*', help='Test cases in JSON format.')
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('--config', help='Generate a sample config \
                          file in json format')

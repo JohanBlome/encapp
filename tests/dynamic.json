@@ -67,7 +67,7 @@
 		"i_frame_sizes": [
 			"unlimited"
 		],
-        "set_parameters": [            
+        "runtime_parameters": [
             {
                 "name": "video-bitrate" ,
                 "type": "int",
@@ -109,7 +109,7 @@
 			"i_frame_sizes": [
 			"unlimited"
 		],
-			"set_parameters": [
+			"runtime_parameters": [
 			{
 				"name": "drop" ,
 				"type": "int",
@@ -151,7 +151,7 @@
 		"i_frame_sizes": [
 			"unlimited"
 		],
-		"set_parameters": [
+		"runtime_parameters": [
 			{
 				"name": "request-sync" ,
 				"type": "int",
