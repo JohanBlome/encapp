@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private HashMap<String, String> mExtraDataHashMap;
     TextureView mTextureView;
     private int mEncodingsRunning = 0;
-    private Object mEncodingLockObject = new Object();
+    private final Object mEncodingLockObject = new Object();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
-        TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
+        TextView mTvTestRun = findViewById(R.id.tv_testrun);
         if (getInstrumentedTest()) {
 
             mTvTestRun.setVisibility(View.VISIBLE);
@@ -60,21 +60,21 @@ public class MainActivity extends AppCompatActivity {
                 }
             })).start();
         } else {
-            mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
+            mTvTestRun = findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
                     MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = (TextView) findViewById(R.id.logText);
+                    TextView logText = findViewById(R.id.logText);
                     logText.append("-- List supported codecs --\n\n");
                     for (MediaCodecInfo info : codecInfos) {
                         if (info.isEncoder()) {
                             String str = codecInfoToText(info);
-                            if (str.toString().toLowerCase(Locale.US).contains("video")) {
+                            if (str.toLowerCase(Locale.US).contains("video")) {
                                 logText.append("\n" + str);
-                                Log.d(TAG, str.toString());
+                                Log.d(TAG, str);
                             }
                         }
                     }
@@ -175,24 +175,24 @@ public class MainActivity extends AppCompatActivity {
      */
     private void performInstrumentedTest() {
         Log.d(TAG, "Instrumentation test - let us start!");
-        final TextView logText = (TextView) findViewById(R.id.logText);
+        final TextView logText = findViewById(R.id.logText);
 
         if (mExtraDataHashMap.containsKey("list_codecs")) {
-            TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
+            TextView mTvTestRun = findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
                     MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = (TextView) findViewById(R.id.logText);
+                    TextView logText = findViewById(R.id.logText);
                     logText.append("-- List supported codecs --\n\n");
                     for (MediaCodecInfo info : codecInfos) {
                         if (info.isEncoder()) {
                             String str = codecInfoToText(info);
-                            if (str.toString().toLowerCase(Locale.US).contains("video")) {
+                            if (str.toLowerCase(Locale.US).contains("video")) {
                                 logText.append("\n" + str);
-                                Log.d(TAG, str.toString());
+                                Log.d(TAG, str);
                             }
                         }
                     }
@@ -209,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
 
         boolean tmp = true; // By default always write encoded file
         if (mExtraDataHashMap.containsKey("write")) {
-            tmp = (mExtraDataHashMap.get("write").equals("false")) ? false : true;
+            tmp = !mExtraDataHashMap.get("write").equals("false");
         }
 
         final boolean writeOutput = tmp;
@@ -224,20 +224,20 @@ public class MainActivity extends AppCompatActivity {
             refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
         }
 
-        Log.d(TAG, "file: "+filename);
+        Log.d(TAG, "file: " + filename);
 
         /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 Vector<TestParams> vcCombinations;
                 if (mExtraDataHashMap.containsKey("test")) {
-                    vcCombinations = JSONTestCaseBuilder.parseFile((String) mExtraDataHashMap.get("test"));
+                    vcCombinations = JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"));
                 } else {
                     vcCombinations = buildSettingsFromCommandline();
                 }
-                Log.d(TAG, "Test params collected - start # "+vcCombinations.size() + " of tests, concurrent = " + concurrent);
+                Log.d(TAG, "Test params collected - start # " + vcCombinations.size() + " of tests, concurrent = " + concurrent);
                 for (TestParams vc : vcCombinations) {
-                    Log.d(TAG, "filename is "+ filename + " swap out " + vc.getInputfile());
+                    Log.d(TAG, "filename is " + filename + " swap out " + vc.getInputfile());
                     if (filename != null) {
                         vc.setInputfile(filename);
                     }
@@ -288,7 +288,7 @@ public class MainActivity extends AppCompatActivity {
 
                         } while (mEncodingsRunning > 0);
                         Log.d(TAG, "Done with encodings");
-                        TextView mTvTestRun = (TextView) findViewById(R.id.tv_testrun);
+                        TextView mTvTestRun = findViewById(R.id.tv_testrun);
                         mTvTestRun.setVisibility(View.GONE);
                     }
                 });
@@ -336,7 +336,7 @@ public class MainActivity extends AppCompatActivity {
 
         String iframesize = (mExtraDataHashMap.get("ifsize") != null) ? mExtraDataHashMap.get("ifsize") : "DEFAULT";
         int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
-        String ref_resolution =  (mExtraDataHashMap.get("ref_res") != null) ? mExtraDataHashMap.get("ref_res"): "1280x720";
+        String ref_resolution = (mExtraDataHashMap.get("ref_res") != null) ? mExtraDataHashMap.get("ref_res") : "1280x720";
         if (resolutions == null) {
             resolutions = new String[]{ref_resolution};
         }
@@ -355,7 +355,7 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setKeyframeInterval(Integer.parseInt(keys[kC]));
                                 constraints.setFPS(Integer.parseInt(fps[fC]));
                                 constraints.setReferenceFPS(ref_fps);
-                                constraints.setReferenceSize( SizeUtils.parseXString(ref_resolution));
+                                constraints.setReferenceSize(SizeUtils.parseXString(ref_resolution));
                                 constraints.setVideoEncoderIdentifier(encoders[eC]);
                                 constraints.setConstantBitrate(mod[mC].toLowerCase(Locale.US).equals("cbr"));
 
@@ -364,7 +364,7 @@ public class MainActivity extends AppCompatActivity {
                                     constraints.setTemporalLayerCount(Integer.parseInt(mExtraDataHashMap.get("tlc")));
                                 }
                                 Log.e(TAG, constraints.getSettings());
-                                boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) ? Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames")) : false;
+                                boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) && Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames"));
                                 constraints.setSkipFrames(keySkipFrames);
                                 vc.add(constraints);
                             }
@@ -434,9 +434,9 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             Log.d(TAG, "Total time: " + stats.getProcessingTime());
                             Log.d(TAG, "Total frames: " + stats.getFrameCount());
-                            Log.d(TAG, "Time per frame: " + (long) (stats.getProcessingTime() / stats.getFrameCount()));
-                        } catch(ArithmeticException aex) {
-                          Log.e(TAG, aex.getMessage());
+                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getFrameCount()));
+                        } catch (ArithmeticException aex) {
+                            Log.e(TAG, aex.getMessage());
                         }
                         logText.append("\nDone encoding: " + settings);
                     }
@@ -446,7 +446,6 @@ public class MainActivity extends AppCompatActivity {
             decreaseEncodingsInflight();
         }
     }
-
 
 
 }

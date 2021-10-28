@@ -20,6 +20,12 @@ public class TestParams {
     public final static int OMX_SEC_COLOR_FormatNV12Tiled = 0x7FC00002;
     public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m = 0x7FA30C04;
 
+    protected static final String MEDIA_KEY_LTR_NUM_FRAMES = "vendor.qti-ext-enc-ltr-count.num-ltr-frames";
+    protected static String MEDIA_KEY_LTR_MAX_COUNT = "vendor.qti-ext-enc-caps-ltr.max-count";
+    protected static final String MEDIA_KEY_LTR_MARK_FRAME = "vendor.qti-ext-enc-ltr.mark-frame";
+    protected static final String MEDIA_KEY_LTR_USE_FRAME = "vendor.qti-ext-enc-ltr.use-frame";
+    public static final String MEDIA_KEY_IFRAME_SIZE_PRESET = "vendor.qti-ext-enc-iframe-size.iframesize";
+
     public enum IFRAME_SIZE_PRESETS{
         DEFAULT,
         MEDIUM,
@@ -37,7 +43,7 @@ public class TestParams {
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
     private int mLtrCount = 1;
-    private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
+    private final int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
     private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
     private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
     private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
@@ -206,6 +212,25 @@ public class TestParams {
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, mColorStandard);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, mColorTransfer);
+        //IFrame size preset only valid for cbr on qcomm
+        if (getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
+            switch (getIframeSizePreset()) {
+                case DEFAULT:
+                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 0);
+                    break;
+                case MEDIUM:
+                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 1);
+                    break;
+                case HUGE:
+                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 2);
+                    break;
+                case UNLIMITED:
+                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 3);
+                    break;
+                default:
+                    //Not possible
+            }
+        }
         Log.d(TAG, "Create mode: br="+getBitRate() +
                 ", mode=" + getmBitrateMode() +
                 ", fps=" + getFPS() +
@@ -341,7 +366,7 @@ public class TestParams {
                 list = new ArrayList<RuntimeParam>();
                 map.put(frame, list);
             }
-            Log.d(TAG, "Add " + param.name + " @ "+frame + " val: " + (Integer)param.value);
+            Log.d(TAG, "Add " + param.name + " @ "+frame + " val: " + param.value);
             list.add(param);
         }
         return map;

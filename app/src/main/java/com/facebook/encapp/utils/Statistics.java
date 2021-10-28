@@ -15,13 +15,13 @@ import java.util.HashMap;
 import java.util.UUID;
 
 public class Statistics {
-    private String mId;
-    private String mDesc;
+    private final String mId;
+    private final String mDesc;
     private String mEncodedfile = "";
     private String mCodec;
     private long mStartTime;
     private long mStopTime;
-    private HashMap<Long,FrameInfo> mFrames;
+    private final HashMap<Long,FrameInfo> mFrames;
     TestParams mVc;
     Date mStartDate;
 
@@ -158,7 +158,7 @@ public class Statistics {
             for (FrameInfo info: allFrames) {
                 obj = new JSONObject();
 
-                obj.put("frame", (int)(counter++));
+                obj.put("frame", counter++);
                 obj.put("iframe", (info.isIFrame())? 1: 0);
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());

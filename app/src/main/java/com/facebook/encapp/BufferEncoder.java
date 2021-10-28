@@ -19,8 +19,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Vector;
 import java.util.Locale;
+import java.util.Vector;
 
 import static junit.framework.Assert.assertTrue;
 
@@ -30,36 +30,30 @@ import static junit.framework.Assert.assertTrue;
 
 class BufferEncoder {
     // Qualcomm added extended omx parameters
-    protected static final String MEDIA_KEY_LTR_NUM_FRAMES = "vendor.qti-ext-enc-ltr-count.num-ltr-frames";
-    protected static String MEDIA_KEY_LTR_MAX_COUNT = "vendor.qti-ext-enc-caps-ltr.max-count";
-    protected static final String MEDIA_KEY_LTR_MARK_FRAME = "vendor.qti-ext-enc-ltr.mark-frame";
-    protected static final String MEDIA_KEY_LTR_USE_FRAME = "vendor.qti-ext-enc-ltr.use-frame";
-    public static final String MEDIA_KEY_IFRAME_SIZE_PRESET = "vendor.qti-ext-enc-iframe-size.iframesize";
+
 
     protected static final String TAG = "encapp";
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000;
 
     protected int mFrameRate = 30;
     protected float mKeepInterval = 1.0f;
-    protected String mNextEvent = "";
     protected MediaCodec mCodec;
     protected MediaMuxer mMuxer;
 
-    protected int mNextLimit = -1;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
 
     protected long mFrameTime = 0;
-    int mLTRCount = 0;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
     protected boolean mDropNext;
-
+    protected HashMap<Integer, ArrayList<RuntimeParam>> mRuntimeParams;
+    int mLTRCount = 0;
+    boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     private long mFilePntr;
     private FileReader mYuvReader;
-    protected HashMap<Integer, ArrayList<RuntimeParam>> mRuntimeParams;
 
     public String encode(
             TestParams vc,
@@ -68,7 +62,7 @@ class BufferEncoder {
         mSkipped = 0;
         mFramesAdded = 0;
         mRefFramesizeInBytes = (int) (vc.getReferenceSize().getWidth() *
-                                    vc.getReferenceSize().getHeight() * 1.5);
+                vc.getReferenceSize().getHeight() * 1.5);
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
@@ -91,30 +85,7 @@ class BufferEncoder {
             Log.d(TAG, "Done");
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
 
-
-            //IFrame size preset only valid for cbr on qcomm
-            if (vc.getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
-                Log.d(TAG, "Set iframe preset: " + vc.getIframeSizePreset());
-                switch (vc.getIframeSizePreset()) {
-                    case DEFAULT:
-                        format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 0);
-                        break;
-                    case MEDIUM:
-                        format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 1);
-                        break;
-                    case HUGE:
-                        format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 2);
-                        break;
-                    case UNLIMITED:
-                        format.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 3);
-                        break;
-                    default:
-                        //Not possible
-                }
-            }
-
             setConfigureParams(vc, format);
-
             mCodec.configure(
                     format,
                     null /* surface */,
@@ -144,17 +115,14 @@ class BufferEncoder {
         int mPts = 132;
         calculateFrameTiming();
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
         if (isVP) {
-            MediaFormat oformat = mCodec.getOutputFormat();
             //There seems to be a bug so that this key is no set (but used).
-            oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-            oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
+            format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
             if (mWriteFile)
-                mMuxer = createMuxer(mCodec, oformat, true);
-
+                mMuxer = createMuxer(mCodec, format, true);
         }
 
         long numBytesSubmitted = 0;
@@ -168,7 +136,8 @@ class BufferEncoder {
 
                 if (index >= 0) {
                     int size = -1;
-                    if (isVP && isQCom && inFramesCount > 0 && keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
+                    if (VP8_IS_BROKEN && isVP && isQCom && inFramesCount > 0 &&
+                            keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
                         Bundle params = new Bundle();
                         params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
                         mCodec.setParameters(params);
@@ -233,10 +202,10 @@ class BufferEncoder {
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
-                Log.d(TAG, "flags = "+(info.flags));
-                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {                    
+                Log.d(TAG, "flags = " + (info.flags));
+                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
-                    
+
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
@@ -319,7 +288,6 @@ class BufferEncoder {
 
         return read;
     }
-
 
 
     /**
@@ -411,7 +379,7 @@ class BufferEncoder {
     public Statistics getStatistics() {
         return mStats;
     }
-    
+
     protected String getCodecName(TestParams vc) {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
@@ -438,12 +406,12 @@ class BufferEncoder {
 
     protected void setConfigureParams(TestParams vc, MediaFormat format) {
         ArrayList<ConfigureParam> params = vc.getExtraConfigure();
-        Log.d(TAG, "setConfigureParams: " + params.toString() + ", l = "+params.size());
-        for (ConfigureParam param: params) {
+        Log.d(TAG, "setConfigureParams: " + params.toString() + ", l = " + params.size());
+        for (ConfigureParam param : params) {
             if (param.value instanceof Integer) {
                 format.setInteger(param.name, (Integer) param.value);
             } else if (param.value instanceof String) {
-                Log.d(TAG, "Set  " + param.name + " to " +(String) param.value);
+                Log.d(TAG, "Set  " + param.name + " to " + param.value);
                 format.setString(param.name, (String) param.value);
             }
         }
@@ -459,12 +427,13 @@ class BufferEncoder {
                         params.putInt(param.name, frameCount);
                     } else if (param.value instanceof Integer) {
                         if (param.name.equals("fps")) {
-                            Log.d(TAG, "Set fps to " +  (Integer) param.value);
-                            mKeepInterval = (float) mFrameRate / (float)  (Integer) param.value;
-                        }  if (param.name.equals("fps")) {
+                            Log.d(TAG, "Set fps to " + param.value);
+                            mKeepInterval = (float) mFrameRate / (float) (Integer) param.value;
+                        }
+                        if (param.name.equals("fps")) {
                             mDropNext = true;
                         } else {
-                            Log.d(TAG, param.name + " @ " + frameCount + " - " +  param.value);
+                            Log.d(TAG, param.name + " @ " + frameCount + " - " + param.value);
                             params.putInt(param.name, (Integer) param.value);
                         }
                     } else {
