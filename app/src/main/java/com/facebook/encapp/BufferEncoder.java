@@ -440,6 +440,7 @@ class BufferEncoder {
                         Log.d(TAG, "Unknown type: " + param.value.getClass());
                     }
                 }
+                Log.d(TAG, "Set runtime parameters in codec");
                 mCodec.setParameters(params);
             }
         }

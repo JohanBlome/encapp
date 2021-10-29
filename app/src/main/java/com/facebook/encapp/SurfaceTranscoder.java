@@ -180,7 +180,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-
+                    Log.d(TAG, "Check runtime parmeters: " + inFramesCount + ", param size = " + mRuntimeParams.size());
                     setRuntimeParameters(inFramesCount);
 
                     ByteBuffer data = mDecoder.getOutputBuffer(index);

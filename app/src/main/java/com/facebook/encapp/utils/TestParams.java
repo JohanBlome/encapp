@@ -118,10 +118,9 @@ public class TestParams {
 
     }
 
-    public void setConstantBitrate(boolean setCBR) {
-        mBitrateMode = (setCBR)?  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR:
-                                  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
-        if(mSkipFrames) mBitrateMode += 2;
+    /* vbr, cbr or cq */
+    public void setBitrateMode(String mode) {
+        mBitrateMode = findBitrateMode(mode);
     }
 
     public void setSkipFrames(boolean setSkipFrames) {
@@ -212,6 +211,7 @@ public class TestParams {
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, mColorStandard);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, mColorTransfer);
+
         //IFrame size preset only valid for cbr on qcomm
         if (getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
             switch (getIframeSizePreset()) {
@@ -259,6 +259,23 @@ public class TestParams {
                     bitrateModeName() + ", " +
                     mFPS + " fps, key int:" +
                     mKeyframeRate;
+    }
+
+    int findBitrateMode(String name) {
+        if (name.toLowerCase().contains("vbr_skip")) {
+            return BITRATE_MODE_VBR_SKIP_FRAMES;
+        } else if (name.toLowerCase().contains("cbr_skip")) {
+            return BITRATE_MODE_CBR_SKIP_FRAMES;
+        } else if (name.toLowerCase().contains("vbr")) {
+            return MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
+        } else if (name.toLowerCase().contains("cbr")) {
+            return MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR;
+        } else if (name.toLowerCase().contains("cq")) {
+            return MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ;
+        } else {
+            Log.e(TAG, "Unknown bitrate mode: "  + name + " use vbr");
+            return MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
+        }
     }
 
     String bitrateModeName() {
@@ -369,6 +386,8 @@ public class TestParams {
             Log.d(TAG, "Add " + param.name + " @ "+frame + " val: " + param.value);
             list.add(param);
         }
+
+        Log.d(TAG, "Runtime parameters: " + map.size());
         return map;
     }
 

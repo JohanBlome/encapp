@@ -51,6 +51,7 @@ public class JSONTestCaseBuilder {
                             String[] codecs = {"hevc"};
                             String[] fps = {"30"};
                             String[] mod = {"VBR"};
+                            String rc_mode = "vbr";
                             String[] input_files = {};
                             String[] i_frame_sizes = {"default"};
                             String[] i_intervals = {"10"};
@@ -198,7 +199,7 @@ public class JSONTestCaseBuilder {
                                                             testParams.setFPS(Integer.parseInt(fps[fC]));
                                                             testParams.setReferenceFPS(Integer.parseInt(input_fps));
                                                             testParams.setVideoEncoderIdentifier(codecs[eC]);
-                                                            testParams.setConstantBitrate((mod[mC].toLowerCase(Locale.US).equals("cbr")));
+                                                            testParams.setBitrateMode(mod[mC].toLowerCase());
                                                             testParams.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(i_frame_sizes[iS].toUpperCase(Locale.US)));
                                                             testParams.setSkipFrames(Boolean.parseBoolean(skip_frames));
                                                             testParams.setInputfile(input_files[iF]);

@@ -357,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setReferenceFPS(ref_fps);
                                 constraints.setReferenceSize(SizeUtils.parseXString(ref_resolution));
                                 constraints.setVideoEncoderIdentifier(encoders[eC]);
-                                constraints.setConstantBitrate(mod[mC].toLowerCase(Locale.US).equals("cbr"));
+                                constraints.setBitrateMode(mod[mC]);
 
                                 constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));
                                 if (mExtraDataHashMap.containsKey("tlc")) {
