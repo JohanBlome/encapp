@@ -25,58 +25,59 @@ KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
 KEY_NAME_ENC_LOOP = 'enc_loop'
 KEY_NAME_CONFIGURE = 'configure'
 KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
+
 sample_config_json_data = [
     [{
-        KEY_NAME_DESCRIPTION: 'sample',
-        KEY_NAME_INPUT_FILES: [''],
-        KEY_NAME_INPUT_FORMAT: 'mp4',
-        KEY_NAME_INPUT_RESOLUTION: '1280x720',
-        KEY_NAME_CODECS: ['hevc'],
-        KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
-        KEY_NAME_RC_MODES: ['cbr'],
-        KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
-        KEY_NAME_I_INTERVALS: [2],
-        # DEFAULT, MEDIUM, HUGE, UNLIMITED
-        KEY_NAME_I_FRAME_SIZES:['unlimited'],        
-        KEY_NAME_DURATION: 10,
-        KEY_NAME_ENC_LOOP: 0,
-        KEY_NAME_CONFIGURE: [''],
-        KEY_NAME_RUNTIME_PARAMETER: ['']
-    }
-]]
+      KEY_NAME_DESCRIPTION: 'sample',
+      KEY_NAME_INPUT_FILES: [''],
+      KEY_NAME_INPUT_FORMAT: 'mp4',
+      KEY_NAME_INPUT_RESOLUTION: '1280x720',
+      KEY_NAME_CODECS: ['hevc'],
+      KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
+      KEY_NAME_RC_MODES: ['cbr'],
+      KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
+      KEY_NAME_I_INTERVALS: [2],
+      # DEFAULT, MEDIUM, HUGE, UNLIMITED
+      KEY_NAME_I_FRAME_SIZES:['unlimited'],
+      KEY_NAME_DURATION: 10,
+      KEY_NAME_ENC_LOOP: 0,
+      KEY_NAME_CONFIGURE: [''],
+      KEY_NAME_RUNTIME_PARAMETER: ['']
+    }]
+]
 
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
+
 def install_app(serial_no):
     script_path = os.path.realpath(__file__)
-    path, __=os.path.split(script_path)
+    path, __ = os.path.split(script_path)
     run_cmd(f"adb -s {serial_no} install -g "
-            f"{path}/../app/build/outputs/apk/androidTest/debug/"\
+            f"{path}/../app/build/outputs/apk/androidTest/debug/"
             "com.facebook.encapp-v1.0-debug-androidTest.apk ")
 
     run_cmd(f"adb -s {serial_no} install -g "
-            f"{path}/../app/build/outputs/apk/debug/"\
+            f"{path}/../app/build/outputs/apk/debug/"
             "com.facebook.encapp-v1.0-debug.apk")
-    
 
-def run_encode_tests(tests, json_path, device_model, serial_no, test_desc, install, workdir):
+
+def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
+                     install, workdir):
     if install:
         install_app(serial_no)
-    
+
     if tests is None:
         raise Exception('Test file is empty')
-    
 
     print(f"{tests}")
-
 
     with open(workdir+'/config.json', 'w') as fp:
         json.dump(tests, fp, indent=4)
 
-    path, filename=os.path.split(json_path)
+    path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f"adb -s {serial_no} rm /sdcard/encapp_*")
 
@@ -84,11 +85,10 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc, insta
     for test in tests:
         print(f"{test}")
         input_files = test.get(KEY_NAME_INPUT_FILES)
-        for fl in input_files:            
+        for fl in input_files:
             run_cmd(f"adb -s {serial_no} push {fl} /sdcard/")
-                
 
-    run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "\
+    run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
             f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
     adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
     ret, stdout, stderr = run_cmd(adb_cmd)
@@ -98,22 +98,23 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc, insta
     sub_dir = '_'.join([base_file_name, "files"])
     output_dir = f"{workdir}/{sub_dir}/"
     run_cmd(f"mkdir {output_dir}")
-    
+
     for file in output_files:
         if file == '':
             print("No file found")
             continue
         # pull the output file
         print(f"pull {file} to {output_dir}")
-    
+
         adb_cmd = f'adb -s {serial_no} pull /sdcard/{file} {output_dir}'
         run_cmd(adb_cmd)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial_no} shell rm /sdcard/{file}'
         run_cmd(adb_cmd)
-    
+
     print("Done")
+
 
 def list_codecs(serial_no, install):
     if install:
@@ -170,11 +171,12 @@ def main(argv):
                 with open(test, 'r') as fp:
                     print(f"Load {test}")
                     tests_json = json.load(fp)
-                    run_encode_tests(tests_json, 
-                                     test, 
+                    run_encode_tests(tests_json,
+                                     test,
                                      device_model,
                                      serial_no,
-                                     options.desc if options.desc is not None else '',
+                                     options.desc if options.desc is
+                                     not None else '',
                                      options.install,
                                      workdir)
 
