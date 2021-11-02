@@ -1,13 +1,13 @@
 #!/usr/local/bin/python3
+
 import os
-import subprocess
 import json
 import sys
 import argparse
 import re
+
 from encapp_tests import run_cmd
 from encapp_tests import check_device
-from pathlib import Path
 from datetime import datetime
 
 KEY_NAME_DESCRIPTION = 'description'
@@ -125,38 +125,7 @@ def list_codecs(serial_no, install):
     run_cmd(adb_cmd)
 
 
-def main(args):
-    if args.config is not None:
-        if args.config.endswith('.json') is False:
-            print('Error: the config file should have .json extension')
-        with open(args.config, 'w') as fp:
-            json.dump(sample_config_json_data, fp, indent=4)
-            fp.close()
-    else:
-        device_model, serial_no = check_device(args.serial)
-        if args.list_codecs is True:
-            list_codecs(serial_no, args.install)
-        else:
-            # get date and time and format it
-            now = datetime.now()
-            dt_string = now.strftime('%m-%d-%Y_%H_%M')
-            workdir = f'{device_model}_{dt_string}_{args.desc}'
-            os.system('mkdir -p ' + workdir)
-            for test in args.test:            
-                with open(test, 'r') as fp:
-                    print(f"Load {test}")
-                    tests_json = json.load(fp)
-                    fp.close()                    
-                    run_encode_tests(tests_json, 
-                                     test, 
-                                     device_model,
-                                     serial_no,
-                                     args.desc if args.desc is not None else '',
-                                     args.install,
-                                     workdir)
-
-
-if __name__ == '__main__':
+def get_options(argv):
     parser = argparse.ArgumentParser(description='A Python script to run \
     ENCAPP tests on Android and collect results. \
     The script will create a directory based on device model and date, \
@@ -171,10 +140,47 @@ if __name__ == '__main__':
     parser.add_argument('--install', default='true',
                         type=bool,
                         help='Do install apk')
-    args = parser.parse_args()
+    options = parser.parse_args()
 
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit()
 
-    main(args)
+    return options
+
+
+def main(argv):
+    options = get_options(argv)
+
+    if options.config is not None:
+        if options.config.endswith('.json') is False:
+            print('Error: the config file should have .json extension')
+        with open(options.config, 'w') as fp:
+            json.dump(sample_config_json_data, fp, indent=4)
+            fp.close()
+    else:
+        device_model, serial_no = check_device(options.serial)
+        if options.list_codecs is True:
+            list_codecs(serial_no, options.install)
+        else:
+            # get date and time and format it
+            now = datetime.now()
+            dt_string = now.strftime('%m-%d-%Y_%H_%M')
+            workdir = f'{device_model}_{dt_string}_{options.desc}'
+            os.system('mkdir -p ' + workdir)
+            for test in options.test:
+                with open(test, 'r') as fp:
+                    print(f"Load {test}")
+                    tests_json = json.load(fp)
+                    fp.close()                    
+                    run_encode_tests(tests_json, 
+                                     test, 
+                                     device_model,
+                                     serial_no,
+                                     options.desc if options.desc is not None else '',
+                                     options.install,
+                                     workdir)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
