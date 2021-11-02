@@ -75,7 +75,6 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc, insta
 
     with open(workdir+'/config.json', 'w') as fp:
         json.dump(tests, fp, indent=4)
-        fp.close()
 
     path, filename=os.path.split(json_path)
     # remove old encapp files on device (!)
@@ -157,7 +156,6 @@ def main(argv):
             print('Error: the config file should have .json extension')
         with open(options.config, 'w') as fp:
             json.dump(sample_config_json_data, fp, indent=4)
-            fp.close()
     else:
         device_model, serial_no = check_device(options.serial)
         if options.list_codecs is True:
@@ -172,7 +170,6 @@ def main(argv):
                 with open(test, 'r') as fp:
                     print(f"Load {test}")
                     tests_json = json.load(fp)
-                    fp.close()                    
                     run_encode_tests(tests_json, 
                                      test, 
                                      device_model,
