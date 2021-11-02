@@ -165,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('--config', help='Generate a sample config \
                          file in json format')
-    parser.add_argument('--list_codecs', action='store_true',
+    parser.add_argument('-l', '--list_codecs', action='store_true',
                         help='List codecs the devices support')
     parser.add_argument('--desc', default="encapp", help='Test description')
     parser.add_argument('--install', default='true',
