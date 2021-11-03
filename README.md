@@ -81,7 +81,7 @@ Run the `list_codecs` function.
 Note that, for the very first time you run the instrumentation codecs, the
 device will ask you for permission to access to `/sdcard/`.
 
-Figure 1 shows ![an android device asking for permission to run encapp](encapp_permission.jpeg)
+Figure 1 shows ![an android device asking for permission to run encapp](doc/encapp_permission.jpeg)
 
 ```
 $ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
