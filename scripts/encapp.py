@@ -147,6 +147,10 @@ def get_options(argv):
         parser.print_help()
         sys.exit()
 
+    if options.serial is None and 'ANDROID_SERIAL' in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ['ANDROID_SERIAL']
+
     return options
 
 
