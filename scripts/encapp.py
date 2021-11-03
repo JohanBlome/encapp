@@ -120,7 +120,7 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 def list_codecs(serial_no, install):
     if install:
         install_app(serial_no)
-    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument  -w -r ' +\
+    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r ' +\
               '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
               ' ' + JUNIT_RUNNER_NAME
     run_cmd(adb_cmd)
