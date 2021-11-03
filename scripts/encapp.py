@@ -46,6 +46,7 @@ sample_config_json_data = [
     }]
 ]
 
+TEST_CLASS_NAME = "com.facebook.encapp.CodecValidationInstrumentedTest"
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
@@ -119,7 +120,7 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 def list_codecs(serial_no, install):
     if install:
         install_app(serial_no)
-    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument  -w -r ' +\
+    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r ' +\
               '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
               ' ' + JUNIT_RUNNER_NAME
     run_cmd(adb_cmd)
@@ -145,6 +146,10 @@ def get_options(argv):
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit()
+
+    if options.serial is None and 'ANDROID_SERIAL' in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ['ANDROID_SERIAL']
 
     return options
 
