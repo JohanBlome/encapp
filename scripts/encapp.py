@@ -46,6 +46,7 @@ sample_config_json_data = [
     }]
 ]
 
+TEST_CLASS_NAME="com.facebook.encapp.CodecValidationInstrumentedTest"
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
