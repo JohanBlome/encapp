@@ -43,7 +43,7 @@ public class TestParams {
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
     private int mLtrCount = 1;
-    private final int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
+    private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
     private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
     private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
     private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
@@ -150,7 +150,7 @@ public class TestParams {
     }
 
     public void setColorRange(int colorRange) {
-        mColorFormat = colorRange;
+        mColorRange = colorRange;
     }
 
     public int getColorRange() {
@@ -211,6 +211,7 @@ public class TestParams {
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, mColorStandard);
         encoderFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, mColorTransfer);
+
 
         //IFrame size preset only valid for cbr on qcomm
         if (getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
