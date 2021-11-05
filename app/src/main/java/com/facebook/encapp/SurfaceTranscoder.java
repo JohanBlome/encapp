@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
 
+import com.facebook.encapp.utils.ConfigureParam;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestParams;
 
@@ -74,20 +75,21 @@ public class SurfaceTranscoder extends BufferEncoder {
             //Use same color settings as the input
             Log.d(TAG, "Check decoder settings");
             if (inputFormat.containsKey(MediaFormat.KEY_COLOR_RANGE)) {
-                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_RANGE));
-                Log.d(TAG, "Color range set: " + vc.getColorRange());
+                vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_RANGE, inputFormat.getInteger(MediaFormat.KEY_COLOR_RANGE)));
+                Log.d(TAG, "Color range set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_RANGE));
             }
             if (inputFormat.containsKey(MediaFormat.KEY_COLOR_TRANSFER)) {
-                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER));
-                Log.d(TAG, "Color transfer set: " + vc.getColorRange());
+                vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_TRANSFER, inputFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER)));
+                Log.d(TAG, "Color transfer set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER));
             }
             if (inputFormat.containsKey(MediaFormat.KEY_COLOR_STANDARD)) {
-                vc.setColorRange(inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD));
-                Log.d(TAG, "Color standard set: " + vc.getColorRange());
+                vc.addConfigureSetting( new ConfigureParam(MediaFormat.KEY_COLOR_STANDARD, inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD)));
+                Log.d(TAG, "Color standard set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD));
             }
             // We explicitly set the color format
+            vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface));
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+            //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 
             mInputSurfaceReference = new AtomicReference<>();
             mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());

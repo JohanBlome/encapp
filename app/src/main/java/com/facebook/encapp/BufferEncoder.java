@@ -68,6 +68,8 @@ class BufferEncoder {
         mStats.start();
         mYuvReader = new FileReader();
 
+        vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible));
         int loop = vc.getLoopCount();
 
         if (!mYuvReader.openFile(vc.getInputfile())) {

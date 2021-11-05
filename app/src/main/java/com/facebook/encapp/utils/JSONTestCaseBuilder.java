@@ -117,6 +117,8 @@ public class JSONTestCaseBuilder {
                                         String type = j2.getString("type");
                                         if (type.toLowerCase(Locale.US).equals("int")) {
                                             config_extra.add(new ConfigureParam(j2.getString("name"), j2.getInt("setting")));
+                                        } else if (type.toLowerCase(Locale.US).equals("float") | type.toLowerCase(Locale.US).equals("double")) {
+                                            config_extra.add(new ConfigureParam(j2.getString("name"), j2.getDouble("setting")));
                                         } else if (type.toLowerCase(Locale.US).equals("string")) {
                                             config_extra.add(new ConfigureParam(j2.getString("name"), j2.getString("setting")));
                                         }
@@ -242,7 +244,8 @@ public class JSONTestCaseBuilder {
         } catch (JSONException e) {
             e.printStackTrace();
             Log.e(TAG, e.getLocalizedMessage());
-        } finally {
+        } catch (Exception ex) {
+            Log.e(TAG, ex.getLocalizedMessage());
         }
         return vcs;
     }

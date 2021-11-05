@@ -13,18 +13,6 @@ import java.util.HashMap;
 
 public class TestParams {
     final static String TAG = "encapp";
-    // QCOM specific
-    public final static int OMX_TI_COLOR_FormatYUV420PackedSemiPlanar = 0x7F000100;
-    public final static int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
-    public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
-    public final static int OMX_SEC_COLOR_FormatNV12Tiled = 0x7FC00002;
-    public final static int OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m = 0x7FA30C04;
-
-    protected static final String MEDIA_KEY_LTR_NUM_FRAMES = "vendor.qti-ext-enc-ltr-count.num-ltr-frames";
-    protected static String MEDIA_KEY_LTR_MAX_COUNT = "vendor.qti-ext-enc-caps-ltr.max-count";
-    protected static final String MEDIA_KEY_LTR_MARK_FRAME = "vendor.qti-ext-enc-ltr.mark-frame";
-    protected static final String MEDIA_KEY_LTR_USE_FRAME = "vendor.qti-ext-enc-ltr.use-frame";
-    public static final String MEDIA_KEY_IFRAME_SIZE_PRESET = "vendor.qti-ext-enc-iframe-size.iframesize";
 
     public enum IFRAME_SIZE_PRESETS{
         DEFAULT,
@@ -43,9 +31,7 @@ public class TestParams {
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
     private int mLtrCount = 1;
-    private int mColorRange = MediaFormat.COLOR_RANGE_LIMITED;
-    private int mColorStandard = MediaFormat.COLOR_STANDARD_BT601_NTSC;
-    private int mColorTransfer = MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
+
     private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
     //Bitrate mode 3,4 is
     //OMX_Video_ControlRateVariableSkipFrames,
@@ -55,7 +41,6 @@ public class TestParams {
 
     private int mProfile = -1;
     private int mProfileLevel = -1;
-    private int mColorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible;
     private int mTemporalLayerCount = 1;
     private String mInputfile = null;
     private Size mRefSize = null;
@@ -148,31 +133,6 @@ public class TestParams {
     public int getProfile() {
         return mProfile;
     }
-
-    public void setColorRange(int colorRange) {
-        mColorRange = colorRange;
-    }
-
-    public int getColorRange() {
-        return mColorRange;
-    }
-
-    public void setColorTransfer(int colorTransfer) {
-        mColorTransfer = colorTransfer;
-    }
-
-    public int getColorTransfer() {
-        return mColorTransfer;
-    }
-
-    public void setColorStandard(int colorStandard) {
-        mColorStandard = colorStandard;
-    }
-
-    public int getColorStandard() {
-        return mColorStandard;
-    }
-
     /**
      * Sets encoder profile. Can be one of constants declared in
      * {@link MediaCodecInfo.CodecProfileLevel}.
@@ -190,56 +150,24 @@ public class TestParams {
         this.mProfileLevel = profileLevel;
     }
 
-    public int getColorFormat() {
-        return mColorFormat;
-    }
-
-    public void setColorFormat(int colorFormat) {
-        this.mColorFormat = colorFormat;
-    }
-
-
     public MediaFormat createEncoderMediaFormat(int width, int height) {
         MediaFormat encoderFormat = MediaFormat.createVideoFormat(
                 getVideoEncoderIdentifier(), width, height);
-        encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
         encoderFormat.setInteger(MediaFormat.KEY_BIT_RATE, getBitRate());
         encoderFormat.setInteger(MediaFormat.KEY_FRAME_RATE, (int)getFPS());
         encoderFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, mBitrateMode);
         encoderFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, getKeyframeRate());
-        encoderFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, mColorRange);
-        encoderFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, mColorFormat);
-        encoderFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, mColorStandard);
-        encoderFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, mColorTransfer);
 
+        // Must have a colorformat
 
-        //IFrame size preset only valid for cbr on qcomm
-        if (getmBitrateMode() == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR) {
-            switch (getIframeSizePreset()) {
-                case DEFAULT:
-                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 0);
-                    break;
-                case MEDIUM:
-                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 1);
-                    break;
-                case HUGE:
-                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 2);
-                    break;
-                case UNLIMITED:
-                    encoderFormat.setInteger(MEDIA_KEY_IFRAME_SIZE_PRESET, 3);
-                    break;
-                default:
-                    //Not possible
-            }
-        }
+      /*  if (mExtraConfigure.indexOf(MediaFormat.KEY_COLOR_FORMAT) == -1) {
+            addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
+                                                   MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible));
+        }*/
         Log.d(TAG, "Create mode: br="+getBitRate() +
                 ", mode=" + getmBitrateMode() +
                 ", fps=" + getFPS() +
-                ", i int=" + getKeyframeRate() + " sec" +
-                ", color range: " + mColorRange +
-                ", color format: " + mColorFormat +
-                ", color standard: " + mColorStandard +
-                ", color transfer: " + mColorTransfer);
+                ", i int=" + getKeyframeRate() + " sec");
         return encoderFormat;
     }
 
@@ -435,7 +363,16 @@ public class TestParams {
     }
 
     public void setExtraConfigure(ArrayList<ConfigureParam> extra) {
+        for (ConfigureParam param: extra) {
+            Log.d(TAG, "Extra: " + param.name + " - "  + param.value.toString());
+        }
         mExtraConfigure = extra;
+    }
+
+    public void addConfigureSetting(ConfigureParam param) {
+        Log.d(TAG, "setting: " + param.name + " - "  + param.value.toString());
+
+        mExtraConfigure.add(param);
     }
 
     public ArrayList<ConfigureParam> getExtraConfigure() {

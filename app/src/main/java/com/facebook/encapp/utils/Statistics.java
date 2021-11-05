@@ -1,4 +1,5 @@
 package com.facebook.encapp.utils;
+
 import android.util.Size;
 
 import org.json.JSONArray;
@@ -140,12 +141,11 @@ public class Statistics {
             settings.put("encmode",mVc.bitrateModeName());
             settings.put("keyrate",mVc.getKeyframeRate());
             settings.put("iframepreset",mVc.getIframeSizePreset());
-            settings.put("colorformat",mVc.getColorFormat());
-            settings.put("colorrange",mVc.getColorRange());
-            settings.put("colorstandard",mVc.getColorStandard());
-            settings.put("colortransfer",mVc.getColorTransfer());
-            settings.put("ltrcount",mVc.getLTRCount());
 
+            ArrayList<ConfigureParam> configure = mVc.getExtraConfigure();
+            for (ConfigureParam param: configure) {
+                settings.put(param.name, param.value.toString());
+            }
             json.put("settings", settings);
 
             ArrayList<FrameInfo> allFrames = new ArrayList<>(mFrames.values());
