@@ -9,6 +9,7 @@ import re
 from encapp_tests import run_cmd
 from encapp_tests import check_device
 from datetime import datetime
+from os.path import exists
 
 KEY_NAME_DESCRIPTION = 'description'
 KEY_NAME_INPUT_FILES = 'input_files'
@@ -75,19 +76,25 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 
     print(f"{tests}")
 
-    with open(workdir+'/config.json', 'w') as fp:
-        json.dump(tests, fp, indent=4)
 
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f"adb -s {serial_no} rm /sdcard/encapp_*")
-
     run_cmd(f"adb -s {serial_no} push {json_path} /sdcard/")
+
+    json_folder = os.path.dirname(json_path)
+    print(f"json folder: {json_folder}")
     for test in tests:
         print(f"{test}")
         input_files = test.get(KEY_NAME_INPUT_FILES)
         for fl in input_files:
-            run_cmd(f"adb -s {serial_no} push {fl} /sdcard/")
+            path = f"{json_folder}/{fl}"
+            print(f"{path}")
+            if exists(path):
+                run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
+            else:
+                print(f"Media file is missing: {path}")
+                exit(0)
 
     run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
             f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
