@@ -47,11 +47,11 @@ class VMAFPlot:
         plt.grid(True)
         plt.draw()
 
-    def finish(self,fig_file):
+    def finish(self, fig_file):
         if fig_file is None:
             plt.show()
         else:
-            plt.savefig(fig_file,format='png')
+            plt.savefig(fig_file, format='png')
 
     def plot_rd_curve(self, rd_results_json_files, labels, fig_file):
         rd_results = None
@@ -87,11 +87,12 @@ if __name__ == '__main__':
                         help='VMAF Files', type=str)
     parser.add_argument('--labels', nargs='+',
                         help='Curve labels', type=str)
-    parser.add_argument('--fig',help='Specify a file name to save figure', type=str)
+    parser.add_argument('--fig', help='Specify a file name to save figure',
+                        type=str)
     args = parser.parse_args()
     rd_plot = VMAFPlot()
     vmaf_files = []
     for file in args.vfiles:
         vmaf_files.append(file)
     if len(vmaf_files) > 0:
-        rd_plot.plot_rd_curve(vmaf_files,args.labels, args.fig)
+        rd_plot.plot_rd_curve(vmaf_files, args.labels, args.fig)

@@ -46,7 +46,6 @@ class RDPlot:
         plt.grid()
         plt.draw()
 
-
     def plot_rd_curve(self, rd_results_json_file):
         rd_results = None
         with open(rd_results_json_file, "r") as fp:
