@@ -170,6 +170,29 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void listCodecs() {
+        TextView mTvTestRun = findViewById(R.id.tv_testrun);
+        mTvTestRun.setVisibility(View.VISIBLE);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+                MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+                TextView logText = findViewById(R.id.logText);
+                logText.append("-- List supported codecs --\n\n");
+                for (MediaCodecInfo info : codecInfos) {
+                    if (info.isEncoder()) {
+                        String str = codecInfoToText(info);
+                        if (str.toLowerCase(Locale.US).contains("video")) {
+                            logText.append("\n" + str);
+                            Log.d(TAG, str);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     /**
      * Start automated test run.
      */
@@ -178,27 +201,7 @@ public class MainActivity extends AppCompatActivity {
         final TextView logText = findViewById(R.id.logText);
 
         if (mExtraDataHashMap.containsKey("list_codecs")) {
-            TextView mTvTestRun = findViewById(R.id.tv_testrun);
-            mTvTestRun.setVisibility(View.VISIBLE);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = findViewById(R.id.logText);
-                    logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info : codecInfos) {
-                        if (info.isEncoder()) {
-                            String str = codecInfoToText(info);
-                            if (str.toLowerCase(Locale.US).contains("video")) {
-                                logText.append("\n" + str);
-                                Log.d(TAG, str);
-                            }
-                        }
-                    }
-                }
-            });
-
+            listCodecs();
             return;
         }
 
