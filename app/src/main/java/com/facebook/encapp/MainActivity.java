@@ -64,41 +64,69 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    String codecInfoToText(MediaCodecInfo info) {
-        // TODO: from Android 10 (api 29) we can check
+    String codecInfoTypeToText(String type, MediaCodecInfo.CodecCapabilities cap, int tab_length) {
+        String tab = String.format("%" + (tab_length * 4) + "s", "");
+        String tab2 = String.format("%" + ((tab_length + 1) * 4) + "s", "");
+
+        StringBuilder str = new StringBuilder();
+        str.append(tab + "mime_type: " + type + "\n");
+        str.append(tab + "max_supported_instances: " + cap.getMaxSupportedInstances() + "\n");
+
+        for (int col : cap.colorFormats) {
+            str.append(tab + "color {\n");
+            str.append(tab2 + "format: " + col + "\n");
+            switch (col) {
+                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible:
+                    str.append(tab2 + "name: COLOR_FormatYUV420Flexible\n");
+                    break;
+                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
+                    str.append(tab2 + "name: COLOR_FormatYUV420SemiPlanar\n");
+                    break;
+                case MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar:
+                    str.append(tab2 + "name: COLOR_QCOM_FormatYUV420SemiPlanar\n");
+                    break;
+                case MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface:
+                    str.append(tab2 + "name: COLOR_FormatSurface\n");
+                    break;
+                case MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888:
+                    str.append(tab2 + "name: COLOR_Format24bitBGR888\n");
+                    break;
+            }
+            str.append(tab + "}\n");
+        }
+
+        for (MediaCodecInfo.CodecProfileLevel prof : cap.profileLevels) {
+            str.append(tab + "profile {\n");
+            str.append(tab2 + "profile: " + prof.profile + "\n");
+            str.append(tab2 + "level: " + prof.level + "\n");
+            str.append(tab + "}\n");
+        }
+
+        MediaFormat format = cap.getDefaultFormat();
+        //Odds are that if there is no default profile - nothing else will have defaults anyway...
+        if (format.getString(MediaFormat.KEY_PROFILE) != null) {
+            str.append("\nDefault settings:");
+            str.append(TestParams.getFormatInfo(format));
+        }
+        return str.toString();
+    }
+
+    String codecInfoToText(MediaCodecInfo info, int tab_length) {
+        String tab = String.format("%" + (tab_length * 4) + "s", "");
+        String tab2 = String.format("%" + ((tab_length + 1) * 4) + "s", "");
+
+        // TODO(johan): from Android 10 (api 29) we can check
         // codec type (hw or sw codec)
-        StringBuilder str = new StringBuilder("\n---\nCodec: ");
-        str.append(info.getName());
+        StringBuilder str = new StringBuilder();
+        str.append(tab + "MediaCodec {\n");
+        str.append(tab2 + "name: " + info.getName() + "\n");
         String[] types = info.getSupportedTypes();
         for (String tp : types) {
-            str.append(" type: " + tp);
-            MediaCodecInfo.CodecCapabilities cap = info.getCapabilitiesForType(tp);
-            str.append("\nMax supported instances: " + cap.getMaxSupportedInstances());
-            int[] colforms = cap.colorFormats;
-            MediaCodecInfo.CodecProfileLevel[] proflevels = cap.profileLevels;
-            for (int col : colforms) {
-                str.append("\n -col: " + col + " - ");
-                if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) != 0) {
-                    str.append("COLOR_FormatYUV420Flexible");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) != 0) {
-                    str.append("COLOR_FormatYUV420SemiPlanar");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface) != 0) {
-                    str.append("COLOR_FormatSurface");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888) != 0) {
-                    str.append("COLOR_Format24bitBGR888");
-                }
-            }
-
-            for (MediaCodecInfo.CodecProfileLevel prof : proflevels) {
-                str.append("\n -profile: " + prof.profile + ", level: " + prof.level);
-            }
-            MediaFormat format = cap.getDefaultFormat();
-            //Odds are that if there is no default profile - nothing else will have defaults anyway...
-            if (format.getString(MediaFormat.KEY_PROFILE) != null) {
-                str.append("\nDefault settings:");
-                str.append(TestParams.getFormatInfo(format));
-            }
+            str.append(tab2 + "type {\n");
+            str.append(codecInfoTypeToText(tp, info.getCapabilitiesForType(tp), tab_length + 2));
+            str.append(tab2 + "}\n");
         }
+        str.append(tab + "}\n");
         return str.toString();
 
     }
@@ -158,16 +186,17 @@ public class MainActivity extends AppCompatActivity {
                 MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
                 MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
                 TextView logText = findViewById(R.id.logText);
-                logText.append("-- List supported codecs --\n\n");
+                logText.append("codecs {\n");
                 for (MediaCodecInfo info : codecInfos) {
                     if (info.isEncoder()) {
-                        String str = codecInfoToText(info);
+                        String str = codecInfoToText(info, 2);
                         if (str.toLowerCase(Locale.US).contains("video")) {
-                            logText.append("\n" + str);
+                            logText.append(str + "\n");
                             Log.d(TAG, str);
                         }
                     }
                 }
+                logText.append("}\n");
             }
         });
     }
