@@ -60,29 +60,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             })).start();
         } else {
-            mTvTestRun = findViewById(R.id.tv_testrun);
-            mTvTestRun.setVisibility(View.VISIBLE);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = findViewById(R.id.logText);
-                    logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info : codecInfos) {
-                        if (info.isEncoder()) {
-                            String str = codecInfoToText(info);
-                            if (str.toLowerCase(Locale.US).contains("video")) {
-                                logText.append("\n" + str);
-                                Log.d(TAG, str);
-                            }
-                        }
-                    }
-                }
-            });
+            listCodecs();
         }
-
-
     }
 
     String codecInfoToText(MediaCodecInfo info) {
