@@ -49,9 +49,8 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
-        TextView mTvTestRun = findViewById(R.id.tv_testrun);
         if (getInstrumentedTest()) {
-
+            TextView mTvTestRun = findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             (new Thread(new Runnable() {
                 @Override
