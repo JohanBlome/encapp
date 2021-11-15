@@ -224,8 +224,8 @@ public class SurfaceTranscoder extends BufferEncoder {
             } else if (index >= 0) {
                 ByteBuffer data = mCodec.getOutputBuffer(index);
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                    Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: " + format);
                     MediaFormat oformat = mCodec.getOutputFormat();
+                    Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: " + oformat);
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));

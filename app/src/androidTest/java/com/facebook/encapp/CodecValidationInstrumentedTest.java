@@ -53,7 +53,7 @@ import static org.junit.Assert.assertThat;
 public class CodecValidationInstrumentedTest {
     private static final String TAG = "encapp";
 
-    private static final int LAUNCH_TIMEOUT = 5000;
+    private static final int LAUNCH_TIMEOUT = 0;
 
     private static final String TARGET_PACKAGE =
             InstrumentationRegistry.getTargetContext().getPackageName();
@@ -251,13 +251,11 @@ public class CodecValidationInstrumentedTest {
 
     @Test
     public void automateValidation() throws Exception {
-        Thread.sleep(LAUNCH_TIMEOUT);
         Log.d(TAG, "Check search criteria: " + TARGET_PACKAGE);
         SearchCondition<Boolean> isGone =
                 Until.gone(By.res(TARGET_PACKAGE, "tv_testrun"));
-        Log.e(TAG, "Wait for : " + UI_TIMEOUT + " ms (" + (UI_TIMEOUT / (1000 * 60.0)) + " min)");
+        Log.e(TAG, "Wait at most for : " + UI_TIMEOUT + " ms (" + (UI_TIMEOUT / (1000 * 60.0)) + " min)");
         mDevice.wait(isGone, UI_TIMEOUT);
-        Log.e(TAG, "Done waiting for : " + UI_TIMEOUT + " test: " + isGone);
-        Thread.sleep(LAUNCH_TIMEOUT);
+        Log.e(TAG, "Done waiting for maximum: " + UI_TIMEOUT + " test: " + isGone);
     }
 }

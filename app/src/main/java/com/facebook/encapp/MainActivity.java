@@ -22,6 +22,7 @@ import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestParams;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (getInstrumentedTest()) {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
+
             mTvTestRun.setVisibility(View.VISIBLE);
             (new Thread(new Runnable() {
                 @Override
@@ -64,6 +66,51 @@ public class MainActivity extends AppCompatActivity {
         } else {
             listCodecs();
         }
+
+    }
+
+    protected void listCodecs() {
+        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+        TextView logText = findViewById(R.id.logText);
+        StringBuffer encoders = new StringBuffer("--- List of supported encoders  ---\n\n");
+        StringBuffer decoders = new StringBuffer("--- List of supported decoders  ---\n\n");
+
+        for (MediaCodecInfo info : codecInfos) {
+            String str = MediaCodecInfoHelper.toText(info, 2);
+            if (str.toLowerCase(Locale.US).contains("video")) {
+                if (info.isEncoder()) {
+                    encoders.append(str + "\n");
+                }  else {
+                    decoders.append(str + "\n");
+                }
+
+            }
+
+
+        }
+
+
+        logText.append(encoders);
+        logText.append("\n" + decoders);
+        Log.d(TAG, encoders + "\n" + decoders);
+
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(new File("/sdcard/codecs.txt"));
+            Log.d(TAG, "Write to file");
+            writer.write(encoders.toString());
+            writer.write("\n*******\n");
+            writer.write(decoders.toString());
+            writer.flush();
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void exit() {
+        System.exit(0);
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -110,30 +157,6 @@ public class MainActivity extends AppCompatActivity {
         synchronized (mEncodingLockObject) {
             mEncodingsRunning--;
         }
-    }
-
-    private void listCodecs() {
-        TextView mTvTestRun = findViewById(R.id.tv_testrun);
-        mTvTestRun.setVisibility(View.VISIBLE);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-                MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                TextView logText = findViewById(R.id.logText);
-                logText.append("codecs {\n");
-                for (MediaCodecInfo info : codecInfos) {
-                    if (info.isEncoder()) {
-                        String str = MediaCodecInfoHelper.toText(info, 2);
-                        if (str.toLowerCase(Locale.US).contains("video")) {
-                            logText.append(str + "\n");
-                            Log.d(TAG, str);
-                        }
-                    }
-                }
-                logText.append("}\n");
-            }
-        });
     }
 
     /**

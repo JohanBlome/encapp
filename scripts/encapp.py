@@ -107,8 +107,7 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
                 else:
                     print(f"Media file is missing: {path}")
                     exit(0)
-        else:
-            print("input fiels is None")
+
     run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
             f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
     adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
@@ -140,10 +139,19 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 def list_codecs(serial_no, install):
     if install:
         install_app(serial_no)
+
     adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r ' +\
               '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
               ' ' + JUNIT_RUNNER_NAME
+
     run_cmd(adb_cmd)
+    adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/codecs.txt .'
+    run_cmd(adb_cmd)
+    with open("codecs.txt", 'r') as codec_file:
+        lines = codec_file.readlines()
+        for line in lines:
+            print(line.split("\n")[0]);
+        print("File is available in current dir");
 
 
 def get_options(argv):
@@ -194,7 +202,7 @@ def main(argv):
             os.system('mkdir -p ' + workdir)
             for test in options.test:
                 with open(test, 'r') as fp:
-                    print(f"Load {test}")
+                    print(f"Load {test}, {options.install}")
                     tests_json = json.load(fp)
                     run_encode_tests(tests_json,
                                      test,

@@ -210,6 +210,7 @@ public class MediaCodecInfoHelper {
         }
         str.append(tab + "}\n");
         return str.toString();
+
     }
 }
 
