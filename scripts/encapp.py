@@ -29,21 +29,28 @@ KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
 
 sample_config_json_data = [
     [{
-      KEY_NAME_DESCRIPTION: 'sample',
-      KEY_NAME_INPUT_FILES: [''],
-      KEY_NAME_INPUT_FORMAT: 'mp4',
-      KEY_NAME_INPUT_RESOLUTION: '1280x720',
-      KEY_NAME_CODECS: ['hevc'],
-      KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
-      KEY_NAME_RC_MODES: ['cbr'],
-      KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
-      KEY_NAME_I_INTERVALS: [2],
-      # DEFAULT, MEDIUM, HUGE, UNLIMITED
-      KEY_NAME_I_FRAME_SIZES:['unlimited'],
-      KEY_NAME_DURATION: 10,
-      KEY_NAME_ENC_LOOP: 0,
-      KEY_NAME_CONFIGURE: [''],
-      KEY_NAME_RUNTIME_PARAMETER: ['']
+    "session": 
+        [{
+            "conc": 1
+        }],
+    "tests":
+        [{
+          KEY_NAME_DESCRIPTION: 'sample',
+          KEY_NAME_INPUT_FILES: [''],
+          KEY_NAME_INPUT_FORMAT: 'mp4',
+          KEY_NAME_INPUT_RESOLUTION: '1280x720',
+          KEY_NAME_CODECS: ['hevc'],
+          KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
+          KEY_NAME_RC_MODES: ['cbr'],
+          KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
+          KEY_NAME_I_INTERVALS: [2],
+          # DEFAULT, MEDIUM, HUGE, UNLIMITED
+          KEY_NAME_I_FRAME_SIZES:['unlimited'],
+          KEY_NAME_DURATION: 10,
+          KEY_NAME_ENC_LOOP: 0,
+          KEY_NAME_CONFIGURE: [''],
+          KEY_NAME_RUNTIME_PARAMETER: ['']
+        }]
     }]
 ]
 
@@ -83,18 +90,25 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 
     json_folder = os.path.dirname(json_path)
     print(f"json folder: {json_folder}")
-    for test in tests:
-        print(f"{test}")
-        input_files = test.get(KEY_NAME_INPUT_FILES)
-        for fl in input_files:
-            path = f"{json_folder}/{fl}"
-            print(f"{path}")
-            if exists(path):
-                run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
-            else:
-                print(f"Media file is missing: {path}")
-                exit(0)
 
+    for test in tests:
+        session_params = test.get("session")
+        print(f"session: {session_params}")
+        input_files = test.get(KEY_NAME_INPUT_FILES)
+        if input_files is not None:
+            for fl in input_files:
+                if len(json_folder) > 0:
+                    path = f"{json_folder}/{fl}"
+                else:
+                    path = f"{fl}"
+                print(f"Media path: {path}")
+                if exists(path):
+                    run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
+                else:
+                    print(f"Media file is missing: {path}")
+                    exit(0)
+        else:
+            print("input fiels is None")
     run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
             f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
     adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'

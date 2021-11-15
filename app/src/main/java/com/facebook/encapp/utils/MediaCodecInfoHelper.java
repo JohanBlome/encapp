@@ -1,10 +1,7 @@
-package com.facebook.encapp;
+package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
 import android.media.MediaFormat;
-
-import com.facebook.encapp.utils.TestParams;
 
 
 public class MediaCodecInfoHelper {

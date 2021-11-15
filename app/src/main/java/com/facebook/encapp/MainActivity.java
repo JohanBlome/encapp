@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
-import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
@@ -17,16 +16,18 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.facebook.encapp.utils.JSONTestCaseBuilder;
+import com.facebook.encapp.utils.SessionParam;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestParams;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Vector;
 import java.util.Locale;
+import java.util.Vector;
 
 import static junit.framework.Assert.assertTrue;
 
@@ -183,9 +184,15 @@ public class MainActivity extends AppCompatActivity {
         /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                Vector<TestParams> vcCombinations;
+                Vector<TestParams> vcCombinations = null;
                 if (mExtraDataHashMap.containsKey("test")) {
-                    vcCombinations = JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"));
+                    Vector<SessionParam> sessionSettings = new Vector<>();
+                    vcCombinations = new Vector<>();
+                    Log.d(TAG, "cases: "+vcCombinations);
+                    if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sessionSettings)) {
+                        assertTrue("Failed to parse tests", false);
+                    }
+                    Log.d(TAG, "cases2: "+vcCombinations);
                 } else {
                     vcCombinations = buildSettingsFromCommandline();
                 }

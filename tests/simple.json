@@ -1,158 +1,171 @@
 [{
-		"description": "Bitrates",
-		"input_files": [
-			"../media/320x180_900fr_nv12.yuv",
-			"../media/320x180_900fr_avc.mp4"
-		],
-		"use_surface_enc": 0,
-		"input_format": "raw",
-		"input_resolution": "320x180",
-		"input_fps": "30",
-		"codecs": [
-			"encoder.avc"
-		],
-		"encode_resolutions": [
-			"320x180"
-		],
-		"rc_modes": [
-			"vbc"
-		],
-		"bitrates": [
-			200,
-			500
-		],
-		"i_intervals": [
-			2
-		],
-		"i_frame_sizes": [
-			"unlimited"
-		],
-		"configure": [{
-				"tl-schema": "android.generic.2"
-			},
-			{
-				"vendor.qti-ext-enc-ltr-count.num-ltr-frames": "2"
-			}
-		],
-		"duration": 10,
-		"enc_loop": 0
-	},
-	{
-		"description": "Encoders",
-		"input_files": [
-			"../media/320x180_900fr_nv12.yuv",
-			"../media/320x180_900fr_avc.mp4"
-		],
-		"use_surface_enc": 0,
-		"input_format": "raw",
-		"input_resolution": "320x180",
-		"input_fps": "30",
-		"codecs": [
-			"encoder.avc",
-			"encoder.hevc"
-		],
-		"encode_resolutions": [
-			"320x180"
-		],
-		"rc_modes": [
-			"vbc"
-		],
-		"bitrates": [
-			1000
-		],
-		"i_intervals": [
-			2
-		],
-		"i_frame_sizes": [
-			"unlimited"
-		],
-		"configure": [{
-            "name": "tl-schema",
-            "type": "string",
-            "setting" : "android.generic.2"
-		}],
-		"duration": 10,
-		"enc_loop": 0
-	},
-    {
-		"description": "Dynamic LTR",
-		"input_files": [
-			"../media/320x180_900fr_nv12.yuv",
-			"../media/320x180_900fr_avc.mp4"
-		],
-		"use_surface_enc": 0,
-		"input_format": "raw",
-		"input_resolution": "320x180",
-		"input_fps": "30",
-		"codecs": [
-			"encoder.avc"
-		],
-		"encode_resolutions": [
-			"320x180"
-		],
-		"rc_modes": [
-			"vbc"
-		],
-		"bitrates": [
-			1000
-		],
-		"i_intervals": [
-			2
-		],
-		"i_frame_sizes": [
-			"unlimited"
-		],
-		"configure": [{
-            "name": "tl-schema",
-            "type": "string",
-            "setting" : "android.generic.2"
-		},
+    "session": 
+    [{
+        "conc": 1
+    }],
+    "tests":
+    [
         {
-            "name": "vendor.qti-ext-enc-caps-ltr.max-count",
-            "type": "int",
-            "setting" : "6"            
+            "description": "Bitrates",
+            "input_files": [
+                "../media/320x180_900fr_nv12.yuv",
+                "../media/320x180_900fr_avc.mp4"
+            ],
+            "use_surface_enc": 0,
+            "input_format": "raw",
+            "input_resolution": "320x180",
+            "input_fps": "30",
+            "codecs": [
+                "encoder.avc"
+            ],
+            "encode_resolutions": [
+                "320x180"
+            ],
+            "rc_modes": [
+                "vbc"
+            ],
+            "bitrates": [
+                200,
+                500
+            ],
+            "i_intervals": [
+                2
+            ],
+            "i_frame_sizes": [
+                "unlimited"
+            ],
+            "configure": [
+                {
+                    "name": "tl-schema" ,
+                    "type": "string",
+                    "setting": "android.generic.2"                
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames" ,
+                    "type": "int",
+                    "setting": "2"
+                }
+            ],
+            "duration": 10,
+            "enc_loop": 0
         },
         {
-            "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
-            "type": "int",
-            "setting" : "2"            
-        }],
-        "runtime_parameters": [
-            {
-                "name": "vendor.qti-ext-enc-ltr.mark-frame",                
-                "type" : "int",
-                "settings": [                        
-                    {"0": "10"},
-                    {"1": "20"}                    
-                ]
+            "description": "Encoders",
+            "input_files": [
+                "../media/320x180_900fr_nv12.yuv",
+                "../media/320x180_900fr_avc.mp4"
+            ],
+            "use_surface_enc": 0,
+            "input_format": "raw",
+            "input_resolution": "320x180",
+            "input_fps": "30",
+            "codecs": [
+                "encoder.avc",
+                "encoder.hevc"
+            ],
+            "encode_resolutions": [
+                "320x180"
+            ],
+            "rc_modes": [
+                "vbc"
+            ],
+            "bitrates": [
+                1000
+            ],
+            "i_intervals": [
+                2
+            ],
+            "i_frame_sizes": [
+                "unlimited"
+            ],
+            "configure": [{
+                "name": "tl-schema",
+                "type": "string",
+                "setting" : "android.generic.2"
+            }],
+            "duration": 10,
+            "enc_loop": 0
+        },
+        {
+            "description": "Dynamic LTR",
+            "input_files": [
+                "../media/320x180_900fr_nv12.yuv",
+                "../media/320x180_900fr_avc.mp4"
+            ],
+            "use_surface_enc": 0,
+            "input_format": "raw",
+            "input_resolution": "320x180",
+            "input_fps": "30",
+            "codecs": [
+                "encoder.avc"
+            ],
+            "encode_resolutions": [
+                "320x180"
+            ],
+            "rc_modes": [
+                "vbc"
+            ],
+            "bitrates": [
+                1000
+            ],
+            "i_intervals": [
+                2
+            ],
+            "i_frame_sizes": [
+                "unlimited"
+            ],
+            "configure": [{
+                "name": "tl-schema",
+                "type": "string",
+                "setting" : "android.generic.2"
             },
             {
-                "name": "vendor.qti-ext-enc-ltr.use-frame" ,
+                "name": "vendor.qti-ext-enc-caps-ltr.max-count",
                 "type": "int",
-                "settings": [
-                    {"40" : "0"},
-                    {"60" : "1"}
-                ]           
+                "setting" : "6"            
             },
             {
-                "name": "video-bitrate" ,
+                "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
                 "type": "int",
-                "settings": [
-                    {"30" : "700"},
-                    {"60" : "2500"}
-                ]           
-            },
-            {
-                "name": "request-sync" ,
-                "type": "int",
-                "settings": [
-                    "34",
-                    "98"
-                ]           
-            }
-        ],
-		"duration": 10,
-		"enc_loop": 0
-	}
-]
+                "setting" : "2"            
+            }],
+            "runtime_parameters": [
+                {
+                    "name": "vendor.qti-ext-enc-ltr.mark-frame",                
+                    "type" : "int",
+                    "settings": [                        
+                        {"0": "10"},
+                        {"1": "20"}                    
+                    ]
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr.use-frame" ,
+                    "type": "int",
+                    "settings": [
+                        {"40" : "0"},
+                        {"60" : "1"}
+                    ]           
+                },
+                {
+                    "name": "video-bitrate" ,
+                    "type": "int",
+                    "settings": [
+                        {"30" : "700"},
+                        {"60" : "2500"}
+                    ]           
+                },
+                {
+                    "name": "request-sync" ,
+                    "type": "int",
+                    "settings": [
+                        "34",
+                        "98"
+                    ]           
+                }
+            ],
+            "duration": 10,
+            "enc_loop": 0
+        }
+    ]
+}]
 

@@ -423,8 +423,11 @@ class BufferEncoder {
         if (mRuntimeParams != null && !mRuntimeParams.isEmpty()) {
             Bundle params = new Bundle();
             ArrayList<RuntimeParam> runtimeParams = mRuntimeParams.get(Integer.valueOf(frameCount));
+            Log.d(TAG, "setRuntimeParameters, checking: " + frameCount + " - " + runtimeParams);
             if (runtimeParams != null) {
+                Log.d(TAG, "setRuntimeParameters, size: " + runtimeParams.size());
                 for (RuntimeParam param : runtimeParams) {
+                    Log.d(TAG, "Runtime param: "  +param.name  + " - " + param.value);
                     if (param.value == null) {
                         params.putInt(param.name, frameCount);
                     } else if (param.value instanceof Integer) {
