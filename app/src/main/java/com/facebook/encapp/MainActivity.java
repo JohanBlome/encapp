@@ -36,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     TextureView mTextureView;
     private int mEncodingsRunning = 0;
     private final Object mEncodingLockObject = new Object();
+    int mUIHoldtimeSec = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -143,6 +144,15 @@ public class MainActivity extends AppCompatActivity {
 
         if (mExtraDataHashMap.containsKey("list_codecs")) {
             listCodecs();
+            try {
+                if (mUIHoldtimeSec > 0) {
+                    Thread.sleep(mUIHoldtimeSec);
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            TextView mTvTestRun = findViewById(R.id.tv_testrun);
+            mTvTestRun.setVisibility(View.GONE);
             return;
         }
 
@@ -232,6 +242,13 @@ public class MainActivity extends AppCompatActivity {
 
                         } while (mEncodingsRunning > 0);
                         Log.d(TAG, "Done with encodings");
+                        try {
+                            if (mUIHoldtimeSec > 0) {
+                                Thread.sleep(mUIHoldtimeSec);
+                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                         TextView mTvTestRun = findViewById(R.id.tv_testrun);
                         mTvTestRun.setVisibility(View.GONE);
                     }
@@ -277,6 +294,8 @@ public class MainActivity extends AppCompatActivity {
             String data = mExtraDataHashMap.get("mod");
             mod = data.split(",");
         }
+
+        mUIHoldtimeSec = mExtraDataHashMap.containsKey("ui_hold_sec") ? Integer.parseInt(mExtraDataHashMap.get("ui_hold_sec")): 0;
 
         String iframesize = (mExtraDataHashMap.get("ifsize") != null) ? mExtraDataHashMap.get("ifsize") : "DEFAULT";
         int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
