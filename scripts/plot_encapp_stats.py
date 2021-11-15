@@ -5,39 +5,38 @@ import pandas as pd
 import seaborn as sb
 import matplotlib.pyplot as plt
 
-
-  # "id": "encapp_3d989dae-2218-43a8-a96c-c4856f362c4b",
-  # "description": "surface encoder",
-  # "date": "Mon Jul 20 15:18:35 PDT 2020",
-  # "proctime": 842594344696070,
-  # "framecount": 294,
-  # "encodedfile": "encapp_3d989dae-2218-43a8-a96c-c4856f362c4b.mp4",
-  # "settings": {
-    # "codec": "video/hevc",
-    # "gop": 10,
-    # "fps": 30,
-    # "bitrate": 2000000,
-    # "meanbitrate": 1905177,
-    # "width": 1280,
-    # "height": 720,
-    # "encmode": "BITRATE_MODE_CBR",
-    # "keyrate": 10,
-    # "iframepreset": "UNLIMITED",
-    # "colorformat": 2135033992,
-    # "colorrange": 2,
-    # "colorstandard": 4,
-    # "colortransfer": 3,
-    # "hierplayers": 0,
-    # "ltrcount": 1
-  # },
-  # "frames": [
-    # {
-      # "frame": 0,
-      # "iframe": 1,
-      # "size": 31568,
-      # "pts": 66666,
-      # "proctime": 74273281
-    # },
+# "id": "encapp_3d989dae-2218-43a8-a96c-c4856f362c4b",
+# "description": "surface encoder",
+# "date": "Mon Jul 20 15:18:35 PDT 2020",
+# "proctime": 842594344696070,
+# "framecount": 294,
+# "encodedfile": "encapp_3d989dae-2218-43a8-a96c-c4856f362c4b.mp4",
+# "settings": {
+#   "codec": "video/hevc",
+#   "gop": 10,
+#   "fps": 30,
+#   "bitrate": 2000000,
+#   "meanbitrate": 1905177,
+#   "width": 1280,
+#   "height": 720,
+#   "encmode": "BITRATE_MODE_CBR",
+#   "keyrate": 10,
+#   "iframepreset": "UNLIMITED",
+#   "colorformat": 2135033992,
+#   "colorrange": 2,
+#   "colorstandard": 4,
+#   "colortransfer": 3,
+#   "hierplayers": 0,
+#   "ltrcount": 1
+# },
+# "frames": [
+#   {
+#   "frame": 0,
+#   "iframe": 1,
+#   "size": 31568,
+#   "pts": 66666,
+#   "proctime": 74273281
+#   },
 
 
 def plot_framesize(data, variant, description, options):
@@ -53,7 +52,7 @@ def plot_framesize(data, variant, description, options):
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.suptitle(options.label + description)
 
-    name = options.label + '_bitrate_' +  description + '.png'
+    name = options.label + '_bitrate_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format="png")
 
 
@@ -75,7 +74,7 @@ def plot_processingtime(data, variant, description, options):
     plt.suptitle(options.label + description)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    name = options.label + '_proc-time_' +  description + '.png'
+    name = options.label + '_proc-time_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format="png")
 
 
@@ -149,6 +148,7 @@ def main():
             plot_processingtime(data, "codec", desc, options)
 
     plt.show()
+
 
 if __name__ == "__main__":
     main()

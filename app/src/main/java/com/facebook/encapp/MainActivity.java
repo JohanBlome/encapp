@@ -49,79 +49,19 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
-        TextView mTvTestRun = findViewById(R.id.tv_testrun);
         if (getInstrumentedTest()) {
-
+            TextView mTvTestRun = findViewById(R.id.tv_testrun);
             mTvTestRun.setVisibility(View.VISIBLE);
             (new Thread(new Runnable() {
                 @Override
                 public void run() {
                     performInstrumentedTest();
+                    finish();
                 }
             })).start();
         } else {
-            mTvTestRun = findViewById(R.id.tv_testrun);
-            mTvTestRun.setVisibility(View.VISIBLE);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = findViewById(R.id.logText);
-                    logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info : codecInfos) {
-                        if (info.isEncoder()) {
-                            String str = codecInfoToText(info);
-                            if (str.toLowerCase(Locale.US).contains("video")) {
-                                logText.append("\n" + str);
-                                Log.d(TAG, str);
-                            }
-                        }
-                    }
-                }
-            });
+            listCodecs();
         }
-
-
-    }
-
-    String codecInfoToText(MediaCodecInfo info) {
-        // TODO: from Android 10 (api 29) we can check
-        // codec type (hw or sw codec)
-        StringBuilder str = new StringBuilder("\n---\nCodec: ");
-        str.append(info.getName());
-        String[] types = info.getSupportedTypes();
-        for (String tp : types) {
-            str.append(" type: " + tp);
-            MediaCodecInfo.CodecCapabilities cap = info.getCapabilitiesForType(tp);
-            str.append("\nMax supported instances: " + cap.getMaxSupportedInstances());
-            int[] colforms = cap.colorFormats;
-            MediaCodecInfo.CodecProfileLevel[] proflevels = cap.profileLevels;
-            for (int col : colforms) {
-                str.append("\n -col: " + col + " - ");
-                if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) != 0) {
-                    str.append("COLOR_FormatYUV420Flexible");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) != 0) {
-                    str.append("COLOR_FormatYUV420SemiPlanar");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface) != 0) {
-                    str.append("COLOR_FormatSurface");
-                } else if ((col & MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888) != 0) {
-                    str.append("COLOR_Format24bitBGR888");
-                }
-            }
-
-            for (MediaCodecInfo.CodecProfileLevel prof : proflevels) {
-                str.append("\n -profile: " + prof.profile + ", level: " + prof.level);
-            }
-            MediaFormat format = cap.getDefaultFormat();
-            //Odds are that if there is no default profile - nothing else will have defaults anyway...
-            if (format.getString(MediaFormat.KEY_PROFILE) != null) {
-                str.append("\nDefault settings:");
-                str.append(TestParams.getFormatInfo(format));
-            }
-        }
-        return str.toString();
-
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -170,6 +110,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void listCodecs() {
+        TextView mTvTestRun = findViewById(R.id.tv_testrun);
+        mTvTestRun.setVisibility(View.VISIBLE);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+                MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+                TextView logText = findViewById(R.id.logText);
+                logText.append("codecs {\n");
+                for (MediaCodecInfo info : codecInfos) {
+                    if (info.isEncoder()) {
+                        String str = MediaCodecInfoHelper.toText(info, 2);
+                        if (str.toLowerCase(Locale.US).contains("video")) {
+                            logText.append(str + "\n");
+                            Log.d(TAG, str);
+                        }
+                    }
+                }
+                logText.append("}\n");
+            }
+        });
+    }
+
     /**
      * Start automated test run.
      */
@@ -178,27 +142,7 @@ public class MainActivity extends AppCompatActivity {
         final TextView logText = findViewById(R.id.logText);
 
         if (mExtraDataHashMap.containsKey("list_codecs")) {
-            TextView mTvTestRun = findViewById(R.id.tv_testrun);
-            mTvTestRun.setVisibility(View.VISIBLE);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-                    MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-                    TextView logText = findViewById(R.id.logText);
-                    logText.append("-- List supported codecs --\n\n");
-                    for (MediaCodecInfo info : codecInfos) {
-                        if (info.isEncoder()) {
-                            String str = codecInfoToText(info);
-                            if (str.toLowerCase(Locale.US).contains("video")) {
-                                logText.append("\n" + str);
-                                Log.d(TAG, str);
-                            }
-                        }
-                    }
-                }
-            });
-
+            listCodecs();
             return;
         }
 

@@ -76,7 +76,6 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
 
     print(f"{tests}")
 
-
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f"adb -s {serial_no} rm /sdcard/encapp_*")

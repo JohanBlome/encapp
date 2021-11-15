@@ -205,7 +205,7 @@ class VideoAnalyzer:
         return input_yuv_file, res
 
     def get_vmaf_score(self, mp4_file_ref, mp4_file_out, duration):
-        ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
+        ret, stdout, stderr = run_cmd('ffmpeg -filters | grep libvmaf')
         log_file = str(Path(mp4_file_out).with_suffix(''))+'_vmaf.json'
         mp4_file_ref_res = self.get_resolution(mp4_file_ref)
         mp4_file_out_res = self.get_resolution(mp4_file_out)
@@ -259,7 +259,7 @@ class VideoAnalyzer:
         run_cmd(ffmpeg_cmd)
 
         sizes = ref_res.split('x')
-        ret, stdout, stderr = run_cmd("ffmpeg -filters | grep libvmaf")
+        ret, stdout, stderr = run_cmd('ffmpeg -filters | grep libvmaf')
         log_file = str(Path(mp4_file_out).with_suffix(''))+'_vmaf.json'
         if (len(stdout) > 0):
             vmaf_cmd = 'ffmpeg -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
@@ -332,13 +332,16 @@ class JobInfo:
             self.pix_fmt = 'yuv420p'
         self.i_frame_size = i_frame_size
         self.enc_loop = 0 if enc_loop is None else enc_loop
-        #surface encoding without decoding is not possible at the moment
-        if not (self.input_format == 'mp4' or self.input_format == 'webm') and self.use_surface_enc:
-                print("ERROR: Surface encoding with raw input is no possible")
-                exit(0)
-        elif (self.input_format == 'mp4' or self.input_format == 'webm') and not self.use_surface_enc:
-                print("ERROR: Surface encoding required with encoded input")
-                exit(0)
+        # surface encoding without decoding is not possible at the moment
+        if (not (self.input_format == 'mp4' or self.input_format == 'webm')
+           and self.use_surface_enc):
+            print('ERROR: Surface encoding with raw input is no possible')
+            exit(0)
+        elif ((self.input_format == 'mp4' or self.input_format == 'webm')
+              and not self.use_surface_enc):
+            print('ERROR: Surface encoding required with encoded input')
+            exit(0)
+
 
 class EncodeJobs:
     def __init__(self, device_model):
@@ -444,18 +447,21 @@ class EncodeJobs:
             # get the media file as well
             fid = job_info.data['id']
             settings = job_info.data['settings']
-            print("fid {:s} - br: {:d}, mean br: {:d}, res: {:d}x{:d}, codec: {:s}".format(
-                fid, settings['bitrate'], settings['meanbitrate'], settings['width'],
-                settings['height'],  settings['codec']))
+            print('fid {:s} - br: {:d}, mean br: {:d}, res: {:d}x{:d}, '
+                  'codec: {:s}'.format(
+                      fid, settings['bitrate'], settings['meanbitrate'],
+                      settings['width'], settings['height'],
+                      settings['codec']))
             encoded_file = job_info.data['encodedfile']
             if len(encoded_file) > 0:
-                adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/' + encoded_file  + \
-                          ' ' + job_info.output_dir
+                adb_cmd = ('adb -s ' + serial_no + ' pull /sdcard/' +
+                           encoded_file + ' ' + job_info.output_dir)
                 run_cmd(adb_cmd)
                 # remove the output
-                adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + encoded_file
+                adb_cmd = ('adb -s ' + serial_no + ' shell rm /sdcard/' +
+                           encoded_file)
                 run_cmd(adb_cmd)
-                job_info.output_file = job_info.output_dir + '/' +  encoded_file
+                job_info.output_file = job_info.output_dir + '/' + encoded_file
             else:
                 job_info.output_file = None
 
@@ -508,7 +514,7 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
                       use_surface_enc, input_format,
                       input_res, temporal_layer_count, enc_loop):
     base_file_name = os.path.basename(in_file)
-    sub_dir = '_'.join([base_file_name, "files"])
+    sub_dir = '_'.join([base_file_name, 'files'])
 
     output_dir = workdir + '/' + sub_dir
     os.system('mkdir -p ' + output_dir)
