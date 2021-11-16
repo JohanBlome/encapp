@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
     protected void listCodecs() {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        TextView logText = findViewById(R.id.logText);
+
         StringBuffer encoders = new StringBuffer("--- List of supported encoders  ---\n\n");
         StringBuffer decoders = new StringBuffer("--- List of supported decoders  ---\n\n");
 
@@ -89,11 +89,17 @@ public class MainActivity extends AppCompatActivity {
 
 
         }
+        final TextView logText = findViewById(R.id.logText);
+        runOnUiThread(new Runnable() {
+                          @Override
+                          public void run() {
 
+                              logText.append(encoders);
+                              logText.append("\n" + decoders);
+                              Log.d(TAG, encoders + "\n" + decoders);
 
-        logText.append(encoders);
-        logText.append("\n" + decoders);
-        Log.d(TAG, encoders + "\n" + decoders);
+                          }
+                      });
 
         FileWriter writer = null;
         try {
@@ -175,8 +181,13 @@ public class MainActivity extends AppCompatActivity {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            TextView mTvTestRun = findViewById(R.id.tv_testrun);
-            mTvTestRun.setVisibility(View.GONE);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    TextView mTvTestRun = findViewById(R.id.tv_testrun);
+                    mTvTestRun.setVisibility(View.GONE);
+                }
+            });
             return;
         }
 
