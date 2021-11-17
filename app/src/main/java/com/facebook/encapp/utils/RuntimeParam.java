@@ -5,9 +5,10 @@ public class RuntimeParam {
     public String type;
     public Object value;
     public int frame;
-    public RuntimeParam(String name, int frame, Object value) {
+    public RuntimeParam(String name, int frame, String type, Object value) {
         this.name = name;
         this.value = value;
         this.frame = frame;
+        this.type = type;
     }
 }

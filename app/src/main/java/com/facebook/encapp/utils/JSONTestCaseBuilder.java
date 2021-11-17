@@ -172,26 +172,28 @@ public class JSONTestCaseBuilder {
                                                     if (obj instanceof JSONObject) {
                                                         JSONObject param = (JSONObject) obj;
 
-                                                        String name = param.getString("name");
-                                                        String type = param.getString("type");
+                                                        String name = param.getString("name").trim();
+                                                        String type = param.getString("type").trim();
                                                         JSONArray settings = param.getJSONArray("settings");
                                                         for (int k = 0; k < settings.length(); k++) {
                                                             Object val = settings.get(k);
-                                                            if (val instanceof String) {
+                                                            if (type.equals("string")) {
                                                                 int frame = Integer.parseInt(val.toString());
-                                                                runtime_parameters.add(new RuntimeParam(name, frame, null));
+                                                                runtime_parameters.add(new RuntimeParam(name, frame, type, null));
                                                             } else if (val instanceof JSONObject) {
                                                                 //Should be only a pair i.e. {frame, "value"}
                                                                 JSONArray ja = ((JSONObject) val).names();
                                                                 int frame = ja.getInt(0);
                                                                 Object rt_data = null;
                                                                 if (type.toLowerCase(Locale.US).equals("int")) {
-                                                                    rt_data = ((JSONObject) val).getInt(Integer.toString(frame));
+                                                                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
+                                                                } else if (type.toLowerCase(Locale.US).equals("float")) {
+                                                                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
                                                                 } else {
                                                                     Log.e(TAG, "Unknown dynamic type: " + type);
                                                                     break;
                                                                 }
-                                                                runtime_parameters.add(new RuntimeParam(name, frame, rt_data));
+                                                                runtime_parameters.add(new RuntimeParam(name, frame, type, rt_data));
 
                                                             }
                                                         }
@@ -217,7 +219,15 @@ public class JSONTestCaseBuilder {
                                                                         TestParams testParams = new TestParams();
                                                                         Size videoSize = SizeUtils.parseXString(encode_resolutions[vC]);
                                                                         testParams.setVideoSize(videoSize);
-                                                                        testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC]) * 1000));
+                                                                        if (bitrates[bC].endsWith("k")) {
+                                                                            testParams.setBitRate(Math.round(Float.parseFloat(
+                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('k') - 1)) * 1000));
+                                                                        } else if (bitrates[bC].endsWith("M")) {
+                                                                            testParams.setBitRate(Math.round(Float.parseFloat(
+                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('M') - 1)) * 1000000));
+                                                                        } else {
+                                                                            testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC])));
+                                                                        }
                                                                         testParams.setKeyframeInterval(Integer.parseInt(i_intervals[kC]));
                                                                         testParams.setFPS(Integer.parseInt(fps[fC]));
                                                                         testParams.setReferenceFPS(Integer.parseInt(input_fps));

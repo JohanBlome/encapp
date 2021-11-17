@@ -430,19 +430,25 @@ class BufferEncoder {
                     Log.d(TAG, "Runtime param: "  +param.name  + " - " + param.value);
                     if (param.value == null) {
                         params.putInt(param.name, frameCount);
-                    } else if (param.value instanceof Integer) {
+                    } else if (param.type.equals("int")) {
                         if (param.name.equals("fps")) {
                             Log.d(TAG, "Set fps to " + param.value);
-                            mKeepInterval = (float) mFrameRate / (float) (Integer) param.value;
-                        }
-                        if (param.name.equals("fps")) {
-                            mDropNext = true;
+                            mKeepInterval = (float) mFrameRate / (float) Integer.parseInt((String)param.value);
                         } else {
+                            String sval =  param.value.toString();
+                            int val = 0;
+                            if (sval.endsWith("k")) {
+                                val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('k'))) * 1000;
+                            } else if (sval.endsWith("M")) {
+                                val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('M'))) * 1000000;
+                            } else {
+                                Integer.parseInt(sval);
+                            }
                             Log.d(TAG, param.name + " @ " + frameCount + " - " + param.value);
-                            params.putInt(param.name, (Integer) param.value);
+                            params.putInt(param.name, val);
                         }
                     } else {
-                        Log.d(TAG, "Unknown type: " + param.value.getClass());
+                        Log.d(TAG, "Unknown type: " + param.type);
                     }
                 }
                 Log.d(TAG, "Set runtime parameters in codec");
