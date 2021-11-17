@@ -73,15 +73,15 @@ def install_app(serial_no):
             "com.facebook.encapp-v1.0-debug.apk")
 
 
-def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
+def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
                      install, workdir):
     if install:
         install_app(serial_no)
 
-    if tests is None:
-        raise Exception('Test file is empty')
+    if test_files is None:
+        raise Exception('No test files')
 
-    print(f"{tests}")
+    print(f"{test_files}")
 
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
@@ -91,22 +91,26 @@ def run_encode_tests(tests, json_path, device_model, serial_no, test_desc,
     json_folder = os.path.dirname(json_path)
     print(f"json folder: {json_folder}")
 
-    for test in tests:
-        session_params = test.get("session")
+    for test_file in test_files:
+        session_params = test_file.get("session")
+        tests = test_file.get("tests")
         print(f"session: {session_params}")
-        input_files = test.get(KEY_NAME_INPUT_FILES)
-        if input_files is not None:
-            for fl in input_files:
-                if len(json_folder) > 0:
-                    path = f"{json_folder}/{fl}"
-                else:
-                    path = f"{fl}"
-                print(f"Media path: {path}")
-                if exists(path):
-                    run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
-                else:
-                    print(f"Media file is missing: {path}")
-                    exit(0)
+        print(f"tests: {tests}")
+        for test in tests:
+            input_files = test.get(KEY_NAME_INPUT_FILES)
+            print(f"Input files: {input_files}")
+            if input_files is not None:
+                for fl in input_files:
+                    if len(json_folder) > 0:
+                        path = f"{json_folder}/{fl}"
+                    else:
+                        path = f"{fl}"
+                    print(f"Media path: {path}")
+                    if exists(path):
+                        run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
+                    else:
+                        print(f"Media file is missing: {path}")
+                        exit(0)
 
     run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
             f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
@@ -166,6 +170,7 @@ def get_options(argv):
     parser.add_argument('-l', '--list_codecs', action='store_true',
                         help='List codecs the devices support')
     parser.add_argument('--desc', default="encapp", help='Test description')
+    parser.add_argument('-o', '--output', help='Name output directory')
     parser.add_argument('--install', default='true',
                         type=bool,
                         help='Do install apk')
@@ -198,7 +203,9 @@ def main(argv):
             # get date and time and format it
             now = datetime.now()
             dt_string = now.strftime('%m-%d-%Y_%H_%M')
-            workdir = f'{device_model}_{dt_string}_{options.desc}'
+            workdir = f'{options.desc}_{device_model}_{dt_string}'
+            if options.output is not None:
+                workdir = options.output
             os.system('mkdir -p ' + workdir)
             for test in options.test:
                 with open(test, 'r') as fp:
