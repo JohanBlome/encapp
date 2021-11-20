@@ -82,7 +82,7 @@ public class JSONTestCaseBuilder {
                                         String use_surface_enc = "false";
                                         String input_fps = "30";
                                         String skip_frames = "false";
-                                        ArrayList<RuntimeParam> runtime_parameters = new ArrayList<>();
+                                        ArrayList<Object> runtime_parameters = new ArrayList<>();
                                         Log.d(TAG, "4 "+data.length());
                                         for (Iterator<String> it2 = data.keys(); it2.hasNext(); ) {
                                             String case_key = it2.next();
@@ -168,36 +168,8 @@ public class JSONTestCaseBuilder {
                                                 JSONArray runtime_array = (JSONArray) data_object;
 
                                                 for (int rp = 0; rp < runtime_array.length(); rp++) {
-                                                    obj = runtime_array.get(rp);
-                                                    if (obj instanceof JSONObject) {
-                                                        JSONObject param = (JSONObject) obj;
-
-                                                        String name = param.getString("name").trim();
-                                                        String type = param.getString("type").trim();
-                                                        JSONArray settings = param.getJSONArray("settings");
-                                                        for (int k = 0; k < settings.length(); k++) {
-                                                            Object val = settings.get(k);
-                                                            if (type.equals("string")) {
-                                                                int frame = Integer.parseInt(val.toString());
-                                                                runtime_parameters.add(new RuntimeParam(name, frame, type, null));
-                                                            } else if (val instanceof JSONObject) {
-                                                                //Should be only a pair i.e. {frame, "value"}
-                                                                JSONArray ja = ((JSONObject) val).names();
-                                                                int frame = ja.getInt(0);
-                                                                Object rt_data = null;
-                                                                if (type.toLowerCase(Locale.US).equals("int")) {
-                                                                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
-                                                                } else if (type.toLowerCase(Locale.US).equals("float")) {
-                                                                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
-                                                                } else {
-                                                                    Log.e(TAG, "Unknown dynamic type: " + type);
-                                                                    break;
-                                                                }
-                                                                runtime_parameters.add(new RuntimeParam(name, frame, type, rt_data));
-
-                                                            }
-                                                        }
-                                                    }
+                                                    JSONObject param = runtime_array.getJSONObject(rp);
+                                                    parseSetting(param, runtime_parameters);
                                                 }
                                             }
                                         }
@@ -283,6 +255,47 @@ public class JSONTestCaseBuilder {
             Log.e(TAG, ex.getLocalizedMessage());
         }
         return true;
+    }
+
+    protected static void parseSetting(JSONObject param, ArrayList<Object> parameters) throws JSONException {
+        String name = param.getString("name").trim();
+        String type = param.getString("type").trim();
+        JSONArray settings = param.getJSONArray("settings");
+
+        ArrayList<Object> list = new ArrayList<>(); // for bundles, if available
+        for (int k = 0; k < settings.length(); k++) {
+            Object val = settings.get(k);
+            if (type.equals("string")) {
+                int frame = Integer.parseInt(val.toString());
+                parameters.add(new RuntimeParam(name, frame, type, null));
+            } else if (val instanceof JSONObject) {
+                if (type.toLowerCase(Locale.US).equals("int")) {
+                    //Should be only a pair i.e. {frame, "value"}
+                    JSONArray ja = ((JSONObject) val).names();
+                    int frame = ja.getInt(0);
+                    Object rt_data = null;
+                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
+                    parameters.add(new RuntimeParam(name, frame, type, rt_data));
+                } else if (type.toLowerCase(Locale.US).equals("float")) {
+                    //Should be only a pair i.e. {frame, "value"}
+                    JSONArray ja = ((JSONObject) val).names();
+                    int frame = ja.getInt(0);
+                    Object rt_data = null;
+                    rt_data = ((JSONObject) val).get(String.valueOf(frame));
+                    parameters.add(new RuntimeParam(name, frame, type, rt_data));
+                } else if (type.toLowerCase(Locale.US).equals("bundle")) {
+                    JSONObject loc_val = ((JSONObject) val);
+                    parseSetting((JSONObject)loc_val, list);
+                }  else {
+                    Log.e(TAG, "Unknown dynamic type: " + type);
+                    break;
+                }
+            }
+        }
+
+        if (list.size() > 0) {
+            parameters.add(new RuntimeParam(name, -1, type, list));
+        }
     }
 
     public static String[] getStringArray(JSONArray array) {

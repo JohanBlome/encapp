@@ -447,6 +447,9 @@ class BufferEncoder {
                             Log.d(TAG, param.name + " @ " + frameCount + " - " + param.value);
                             params.putInt(param.name, val);
                         }
+                    } else if (param.type.equals("bundle")) {
+                        Log.d(TAG, "Add bundle: "+param.name);
+                        params.putBundle(param.name, (Bundle)param.value);
                     } else {
                         Log.d(TAG, "Unknown type: " + param.type);
                     }

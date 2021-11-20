@@ -4,6 +4,7 @@ package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 
@@ -48,7 +49,7 @@ public class TestParams {
     private int mLoopCount = 0;
     private String mDescription = "";
     private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
-    ArrayList<RuntimeParam> mRuntimeParams;
+    ArrayList<Object> mRuntimeParams;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -294,26 +295,67 @@ public class TestParams {
         return mTemporalLayerCount;
     }
 
-    public void setRuntimeParameters(ArrayList<RuntimeParam> params) {
+    public void setRuntimeParameters(ArrayList<Object> params) {
         mRuntimeParams = params;
     }
 
+    private void createBundles(String name, ArrayList<Object> datalist, HashMap<Integer, ArrayList<RuntimeParam>> runtimes) {
+        Log.d(TAG, "Create bundles");
+        HashMap<Integer, Bundle> map = new HashMap<>();
+        for (Object obj: datalist) {
+            RuntimeParam param = (RuntimeParam)obj;
+            Log.d(TAG, "obj = " + param .name + ", frame "+param.frame  + ", vl = " + param.value);
+
+            Bundle bundle = map.get(param.frame);
+            if (bundle == null) {
+                bundle = new Bundle();
+                map.put(param.frame, bundle);
+            }
+            if (param.type.equals("int")) {
+                Log.d(TAG, "name: " + param.name + ", " +  param.frame+", "+param.value+", " + param.value.getClass());
+                bundle.putInt(param.name, Integer.parseInt(param.value.toString()));
+            }
+
+
+        }
+
+        for (Integer key: map.keySet()) {
+
+            Bundle bundle = map.get(key);
+            Log.d(TAG, "Add bundle @ "+ key + " name = " + name);
+            ArrayList<RuntimeParam> list = runtimes.get(String.valueOf(key));
+            if (list == null) {
+                list = new ArrayList<RuntimeParam>();
+                runtimes.put(key, list);
+            }
+            list.add(new RuntimeParam(name, key, "bundle", bundle));
+        }
+    }
+
     public HashMap<Integer, ArrayList<RuntimeParam>> getRuntimeParameters() {
+        Log.d(TAG, "getRuntimeParameters");
         //Sort and return a HashMap
         HashMap<Integer, ArrayList<RuntimeParam>> map = new HashMap<>();
         if (mRuntimeParams == null) {
             Log.w(TAG, "Runtime parameters are null. No cli runtime parameters supported.");
             return map;
         }
-        for (RuntimeParam param: mRuntimeParams) {
-            Integer frame = Integer.valueOf(param.frame);
-            ArrayList<RuntimeParam> list = map.get(frame);
-            if (list == null) {
-                list = new ArrayList<RuntimeParam>();
-                map.put(frame, list);
+        for (Object obj: mRuntimeParams) {
+            if (obj instanceof RuntimeParam) {
+                RuntimeParam param = (RuntimeParam)obj;
+                Integer frame = Integer.valueOf(param.frame);
+                ArrayList<RuntimeParam> list = map.get(frame);
+                if (list == null) {
+                    list = new ArrayList<RuntimeParam>();
+                    map.put(frame, list);
+                }
+                if (param.value instanceof ArrayList) {
+                    createBundles(param.name, (ArrayList<Object>)param.value, map);
+                } else {
+                    Log.d(TAG, "Add " + param.name + " @ " + frame + " val: " + param.value);
+                    list.add(param);
+                }
             }
-            Log.d(TAG, "Add " + param.name + " @ "+frame + " val: " + param.value);
-            list.add(param);
         }
 
         Log.d(TAG, "Runtime parameters: " + map.size());
