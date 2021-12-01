@@ -15,12 +15,13 @@ import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
+import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.JSONTestCaseBuilder;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SessionParam;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestParams;
-import com.facebook.encapp.utils.MediaCodecInfoHelper;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -29,8 +30,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Vector;
-
-import static junit.framework.Assert.assertTrue;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
@@ -224,7 +223,7 @@ public class MainActivity extends AppCompatActivity {
                     vcCombinations = new Vector<>();
                     Log.d(TAG, "cases: "+vcCombinations);
                     if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sessionSettings)) {
-                        assertTrue("Failed to parse tests", false);
+                        Assert.assertTrue("Failed to parse tests", false);
                     }
                     Log.d(TAG, "cases2: "+vcCombinations);
                 } else {
@@ -428,7 +427,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         logText.append("\nEncoding failed: " + settings);
                         logText.append("\n" + status);
-                        assertTrue(status, false);
+                        Assert.assertTrue(status, false);
                     }
                 });
             } else {

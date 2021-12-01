@@ -5,10 +5,12 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
+import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.ConfigureParam;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.RuntimeParam;
@@ -20,9 +22,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Set;
 import java.util.Vector;
 
-import static junit.framework.Assert.assertTrue;
 
 /**
  * Created by jobl on 2018-02-27.
@@ -93,6 +95,10 @@ class BufferEncoder {
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
+
+
+            CheckConfig( mCodec.getInputFormat());
+
 
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
@@ -207,7 +213,7 @@ class BufferEncoder {
                 Log.d(TAG, "flags = " + (info.flags));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
-
+                    CheckConfig(oformat);
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
@@ -259,6 +265,42 @@ class BufferEncoder {
         }
 
         return "";
+    }
+
+    protected void CheckConfig(MediaFormat format) {
+        Log.d(TAG, "Check config: version = "+Build.VERSION.SDK_INT );
+        if ( Build.VERSION.SDK_INT >= 29) {
+            Set<String> features = format.getFeatures();
+            for (String feature: features) {
+                Log.d(TAG, "MediaFormat: " + feature);
+            }
+
+            Set<String> keys = format.getKeys();
+            for (String key: keys) {
+                int type = format.getValueTypeForKey(key);
+                switch (type) {
+                    case MediaFormat.TYPE_BYTE_BUFFER:
+                        Log.d(TAG, "MediaFormat: " + key + " - bytebuffer: " + format.getByteBuffer(key));
+                        break;
+                    case MediaFormat.TYPE_FLOAT:
+                        Log.d(TAG, "MediaFormat: " + key + " - float: " + format.getFloat(key));
+                        break;
+                    case MediaFormat.TYPE_INTEGER:
+                        Log.d(TAG, "MediaFormat: " + key + " - integer: " + format.getInteger(key));
+                        break;
+                    case MediaFormat.TYPE_LONG:
+                        Log.d(TAG, "MediaFormat: " + key + " - long: " + format.getLong(key));
+                        break;
+                    case MediaFormat.TYPE_NULL:
+                        Log.d(TAG, "MediaFormat: " + key + " - null");
+                        break;
+                    case MediaFormat.TYPE_STRING:
+                        Log.d(TAG, "MediaFormat: " + key + " - string: "+ format.getString(key));
+                        break;
+                }
+
+            }
+        }
     }
 
     /**
@@ -396,9 +438,9 @@ class BufferEncoder {
             for (MediaCodecInfo info : matching) {
                 sb.append(info.getName() + "\n");
             }
-            assertTrue(sb.toString(), false);
+            Assert.assertTrue(sb.toString(), false);
         } else if (matching.size() == 0) {
-            assertTrue("\nNo matching codecs to : " + id, false);
+            Assert.assertTrue("\nNo matching codecs to : " + id, false);
         } else {
             vc.setVideoEncoderIdentifier(matching.elementAt(0).getSupportedTypes()[0]);
             codecName = matching.elementAt(0).getName();
