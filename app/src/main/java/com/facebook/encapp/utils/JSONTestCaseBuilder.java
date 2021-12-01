@@ -193,10 +193,10 @@ public class JSONTestCaseBuilder {
                                                                         testParams.setVideoSize(videoSize);
                                                                         if (bitrates[bC].endsWith("k")) {
                                                                             testParams.setBitRate(Math.round(Float.parseFloat(
-                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('k') - 1)) * 1000));
+                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('k'))) * 1000));
                                                                         } else if (bitrates[bC].endsWith("M")) {
                                                                             testParams.setBitRate(Math.round(Float.parseFloat(
-                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('M') - 1)) * 1000000));
+                                                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('M'))) * 1000000));
                                                                         } else {
                                                                             testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC])));
                                                                         }
