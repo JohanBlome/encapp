@@ -430,15 +430,19 @@ class BufferEncoder {
         ArrayList<ConfigureParam> params = vc.getExtraConfigure();
         Log.d(TAG, "checkConfigureParams: " + params.toString() + ", l = " + params.size());
         for (ConfigureParam param : params) {
-            if (param.value instanceof Integer) {
-                int value = format.getInteger(param.name);
-                Log.d(TAG, "MediaFormat: " + param.name + " - integer: " + value);
-            } else if (param.value instanceof String) {
-                String value = format.getString(param.name);
-                Log.d(TAG, "MediaFormat: " + param.name + " - string: " + value);
-            } else if (param.value instanceof Float) {
-                float value = format.getFloat(param.name);
-                Log.d(TAG, "MediaFormat: " + param.name + " - float: " + value);
+            try {
+                if (param.value instanceof Integer) {
+                    int value = format.getInteger(param.name);
+                    Log.d(TAG, "MediaFormat: " + param.name + " - integer: " + value);
+                } else if (param.value instanceof String) {
+                    String value = format.getString(param.name);
+                    Log.d(TAG, "MediaFormat: " + param.name + " - string: " + value);
+                } else if (param.value instanceof Float) {
+                    float value = format.getFloat(param.name);
+                    Log.d(TAG, "MediaFormat: " + param.name + " - float: " + value);
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, param.name + ", Bad behaving Mediaformat query: " + ex.getMessage());
             }
         }
     }
