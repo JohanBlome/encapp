@@ -97,7 +97,7 @@ class BufferEncoder {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
 
 
-            checkConfig( mCodec.getInputFormat());
+            checkConfigureParams(vc, mCodec.getInputFormat());
 
 
         } catch (IOException iox) {
@@ -267,41 +267,6 @@ class BufferEncoder {
         return "";
     }
 
-    protected void checkConfig(MediaFormat format) {
-        Log.d(TAG, "Check config: version = "+Build.VERSION.SDK_INT );
-        if ( Build.VERSION.SDK_INT >= 29) {
-            Set<String> features = format.getFeatures();
-            for (String feature: features) {
-                Log.d(TAG, "MediaFormat: " + feature);
-            }
-
-            Set<String> keys = format.getKeys();
-            for (String key: keys) {
-                int type = format.getValueTypeForKey(key);
-                switch (type) {
-                    case MediaFormat.TYPE_BYTE_BUFFER:
-                        Log.d(TAG, "MediaFormat: " + key + " - bytebuffer: " + format.getByteBuffer(key));
-                        break;
-                    case MediaFormat.TYPE_FLOAT:
-                        Log.d(TAG, "MediaFormat: " + key + " - float: " + format.getFloat(key));
-                        break;
-                    case MediaFormat.TYPE_INTEGER:
-                        Log.d(TAG, "MediaFormat: " + key + " - integer: " + format.getInteger(key));
-                        break;
-                    case MediaFormat.TYPE_LONG:
-                        Log.d(TAG, "MediaFormat: " + key + " - long: " + format.getLong(key));
-                        break;
-                    case MediaFormat.TYPE_NULL:
-                        Log.d(TAG, "MediaFormat: " + key + " - null");
-                        break;
-                    case MediaFormat.TYPE_STRING:
-                        Log.d(TAG, "MediaFormat: " + key + " - string: "+ format.getString(key));
-                        break;
-                }
-
-            }
-        }
-    }
 
     /**
      * Fills input buffer for encoder from YUV buffers.
@@ -457,6 +422,59 @@ class BufferEncoder {
             } else if (param.value instanceof String) {
                 Log.d(TAG, "Set  " + param.name + " to " + param.value);
                 format.setString(param.name, (String) param.value);
+            }
+        }
+    }
+
+    protected void checkConfigureParams(TestParams vc, MediaFormat format) {
+        ArrayList<ConfigureParam> params = vc.getExtraConfigure();
+        Log.d(TAG, "checkConfigureParams: " + params.toString() + ", l = " + params.size());
+        for (ConfigureParam param : params) {
+            if (param.value instanceof Integer) {
+                int value = format.getInteger(param.name);
+                Log.d(TAG, "MediaFormat: " + param.name + " - integer: " + value);
+            } else if (param.value instanceof String) {
+                String value = format.getString(param.name);
+                Log.d(TAG, "MediaFormat: " + param.name + " - string: " + value);
+            } else if (param.value instanceof Float) {
+                float value = format.getFloat(param.name);
+                Log.d(TAG, "MediaFormat: " + param.name + " - float: " + value);
+            }
+        }
+    }
+
+    protected void checkConfig(MediaFormat format) {
+        Log.d(TAG, "Check config: version = "+Build.VERSION.SDK_INT );
+        if ( Build.VERSION.SDK_INT >= 29) {
+            Set<String> features = format.getFeatures();
+            for (String feature: features) {
+                Log.d(TAG, "MediaFormat: " + feature);
+            }
+
+            Set<String> keys = format.getKeys();
+            for (String key: keys) {
+                int type = format.getValueTypeForKey(key);
+                switch (type) {
+                    case MediaFormat.TYPE_BYTE_BUFFER:
+                        Log.d(TAG, "MediaFormat: " + key + " - bytebuffer: " + format.getByteBuffer(key));
+                        break;
+                    case MediaFormat.TYPE_FLOAT:
+                        Log.d(TAG, "MediaFormat: " + key + " - float: " + format.getFloat(key));
+                        break;
+                    case MediaFormat.TYPE_INTEGER:
+                        Log.d(TAG, "MediaFormat: " + key + " - integer: " + format.getInteger(key));
+                        break;
+                    case MediaFormat.TYPE_LONG:
+                        Log.d(TAG, "MediaFormat: " + key + " - long: " + format.getLong(key));
+                        break;
+                    case MediaFormat.TYPE_NULL:
+                        Log.d(TAG, "MediaFormat: " + key + " - null");
+                        break;
+                    case MediaFormat.TYPE_STRING:
+                        Log.d(TAG, "MediaFormat: " + key + " - string: "+ format.getString(key));
+                        break;
+                }
+
             }
         }
     }

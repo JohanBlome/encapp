@@ -99,7 +99,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
-            checkConfig( mCodec.getInputFormat());
+            checkConfigureParams(vc, mCodec.getInputFormat());
             mInputSurfaceReference.set(mCodec.createInputSurface());
             mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mInputSurface.makeCurrent();
