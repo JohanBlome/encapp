@@ -10,6 +10,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -28,8 +29,16 @@ public class JSONTestCaseBuilder {
         if (vcs == null) vcs = new Vector<>();
         if (session == null) session = new Vector<>();
         Path path = FileSystems.getDefault().getPath("", filename);
-        Log.d(TAG, "Path: "+path.getFileName());
-        String json = new String(Files.readAllBytes(path));
+        Log.d(TAG, "Path: "+path.getFileName() + ", " + path.toString());
+        File file = path.toFile();
+        Log.d(TAG, "File exists: " + file.exists() + ", can read: " + file.canRead());
+        String json = "";
+        try {
+            json = new String(Files.readAllBytes(path));
+        } catch (Exception ex) {
+            Log.d(TAG, "Failed to read test spec: " + ex.getMessage());
+            return false;
+        }
         JSONTokener tokenizer = new JSONTokener(json);
 
         // Some toplevel settings

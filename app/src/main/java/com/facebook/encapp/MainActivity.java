@@ -5,8 +5,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -51,6 +54,17 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
 
+        if ( Build.VERSION.SDK_INT >= 30) {
+            Log.d(TAG, "Check ExternalStorageManager");
+            Assert.assertTrue("Failed to get permission as ExternalStorageManager", Environment.isExternalStorageManager());
+            //request for the permission
+            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+            Uri uri = Uri.fromParts("package", getPackageName(), null);
+            intent.setData(uri);
+            startActivity(intent);
+        }
+
+        Log.d(TAG, "Passed all permission checks");
         if (getInstrumentedTest()) {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
 
@@ -212,7 +226,9 @@ public class MainActivity extends AppCompatActivity {
             refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
         }
 
-        Log.d(TAG, "file: " + filename);
+        if (filename != null) {
+            Log.d(TAG, "override file: " + filename);
+        }
 
         /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -221,7 +237,6 @@ public class MainActivity extends AppCompatActivity {
                 if (mExtraDataHashMap.containsKey("test")) {
                     Vector<SessionParam> sessionSettings = new Vector<>();
                     vcCombinations = new Vector<>();
-                    Log.d(TAG, "cases: "+vcCombinations);
                     if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sessionSettings)) {
                         Assert.assertTrue("Failed to parse tests", false);
                     }
