@@ -97,7 +97,7 @@ class BufferEncoder {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
 
 
-            CheckConfig( mCodec.getInputFormat());
+            checkConfig( mCodec.getInputFormat());
 
 
         } catch (IOException iox) {
@@ -213,7 +213,7 @@ class BufferEncoder {
                 Log.d(TAG, "flags = " + (info.flags));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
-                    CheckConfig(oformat);
+                    checkConfig(oformat);
                     //There seems to be a bug so that this key is no set (but used).
                     oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
                     oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
@@ -267,7 +267,7 @@ class BufferEncoder {
         return "";
     }
 
-    protected void CheckConfig(MediaFormat format) {
+    protected void checkConfig(MediaFormat format) {
         Log.d(TAG, "Check config: version = "+Build.VERSION.SDK_INT );
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
