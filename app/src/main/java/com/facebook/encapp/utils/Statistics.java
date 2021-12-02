@@ -32,8 +32,10 @@ public class Statistics {
 
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
+    int mEncodingProcessingFrames = 0;
     TestParams mVc;
     Date mStartDate;
+    SystemLoad mLoad = new SystemLoad();
 
     public Statistics(String desc, TestParams vc) {
         mDesc = desc;
@@ -70,16 +72,20 @@ public class Statistics {
 
     public void start(){
         mStartTime = System.nanoTime();
+        mLoad.start();
     }
 
     public void stop(){
         mStopTime = System.nanoTime();
+        mLoad.stop();
     }
 
     public void startEncodingFrame(long pts) {
         FrameInfo frame = new FrameInfo(pts);
         frame.start();
         mEncodingFrames.put(Long.valueOf(pts), frame);
+        mEncodingProcessingFrames += 1;
+        Log.d(TAG, "Start processing, in flight: "+ mEncodingProcessingFrames);
     }
 
     public void stopEncodingFrame(long pts, long size, boolean isIFrame) {
@@ -89,6 +95,8 @@ public class Statistics {
             frame.setSize(size);
             frame.isIFrame(isIFrame);
         }
+        mEncodingProcessingFrames -= 1;
+        Log.d(TAG, "Stopped processing, in flight: "+ mEncodingProcessingFrames);
     }
 
     public void startDecodingFrame(long pts, long size, int flags) {
@@ -255,7 +263,9 @@ public class Statistics {
                 obj.put("iframe", (info.isIFrame())? 1: 0);
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
-                obj.put("proctime", (int)(info.getProcessingTime()));
+                obj.put("proctime", info.getProcessingTime());
+                obj.put("starttime",info.getStartTime());
+                obj.put("stoptime", info.getStopTime());
                 jsonArray.put(obj);
             }
             json.put("frames", jsonArray);
@@ -276,7 +286,9 @@ public class Statistics {
                         obj.put("flags", info.getFlags());
                         obj.put("size", info.getSize());
                         obj.put("pts", info.getPts());
-                        obj.put("proctime", (int) (info.getProcessingTime()));
+                        obj.put("proctime", info.getProcessingTime());
+                        obj.put("starttime", info.getStartTime());
+                        obj.put("stoptime", info.getStopTime());
                         jsonArray.put(obj);
                     } else {
                         Log.d(TAG, "Decode time is negative. " + proc_time + ", start = " +
@@ -285,6 +297,45 @@ public class Statistics {
                 }
                 json.put("decoded_frames", jsonArray);
             }
+
+            //GPU info
+            JSONObject gpuData = new JSONObject();
+            HashMap<String, String> gpuInfo = mLoad.getGPUInfo();
+
+            for (String key: gpuInfo.keySet()) {
+                gpuData.put(key, gpuInfo.get(key));
+            }
+
+            counter = 0;
+            jsonArray = new JSONArray();
+
+            int[] gpuload = mLoad.getGPULoadPercentagePerTimeUnit();
+            float timer = (float)(1.0/mLoad.getSampleFrequency());
+            obj = null;
+            for (int load : gpuload) {
+                obj = new JSONObject();
+                int msec = Math.round(counter * timer * 1000);
+                obj.put("time_sec", msec/1000.0);
+                obj.put("load_percentage", load);
+                counter++;
+                jsonArray.put(obj);
+            }
+            gpuData.put("gpu_load_percentage", jsonArray);
+            obj = null;
+            jsonArray = new JSONArray();
+            counter = 0;
+            for (String clock : mLoad.getGPUClockFreqPerTimeUnit()) {
+                obj = new JSONObject();
+
+                int msec = Math.round(counter * timer * 1000);
+                obj.put("time_sec", msec/1000.0);
+                obj.put("clock_MHz", clock);
+                counter++;
+                jsonArray.put(obj);
+            }
+            gpuData.put("gpu_clock_freq", jsonArray);
+            json.put("gpu_data", gpuData);
+
             writer.write(json.toString(2));
         } catch (JSONException e) {
             e.printStackTrace();

@@ -54,4 +54,8 @@ public class FrameInfo {
         return mStopTime - mStartTime;
     }
 
+    public long getStartTime() { return mStartTime;}
+    public long getStopTime() { return mStopTime;}
+
+
 }
