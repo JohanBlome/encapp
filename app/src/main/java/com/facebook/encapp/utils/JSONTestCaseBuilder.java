@@ -46,7 +46,13 @@ public class JSONTestCaseBuilder {
         try {
             while (tokenizer.more()) {
                 Log.d(TAG, "get next value");
-                Object value = tokenizer.nextValue();
+                Object value = null;
+                try {
+                    value = tokenizer.nextValue();
+                } catch (JSONException jex) {
+                    // the json parse is very sensitive to how the file ends...
+                    continue;
+                }
                 // Each test case is two levels deep at most
                 if (value instanceof JSONArray) {
                     JSONArray a1 = (JSONArray) value;

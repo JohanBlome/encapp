@@ -7,7 +7,7 @@ public class FrameInfo {
     long mStartTime;
     long mStopTime;
     boolean mIsIframe;
-
+    int mFlags;
 
     public FrameInfo(long pts) {
         mPts = pts;
@@ -33,6 +33,11 @@ public class FrameInfo {
         return mIsIframe;
     }
 
+    public int getFlags() {return mFlags;}
+
+    public void setFlags(int flags) {
+        mFlags = flags;
+    }
     public void start(){
         mStartTime = System.nanoTime();
     }

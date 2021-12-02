@@ -107,6 +107,8 @@ public class SurfaceTranscoder extends BufferEncoder {
             mOutputSurface = new OutputSurface();
             mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
             mDecoder.start();
+            mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
+            mStats.setEncoderMediaFormat(mCodec.getInputFormat());
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
             return "Failed to create codec";
@@ -158,6 +160,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     if (size > 0) {
+                        mStats.startDecodingFrame(mExtractor.getSampleTime(), mExtractor.getSampleSize(), mExtractor.getSampleFlags());
                         mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), mExtractor.getSampleFlags());
                     }
                     boolean eof = !mExtractor.advance();
@@ -167,7 +170,11 @@ public class SurfaceTranscoder extends BufferEncoder {
 
                         if (current_loop > loop) {
                             Log.d(TAG, "End of stream!");
-                            mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            try {
+                                mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            } catch (MediaCodec.CodecException cex) {
+                                Log.d(TAG, "End of stream: "+ cex.getMessage());
+                            }
                             break;
                         }
                         Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
@@ -185,7 +192,8 @@ public class SurfaceTranscoder extends BufferEncoder {
                 if (info.size > 0) {
                     Log.d(TAG, "Check runtime parmeters: " + inFramesCount + ", param size = " + mRuntimeParams.size());
                     setRuntimeParameters(inFramesCount);
-
+                    long pts = info.presentationTimeUs;
+                    mStats.stopDecodingFrame(pts);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int) ((float) (inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int) ((float) ((inFramesCount + 1)) / mKeepInterval);
@@ -197,7 +205,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mDecoder.releaseOutputBuffer(index, true);
                         mOutputSurface.awaitNewImage();
                         mOutputSurface.drawImage();
-                        long pts = info.presentationTimeUs;
+
                         if (pts > last_pts) {
                             last_pts = pts;
                         } else {
@@ -207,7 +215,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         //egl have time in ns
                         mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
-                        mStats.startFrame(pts);
+                        mStats.startEncodingFrame(pts);
                     }
 
                 }
@@ -238,7 +246,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     break;
                 } else {
                     boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                    mStats.stopFrame(info.presentationTimeUs, info.size, keyFrame);
+                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
 
                     if (keyFrame) {
                         Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);

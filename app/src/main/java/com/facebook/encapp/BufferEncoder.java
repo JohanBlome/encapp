@@ -98,7 +98,7 @@ class BufferEncoder {
 
 
             checkConfigureParams(vc, mCodec.getInputFormat());
-
+            mStats.setEncoderMediaFormat(mCodec.getInputFormat());
 
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
@@ -229,7 +229,7 @@ class BufferEncoder {
                     break;
                 } else {
                     boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                    mStats.stopFrame(info.presentationTimeUs, info.size, keyFrame);
+                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
                     if (keyFrame) {
                         Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);
                     }
@@ -288,7 +288,7 @@ class BufferEncoder {
         } else if (read == size) {
             mFramesAdded++;
             long ptsUsec = computePresentationTime(frameCount);
-            mStats.startFrame(ptsUsec);
+            mStats.startEncodingFrame(ptsUsec);
             Log.d(TAG, "Queue frame " + frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {

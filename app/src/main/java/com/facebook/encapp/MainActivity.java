@@ -451,8 +451,8 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         try {
                             Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                            Log.d(TAG, "Total frames: " + stats.getFrameCount());
-                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getFrameCount()));
+                            Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
+                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
                         } catch (ArithmeticException aex) {
                             Log.e(TAG, aex.getMessage());
                         }
