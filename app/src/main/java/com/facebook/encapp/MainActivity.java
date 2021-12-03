@@ -204,9 +204,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        int concurrent = 1;
+        int overrideConcurrent = 1;
         if (mExtraDataHashMap.containsKey("conc")) {
-            concurrent = Integer.parseInt(mExtraDataHashMap.get("conc"));
+            overrideConcurrent = Integer.parseInt(mExtraDataHashMap.get("conc"));
         }
 
         boolean tmp = true; // By default always write encoded file
@@ -244,7 +244,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     vcCombinations = buildSettingsFromCommandline();
                 }
-                Log.d(TAG, "Test params collected - start # " + vcCombinations.size() + " of tests, concurrent = " + concurrent);
+                Log.d(TAG, "Test params collected - start # " + vcCombinations.size() + " of tests, override concurrent = " + overrideConcurrent);
                 for (TestParams vc : vcCombinations) {
                     Log.d(TAG, "filename is " + filename + " swap out " + vc.getInputfile());
                     if (filename != null) {
@@ -254,6 +254,8 @@ public class MainActivity extends AppCompatActivity {
                     if (refFrameSize != null) {
                         vc.setReferenceSize(refFrameSize);
                     }
+                    int vcConc = vc.getConcurrentCodings();
+                    int concurrent = (vcConc > overrideConcurrent)?vcConc: overrideConcurrent;
                     if (concurrent > 1) {
                         while (mEncodingsRunning >= concurrent) {
                             try {

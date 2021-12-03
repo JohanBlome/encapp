@@ -227,7 +227,7 @@ public class JSONTestCaseBuilder {
                                                                         testParams.setExtraConfigure(config_extra);
                                                                         testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
                                                                         testParams.setLoopCount(Integer.parseInt(enc_loop));
-
+                                                                        testParams.setConcurrentCodings(Integer.parseInt(conc));
                                                                         vc.add(testParams);
 
                                                                     }

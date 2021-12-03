@@ -50,6 +50,7 @@ public class TestParams {
     private String mDescription = "";
     private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
     ArrayList<Object> mRuntimeParams;
+    private int mConcurrentCodings = 1;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -420,6 +421,15 @@ public class TestParams {
     public ArrayList<ConfigureParam> getExtraConfigure() {
         return mExtraConfigure;
     }
+
+    public void setConcurrentCodings(int count) {
+        this.mConcurrentCodings = count;
+    }
+
+    public int getConcurrentCodings() {
+        return mConcurrentCodings;
+    }
+
 }
 
 
