@@ -25,6 +25,8 @@ public class SystemLoad {
         if (tmp == "") {
             Log.e(TAG, "Could not read system data, \"adb root && adb shell setenforce 0\" needed");
             return;
+        } else {
+            Log.e(TAG, "GPU model: "+tmp);
         }
         mGPUInfo.put("gpu_model", tmp.trim());
         tmp = readSystemData("sys/class/kgsl/kgsl-3d0/min_clock_mhz");
@@ -32,13 +34,16 @@ public class SystemLoad {
         tmp = readSystemData("/sys/class/kgsl/kgsl-3d0/max_clock_mhz");
         mGPUInfo.put("gpu_max_clock", tmp.trim());
 
-
+        if (mCannotRead) {
+            Log.e(TAG, "Could not read system files, quit SystemLoad");
+            return;
+        }
         synchronized (started) {
             started = Boolean.TRUE;
             Thread t = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    while (started) {
+                    while (started & !mCannotRead) {
                         String tmp;
                         long sleeptime = (long) (1000.0 / mFrequencyHz);
                         synchronized (started) {
@@ -84,6 +89,7 @@ public class SystemLoad {
         } catch (Exception e) {
             e.printStackTrace();
             Log.e(TAG, "Failed to read: " + path);
+            mCannotRead = true;
         } finally {
             if (reader != null) {
                 try {
@@ -110,8 +116,11 @@ public class SystemLoad {
             Matcher m = p.matcher(line);
 
             if (m.find()) {
-                int val = Integer.parseInt(m.group(0));
-                ret[counter++] = val;
+                String tmp = m.group(0);
+                if (tmp.length() > 0) {
+                    int val = Integer.parseInt(m.group(0));
+                    ret[counter++] = val;
+                }
             } else {
                 Log.d(TAG, "Failed to parse: " + line);
             }

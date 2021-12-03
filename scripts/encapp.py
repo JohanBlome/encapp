@@ -203,7 +203,7 @@ def main(argv):
             # get date and time and format it
             now = datetime.now()
             dt_string = now.strftime('%m-%d-%Y_%H_%M')
-            workdir = f'{options.desc}_{device_model}_{dt_string}'
+            workdir = f'{options.desc.replace(" ", "_")}_{device_model}_{dt_string}'
             if options.output is not None:
                 workdir = options.output
             os.system('mkdir -p ' + workdir)

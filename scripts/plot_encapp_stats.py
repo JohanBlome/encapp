@@ -199,15 +199,18 @@ def main():
                 decoded_data['meanproctime'] = mean
 
             #See if there is gpu information
-            gpu_data = pd.DataFrame(alldata['gpu_data'])
-            if (len(gpu_data) > 0):
-                gpu_model = alldata['gpu_data']['gpu_model']
-                gpu_max_clock = int(alldata['gpu_data']['gpu_max_clock'])
-                #print("codec = " + str(alldata['decoder_media_format']['mime']) + ", mean = "  + str(mean/1000000))
-                gpuload_data = pd.DataFrame(alldata['gpu_data']['gpu_load_percentage'])
-                gpuclock_data = pd.DataFrame(alldata['gpu_data']['gpu_clock_freq'])
-                gpuclock_data['clock_perc'] = gpuclock_data['clock_MHz'].astype(float)*100.0/gpu_max_clock
-                plot_gpuprocessing(gpuload_data, gpuclock_data, gpu_model, options, gpu_max_clock)
+            try:
+                gpu_data = pd.DataFrame(alldata['gpu_data'])
+                if (len(gpu_data) > 0):
+                    gpu_model = alldata['gpu_data']['gpu_model']
+                    gpu_max_clock = int(alldata['gpu_data']['gpu_max_clock'])
+                    #print("codec = " + str(alldata['decoder_media_format']['mime']) + ", mean = "  + str(mean/1000000))
+                    gpuload_data = pd.DataFrame(alldata['gpu_data']['gpu_load_percentage'])
+                    gpuclock_data = pd.DataFrame(alldata['gpu_data']['gpu_clock_freq'])
+                    gpuclock_data['clock_perc'] = gpuclock_data['clock_MHz'].astype(float)*100.0/gpu_max_clock
+                    plot_gpuprocessing(gpuload_data, gpuclock_data, gpu_model, options, gpu_max_clock)
+            except Exception:
+                pass
         if accum_data is None:
             accum_data = data
         else:
