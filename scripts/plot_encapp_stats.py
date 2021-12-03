@@ -176,27 +176,31 @@ def main():
             print("__")
             
             #See if there is decoding information
-            decoded_data = pd.DataFrame(alldata['decoded_frames'])
-            if (len(decoded_data) > 0):
-                try:
-                    decoded_data['codec'] = alldata['decoder_media_format']['mime']
-                except Exception:
-                    print("Failed to read decoder data")
-                    decoded_data['codec'] = "unknown codec"
-                
-                try:
-                    #decoded_data['description'] = alldata['description']
-                    #decoded_data['bitrate'] = alldata['settings']['bitrate']
-                    decoded_data['height'] = alldata['decoder_media_format']['height']
-                except Exception:
-                    print("Failed to read decoder data")
-                    decoded_data['height'] = "unknown height"
-                
-                if len(decoded_data.loc[decoded_data['proctime'] < 0]):
-                    print("Have negative time...")
-                decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
-                mean = sum(decoded_data['proctime']/framecount)
-                decoded_data['meanproctime'] = mean
+            decoded_data = []
+            try:
+                decoded_data = pd.DataFrame(alldata['decoded_frames'])
+                if (len(decoded_data) > 0):
+                    try:
+                        decoded_data['codec'] = alldata['decoder_media_format']['mime']
+                    except Exception:
+                        print("Failed to read decoder data")
+                        decoded_data['codec'] = "unknown codec"
+
+                    try:
+                        #decoded_data['description'] = alldata['description']
+                        #decoded_data['bitrate'] = alldata['settings']['bitrate']
+                        decoded_data['height'] = alldata['decoder_media_format']['height']
+                    except Exception:
+                        print("Failed to read decoder data")
+                        decoded_data['height'] = "unknown height"
+
+                    if len(decoded_data.loc[decoded_data['proctime'] < 0]):
+                        print("Have negative time...")
+                    decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
+                    mean = sum(decoded_data['proctime']/framecount)
+                    decoded_data['meanproctime'] = mean
+            except Exception:
+                pass
 
             #See if there is gpu information
             try:
