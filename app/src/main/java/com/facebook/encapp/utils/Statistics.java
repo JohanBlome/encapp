@@ -161,6 +161,9 @@ public class Statistics {
 
     private JSONObject getSettingsFromMediaFormat(MediaFormat format) {
         JSONObject mediaformat = new JSONObject();
+        if (format == null) {
+            return mediaformat;
+        }
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
             for (String feature: features) {

@@ -1,10 +1,5 @@
 [
     {
-        "session": [
-            {
-                "conc": 1
-            }
-        ],
         "tests": [
             {
                 "description": "Bitrates",
@@ -27,7 +22,8 @@
                 ],
                 "bitrates": [
                     200,
-                    500
+                    500,
+                    1000
                 ],
                 "i_intervals": [
                     2
@@ -37,18 +33,14 @@
                 ],
                 "configure": [
                     {
-                        "name": "tl-schema",
-                        "type": "string",
-                        "setting": "android.generic.2"
-                    },
-                    {
-                        "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
+                        "name": "vendor.qti-ext-enc-low-latency.enable",
                         "type": "int",
-                        "setting": "2"
+                        "setting": "1"
                     }
                 ],
                 "duration": 10,
-                "enc_loop": 0
+                "enc_loop": 0,
+                "conc": 2
             },
             {
                 "description": "Encoders",
@@ -62,7 +54,8 @@
                 "input_fps": "30",
                 "codecs": [
                     "encoder.avc",
-                    "encoder.hevc"
+                    "encoder.hevc",
+                    "vp8"
                 ],
                 "encode_resolutions": [
                     "320x180"
@@ -81,107 +74,14 @@
                 ],
                 "configure": [
                     {
-                        "name": "tl-schema",
-                        "type": "string",
-                        "setting": "android.generic.2"
+                        "name": "vendor.qti-ext-enc-low-latency.enable",
+                        "type": "int",
+                        "setting": "1"
                     }
                 ],
                 "duration": 10,
-                "enc_loop": 0
-            },
-            {
-                "description": "Dynamic LTR",
-                "input_files": [
-                    "../media/320x180_900fr_nv12.yuv",
-                    "../media/320x180_900fr_avc.mp4"
-                ],
-                "use_surface_enc": 0,
-                "input_format": "raw",
-                "input_resolution": "320x180",
-                "input_fps": "30",
-                "codecs": [
-                    "encoder.avc"
-                ],
-                "encode_resolutions": [
-                    "320x180"
-                ],
-                "rc_modes": [
-                    "vbc"
-                ],
-                "bitrates": [
-                    1000
-                ],
-                "i_intervals": [
-                    2
-                ],
-                "i_frame_sizes": [
-                    "unlimited"
-                ],
-                "configure": [
-                    {
-                        "name": "tl-schema",
-                        "type": "string",
-                        "setting": "android.generic.2"
-                    },
-                    {
-                        "name": "vendor.qti-ext-enc-caps-ltr.max-count",
-                        "type": "int",
-                        "setting": "6"
-                    },
-                    {
-                        "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
-                        "type": "int",
-                        "setting": "2"
-                    }
-                ],
-                "runtime_parameters": [
-                    {
-                        "name": "vendor.qti-ext-enc-ltr.mark-frame",
-                        "type": "int",
-                        "settings": [
-                            {
-                                "0": "10"
-                            },
-                            {
-                                "1": "20"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "vendor.qti-ext-enc-ltr.use-frame",
-                        "type": "int",
-                        "settings": [
-                            {
-                                "40": "0"
-                            },
-                            {
-                                "60": "1"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "video-bitrate",
-                        "type": "int",
-                        "settings": [
-                            {
-                                "30": "700"
-                            },
-                            {
-                                "60": "2500"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "request-sync",
-                        "type": "int",
-                        "settings": [
-                            "34",
-                            "98"
-                        ]
-                    }
-                ],
-                "duration": 10,
-                "enc_loop": 0
+                "enc_loop": 0,
+                "conc": 2
             }
         ]
     }

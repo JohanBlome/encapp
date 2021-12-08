@@ -63,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
             intent.setData(uri);
             startActivity(intent);
         }
-
         Log.d(TAG, "Passed all permission checks");
         if (getInstrumentedTest()) {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
@@ -256,6 +255,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                     int vcConc = vc.getConcurrentCodings();
                     int concurrent = (vcConc > overrideConcurrent)?vcConc: overrideConcurrent;
+                    Log.d(TAG, "Conccurent for case is " + concurrent);
                     if (concurrent > 1) {
                         while (mEncodingsRunning >= concurrent) {
                             try {
@@ -377,6 +377,7 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setReferenceFPS(ref_fps);
                                 constraints.setReferenceSize(SizeUtils.parseXString(ref_resolution));
                                 constraints.setVideoEncoderIdentifier(encoders[eC]);
+                                Log.d(TAG, "Set bitrate mode: " + mod[mC] +", mods = "+mod.length);
                                 constraints.setBitrateMode(mod[mC]);
 
                                 constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));

@@ -171,6 +171,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         if (current_loop > loop) {
                             Log.d(TAG, "End of stream!");
                             try {
+                                mStats.startDecodingFrame(mExtractor.getSampleTime(), mExtractor.getSampleSize(), mExtractor.getSampleFlags());
                                 mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                             } catch (MediaCodec.CodecException cex) {
                                 Log.d(TAG, "End of stream: "+ cex.getMessage());
@@ -190,10 +191,10 @@ public class SurfaceTranscoder extends BufferEncoder {
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    Log.d(TAG, "Check runtime parmeters: " + inFramesCount + ", param size = " + mRuntimeParams.size());
-                    setRuntimeParameters(inFramesCount);
                     long pts = info.presentationTimeUs;
                     mStats.stopDecodingFrame(pts);
+                    Log.d(TAG, "Check runtime parmeters: " + inFramesCount + ", param size = " + mRuntimeParams.size());
+                    setRuntimeParameters(inFramesCount);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int) ((float) (inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int) ((float) ((inFramesCount + 1)) / mKeepInterval);
@@ -231,6 +232,8 @@ public class SurfaceTranscoder extends BufferEncoder {
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
             } else if (index >= 0) {
+                boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
+                mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
                 ByteBuffer data = mCodec.getOutputBuffer(index);
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
@@ -245,9 +248,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
                 } else {
-                    boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
-
                     if (keyFrame) {
                         Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);
                     }

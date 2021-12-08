@@ -135,7 +135,7 @@ public class JSONTestCaseBuilder {
                                                 codecs = getStringArray((JSONArray) data_object);
                                             } else if (case_key.equals("fps")) {
                                                 fps = getStringArray((JSONArray) data_object);
-                                            } else if (case_key.equals("mod")) {
+                                            } else if (case_key.equals("rc_modes")) {
                                                 mod = getStringArray((JSONArray) data_object);
                                             } else if (case_key.equals("configure")) {
                                                 JSONArray config_array = (JSONArray) data_object;
@@ -215,6 +215,8 @@ public class JSONTestCaseBuilder {
                                                                         } else {
                                                                             testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC])));
                                                                         }
+                                                                        Log.d(TAG, "Set bitrate mode: " + mod[mC] +", mods = "+mod.length);
+                                                                        testParams.setBitrateMode(mod[mC]);
                                                                         testParams.setKeyframeInterval(Integer.parseInt(i_intervals[kC]));
                                                                         testParams.setFPS(Integer.parseInt(fps[fC]));
                                                                         testParams.setReferenceFPS(Integer.parseInt(input_fps));

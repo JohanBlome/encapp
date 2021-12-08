@@ -198,6 +198,8 @@ class BufferEncoder {
                     }
                     numBytesSubmitted += size;
                     // if (size == 0) break;
+                } else {
+                    Log.w(TAG, "dequeueInputBuffer, no index, " + index);
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -207,6 +209,7 @@ class BufferEncoder {
 
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
+                Log.w(TAG, "dequeueoutputBuffer, Try again");
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
