@@ -1,5 +1,10 @@
 #!/usr/local/bin/python3
 
+"""Python script to run ENCAPP tests on Android and collect results.
+The script will create a directory based on device model and date,
+and save encoded video and rate distortion results in the directory
+"""
+
 import os
 import json
 import sys
@@ -29,32 +34,32 @@ KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
 
 sample_config_json_data = [
     [{
-    "session": 
-        [{
-            "conc": 1
-        }],
-    "tests":
-        [{
-          KEY_NAME_DESCRIPTION: 'sample',
-          KEY_NAME_INPUT_FILES: [''],
-          KEY_NAME_INPUT_FORMAT: 'mp4',
-          KEY_NAME_INPUT_RESOLUTION: '1280x720',
-          KEY_NAME_CODECS: ['hevc'],
-          KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
-          KEY_NAME_RC_MODES: ['cbr'],
-          KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
-          KEY_NAME_I_INTERVALS: [2],
-          # DEFAULT, MEDIUM, HUGE, UNLIMITED
-          KEY_NAME_I_FRAME_SIZES:['unlimited'],
-          KEY_NAME_DURATION: 10,
-          KEY_NAME_ENC_LOOP: 0,
-          KEY_NAME_CONFIGURE: [''],
-          KEY_NAME_RUNTIME_PARAMETER: ['']
-        }]
+        "session":
+            [{
+                "conc": 1
+            }],
+        "tests":
+            [{
+              KEY_NAME_DESCRIPTION: 'sample',
+              KEY_NAME_INPUT_FILES: [''],
+              KEY_NAME_INPUT_FORMAT: 'mp4',
+              KEY_NAME_INPUT_RESOLUTION: '1280x720',
+              KEY_NAME_CODECS: ['hevc'],
+              KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
+              KEY_NAME_RC_MODES: ['cbr'],
+              KEY_NAME_BITRATES: [500, 1000, 1500, 2000, 2500],
+              KEY_NAME_I_INTERVALS: [2],
+              # DEFAULT, MEDIUM, HUGE, UNLIMITED
+              KEY_NAME_I_FRAME_SIZES:['unlimited'],
+              KEY_NAME_DURATION: 10,
+              KEY_NAME_ENC_LOOP: 0,
+              KEY_NAME_CONFIGURE: [''],
+              KEY_NAME_RUNTIME_PARAMETER: ['']
+            }]
     }]
 ]
 
-TEST_CLASS_NAME = "com.facebook.encapp.CodecValidationInstrumentedTest"
+TEST_CLASS_NAME = 'com.facebook.encapp.CodecValidationInstrumentedTest'
 JUNIT_RUNNER_NAME = \
     'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
@@ -64,13 +69,13 @@ RD_RESULT_FILE_NAME = 'rd_results.json'
 def install_app(serial_no):
     script_path = os.path.realpath(__file__)
     path, __ = os.path.split(script_path)
-    run_cmd(f"adb -s {serial_no} install -g "
-            f"{path}/../app/build/outputs/apk/androidTest/debug/"
-            "com.facebook.encapp-v1.0-debug-androidTest.apk ")
+    run_cmd(f'adb -s {serial_no} install -g '
+            f'{path}/../app/build/outputs/apk/androidTest/debug/'
+            'com.facebook.encapp-v1.0-debug-androidTest.apk ')
 
-    run_cmd(f"adb -s {serial_no} install -g "
-            f"{path}/../app/build/outputs/apk/debug/"
-            "com.facebook.encapp-v1.0-debug.apk")
+    run_cmd(f'adb -s {serial_no} install -g '
+            f'{path}/../app/build/outputs/apk/debug/'
+            'com.facebook.encapp-v1.0-debug.apk')
 
 
 def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
@@ -81,54 +86,54 @@ def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
     if test_files is None:
         raise Exception('No test files')
 
-    print(f"{test_files}")
+    print(f'{test_files}')
 
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
-    run_cmd(f"adb -s {serial_no} rm /sdcard/encapp_*")
-    run_cmd(f"adb -s {serial_no} push {json_path} /sdcard/")
+    run_cmd(f'adb -s {serial_no} rm /sdcard/encapp_*')
+    run_cmd(f'adb -s {serial_no} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
-    print(f"json folder: {json_folder}")
+    print(f'json folder: {json_folder}')
 
     for test_file in test_files:
-        session_params = test_file.get("session")
-        tests = test_file.get("tests")
-        print(f"session: {session_params}")
-        print(f"tests: {tests}")
+        session_params = test_file.get('session')
+        tests = test_file.get('tests')
+        print(f'session: {session_params}')
+        print(f'tests: {tests}')
         for test in tests:
             input_files = test.get(KEY_NAME_INPUT_FILES)
-            print(f"Input files: {input_files}")
+            print(f'Input files: {input_files}')
             if input_files is not None:
                 for fl in input_files:
                     if len(json_folder) > 0:
-                        path = f"{json_folder}/{fl}"
+                        path = f'{json_folder}/{fl}'
                     else:
-                        path = f"{fl}"
-                    print(f"Media path: {path}")
+                        path = f'{fl}'
+                    print(f'Media path: {path}')
                     if exists(path):
-                        run_cmd(f"adb -s {serial_no} push {path} /sdcard/")
+                        run_cmd(f'adb -s {serial_no} push {path} /sdcard/')
                     else:
-                        print(f"Media file is missing: {path}")
+                        print(f'Media file is missing: {path}')
                         exit(0)
 
-    run_cmd(f"adb -s {serial_no} shell am instrument -w -r -e test "
-            f"/sdcard/{filename} {JUNIT_RUNNER_NAME}")
+    run_cmd(f'adb -s {serial_no} shell am instrument -w -r -e test '
+            f'/sdcard/{filename} {JUNIT_RUNNER_NAME}')
     adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
     ret, stdout, stderr = run_cmd(adb_cmd)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
 
-    base_file_name = os.path.basename(json_path).rsplit(".", 1)[0]
-    sub_dir = '_'.join([base_file_name, "files"])
-    output_dir = f"{workdir}/{sub_dir}/"
-    run_cmd(f"mkdir {output_dir}")
+    base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
+    sub_dir = '_'.join([base_file_name, 'files'])
+    output_dir = f'{workdir}/{sub_dir}/'
+    run_cmd(f'mkdir {output_dir}')
 
     for file in output_files:
         if file == '':
-            print("No file found")
+            print('No file found')
             continue
         # pull the output file
-        print(f"pull {file} to {output_dir}")
+        print(f'pull {file} to {output_dir}')
 
         adb_cmd = f'adb -s {serial_no} pull /sdcard/{file} {output_dir}'
         run_cmd(adb_cmd)
@@ -137,7 +142,7 @@ def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
         adb_cmd = f'adb -s {serial_no} shell rm /sdcard/{file}'
         run_cmd(adb_cmd)
 
-    print("Done")
+    print('Done')
 
 
 def list_codecs(serial_no, install):
@@ -151,25 +156,22 @@ def list_codecs(serial_no, install):
     run_cmd(adb_cmd)
     adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/codecs.txt .'
     run_cmd(adb_cmd)
-    with open("codecs.txt", 'r') as codec_file:
+    with open('codecs.txt', 'r') as codec_file:
         lines = codec_file.readlines()
         for line in lines:
-            print(line.split("\n")[0]);
-        print("File is available in current dir");
+            print(line.split('\n')[0])
+        print('File is available in current dir')
 
 
 def get_options(argv):
-    parser = argparse.ArgumentParser(description='A Python script to run \
-    ENCAPP tests on Android and collect results. \
-    The script will create a directory based on device model and date, \
-    and save encoded video and rate distortion results in the directory')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('test', nargs='*', help='Test cases in JSON format.')
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('--config', help='Generate a sample config \
                          file in json format')
     parser.add_argument('-l', '--list_codecs', action='store_true',
                         help='List codecs the devices support')
-    parser.add_argument('--desc', default="encapp", help='Test description')
+    parser.add_argument('--desc', default='encapp', help='Test description')
     parser.add_argument('-o', '--output', help='Name output directory')
     parser.add_argument('--install', default='true',
                         type=bool,
@@ -203,13 +205,14 @@ def main(argv):
             # get date and time and format it
             now = datetime.now()
             dt_string = now.strftime('%m-%d-%Y_%H_%M')
-            workdir = f'{options.desc.replace(" ", "_")}_{device_model}_{dt_string}'
+            workdir = (
+                f'{options.desc.replace(" ", "_")}_{device_model}_{dt_string}')
             if options.output is not None:
                 workdir = options.output
             os.system('mkdir -p ' + workdir)
             for test in options.test:
                 with open(test, 'r') as fp:
-                    print(f"Load {test}, {options.install}")
+                    print(f'Load {test}, {options.install}')
                     tests_json = json.load(fp)
                     run_encode_tests(tests_json,
                                      test,
