@@ -103,6 +103,8 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("test");
     private static final String TEST_UI_HOLD_TIME_SEC =
             InstrumentationRegistry.getArguments().getString("ui_hold_sec");
+    private static final String OLD_AUTH_METHOD=
+            InstrumentationRegistry.getArguments().getString("old_auth");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
@@ -207,6 +209,10 @@ public class CodecValidationInstrumentedTest {
         if (TEST_UI_HOLD_TIME_SEC != null) {
             mExtraDataHashMap.put("ui_hold_sec", TEST_UI_HOLD_TIME_SEC);
             Log.e(TAG, "ui_hold_sec config: " + TEST_UI_HOLD_TIME_SEC);
+        }
+        if (OLD_AUTH_METHOD != null) {
+            mExtraDataHashMap.put("old_auth", OLD_AUTH_METHOD);
+            Log.e(TAG, "old_auth config: " + OLD_AUTH_METHOD);
         }
     }
 

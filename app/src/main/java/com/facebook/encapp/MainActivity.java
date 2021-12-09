@@ -53,16 +53,26 @@ public class MainActivity extends AppCompatActivity {
             int REQUEST_ALL_PERMISSIONS = 0x4562;
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
-
-        if ( Build.VERSION.SDK_INT >= 30) {
+        // Need to check permission strategy
+        getInstrumentedTest();
+        boolean useNewMethod = true;
+        if (mExtraDataHashMap != null && mExtraDataHashMap.size() > 0) {
+            String old_method = mExtraDataHashMap.get("old_auth");
+            Log.d(TAG, "old auth = "+old_method);
+            if (old_method != null) {
+                useNewMethod = (old_method.equals("true") || old_method.equals("1"))?false: true;
+            }
+        }
+        if ( Build.VERSION.SDK_INT >= 30 && useNewMethod && ! Environment.isExternalStorageManager()) {
             Log.d(TAG, "Check ExternalStorageManager");
-            Assert.assertTrue("Failed to get permission as ExternalStorageManager", Environment.isExternalStorageManager());
             //request for the permission
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             Uri uri = Uri.fromParts("package", getPackageName(), null);
             intent.setData(uri);
             startActivity(intent);
+            Assert.assertTrue("Failed to get permission as ExternalStorageManager", Environment.isExternalStorageManager());
         }
+
         Log.d(TAG, "Passed all permission checks");
         if (getInstrumentedTest()) {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
