@@ -12,7 +12,7 @@ import argparse
 import re
 
 from encapp_tests import run_cmd
-from encapp_tests import check_device
+from encapp_tests import get_device_info
 from datetime import datetime
 from os.path import exists
 
@@ -66,22 +66,22 @@ ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
 
-def install_app(serial_no):
+def install_app(serial):
     script_path = os.path.realpath(__file__)
     path, __ = os.path.split(script_path)
-    run_cmd(f'adb -s {serial_no} install -g '
+    run_cmd(f'adb -s {serial} install -g '
             f'{path}/../app/build/outputs/apk/androidTest/debug/'
             'com.facebook.encapp-v1.0-debug-androidTest.apk ')
 
-    run_cmd(f'adb -s {serial_no} install -g '
+    run_cmd(f'adb -s {serial} install -g '
             f'{path}/../app/build/outputs/apk/debug/'
             'com.facebook.encapp-v1.0-debug.apk')
 
 
-def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
+def run_encode_tests(test_files, json_path, model, serial, test_desc,
                      install, workdir):
     if install:
-        install_app(serial_no)
+        install_app(serial)
 
     if test_files is None:
         raise Exception('No test files')
@@ -90,8 +90,8 @@ def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
 
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
-    run_cmd(f'adb -s {serial_no} rm /sdcard/encapp_*')
-    run_cmd(f'adb -s {serial_no} push {json_path} /sdcard/')
+    run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
+    run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
     print(f'json folder: {json_folder}')
@@ -112,14 +112,14 @@ def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
                         path = f'{fl}'
                     print(f'Media path: {path}')
                     if exists(path):
-                        run_cmd(f'adb -s {serial_no} push {path} /sdcard/')
+                        run_cmd(f'adb -s {serial} push {path} /sdcard/')
                     else:
                         print(f'Media file is missing: {path}')
                         exit(0)
 
-    run_cmd(f'adb -s {serial_no} shell am instrument -w -r -e test '
+    run_cmd(f'adb -s {serial} shell am instrument -w -r -e test '
             f'/sdcard/{filename} {JUNIT_RUNNER_NAME}')
-    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
+    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
     ret, stdout, stderr = run_cmd(adb_cmd)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
 
@@ -135,26 +135,26 @@ def run_encode_tests(test_files, json_path, device_model, serial_no, test_desc,
         # pull the output file
         print(f'pull {file} to {output_dir}')
 
-        adb_cmd = f'adb -s {serial_no} pull /sdcard/{file} {output_dir}'
+        adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
         run_cmd(adb_cmd)
 
         # remove the json file on the device too
-        adb_cmd = f'adb -s {serial_no} shell rm /sdcard/{file}'
+        adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
         run_cmd(adb_cmd)
 
     print('Done')
 
 
-def list_codecs(serial_no, install):
+def list_codecs(serial, install):
     if install:
-        install_app(serial_no)
+        install_app(serial)
 
-    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r ' +\
+    adb_cmd = 'adb -s ' + serial + ' shell am instrument -w -r ' +\
               '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
               ' ' + JUNIT_RUNNER_NAME
 
     run_cmd(adb_cmd)
-    adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/codecs.txt .'
+    adb_cmd = 'adb -s ' + serial + ' pull /sdcard/codecs.txt .'
     run_cmd(adb_cmd)
     with open('codecs.txt', 'r') as codec_file:
         lines = codec_file.readlines()
@@ -198,15 +198,15 @@ def main(argv):
         with open(options.config, 'w') as fp:
             json.dump(sample_config_json_data, fp, indent=4)
     else:
-        device_model, serial_no = check_device(options.serial)
+        model, serial = get_device_info(options.serial)
         if options.list_codecs is True:
-            list_codecs(serial_no, options.install)
+            list_codecs(serial, options.install)
         else:
             # get date and time and format it
             now = datetime.now()
             dt_string = now.strftime('%m-%d-%Y_%H_%M')
             workdir = (
-                f'{options.desc.replace(" ", "_")}_{device_model}_{dt_string}')
+                f'{options.desc.replace(" ", "_")}_{model}_{dt_string}')
             if options.output is not None:
                 workdir = options.output
             os.system('mkdir -p ' + workdir)
@@ -216,8 +216,8 @@ def main(argv):
                     tests_json = json.load(fp)
                     run_encode_tests(tests_json,
                                      test,
-                                     device_model,
-                                     serial_no,
+                                     model,
+                                     serial,
                                      options.desc if options.desc is
                                      not None else '',
                                      options.install,
