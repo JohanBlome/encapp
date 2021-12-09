@@ -157,18 +157,19 @@ def plot_inflight_data(data, variant, description, options):
       #{
       #  "time_sec": 3.8,
       #  "load_percentage": 38
-      
+
       #},
       #{
       #  "time_sec": 0,
       #  "clock_MHz": "180"
       #},
 
-def plot_gpuprocessing(gpuload, description, options):
-    maxclock = gpuload['gpu_max_clock'][0][0]
-    gpumodel = gpuload['gpu_model'][0][0]
+def plot_gpuprocessing(gpuload, description, options): 
+    maxclock = gpuload['gpu_max_clock'].values[0]
+    gpumodel = gpuload['gpu_model'].values[0]
 
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)   
+
+    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     sb.lineplot(x=gpuload['time_sec'],
                 y=gpuload['clock_perc'],
                 ci="sd", data=gpuload,
@@ -373,8 +374,28 @@ def main():
     frames, concurrency = calc_infligh(frames, first)
     plot_inflight_data(frames, 'codec', "encoding pipeline", options)
     
-    plt.show()
+    if concurrency is not None and len(concurrency) > 1:
+        plot_concurrency(concurrency, "conc", options)
 
+    if options.bitrate:
+        plot_framesize(frames, "codec", "encoder", options)
+
+    if options.proctime:
+        plot_processingtime(frames, "codec", "encoder", options)
+
+    if accum_dec_data is not None and len(accum_dec_data) > 0:
+        first = np.min(accum_dec_data['starttime'])
+        accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
+        plot_inflight_data(accum_dec_data, 'codec', "decoding pipeline", options)
+        plot_processingtime(accum_dec_data, "codec", "decoder", options)
+
+    if accum_gpu_data is not None and len(accum_gpu_data) > 0:
+        plot_gpuprocessing(accum_gpu_data, "gpu load", options)
+
+
+
+    sb.set(style="whitegrid", color_codes=True)
+    plt.show()
 
 if __name__ == "__main__":
     main()

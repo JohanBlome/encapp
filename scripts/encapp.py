@@ -34,10 +34,6 @@ KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
 
 sample_config_json_data = [
     [{
-        "session":
-            [{
-                "conc": 1
-            }],
         "tests":
             [{
               KEY_NAME_DESCRIPTION: 'sample',
