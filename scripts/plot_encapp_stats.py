@@ -119,7 +119,7 @@ def plot_concurrency(data, description, options):
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
 
     p.set_ylabel("Number codecs")
-    p.set_xlabel("Start time of encoding in ms")
+    p.set_xlabel("Start time of encoding in sec")
     plt.suptitle(f"{options.label} - {description}")
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -128,7 +128,6 @@ def plot_concurrency(data, description, options):
 
 
 def plot_inflight_data(data, variant, description, options):
-    print(f"{data} - \n{description}")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     p = sb.lineplot(x=data['pts']/1000000,
                 y=data['inflight'],
@@ -139,7 +138,7 @@ def plot_inflight_data(data, variant, description, options):
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
 
     p.set_ylabel("Number of frames in codec at the same time")
-    p.set_xlabel("Time in ms")
+    p.set_xlabel("Time in sec")
     plt.suptitle(f"{options.label} - {description}")
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -164,7 +163,7 @@ def plot_inflight_data(data, variant, description, options):
       #  "clock_MHz": "180"
       #},
 
-def plot_gpuprocessing(gpuload, description, options): 
+def plot_gpuprocessing(gpuload, description, options):
     maxclock = gpuload['gpu_max_clock'].values[0]
     gpumodel = gpuload['gpu_model'].values[0]
 
@@ -274,7 +273,6 @@ def calc_infligh(frames, time_ref):
             start = row[1]['starttime']
             stop = row[1]['stoptime']
             intime = filtered.loc[(filtered['starttime'] > start) & (filtered['starttime'] < stop)]
-            #print(f"{(stop - intime['starttime'])/1000000}")
             count = len(intime)
             inflight.append(count)
         frames.loc[frames['source'] == source,('inflight')] = inflight
@@ -373,7 +371,7 @@ def main():
 
     frames, concurrency = calc_infligh(frames, first)
     plot_inflight_data(frames, 'codec', "encoding pipeline", options)
-    
+
     if concurrency is not None and len(concurrency) > 1:
         plot_concurrency(concurrency, "conc", options)
 

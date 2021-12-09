@@ -202,7 +202,7 @@ def main(argv):
             now = datetime.now()
             dt_string = now.strftime('%m-%d-%Y_%H_%M')
             workdir = (
-                f'{options.desc.replace(" ", "_")}_{model}_{dt_string}')
+                f"{options.desc.replace(' ', '_')}_{model['product']}_{dt_string}")
             if options.output is not None:
                 workdir = options.output
             os.system('mkdir -p ' + workdir)
