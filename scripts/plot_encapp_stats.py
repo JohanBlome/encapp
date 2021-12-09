@@ -165,15 +165,9 @@ def plot_inflight_data(data, variant, description, options):
       #},
 
 def plot_gpuprocessing(gpuload, description, options):
-    print("*** PLOT GPU PROC ***")
-    print(f"1 \"{gpuload['gpu_model']}\"")
-    print(f"2 \"{gpuload['gpu_model'][0]}\"")
-    print(f"3 \"{gpuload['gpu_model'][0][0]}\"")
     maxclock = gpuload['gpu_max_clock'][0][0]
     gpumodel = gpuload['gpu_model'][0][0]
 
-    print(f"gpumodel = {gpumodel}")
-    exit(0)
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)   
     sb.lineplot(x=gpuload['time_sec'],
                 y=gpuload['clock_perc'],
@@ -309,10 +303,6 @@ def parse_args():
     return options
 
 
-def find_overlapping_times():
-    return
-
-
 def main():
     """
         Calculate stats for videos based on parsing individual frames
@@ -375,6 +365,7 @@ def main():
             accum_gpu_data = accum_gpu_data.append(gpu_data)
 
     frames = accum_data.loc[accum_data['size'] > 0]
+    sb.set(style="whitegrid", color_codes=True)
     codecs = pd.unique(frames['codec'])
     sources = pd.unique(frames['source'])
     first = np.min(frames['starttime'])
@@ -382,29 +373,6 @@ def main():
     frames, concurrency = calc_infligh(frames, first)
     plot_inflight_data(frames, 'codec', "encoding pipeline", options)
     
-    if concurrency is not None and len(concurrency) > 1:
-        plot_concurrency(concurrency, "conc", options)
-
-    if options.bitrate:
-        plot_framesize(frames, "codec", "encoder", options)
-
-    if options.proctime:
-        plot_processingtime(frames, "codec", "encoder", options)
-
-    if accum_dec_data is not None and len(accum_dec_data) > 0:
-        first = np.min(accum_dec_data['starttime'])
-        accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
-        plot_inflight_data(accum_dec_data, 'codec', "decoding pipeline", options)
-        plot_processingtime(accum_dec_data, "codec", "decoder", options)
-
-    if accum_gpu_data is not None and len(accum_gpu_data) > 0:
-        plot_gpuprocessing(accum_gpu_data, "gpu load", options)
-
-
-
-    sb.set(style="whitegrid", color_codes=True)
-
-
     plt.show()
 
 
