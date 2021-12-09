@@ -1,4 +1,10 @@
 #!/usr/local/bin/python3
+
+"""Python script to run ENCAPP tests on Android and collect results.
+The script will create a directory based on device model and date,
+and save encoded video and rate distortion results in the directory
+"""
+
 import os
 import subprocess
 import json
@@ -44,8 +50,8 @@ sample_config_json_data = [
     }
 ]
 TEST_CLASS_NAME = 'com.facebook.encapp.CodecValidationInstrumentedTest'
-JUNIT_RUNNER_NAME = \
-    'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner'
+JUNIT_RUNNER_NAME = (
+    'com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner')
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*(?:\.json$)'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
@@ -65,53 +71,66 @@ def run_cmd(cmd):
     return ret, stdout.decode(), stderr.decode()
 
 
-def check_device(serial_no):
-    # check for devices
+# returns info (device model and serial number) about the device where the
+# test will be run
+def get_device_info(serial_inp, debug=0):
+    # list all available devices
     adb_cmd = 'adb devices -l'
     ret, stdout, stderr = run_cmd(adb_cmd)
-    if ret is False:
-        print('Failed to get adb devices')
-        sys.exit()
-    device_serials = []
+    assert ret, 'error: failed to get adb devices'
 
+    # parse list
+    device_info = {}
     for line in stdout.split('\n'):
         if line == 'List of devices attached' or line == '':
             continue
         serial = line.split()[0]
-        device_serials.append(serial)
+        item_dict = {}
+        for item in line.split()[1:]:
+            # ':' used to separate key/values
+            if ':' in item:
+                key, val = item.split(':', 1)
+                item_dict[key] = val
+        # ensure the 'model' field exists
+        if 'model' not in item_dict:
+            item_dict['model'] = 'generic'
+        device_info[serial] = item_dict
+    assert len(device_info) > 0, 'error: no devices connected'
+    if debug > 2:
+        print('available devices: %r' % device_info)
 
-    if len(device_serials) == 0:
-        print('No device connected')
-        exit(0)
-    elif len(device_serials) > 1:
-        if (serial_no is None):
-            print('More than one devices connected. \
-                   Please specifiy a device serial number')
-            exit(0)
-        elif (serial_no not in device_serials):
-            print('Specified serial number {} is invalid.'.format(serial_no))
-            exit(0)
+    # select output device
+    serial, model = None, None
+    if serial_inp is None:
+        # if user did not select a serial_inp, make sure there is only one
+        # device available
+        assert len(device_info) == 1, (
+            'error: need to choose a device %r' % list(device_info.keys()))
+        serial = list(device_info.keys())[0]
+        model = device_info[serial]
+
     else:
-        serial_no = serial
+        # if user forced a serial number, make sure it is available
+        assert serial_inp in device_info, (
+            'error: device %s not available' % serial_inp)
+        serial = serial_inp
+        model = device_info[serial]['model']
 
-    # get device model
-    line = re.findall(serial_no + '.*$', stdout, re.MULTILINE)
-    model_re = re.compile(r'model:(?P<model>\S+)')
-    match = model_re.search(line[0])
-    device_model = match.group('model') if match.group('model') else 'generic'
+    if debug > 0:
+        print('selecting device: serial: %s model: %s' % (serial, model))
 
     # remove any files that are generated in previous runs
-    adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
+    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
     ret, stdout, stderr = run_cmd(adb_cmd)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
     for file in output_files:
         if file == '':
             continue
         # remove the output
-        adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
+        adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
         run_cmd(adb_cmd)
 
-    return device_model, serial_no
+    return model, serial
 
 
 class VideoAnalyzer:
@@ -130,8 +149,9 @@ class VideoAnalyzer:
             raise Exception('Video file does not exist')
 
         if video_file.endswith('.webm'):
-            webm_info_cmd = 'webm_info -i ' + video_file +\
-                    ' -clusters -clusters_size'
+            webm_info_cmd = (
+                'webm_info -i ' + video_file +
+                ' -clusters -clusters_size')
             ret, stdout, stderr = run_cmd(webm_info_cmd)
             if ret is False:
                 raise Exception('Failed to extract video bitrate')
@@ -150,13 +170,15 @@ class VideoAnalyzer:
             return bitrate
 
         if video_file.endswith('.mp4'):
-            ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries \
-                stream=bit_rate -of default=noprint_wrappers=1:nokey=1 ' \
-                    + video_file
+            ffprobe_cmd = (
+                'ffprobe -v error -select_streams v:0 -show_entries '
+                'stream=bit_rate -of default=noprint_wrappers=1:nokey=1 ' +
+                video_file)
         else:
-            ffprobe_cmd = 'ffprobe -v error -show_entries format=bit_rate \
-                -of default=noprint_wrappers=1:nokey=1 '\
-                          + video_file
+            ffprobe_cmd = (
+                'ffprobe -v error -show_entries format=bit_rate '
+                '-of default=noprint_wrappers=1:nokey=1 ' +
+                video_file)
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout == '':
             raise Exception('Failed to extract video bitrate')
@@ -166,9 +188,10 @@ class VideoAnalyzer:
 
     @staticmethod
     def get_resolution(mp4_file):
-        ffprobe_cmd = 'ffprobe -v error -select_streams v:0 -show_entries '\
-            + 'stream=width,height -of default=noprint_wrappers=1:nokey=1 ' \
-            + mp4_file
+        ffprobe_cmd = (
+            'ffprobe -v error -select_streams v:0 -show_entries '
+            'stream=width,height -of default=noprint_wrappers=1:nokey=1 ' +
+            mp4_file)
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout == '':
             raise Exception('Failed to extract video resolution')
@@ -176,9 +199,10 @@ class VideoAnalyzer:
         width = lines[0]
         height = lines[1]
 
-        ffprobe_cmd = 'ffprobe -v error -select_streams v:0  -show_entries '\
-            + 'stream_tags=rotate  -of default=noprint_wrappers=1:nokey=1 '\
-            + mp4_file
+        ffprobe_cmd = (
+            'ffprobe -v error -select_streams v:0  -show_entries '
+            'stream_tags=rotate  -of default=noprint_wrappers=1:nokey=1 ' +
+            mp4_file)
         ret, stdout, stderr = run_cmd(ffprobe_cmd)
         if stdout != '':
             rotation = abs(int(stdout.strip('\n')))
@@ -190,10 +214,12 @@ class VideoAnalyzer:
     def get_source_info(self, mp4_file_ref):
         source_info = self.source_file_infos.get(mp4_file_ref)
         if source_info is None:
-            input_yuv_file = self.temp_dir+'/' +\
-                             mp4_file_ref.strip('.mp4')+'.yuv'
-            ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_ref + \
-                         ' -pix_fmt yuv420p ' + input_yuv_file
+            input_yuv_file = (
+                self.temp_dir + '/' +
+                mp4_file_ref.strip('.mp4') + '.yuv')
+            ffmpeg_cmd = (
+                'ffmpeg -y -i ' + mp4_file_ref +
+                ' -pix_fmt yuv420p ' + input_yuv_file)
             run_cmd(ffmpeg_cmd)
             res = self.get_resolution(mp4_file_ref)
             source_info = {'input_yuv_file': input_yuv_file,
@@ -210,9 +236,10 @@ class VideoAnalyzer:
         mp4_file_ref_res = self.get_resolution(mp4_file_ref)
         mp4_file_out_res = self.get_resolution(mp4_file_out)
         if mp4_file_ref_res == mp4_file_out_res and (len(stdout) > 0):
-            vmaf_cmd = 'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out +\
-                        ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
-                        ':log_fmt=json" -t ' + duration + ' -f null -'
+            vmaf_cmd = (
+                'ffmpeg -i  ' + mp4_file_ref + ' -i ' + mp4_file_out +
+                ' -lavfi libvmaf="psnr=1:log_path=' + log_file +
+                ':log_fmt=json" -t ' + duration + ' -f null -')
             ret, stdout, stderr = run_cmd(vmaf_cmd)
 
             with open(log_file, 'r') as fp:
@@ -224,15 +251,17 @@ class VideoAnalyzer:
         else:
             input_yuv_file, src_res = self.get_source_info(mp4_file_ref)
             output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
-            ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
-                         ' -pix_fmt yuv420p -s ' + src_res + \
-                         ' ' + output_yuv_file
+            ffmpeg_cmd = (
+                'ffmpeg -y -i ' + mp4_file_out +
+                ' -pix_fmt yuv420p -s ' + src_res +
+                ' ' + output_yuv_file)
             run_cmd(ffmpeg_cmd)
 
             sizes = src_res.split('x')
-            vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
-                       ' ' + input_yuv_file + ' ' + output_yuv_file +\
-                       ' --out-fmt json'
+            vmaf_cmd = (
+                'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +
+                ' ' + input_yuv_file + ' ' + output_yuv_file +
+                ' --out-fmt json')
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             # remove the output yuv file
             os.system('rm ' + output_yuv_file)
@@ -244,8 +273,9 @@ class VideoAnalyzer:
                 fp.close()
 
             if vmaf_result:
-                if vmaf_result.get('aggregate') is not None and \
-                   vmaf_result.get('aggregate').get('VMAF_score') is not None:
+                if (vmaf_result.get('aggregate') is not None and
+                        vmaf_result.get('aggregate').get('VMAF_score')
+                        is not None):
                     vmaf_score = vmaf_result['aggregate']['VMAF_score']
                     return round(float(vmaf_score), 2)
         return None
@@ -253,21 +283,23 @@ class VideoAnalyzer:
     def get_vmaf_score_yuv(self, ref_yuv, ref_format, ref_res,
                            mp4_file_out, duration):
         output_yuv_file = '/'.join([self.temp_dir, 'output_temp.yuv'])
-        ffmpeg_cmd = 'ffmpeg -y -i ' + mp4_file_out + \
-                     ' -pix_fmt ' + ref_format + ' -s ' + ref_res + \
-                     ' ' + output_yuv_file
+        ffmpeg_cmd = (
+            'ffmpeg -y -i ' + mp4_file_out +
+            ' -pix_fmt ' + ref_format + ' -s ' + ref_res +
+            ' ' + output_yuv_file)
         run_cmd(ffmpeg_cmd)
 
         sizes = ref_res.split('x')
         ret, stdout, stderr = run_cmd('ffmpeg -filters | grep libvmaf')
         log_file = str(Path(mp4_file_out).with_suffix(''))+'_vmaf.json'
         if (len(stdout) > 0):
-            vmaf_cmd = 'ffmpeg -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
-                       ref_format + ' -i  ' + ref_yuv +\
-                       ' -f rawvideo -s ' + ref_res + ' -pix_fmt ' +\
-                       ref_format + ' -i ' + output_yuv_file +\
-                       ' -lavfi libvmaf="psnr=1:log_path=' + log_file +\
-                       ':log_fmt=json" -t ' + duration + ' -f null -'
+            vmaf_cmd = (
+                'ffmpeg -f rawvideo -s ' + ref_res + ' -pix_fmt ' +
+                ref_format + ' -i  ' + ref_yuv +
+                ' -f rawvideo -s ' + ref_res + ' -pix_fmt ' +
+                ref_format + ' -i ' + output_yuv_file +
+                ' -lavfi libvmaf="psnr=1:log_path=' + log_file +
+                ':log_fmt=json" -t ' + duration + ' -f null -')
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             os.system('rm ' + output_yuv_file)
             # VMAF score = 89.176951
@@ -277,9 +309,10 @@ class VideoAnalyzer:
                 vmaf_score = match.group(0)
                 return round(float(vmaf_score), 2)
         else:
-            vmaf_cmd = 'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +\
-                       ' ' + ref_yuv + ' ' + output_yuv_file +\
-                       ' --out-fmt json'
+            vmaf_cmd = (
+                'run_vmaf yuv420p ' + sizes[0] + ' ' + sizes[1] +
+                ' ' + ref_yuv + ' ' + output_yuv_file +
+                ' --out-fmt json')
             ret, stdout, stderr = run_cmd(vmaf_cmd)
             # remove the output yuv file
             os.system('rm ' + output_yuv_file)
@@ -291,8 +324,9 @@ class VideoAnalyzer:
                 fp.close()
 
             if vmaf_result:
-                if vmaf_result.get('aggregate') is not None and \
-                   vmaf_result.get('aggregate').get('VMAF_score') is not None:
+                if (vmaf_result.get('aggregate') is not None and
+                        vmaf_result.get('aggregate').get('VMAF_score')
+                        is not None):
                     vmaf_score = vmaf_result['aggregate']['VMAF_score']
                     return round(float(vmaf_score), 2)
         return None
@@ -336,15 +370,15 @@ class JobInfo:
         if (not (self.input_format == 'mp4' or self.input_format == 'webm')
            and self.use_surface_enc):
             print('ERROR: Surface encoding with raw input is no possible')
-            exit(0)
+            sys.exit(0)
         elif ((self.input_format == 'mp4' or self.input_format == 'webm')
               and not self.use_surface_enc):
             print('ERROR: Surface encoding required with encoded input')
-            exit(0)
+            sys.exit(0)
 
 
 class EncodeJobs:
-    def __init__(self, device_model):
+    def __init__(self, model):
         self.job_info_groups = []
         self.prev_file = None
         self.prev_enc_res = None
@@ -355,23 +389,24 @@ class EncodeJobs:
     def add_job_info_group(self, job_info_group):
         self.job_info_groups.append(job_info_group)
 
-    def run_encodes(self, serial_no):
+    def run_encodes(self, serial):
         for group in self.job_info_groups:
             for job_info in group:
-                self.run_one_encode(job_info, serial_no)
+                self.run_one_encode(job_info, serial)
 
         # clear this before running vmaf
         self.in_file_dict = None
 
     # run one encode job
-    def run_one_encode(self, job_info, serial_no):
+    def run_one_encode(self, job_info, serial):
         # push input file to the device
         if job_info.use_surface_enc or job_info.input_format != 'mp4':
             if job_info.input_file != self.prev_file:
-                adb_cmd = 'adb -s ' + serial_no + ' push ' + \
-                            job_info.input_file + ' ' \
-                            + job_info.device_workdir\
-                            + job_info.input_file_on_device
+                adb_cmd = (
+                    'adb -s ' + serial + ' push ' +
+                    job_info.input_file + ' ' +
+                    job_info.device_workdir +
+                    job_info.input_file_on_device)
                 run_cmd(adb_cmd)
             self.prev_file = job_info.input_file
         else:
@@ -379,39 +414,43 @@ class EncodeJobs:
                     job_info.enc_res != self.prev_enc_res or
                     job_info.pix_fmt != self.prev_pix_fmt):
                 input_file = self.workdir + '/' + 'ref.yuv'
-                ffmpeg_cmd = 'ffmpeg -y -i ' + job_info.input_file + \
-                             ' -s ' + job_info.enc_res + \
-                             ' -t ' + job_info.duration + \
-                             ' -pix_fmt ' + job_info.pix_fmt + ' '\
-                             + input_file
+                ffmpeg_cmd = (
+                    'ffmpeg -y -i ' + job_info.input_file +
+                    ' -s ' + job_info.enc_res +
+                    ' -t ' + job_info.duration +
+                    ' -pix_fmt ' + job_info.pix_fmt + ' ' +
+                    input_file)
                 run_cmd(ffmpeg_cmd)
-                adb_cmd = 'adb -s ' + serial_no + ' push ' + input_file +\
-                          ' ' + job_info.device_workdir \
-                          + job_info.input_file_on_device
+                adb_cmd = (
+                    'adb -s ' + serial + ' push ' + input_file +
+                    ' ' + job_info.device_workdir +
+                    job_info.input_file_on_device)
                 run_cmd(adb_cmd)
             self.prev_file = job_info.input_file
             self.prev_enc_res = job_info.enc_res
             self.prev_pix_fmt = job_info.pix_fmt
 
-        adb_cmd = 'adb -s ' + serial_no + ' shell am instrument -w -r'\
-                  + ' -e key ' + job_info.i_interval\
-                  + ' -e enc ' + job_info.codec\
-                  + ' -e file ' + job_info.device_workdir \
-                  + job_info.input_file_on_device\
-                  + ' -e test_timeout 20'\
-                  + ' -e video_timeout ' + job_info.duration\
-                  + ' -e res ' + job_info.enc_res\
-                  + ' -e ref_res ' + job_info.enc_res\
-                  + ' -e bit ' + job_info.bitrate_target\
-                  + ' -e mod ' + job_info.mode\
-                  + ' -e fps 30'\
-                  + ' -e ifsize ' + job_info.i_frame_size\
-                  + ' -e tlc ' + job_info.temporal_layer_count\
-                  + ' -e skfr false -e debug false -e ltrc 1'
+        adb_cmd = (
+            'adb -s ' + serial + ' shell am instrument -w -r' +
+            ' -e key ' + job_info.i_interval +
+            ' -e enc ' + job_info.codec +
+            ' -e file ' + job_info.device_workdir +
+            job_info.input_file_on_device +
+            ' -e test_timeout 20' +
+            ' -e video_timeout ' + job_info.duration +
+            ' -e res ' + job_info.enc_res +
+            ' -e ref_res ' + job_info.enc_res +
+            ' -e bit ' + job_info.bitrate_target +
+            ' -e mod ' + job_info.mode +
+            ' -e fps 30' +
+            ' -e ifsize ' + job_info.i_frame_size +
+            ' -e tlc ' + job_info.temporal_layer_count +
+            ' -e skfr false -e debug false -e ltrc 1')
 
         if job_info.enc_loop > 0:
-            adb_cmd += ' -e loop ' + str(job_info.enc_loop) +\
-                        ' -e write false'
+            adb_cmd += (
+                ' -e loop ' + str(job_info.enc_loop) +
+                ' -e write false')
 
         if job_info.dynamic is not None:
             adb_cmd += ' -e dyn ' + job_info.dynamic
@@ -423,7 +462,7 @@ class EncodeJobs:
         run_cmd(adb_cmd)
 
         # find the output file name and pull the output file
-        adb_cmd = 'adb -s ' + serial_no + ' shell ls /sdcard/'
+        adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
         ret, stdout, stderr = run_cmd(adb_cmd)
         output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE,
                                   stdout, re.MULTILINE)
@@ -432,12 +471,13 @@ class EncodeJobs:
             if file == '':
                 continue
             # pull the output file
-            adb_cmd = 'adb -s ' + serial_no + ' pull /sdcard/' + file + \
-                      ' ' + job_info.output_dir
+            adb_cmd = (
+                'adb -s ' + serial + ' pull /sdcard/' + file +
+                ' ' + job_info.output_dir)
             run_cmd(adb_cmd)
 
             # remove the json file on the device too
-            adb_cmd = 'adb -s ' + serial_no + ' shell rm /sdcard/' + file
+            adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
             run_cmd(adb_cmd)
 
             with open(job_info.output_dir + '/' + file) as json_file:
@@ -454,19 +494,19 @@ class EncodeJobs:
                       settings['codec']))
             encoded_file = job_info.data['encodedfile']
             if len(encoded_file) > 0:
-                adb_cmd = ('adb -s ' + serial_no + ' pull /sdcard/' +
+                adb_cmd = ('adb -s ' + serial + ' pull /sdcard/' +
                            encoded_file + ' ' + job_info.output_dir)
                 run_cmd(adb_cmd)
                 # remove the output
-                adb_cmd = ('adb -s ' + serial_no + ' shell rm /sdcard/' +
+                adb_cmd = ('adb -s ' + serial + ' shell rm /sdcard/' +
                            encoded_file)
                 run_cmd(adb_cmd)
                 job_info.output_file = job_info.output_dir + '/' + encoded_file
             else:
                 job_info.output_file = None
 
-    def get_rate_distortion(self, serial_no):
-        video_analyzer = VideoAnalyzer(serial_no)
+    def get_rate_distortion(self, serial):
+        video_analyzer = VideoAnalyzer(serial)
         group_index = 0
         for group in self.job_info_groups:
             bitrates = []
@@ -491,8 +531,8 @@ class EncodeJobs:
 
             if len(bitrates):
                 job_info = group[0]
-                desc = job_info.desc if job_info.desc is not None \
-                    else 'Test ' + str(group_index)
+                desc = (job_info.desc if job_info.desc is not None
+                        else 'Test ' + str(group_index))
                 group_result = {'description': desc,
                                 'bitrates': bitrates,
                                 'vmaf_scores': vmaf_scores}
@@ -508,7 +548,7 @@ class EncodeJobs:
         video_analyzer.finish()
 
 
-def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
+def build_one_enc_job(workdir, model, enc_jobs, in_file, codec,
                       res, mode, i_interval, i_frame_size,
                       duration, group_desc, bitrates,
                       use_surface_enc, input_format,
@@ -523,7 +563,7 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
     desc_array = []
     if group_desc != '':
         desc_array.append(group_desc)
-    desc_array.append(device_model)
+    desc_array.append(model)
     desc_array.append(codec)
     desc_array.append(res)
     desc_array.append(mode)
@@ -552,17 +592,17 @@ def build_one_enc_job(workdir, device_model, enc_jobs, in_file, codec,
     enc_jobs.add_job_info_group(job_info_group)
 
 
-def build_tests(tests_json, device_model, test_desc):
+def build_tests(tests_json, model, test_desc):
     if tests_json is None:
         raise Exception('Test file is empty')
 
     # get date and time and format it
     now = datetime.now()
     dt_string = now.strftime('%m-%d-%Y_%H_%M')
-    workdir = device_model + '_' + dt_string + '_' + test_desc
+    workdir = model + '_' + dt_string + '_' + test_desc
     os.system('mkdir -p ' + workdir)
 
-    enc_jobs = EncodeJobs(device_model)
+    enc_jobs = EncodeJobs(model)
     enc_jobs.workdir = workdir
     # save the config json to workdir
     with open(workdir+'/config.json', 'w') as fp:
@@ -599,7 +639,7 @@ def build_tests(tests_json, device_model, test_desc):
                             for i_frame_size in i_frame_sizes:
                                 for tl_count in temporal_layer_counts:
                                     build_one_enc_job(workdir,
-                                                      device_model,
+                                                      model,
                                                       enc_jobs,
                                                       in_file,
                                                       codec,
@@ -619,21 +659,22 @@ def build_tests(tests_json, device_model, test_desc):
     return enc_jobs
 
 
-def run_encode_tests(tests_json, device_model, serial_no, test_desc):
+def run_encode_tests(tests_json, model, serial, test_desc):
 
     # build tests
-    enc_jobs = build_tests(tests_json, device_model, test_desc)
+    enc_jobs = build_tests(tests_json, model, test_desc)
 
     # run encode jobs
-    enc_jobs.run_encodes(serial_no)
+    enc_jobs.run_encodes(serial)
 
-    enc_jobs.get_rate_distortion(serial_no)
+    enc_jobs.get_rate_distortion(serial)
 
 
-def list_codecs(serial_no):
-    adb_cmd = 'adb -s ' + serial_no + ' shell am instrument  -w -r ' +\
-              '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
-              ' ' + JUNIT_RUNNER_NAME
+def list_codecs(serial):
+    adb_cmd = (
+        'adb -s ' + serial + ' shell am instrument  -w -r ' +
+        '-e list_codecs a -e class ' + TEST_CLASS_NAME +
+        ' ' + JUNIT_RUNNER_NAME)
     run_cmd(adb_cmd)
 
 
@@ -645,27 +686,24 @@ def main(args):
             json.dump(sample_config_json_data, fp, indent=4)
             fp.close()
     else:
-        device_model, serial_no = check_device(args.serial)
+        model, serial = get_device_info(args.serial)
         if args.list_codecs is True:
-            list_codecs(serial_no)
+            list_codecs(serial)
         else:
             with open(args.test, 'r') as fp:
                 tests_json = json.load(fp)
                 fp.close()
-                run_encode_tests(tests_json, device_model,
-                                 serial_no,
+                run_encode_tests(tests_json, model,
+                                 serial,
                                  args.desc if args.desc is not None else '')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='A Python script to run \
-    ENCAPP tests on Android and collect results. \
-    The script will create a directory based on device model and date, \
-    and save encoded video and rate distortion results in the directory')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--test', help='Test cases in JSON format.')
     parser.add_argument('--serial', help='Android device serial number')
-    parser.add_argument('--config', help='Generate a sample config \
-                         file in json format')
+    parser.add_argument('--config', help=('Generate a sample config'
+                        'file in json format'))
     parser.add_argument('--list_codecs', action='store_true',
                         help='List codecs the devices support')
     parser.add_argument('--desc', help='Test description')
