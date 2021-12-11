@@ -67,7 +67,6 @@ public class SurfaceTranscoder extends BufferEncoder {
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 
-            Log.d(TAG, "Done");
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
                 return "no input format";
@@ -86,10 +85,10 @@ public class SurfaceTranscoder extends BufferEncoder {
                 vc.addConfigureSetting( new ConfigureParam(MediaFormat.KEY_COLOR_STANDARD, inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD)));
                 Log.d(TAG, "Color standard set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD));
             }
-            // We explicitly set the color format
-            vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface));
+
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-            //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+            Log.d(TAG, "Set color format");
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 
             mInputSurfaceReference = new AtomicReference<>();
             mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
@@ -134,13 +133,10 @@ public class SurfaceTranscoder extends BufferEncoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
-        if (isVP) {
-            //There seems to be a bug so that this key is no set (but used).
-            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-            format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-            if (mWriteFile)
-                mMuxer = createMuxer(mCodec, format, true);
-        }
+
+        Log.d(TAG, "Create muxer");
+        mMuxer = createMuxer(mCodec, format, true);
+
         long totalTime = 0;
         long last_pts = 0;
         int current_loop = 1;
@@ -238,12 +234,13 @@ public class SurfaceTranscoder extends BufferEncoder {
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
                     Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: " + oformat);
-                    //There seems to be a bug so that this key is no set (but used).
-                    oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
-                    oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                    if (mWriteFile)
-                        mMuxer = createMuxer(mCodec, oformat, true);
+                    checkConfig(oformat);
+
+                    if (mWriteFile) {
+                        mVideoTrack = mMuxer.addTrack(oformat);
+                        Log.d(TAG, "Start muxer");
+                        mMuxer.start();
+                    }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
@@ -256,7 +253,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     mFramesAdded += 1;
                     totalTime += info.presentationTimeUs;
                     if (mMuxer != null)
-                        mMuxer.writeSampleData(0, data, info);
+                        mMuxer.writeSampleData(mVideoTrack, data, info);
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }

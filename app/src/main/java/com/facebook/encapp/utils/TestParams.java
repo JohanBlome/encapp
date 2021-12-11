@@ -160,12 +160,6 @@ public class TestParams {
         encoderFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, mBitrateMode);
         encoderFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, getKeyframeRate());
 
-        // Must have a colorformat
-
-      /*  if (mExtraConfigure.indexOf(MediaFormat.KEY_COLOR_FORMAT) == -1) {
-            addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
-                                                   MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible));
-        }*/
         Log.d(TAG, "Create mode: br="+getBitRate() +
                 ", mode=" + getmBitrateMode() +
                 ", fps=" + getFPS() +

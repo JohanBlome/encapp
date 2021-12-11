@@ -56,6 +56,7 @@ class BufferEncoder {
     boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     private long mFilePntr;
     private FileReader mYuvReader;
+    protected int mVideoTrack = -1;
 
     public String encode(
             TestParams vc,
@@ -86,16 +87,16 @@ class BufferEncoder {
             Log.d(TAG, "Create codec by name: " + codecName);
             mCodec = MediaCodec.createByCodecName(codecName);
 
-            Log.d(TAG, "Done");
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-
+            checkConfigureParams(vc, format);
             setConfigureParams(vc, format);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+
             mCodec.configure(
                     format,
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
-
 
             checkConfigureParams(vc, mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
@@ -125,13 +126,9 @@ class BufferEncoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
-        if (isVP) {
-            //There seems to be a bug so that this key is no set (but used).
-            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-            format.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-            if (mWriteFile)
-                mMuxer = createMuxer(mCodec, format, true);
-        }
+
+        Log.d(TAG, "Create muxer");
+        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
 
         long numBytesSubmitted = 0;
         long numBytesDequeued = 0;
@@ -140,7 +137,7 @@ class BufferEncoder {
             int index;
             Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
             try {
-                index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                index = mCodec.dequeueInputBuffer(-1);//VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
                 if (index >= 0) {
                     int size = -1;
@@ -216,16 +213,10 @@ class BufferEncoder {
                 Log.d(TAG, "flags = " + (info.flags));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
-                    checkConfig(oformat);
-                    //There seems to be a bug so that this key is no set (but used).
-                    oformat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL));
-                    oformat.setInteger(MediaFormat.KEY_FRAME_RATE, format.getInteger(MediaFormat.KEY_FRAME_RATE));
-                    oformat.setInteger(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
-                    oformat.setInteger(MediaFormat.KEY_BIT_RATE, format.getInteger(MediaFormat.KEY_BIT_RATE));
 
                     if (mWriteFile) {
-                        Log.d(TAG, "Create muxer");
-                        mMuxer = createMuxer(mCodec, oformat, true);
+                        mVideoTrack = mMuxer.addTrack(oformat);
+                        mMuxer.start();
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -241,7 +232,7 @@ class BufferEncoder {
 
                     if (mMuxer != null) {
                         Log.d(TAG, "Write to muxer: " + data.remaining());
-                        mMuxer.writeSampleData(0, data, info);
+                        mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 }
@@ -352,11 +343,6 @@ class BufferEncoder {
             e.printStackTrace();
         }
 
-        mMuxer.addTrack(format);
-        String formatTxt = TestParams.getFormatInfo(format);
-        Log.d(TAG, "**\nSettings: " + formatTxt + "\n**");
-        Log.d(TAG, "Start mMuxer");
-        mMuxer.start();
         mStats.setEncodedfile(mFilename);
         return mMuxer;
     }
