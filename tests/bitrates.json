@@ -1,0 +1,20 @@
+{
+	"tests": [{
+		"description": "Bitrates",
+		"input_files": [
+			"../media/320x180_900fr_avc.mp4"
+		],
+        "rc_modes": [
+            "cbr"
+        ],
+        "bitrates": [
+            "50k",
+            "100k",
+            "200k",
+            "400k",
+            "800k",
+            "1600k",
+            "3200k"
+        ]
+     }]
+}

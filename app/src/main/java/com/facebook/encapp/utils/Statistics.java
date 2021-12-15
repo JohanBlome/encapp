@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public class Statistics {
-    final static String TAG = "encapp";
+    final static String TAG = "statistics";
     private final String mId;
     private final String mDesc;
     private String mEncodedfile = "";
@@ -85,7 +85,6 @@ public class Statistics {
         frame.start();
         mEncodingFrames.put(Long.valueOf(pts), frame);
         mEncodingProcessingFrames += 1;
-        Log.d(TAG, "Start processing, in flight: "+ mEncodingProcessingFrames);
     }
 
     public void stopEncodingFrame(long pts, long size, boolean isIFrame) {
@@ -96,7 +95,6 @@ public class Statistics {
             frame.isIFrame(isIFrame);
         }
         mEncodingProcessingFrames -= 1;
-        Log.d(TAG, "Stopped processing, in flight: "+ mEncodingProcessingFrames);
     }
 
     public void startDecodingFrame(long pts, long size, int flags) {
@@ -219,6 +217,7 @@ public class Statistics {
         return mediaformat;
     }
     public void writeJSON(Writer writer) throws IOException {
+        Log.d(TAG, "Write stats");
         try {
             JSONObject json = new JSONObject();
 
@@ -229,7 +228,8 @@ public class Statistics {
             json.put("proctime", getProcessingTime());
             json.put("framecount", getEncodedFrameCount());
             json.put("encodedfile", mEncodedfile);
-
+            String[] tmp = mVc.getInputfile().split("/");
+            json.put("sourcefile", tmp[tmp.length - 1]);
             JSONObject settings = new JSONObject();
             settings.put("codec", mCodec);
             settings.put("gop", mVc.getKeyframeRate());
@@ -252,6 +252,25 @@ public class Statistics {
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
             }
+
+            JSONObject runtime = new JSONObject();
+            ArrayList<Object> runtimeList = mVc.getRuntimeParametersList();
+            for (Object param: runtimeList) {
+                if (param instanceof RuntimeParam) {
+                    RuntimeParam rt = (RuntimeParam) param;
+                    JSONObject subtype = null;
+                    if (runtime.has(rt.name)) {
+                        subtype = runtime.getJSONObject(rt.name);
+                    } else {
+                        subtype = new JSONObject();
+                        runtime.put(rt.name, subtype);
+                    }
+                    subtype.put(String.valueOf(rt.frame), rt.value.toString());
+                } else {
+                    Log.e(TAG, "Object is " + param);
+                }
+            }
+            json.put("runtime_settings", runtime);
             ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
             Collections.sort(allFrames, compareByPts);
@@ -293,9 +312,6 @@ public class Statistics {
                         obj.put("starttime", info.getStartTime());
                         obj.put("stoptime", info.getStopTime());
                         jsonArray.put(obj);
-                    } else {
-                        Log.d(TAG, "Decode time is negative. " + proc_time + ", start = " +
-                                         info.mStartTime + ", stoptime = " +info.mStopTime);
                     }
                 }
                 json.put("decoded_frames", jsonArray);

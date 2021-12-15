@@ -57,15 +57,18 @@ class BufferEncoder {
     private long mFilePntr;
     private FileReader mYuvReader;
     protected int mVideoTrack = -1;
+    int mPts = 132;
 
     public String encode(
             TestParams vc,
             boolean writeFile) {
+        Log.d(TAG, "** Raw buffer encoding - " + vc.getDescription() + " **");
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
         mFramesAdded = 0;
         mRefFramesizeInBytes = (int) (vc.getReferenceSize().getWidth() *
                 vc.getReferenceSize().getHeight() * 1.5);
+
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
@@ -82,6 +85,7 @@ class BufferEncoder {
         int keyFrameInterval = vc.getKeyframeRate();
         MediaFormat format;
         try {
+            Log.d(TAG, "codec id: "+vc.getVideoEncoderIdentifier());
             String codecName = getCodecName(vc);
             mStats.setCodec(codecName);
             Log.d(TAG, "Create codec by name: " + codecName);
@@ -121,7 +125,6 @@ class BufferEncoder {
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = vc.getmReferenceFPS();
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        int mPts = 132;
         calculateFrameTiming();
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -135,7 +138,9 @@ class BufferEncoder {
         int current_loop = 1;
         while (loop + 1 >= current_loop) {
             int index;
-            Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+            if (mFramesAdded % 100 == 0) {
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+            }
             try {
                 index = mCodec.dequeueInputBuffer(-1);//VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
@@ -163,7 +168,6 @@ class BufferEncoder {
                         } catch (IllegalStateException isx) {
                             Log.e(TAG, "Queue encoder failed, " + index + ", mess: " + isx.getMessage());
                         }
-                        Log.d(TAG, "size = " + size);
                         if (size == -2) {
                             Log.d(TAG, "continue");
                             continue;
@@ -210,7 +214,6 @@ class BufferEncoder {
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
-                Log.d(TAG, "flags = " + (info.flags));
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
 
@@ -222,16 +225,12 @@ class BufferEncoder {
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
                 } else {
-                    boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
-                    if (keyFrame) {
-                        Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);
-                    }
+                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                    (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                     numBytesDequeued += info.size;
                     ++outFramesCount;
 
                     if (mMuxer != null) {
-                        Log.d(TAG, "Write to muxer: " + data.remaining());
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
@@ -275,7 +274,6 @@ class BufferEncoder {
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
         int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
-            Log.d(TAG, "Skip frame: " + frameCount);
             mSkipped++;
             mDropNext = false;
             read = -2;
@@ -283,7 +281,6 @@ class BufferEncoder {
             mFramesAdded++;
             long ptsUsec = computePresentationTime(frameCount);
             mStats.startEncodingFrame(ptsUsec);
-            Log.d(TAG, "Queue frame " + frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {
             read = -1;
@@ -297,7 +294,7 @@ class BufferEncoder {
      * Generates the presentation time for frameIndex, in microseconds.
      */
     protected long computePresentationTime(int frameIndex) {
-        return 132 + frameIndex * 1000000L / mFrameRate;
+        return mPts + frameIndex * mFrameTime;
     }
 
     protected void calculateFrameTiming() {
@@ -382,7 +379,7 @@ class BufferEncoder {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        String id = vc.getVideoEncoderIdentifier();
+        String id = vc.getCodecName();
         String codecName = "";
         Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, id);
 
@@ -404,7 +401,6 @@ class BufferEncoder {
 
     protected void setConfigureParams(TestParams vc, MediaFormat format) {
         ArrayList<ConfigureParam> params = vc.getExtraConfigure();
-        Log.d(TAG, "setConfigureParams: " + params.toString() + ", l = " + params.size());
         for (ConfigureParam param : params) {
             if (param.value instanceof Integer) {
                 format.setInteger(param.name, (Integer) param.value);
@@ -476,16 +472,12 @@ class BufferEncoder {
         if (mRuntimeParams != null && !mRuntimeParams.isEmpty()) {
             Bundle params = new Bundle();
             ArrayList<RuntimeParam> runtimeParams = mRuntimeParams.get(Integer.valueOf(frameCount));
-            Log.d(TAG, "setRuntimeParameters, checking: " + frameCount + " - " + runtimeParams);
             if (runtimeParams != null) {
-                Log.d(TAG, "setRuntimeParameters, size: " + runtimeParams.size());
                 for (RuntimeParam param : runtimeParams) {
-                    Log.d(TAG, "Runtime param: "  +param.name  + " - " + param.value);
                     if (param.value == null) {
                         params.putInt(param.name, frameCount);
                     } else if (param.type.equals("int")) {
                         if (param.name.equals("fps")) {
-                            Log.d(TAG, "Set fps to " + param.value);
                             mKeepInterval = (float) mFrameRate / (float) Integer.parseInt((String)param.value);
                         } else {
                             String sval =  param.value.toString();
@@ -497,17 +489,14 @@ class BufferEncoder {
                             } else {
                                 Integer.parseInt(sval);
                             }
-                            Log.d(TAG, param.name + " @ " + frameCount + " - " + param.value);
                             params.putInt(param.name, val);
                         }
                     } else if (param.type.equals("bundle")) {
-                        Log.d(TAG, "Add bundle: "+param.name);
                         params.putBundle(param.name, (Bundle)param.value);
                     } else {
                         Log.d(TAG, "Unknown type: " + param.type);
                     }
                 }
-                Log.d(TAG, "Set runtime parameters in codec");
                 mCodec.setParameters(params);
             }
         }

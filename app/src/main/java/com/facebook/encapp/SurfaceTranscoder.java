@@ -28,7 +28,7 @@ public class SurfaceTranscoder extends BufferEncoder {
 
     public String encode(TestParams vc,
                          boolean writeFile) {
-        Log.d(TAG, "**** SURFACE TRANSCODE ***");
+        Log.d(TAG, "**** Surface Transcode - " + vc.getDescription() + " ***");
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
         mFramesAdded = 0;
@@ -48,7 +48,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                 inputFormat = mExtractor.getTrackFormat(track);
                 if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
                         inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
-                    Log.d(TAG, "Found video track at " + track + " " + inputFormat.getString(MediaFormat.KEY_MIME));
                     trackNum = track;
                 }
             }
@@ -128,8 +127,8 @@ public class SurfaceTranscoder extends BufferEncoder {
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = vc.getmReferenceFPS();
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        int mPts = 132;
         calculateFrameTiming();
+        Log.e(TAG, "ref " + mReferenceFrameRate+", fps " + mFrameRate +", keepint. =  " + mKeepInterval + ", mFrameTime = " + mFrameTime);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
@@ -142,7 +141,9 @@ public class SurfaceTranscoder extends BufferEncoder {
         int current_loop = 1;
         while (loop + 1 >= current_loop) {
             int index;
-            Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+            if (mFramesAdded % 100 == 0) {
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+            }
             try {
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 if (index >= 0) {
@@ -187,9 +188,8 @@ public class SurfaceTranscoder extends BufferEncoder {
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    long pts = info.presentationTimeUs;
+                    long pts =  computePresentationTime(inFramesCount); //info.presentationTimeUs;
                     mStats.stopDecodingFrame(pts);
-                    Log.d(TAG, "Check runtime parmeters: " + inFramesCount + ", param size = " + mRuntimeParams.size());
                     setRuntimeParameters(inFramesCount);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int) ((float) (inFramesCount) / mKeepInterval);
@@ -228,8 +228,8 @@ public class SurfaceTranscoder extends BufferEncoder {
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
             } else if (index >= 0) {
-                boolean keyFrame = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-                mStats.stopEncodingFrame(info.presentationTimeUs, info.size, keyFrame);
+                mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                 ByteBuffer data = mCodec.getOutputBuffer(index);
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
@@ -245,10 +245,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     break;
                 } else {
-                    if (keyFrame) {
-                        Log.d(TAG, "Out buffer has KEY_FRAME @ " + outFramesCount);
-                    }
-
                     ++outFramesCount;
                     mFramesAdded += 1;
                     totalTime += info.presentationTimeUs;

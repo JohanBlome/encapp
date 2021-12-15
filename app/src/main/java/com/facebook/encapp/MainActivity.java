@@ -13,7 +13,6 @@ import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.util.Size;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
@@ -58,7 +57,6 @@ public class MainActivity extends AppCompatActivity {
         boolean useNewMethod = true;
         if (mExtraDataHashMap != null && mExtraDataHashMap.size() > 0) {
             String old_method = mExtraDataHashMap.get("old_auth");
-            Log.d(TAG, "old auth = "+old_method);
             if (old_method != null) {
                 useNewMethod = (old_method.equals("true") || old_method.equals("1"))?false: true;
             }
@@ -223,20 +221,32 @@ public class MainActivity extends AppCompatActivity {
             tmp = !mExtraDataHashMap.get("write").equals("false");
         }
 
+        SessionParam sp = new SessionParam();
         final boolean writeOutput = tmp;
-        String filename = null;
         // Override the filename in the json configure by adding cli "-e -file FILENAME"
         if (mExtraDataHashMap.containsKey("file")) {
-            filename = mExtraDataHashMap.get("file");
-        }
-        Size refFrameSize = null;
-        // A new input size is probably needed in that case
-        if (mExtraDataHashMap.containsKey("ref_res")) {
-            refFrameSize = SizeUtils.parseXString(mExtraDataHashMap.get("ref_res"));
+            sp.setInputFile(mExtraDataHashMap.get("file"));
         }
 
-        if (filename != null) {
-            Log.d(TAG, "override file: " + filename);
+        // A new input size is probably needed in that case
+        if (mExtraDataHashMap.containsKey("ref_res")) {
+            sp.setInputResolution(mExtraDataHashMap.get("ref_res"));
+        }
+
+        if (mExtraDataHashMap.containsKey("ref_fps")) {
+            sp.setInputFps(mExtraDataHashMap.get("ref_fps"));
+        }
+
+        if (mExtraDataHashMap.containsKey("fps")) {
+            sp.setOutputFps(mExtraDataHashMap.get("fps"));
+        }
+
+        if (mExtraDataHashMap.containsKey("enc")) {
+            sp.setOutputCodec(mExtraDataHashMap.get("enc"));
+        }
+
+        if (mExtraDataHashMap.containsKey("res")) {
+            sp.setOutputResolution(mExtraDataHashMap.get("res"));
         }
 
         /// Use json builder
@@ -244,28 +254,16 @@ public class MainActivity extends AppCompatActivity {
             try {
                 Vector<TestParams> vcCombinations = null;
                 if (mExtraDataHashMap.containsKey("test")) {
-                    Vector<SessionParam> sessionSettings = new Vector<>();
                     vcCombinations = new Vector<>();
-                    if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sessionSettings)) {
+                    if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sp)) {
                         Assert.assertTrue("Failed to parse tests", false);
                     }
-                    Log.d(TAG, "cases2: "+vcCombinations);
                 } else {
                     vcCombinations = buildSettingsFromCommandline();
                 }
-                Log.d(TAG, "Test params collected - start # " + vcCombinations.size() + " of tests, override concurrent = " + overrideConcurrent);
                 for (TestParams vc : vcCombinations) {
-                    Log.d(TAG, "filename is " + filename + " swap out " + vc.getInputfile());
-                    if (filename != null) {
-                        vc.setInputfile(filename);
-                    }
-                    Log.d(TAG, "Done? " + vc.getInputfile());
-                    if (refFrameSize != null) {
-                        vc.setReferenceSize(refFrameSize);
-                    }
                     int vcConc = vc.getConcurrentCodings();
                     int concurrent = (vcConc > overrideConcurrent)?vcConc: overrideConcurrent;
-                    Log.d(TAG, "Conccurent for case is " + concurrent);
                     if (concurrent > 1) {
                         while (mEncodingsRunning >= concurrent) {
                             try {
@@ -386,15 +384,14 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setFPS(Integer.parseInt(fps[fC]));
                                 constraints.setReferenceFPS(ref_fps);
                                 constraints.setReferenceSize(SizeUtils.parseXString(ref_resolution));
-                                constraints.setVideoEncoderIdentifier(encoders[eC]);
-                                Log.d(TAG, "Set bitrate mode: " + mod[mC] +", mods = "+mod.length);
+                                constraints.setCodecName(encoders[eC]);
                                 constraints.setBitrateMode(mod[mC]);
 
                                 constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));
                                 if (mExtraDataHashMap.containsKey("tlc")) {
                                     constraints.setTemporalLayerCount(Integer.parseInt(mExtraDataHashMap.get("tlc")));
                                 }
-                                Log.e(TAG, constraints.getSettings());
+
                                 boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) && Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames"));
                                 constraints.setSkipFrames(keySkipFrames);
                                 vc.add(constraints);
@@ -439,6 +436,7 @@ public class MainActivity extends AppCompatActivity {
 
             final String status = transcoder.encode(vc,
                     fwriteOutput);
+            Log.d(TAG, "Get stats");
             final Statistics stats = transcoder.getStatistics();
             try {
                 FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
@@ -477,7 +475,5 @@ public class MainActivity extends AppCompatActivity {
             decreaseEncodingsInflight();
         }
     }
-
-
 }
 

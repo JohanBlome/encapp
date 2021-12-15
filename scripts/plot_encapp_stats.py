@@ -41,6 +41,7 @@ import numpy as np
 
 
 def plot_framesize(data, variant, description, options):
+    print(f"Plot frame sizes")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
     axs.set_title('Frame sizes in bytes')
@@ -59,8 +60,59 @@ def plot_framesize(data, variant, description, options):
     name = options.label + '_framesizes_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format='png')
 
+def plot_bitrate(data, variant, description, options):
+    print(f"Plot bitrate")
+    print(f"{data}")
+    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
+    axs.legend(loc='best', fancybox=True, framealpha=0.5)
+    axs.set_title('Bitrate in kbps')
+    #bytes/msec = kbytes/sec
+    data['target in kbps'] = ((data['bitrate']/1000).astype(int)).astype(str)
+    data['kbps'] = (round((8 * data['size']/(data['duration_ms'])), 0)).astype(int)
+    mean = np.mean(data['kbps'])
+    data['kbps'] = data['kbps'].where(data['kbps'] < mean * 20, other=0)
+    print(f"mean br = {mean}")
+    fps = int(np.mean(data['fps']))
+    print(f"fps = {fps}")
+    p = sb.lineplot(x=data['pts']/1000000,
+                    y='kbps',
+                    ci='sd',
+                    data=data,
+                    hue=variant,
+                    ax=axs)
+    p.set_xlabel('Presentation time in sec')
+    p.set_ylabel('Bitrate in kbps')
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.suptitle(f'{options.label} - {description}')
+
+    name = options.label + '_bitrate_' + description + '.png'
+    plt.savefig(name.replace(' ', '_'), format='png')
+
+    # vs target
+    heights = np.unique(data['height'])
+    for height in heights:
+        fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
+        axs.legend(loc='best', fancybox=True, framealpha=0.5)
+        axs.set_title(f'Bitrate in kbps as function of target, {height}p')
+        filtered = data.loc[data['height'] == height]
+        filtered['sm_kbps'] = filtered['kbps'].rolling(fps,  min_periods=1, win_type=None).sum()/fps
+        p = sb.lineplot(x=filtered['pts']/1000000,
+                        y='sm_kbps',
+                        ci='sd',
+                        data=filtered,
+                        hue='target in kbps',
+                        style='codec',
+                        ax=axs)
+        p.set_xlabel('Presentation time in sec')
+        p.set_ylabel('Bitrate in kbps')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.suptitle(f'{options.label} - {description}')
+
+        name = options.label + f'_target-bitrate_{height}_' + description + '.png'
+        plt.savefig(name.replace(' ', '_'), format='png')
 
 def plot_processingtime(data, variant, description, options):
+    print(f"Plot processingtime")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     sb.lineplot(x=data['pts']/1000000,
                 y=data['proctime']/1000000,
@@ -88,6 +140,7 @@ def plot_processingtime(data, variant, description, options):
 
 
 def plot_times(data, variant, description, options):
+    print(f"Plot times")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     sb.lineplot(x=data.index,
                 y=data['starttime']/1000000,
@@ -107,6 +160,7 @@ def plot_times(data, variant, description, options):
 
 
 def plot_concurrency(data, description, options):
+    print(f"Plot concurrency")
     fig, axs = plt.subplots(figsize=(12, 9), dpi=200)
     data['simple'] = round(data['starttime']/1000000)
     p = sb.barplot(x=data['simple'],
@@ -127,6 +181,7 @@ def plot_concurrency(data, description, options):
 
 
 def plot_inflight_data(data, variant, description, options):
+    print(f"Plot inflight data")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     p = sb.lineplot(x=data['pts']/1000000,
                     y=data['inflight'],
@@ -162,6 +217,7 @@ def plot_inflight_data(data, variant, description, options):
 
 
 def plot_gpuprocessing(gpuload, description, options):
+    print(f"Plot gpu processing")
     maxclock = gpuload['gpu_max_clock'].values[0]
     gpumodel = gpuload['gpu_model'].values[0]
 
@@ -199,6 +255,8 @@ def parse_encoding_data(json, inputfile):
     framecount = json['framecount']
     mean = proctime/framecount
     data['meanproctime'] = mean
+    data['duration_ms'] = round((data['pts'].shift(-1, axis='index',fill_value=0) - data['pts'])/1000,2)
+    data['fps'] = round(1000.0/(data['duration_ms']),2)
     data.fillna(0)
     return data
 
@@ -298,8 +356,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('files', nargs='+', help='file to analyze')
     parser.add_argument('--label', default='')
-    parser.add_argument('--proctime', default=True)
-    parser.add_argument('--bitrate', default=True)
+    parser.add_argument('-c', '--concurrency', action="store_true")
+    parser.add_argument('-pt', '--proctime', action="store_true")
+    parser.add_argument('-br', '--bitrate', action="store_true")
+    parser.add_argument('-fs', '--framesize', action="store_true")
+    parser.add_argument('-if', '--inflight', action="store_true")
+    parser.add_argument('-dd', '--decode_data', action="store_true")
+    parser.add_argument('-gd', '--gpu_data', action="store_true")
     options = parser.parse_args()
 
     return options
@@ -312,6 +375,7 @@ def main():
         Can output data for a single file or aggregated data for several files.
     """
     options = parse_args()
+
     accum_data = None
     accum_dec_data = None
     accum_gpu_data = None
@@ -332,7 +396,6 @@ def main():
             proctime = alldata['proctime']
             framecount = alldata['framecount']
             mean_ms = encoding_data['meanproctime'][0]/1000000
-            print(f'mean = {mean_ms}')
             first_frame = np.min(encoding_data['pts'])  # pts is in microsec
             last_frame = np.max(encoding_data['pts'])  # approx.
             video_length = last_frame - first_frame
@@ -377,25 +440,29 @@ def main():
     first = np.min(frames['starttime'])
 
     frames, concurrency = calc_infligh(frames, first)
-    plot_inflight_data(frames, 'codec', 'encoding pipeline', options)
+    if options.inflight:
+        plot_inflight_data(frames, 'codec', 'encoding pipeline', options)
 
-    if concurrency is not None and len(concurrency) > 1:
+    if options.concurrency and concurrency is not None and len(concurrency) > 1:
         plot_concurrency(concurrency, 'conc', options)
 
-    if options.bitrate:
+    if options.framesize:
         plot_framesize(frames, 'codec', 'encoder', options)
+
+    if options.bitrate:
+        plot_bitrate(frames, 'codec', 'encoder', options)
 
     if options.proctime:
         plot_processingtime(frames, 'codec', 'encoder', options)
 
-    if accum_dec_data is not None and len(accum_dec_data) > 0:
+    if options.decode_data and accum_dec_data is not None and len(accum_dec_data) > 0:
         first = np.min(accum_dec_data['starttime'])
         accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
         plot_inflight_data(accum_dec_data, 'codec', 'decoding pipeline',
                            options)
         plot_processingtime(accum_dec_data, 'codec', 'decoder', options)
 
-    if accum_gpu_data is not None and len(accum_gpu_data) > 0:
+    if options.gpu_data and accum_gpu_data is not None and len(accum_gpu_data) > 0:
         plot_gpuprocessing(accum_gpu_data, 'gpu load', options)
 
     sb.set(style='whitegrid', color_codes=True)

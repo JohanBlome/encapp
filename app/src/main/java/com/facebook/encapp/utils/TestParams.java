@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class TestParams {
-    final static String TAG = "encapp";
+    final static String TAG = "TestParams";
 
     public enum IFRAME_SIZE_PRESETS{
         DEFAULT,
@@ -32,6 +32,7 @@ public class TestParams {
     private int mBitrateMode =  MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR;
     private boolean mSkipFrames = false;
     private int mLtrCount = 1;
+    private String mCodecName = "";
 
     private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
     //Bitrate mode 3,4 is
@@ -97,12 +98,21 @@ public class TestParams {
     }
 
     public String getVideoEncoderIdentifier() {
+        Log.d(TAG, "Get video codec ident: " +mVideoEncoderIdentifier );
         return mVideoEncoderIdentifier;
     }
 
     public void setVideoEncoderIdentifier(String videoCodecIdentifier){
+        Log.d(TAG, "Set video codec ident: " +videoCodecIdentifier );
         mVideoEncoderIdentifier = videoCodecIdentifier;
+    }
 
+    public String getCodecName() {
+        return mCodecName;
+    }
+
+    public void setCodecName(String codecName) {
+        this.mCodecName = codecName;
     }
 
     /* vbr, cbr or cq */
@@ -112,11 +122,9 @@ public class TestParams {
 
     public void setSkipFrames(boolean setSkipFrames) {
         mSkipFrames = setSkipFrames;
-        Log.d("Transcoder", "setSkipFrames " + mSkipFrames);
         mBitrateMode = (mBitrateMode % 3); //There are three values in the api and qualcomm
                                            // is using value 1,2 + 2 for corresponding skipframe alternative
         if(mSkipFrames) mBitrateMode += 2;
-        Log.d("Transcoder", "setBitrate " + mBitrateMode);
     }
 
     public void setLTRCount(int count) {
@@ -178,12 +186,12 @@ public class TestParams {
     }
 
     public String getSettings() {
-        return this.getVideoEncoderIdentifier() + ", " +
-                    mVideoSize + ", " +
-                    mBitRate + " kbps, " +
-                    bitrateModeName() + ", " +
-                    mFPS + " fps, key int:" +
-                    mKeyframeRate;
+        return getCodecName() + ", " +
+                mVideoSize + ", " +
+                mBitRate + " kbps, " +
+                bitrateModeName() + ", " +
+                mFPS + " fps, key int:" +
+                mKeyframeRate;
     }
 
     int findBitrateMode(String name) {
@@ -295,19 +303,15 @@ public class TestParams {
     }
 
     private void createBundles(String name, ArrayList<Object> datalist, HashMap<Integer, ArrayList<RuntimeParam>> runtimes) {
-        Log.d(TAG, "Create bundles");
         HashMap<Integer, Bundle> map = new HashMap<>();
         for (Object obj: datalist) {
             RuntimeParam param = (RuntimeParam)obj;
-            Log.d(TAG, "obj = " + param .name + ", frame "+param.frame  + ", vl = " + param.value);
-
             Bundle bundle = map.get(param.frame);
             if (bundle == null) {
                 bundle = new Bundle();
                 map.put(param.frame, bundle);
             }
             if (param.type.equals("int")) {
-                Log.d(TAG, "name: " + param.name + ", " +  param.frame+", "+param.value+", " + param.value.getClass());
                 bundle.putInt(param.name, Integer.parseInt(param.value.toString()));
             }
 
@@ -315,9 +319,7 @@ public class TestParams {
         }
 
         for (Integer key: map.keySet()) {
-
             Bundle bundle = map.get(key);
-            Log.d(TAG, "Add bundle @ "+ key + " name = " + name);
             ArrayList<RuntimeParam> list = runtimes.get(String.valueOf(key));
             if (list == null) {
                 list = new ArrayList<RuntimeParam>();
@@ -328,7 +330,6 @@ public class TestParams {
     }
 
     public HashMap<Integer, ArrayList<RuntimeParam>> getRuntimeParameters() {
-        Log.d(TAG, "getRuntimeParameters");
         //Sort and return a HashMap
         HashMap<Integer, ArrayList<RuntimeParam>> map = new HashMap<>();
         if (mRuntimeParams == null) {
@@ -347,14 +348,18 @@ public class TestParams {
                 if (param.value instanceof ArrayList) {
                     createBundles(param.name, (ArrayList<Object>)param.value, map);
                 } else {
-                    Log.d(TAG, "Add " + param.name + " @ " + frame + " val: " + param.value);
                     list.add(param);
                 }
+            } else {
+                Log.d(TAG, "object is " + obj);
             }
         }
 
-        Log.d(TAG, "Runtime parameters: " + map.size());
         return map;
+    }
+
+    public ArrayList<Object> getRuntimeParametersList() {
+        return mRuntimeParams;
     }
 
     public void setInputfile(String inputfile) {
@@ -400,15 +405,10 @@ public class TestParams {
     }
 
     public void setExtraConfigure(ArrayList<ConfigureParam> extra) {
-        for (ConfigureParam param: extra) {
-            Log.d(TAG, "Extra: " + param.name + " - "  + param.value.toString());
-        }
         mExtraConfigure = extra;
     }
 
     public void addConfigureSetting(ConfigureParam param) {
-        Log.d(TAG, "setting: " + param.name + " - "  + param.value.toString());
-
         mExtraConfigure.add(param);
     }
 
