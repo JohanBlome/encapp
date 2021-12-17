@@ -226,10 +226,12 @@ def main(argv):
             json.dump(sample_config_json_data, fp, indent=4)
     else:
         model, serial = get_device_info(options.serial)
-
         if type(model) is dict:
-            model = list(model.values())[0]
-
+            if "model" in model:
+                model = model.get("model")
+            else:
+                model = list(model.values())[0]
+        print(f"model = {model}")
         if options.list_codecs is True:
             list_codecs(serial, not options.no_install)
         else:
