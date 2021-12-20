@@ -112,11 +112,12 @@ def plot_bitrate(data, variant, description, options):
         plt.savefig(name.replace(' ', '_'), format='png')
 
 def plot_processingtime(data, variant, description, options):
-    print(f"Plot processingtime")
+    print(f"Plot processingtime, latency and average per frame processing")
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     sb.lineplot(x=data['pts']/1000000,
                 y=data['proctime']/1000000,
-                ci='sd', data=data, hue=variant,
+                ci='sd', data=data,
+                hue=variant,
                 ax=axs)
 
     p = sb.lineplot(x=data['pts']/1000000,
@@ -245,19 +246,22 @@ def plot_gpuprocessing(gpuload, description, options):
 
 def parse_encoding_data(json, inputfile):
     print('Parse encoding data')
-    data = pd.DataFrame(json['frames'])
-    data['source'] = inputfile
-    data['codec'] = json['settings']['codec']
-    data['description'] = json['description']
-    data['bitrate'] = json['settings']['bitrate']
-    data['height'] = json['settings']['height']
-    proctime = json['proctime']
-    framecount = json['framecount']
-    mean = proctime/framecount
-    data['meanproctime'] = mean
-    data['duration_ms'] = round((data['pts'].shift(-1, axis='index',fill_value=0) - data['pts'])/1000,2)
-    data['fps'] = round(1000.0/(data['duration_ms']),2)
-    data.fillna(0)
+    try:
+        data = pd.DataFrame(json['frames'])
+        data['source'] = inputfile
+        data['codec'] = json['settings']['codec']
+        data['description'] = json['description']
+        data['bitrate'] = json['settings']['bitrate']
+        data['height'] = json['settings']['height']
+        proctime = json['proctime']
+        framecount = json['framecount']
+        mean = proctime/framecount
+        data['meanproctime'] = mean
+        data['duration_ms'] = round((data['pts'].shift(-1, axis='index',fill_value=0) - data['pts'])/1000,2)
+        data['fps'] = round(1000.0/(data['duration_ms']),2)
+        data.fillna(0)
+    except Exception:
+        return None
     return data
 
 
@@ -390,23 +394,26 @@ def main():
             alldata = json.load(json_file)
 
             encoding_data = parse_encoding_data(alldata, inputfile)
+            if encoding_data is None:
+                continue
             decoded_data = parse_decoding_data(alldata, inputfile)
             gpu_data = parse_gpu_data(alldata, inputfile)
 
-            proctime = alldata['proctime']
+            pts_mult = 1000000
+            msec_to_nano = 1000000
+            proctime_sec = round(alldata['proctime']/1000000000.0,2)
             framecount = alldata['framecount']
-            mean_ms = encoding_data['meanproctime'][0]/1000000
+            mean_ms = encoding_data['meanproctime'][0]/msec_to_nano
             first_frame = np.min(encoding_data['pts'])  # pts is in microsec
             last_frame = np.max(encoding_data['pts'])  # approx.
-            video_length = last_frame - first_frame
-            print(f'proctime {proctime}, count {framecount}')
+            video_length = (last_frame - first_frame)/pts_mult
+            print(f'proctime {proctime_sec} sec, count {framecount}')
             print('__')
             print('file = {:s}'.format(alldata['encodedfile']))
-            print('framecount = {:d}'.format(framecount))
+            print(f'framecount = {framecount}')
             print('video length = {:.2f} sec, start, stop = {:.2f}/{:.2f}'.
-                  format(video_length/1000000, first_frame/1000000,
-                         last_frame/1000000))
-            print('total time = {:d} ms'.format(int(proctime/1000000.0)))
+                  format(video_length, first_frame, last_frame))
+            print(f'total time = {proctime_sec} sec')
             print('codec = {:s}'.format(alldata['settings']['codec']))
             print('bitrate = {:d}'.format(alldata['settings']['bitrate']))
             print('height = {:d}'.format(alldata['settings']['height']))
@@ -414,8 +421,8 @@ def main():
             print('mean frame latency = {:.2f} ms'.format(np.mean(
                   encoding_data.loc[encoding_data['proctime'] > 0,
                                     'proctime'])/1000000))
-            print('average frames encoded simultaneously = {:.2f}'.format(
-                (proctime/video_length * 10000)/1000000))
+            print('Encoding speed = {:.2f} times'.format(
+                (video_length/proctime_sec)))
             print('__')
 
         if accum_data is None:
@@ -433,6 +440,9 @@ def main():
         elif gpu_data is not None:
             accum_gpu_data = accum_gpu_data.append(gpu_data)
 
+    if accum_data is None:
+        print(f"Failed to read data")
+        exit(0)
     frames = accum_data.loc[accum_data['size'] > 0]
     sb.set(style='whitegrid', color_codes=True)
     # codecs = pd.unique(frames['codec'])

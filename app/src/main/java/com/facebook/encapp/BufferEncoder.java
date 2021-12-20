@@ -34,8 +34,8 @@ class BufferEncoder {
     // Qualcomm added extended omx parameters
 
 
-    protected static final String TAG = "encapp";
-    protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000;
+    protected static final String TAG = "encoder";
+    protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000000;
 
     protected int mFrameRate = 30;
     protected float mKeepInterval = 1.0f;
@@ -58,6 +58,9 @@ class BufferEncoder {
     private FileReader mYuvReader;
     protected int mVideoTrack = -1;
     int mPts = 132;
+    long mLastTime = -1;
+    boolean mRealtime = false;
+
 
     public String encode(
             TestParams vc,
@@ -68,7 +71,7 @@ class BufferEncoder {
         mFramesAdded = 0;
         mRefFramesizeInBytes = (int) (vc.getReferenceSize().getWidth() *
                 vc.getReferenceSize().getHeight() * 1.5);
-
+        mRealtime = vc.isRealtime();
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mStats.start();
@@ -95,7 +98,8 @@ class BufferEncoder {
             checkConfigureParams(vc, format);
             setConfigureParams(vc, format);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-
+            Log.d(TAG, "Format of encoder");
+            checkConfig(format);
             mCodec.configure(
                     format,
                     null /* surface */,
@@ -114,6 +118,7 @@ class BufferEncoder {
         }
 
         try {
+            Log.d(TAG, "Start encoder");
             mCodec.start();
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
@@ -139,10 +144,10 @@ class BufferEncoder {
         while (loop + 1 >= current_loop) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop + " / "+loop);
             }
             try {
-                index = mCodec.dequeueInputBuffer(-1);//VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
                 if (index >= 0) {
                     int size = -1;
@@ -192,7 +197,7 @@ class BufferEncoder {
                                 }
                                 break;
                             }
-                            Log.d(TAG, " *********** OPEN FILE SECOND TIME *******");
+                            Log.d(TAG, " *********** OPEN FILE AGAIN *******");
                             mYuvReader.openFile(vc.getInputfile());
                             Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                         }
@@ -210,7 +215,6 @@ class BufferEncoder {
 
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
-                Log.w(TAG, "dequeueoutputBuffer, Try again");
             } else if (index >= 0) {
                 long nowUs = (System.nanoTime() + 500) / 1000;
                 ByteBuffer data = mCodec.getOutputBuffer(index);
@@ -280,6 +284,9 @@ class BufferEncoder {
         } else if (read == size) {
             mFramesAdded++;
             long ptsUsec = computePresentationTime(frameCount);
+            if (mRealtime) {
+                sleepUntilNextFrame();
+            }
             mStats.startEncodingFrame(ptsUsec);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
         } else {
@@ -287,6 +294,24 @@ class BufferEncoder {
         }
 
         return read;
+    }
+
+    protected void sleepUntilNextFrame() {
+        long now = System.nanoTime();
+        if (mLastTime == -1) {
+            mLastTime = System.nanoTime();
+        } else {
+            long diff = (now - mLastTime) / 1000000;
+            long sleepTime = (mFrameTime / 1000 - diff);
+            if (sleepTime > 0) {
+                try {
+                    Thread.sleep(sleepTime);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        mLastTime = now;
     }
 
 
@@ -333,7 +358,7 @@ class BufferEncoder {
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
-            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + mFilename);
+            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + "/sdcard/" + mFilename);
             mMuxer = new MediaMuxer("/sdcard/" + mFilename, type);
         } catch (IOException e) {
             Log.d(TAG, "FAILED Create mMuxer with type " + type + " and filename: " + mFilename);

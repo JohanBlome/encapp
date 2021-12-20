@@ -40,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private int mEncodingsRunning = 0;
     private final Object mEncodingLockObject = new Object();
     int mUIHoldtimeSec = 0;
+    boolean mPursuitOver = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -189,6 +190,7 @@ public class MainActivity extends AppCompatActivity {
      * Start automated test run.
      */
     private void performInstrumentedTest() {
+        Log.d(TAG, "ENTER: performInstrumentedTest");
         Log.d(TAG, "Instrumentation test - let us start!");
         final TextView logText = findViewById(R.id.logText);
 
@@ -261,67 +263,94 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     vcCombinations = buildSettingsFromCommandline();
                 }
-                for (TestParams vc : vcCombinations) {
-                    int vcConc = vc.getConcurrentCodings();
-                    int concurrent = (vcConc > overrideConcurrent)?vcConc: overrideConcurrent;
-                    if (concurrent > 1) {
-                        while (mEncodingsRunning >= concurrent) {
-                            try {
-                                Thread.sleep(200);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
+
+                while (!mPursuitOver) {
+                    Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
+                    for (TestParams vc : vcCombinations) {
+                        boolean pursuit = vc.getPursuit().length() > 0;
+                        int vcConc = vc.getConcurrentCodings();
+                        int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
+
+                        if (!pursuit) {
+                            mPursuitOver = true;
                         }
-                        increaseEncodingsInflight();
+                        if (concurrent > 1 || pursuit) {
+                            increaseEncodingsInflight();
+                            Log.d(TAG, "Start another threaded encoding " + mEncodingsRunning );
+                            (new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Log.d(TAG, "Start threaded encoding");
+                                    RunEncoding(vc, logText, writeOutput);
+                                    Log.d(TAG, "Done threaded encoding");
+                                }
 
-                        (new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Log.d(TAG, "Start threaded encoding");
-                                RunEncoding(vc, logText, writeOutput);
-                                Log.d(TAG, "Done threaded encoding");
+                            })).start();
+
+                            Log.d(TAG, "Concurrent or pursuit");
+                            while (mEncodingsRunning >= concurrent && !pursuit) {
+                                try {
+                                    Log.d(TAG, "Sleep 200ms");
+                                    Thread.sleep(200);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
 
-                        })).start();
-                    } else {
-                        increaseEncodingsInflight();
-                        Log.d(TAG, "start encoding, no sep thread");
-                        RunEncoding(vc, logText, writeOutput);
-                        Log.d(TAG, "Done encoding");
+                            if (pursuit) {
+                                Log.d(TAG, "pursuit sleep 1 sec, encodings: " + mEncodingsRunning );
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+
+                            }
+                        } else {
+                            increaseEncodingsInflight();
+                            Log.d(TAG, "start encoding, no sep thread");
+                            RunEncoding(vc, logText, writeOutput);
+                            Log.d(TAG, "Done encoding");
+                        }
                     }
+
+                    Log.d(TAG, "All tests queued up, check pursuit over: " + mPursuitOver);
                 }
-
-
+                Log.d(TAG, "All encodings queued up, wait for finish");
                 // Wait for all transcoding to be finished
+                do {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Log.d(TAG, "number of encodings running:" + mEncodingsRunning);
+
+                } while (mEncodingsRunning > 0);
+                Log.d(TAG, "Done with encodings, encodings: "+mEncodingsRunning);
+                try {
+                    if (mUIHoldtimeSec > 0) {
+                        Thread.sleep(mUIHoldtimeSec);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        do {
-                            try {
-                                Log.d(TAG, "Sleep for test check");
-                                Thread.sleep(1000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            Log.d(TAG, "number of encodings running:" + mEncodingsRunning);
 
-                        } while (mEncodingsRunning > 0);
-                        Log.d(TAG, "Done with encodings");
-                        try {
-                            if (mUIHoldtimeSec > 0) {
-                                Thread.sleep(mUIHoldtimeSec);
-                            }
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
                         TextView mTvTestRun = findViewById(R.id.tv_testrun);
-                        mTvTestRun.setVisibility(View.GONE);
+                        Log.d(TAG, "Hide view! - Do not hide!");
+                        //mTvTestRun.setVisibility(View.GONE);
                     }
                 });
-            } catch (IOException e) {
+            } catch(IOException e){
+                Log.e(TAG, "@Exception when running tests: "+e.getMessage());
                 e.printStackTrace();
             }
         }
+
+        Log.d(TAG, "EXIT: performInstrumentedTest");
     }
 
     private Vector<TestParams> buildSettingsFromCommandline() {
@@ -453,7 +482,12 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         logText.append("\nEncoding failed: " + settings);
                         logText.append("\n" + status);
-                        Assert.assertTrue(status, false);
+                        if (vc.getPursuit().length() > 0) {
+                            Log.d(TAG, "Pursuit over");
+                            mPursuitOver = true;
+                        } else {
+                            Assert.assertTrue(status, false);
+                        }
                     }
                 });
             } else {

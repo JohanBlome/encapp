@@ -212,6 +212,9 @@ public class SurfaceTranscoder extends BufferEncoder {
                         //egl have time in ns
                         mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
+                        if (mRealtime) {
+                            sleepUntilNextFrame();
+                        }
                         mStats.startEncodingFrame(pts);
                     }
 

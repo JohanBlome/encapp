@@ -217,7 +217,7 @@ public class Statistics {
         return mediaformat;
     }
     public void writeJSON(Writer writer) throws IOException {
-        Log.d(TAG, "Write stats");
+        Log.d(TAG, "Write stats for " + mId);
         try {
             JSONObject json = new JSONObject();
 

@@ -59,7 +59,7 @@ public class JSONTestCaseBuilder {
                             JSONArray a2 = (JSONArray)o1;
                             Log.w(TAG, "Unsupported structure: " + a2.toString());
                         } else if (o1 instanceof JSONObject) {
-                            String[] bitrates = {"1000"};
+                            String[] bitrates = {"1000k"};
                             String[] encode_resolutions = {"1280x720"};
                             String[] codecs = {"OMX.google.h264.encoder"};
                             String[] fps = {"30"};
@@ -78,6 +78,8 @@ public class JSONTestCaseBuilder {
                             String use_surface_enc = "false";
                             String input_fps = "30";
                             String skip_frames = "false";
+                            String pursuit = "";
+                            String realtime = "false";
                             ArrayList<Object> runtime_parameters = new ArrayList<>();
 
                             JSONObject test = (JSONObject)o1;
@@ -96,7 +98,7 @@ public class JSONTestCaseBuilder {
                                     input_resolution = test.getString(case_key);
                                 } else if (case_key.equals("duration")) {
                                     duration = test.getString(case_key);
-                                } else if (case_key.equals("enc_loop")) {
+                                } else if (case_key.equals("loop")) {
                                     enc_loop = test.getString(case_key);
                                 } else if (case_key.equals("conc")) {
                                     conc = test.getString(case_key);
@@ -122,6 +124,10 @@ public class JSONTestCaseBuilder {
                                     fps = getStringArray((JSONArray) data_object);
                                 } else if (case_key.equals("rc_modes")) {
                                     mod = getStringArray((JSONArray) data_object);
+                                } else if (case_key.equals("pursuit")) {
+                                    pursuit = test.getString(case_key);
+                                } else if (case_key.equals("realtime")) {
+                                    realtime = test.getString(case_key);
                                 } else if (case_key.equals("configure")) {
                                     JSONArray config_array = (JSONArray) data_object;
                                 /*
@@ -232,8 +238,9 @@ public class JSONTestCaseBuilder {
                                                             testParams.setLoopCount(Integer.parseInt(enc_loop));
                                                             testParams.setConcurrentCodings(Integer.parseInt(conc));
                                                             testParams.setDescription(description);
+                                                            testParams.setPursuit(pursuit);
+                                                            testParams.setRealtime(Boolean.parseBoolean(realtime));
                                                             vc.add(testParams);
-
                                                         }
                                                     }
                                                 }

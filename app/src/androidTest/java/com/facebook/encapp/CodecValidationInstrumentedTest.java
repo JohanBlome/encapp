@@ -51,7 +51,7 @@ import static org.junit.Assert.assertThat;
 @RunWith(AndroidJUnit4.class)
 @SdkSuppress(minSdkVersion = 25)
 public class CodecValidationInstrumentedTest {
-    private static final String TAG = "encapp";
+    private static final String TAG = "instrumentation";
 
     private static final int LAUNCH_TIMEOUT = 0;
 
@@ -105,6 +105,10 @@ public class CodecValidationInstrumentedTest {
             InstrumentationRegistry.getArguments().getString("ui_hold_sec");
     private static final String OLD_AUTH_METHOD=
             InstrumentationRegistry.getArguments().getString("old_auth");
+    private static final String PURSUIT=
+            InstrumentationRegistry.getArguments().getString("pursuit");
+    private static final String REALTIME=
+            InstrumentationRegistry.getArguments().getString("realtime");
 
     private static long UI_TIMEOUT = 60 * 60 * 1000; //60 minutes in ms
 
@@ -214,6 +218,14 @@ public class CodecValidationInstrumentedTest {
             mExtraDataHashMap.put("old_auth", OLD_AUTH_METHOD);
             Log.e(TAG, "old_auth config: " + OLD_AUTH_METHOD);
         }
+        if (PURSUIT != null) {
+            mExtraDataHashMap.put("pursuit", PURSUIT);
+            Log.e(TAG, "pursuit config: " + PURSUIT);
+        }
+        if (REALTIME != null) {
+            mExtraDataHashMap.put("realtime", REALTIME);
+            Log.e(TAG, "realtime config: " + REALTIME);
+        }
     }
 
     @Before
@@ -257,11 +269,12 @@ public class CodecValidationInstrumentedTest {
 
     @Test
     public void automateValidation() throws Exception {
+        long startTime = System.nanoTime();
         Log.d(TAG, "Check search criteria: " + TARGET_PACKAGE);
         SearchCondition<Boolean> isGone =
                 Until.gone(By.res(TARGET_PACKAGE, "tv_testrun"));
         Log.e(TAG, "Wait at most for : " + UI_TIMEOUT + " ms (" + (UI_TIMEOUT / (1000 * 60.0)) + " min)");
         mDevice.wait(isGone, UI_TIMEOUT);
-        Log.e(TAG, "Done waiting for maximum: " + UI_TIMEOUT + " test: " + isGone);
+        Log.e(TAG, "Done waiting: " + (System.nanoTime() - startTime)/1000000000 +" secs (maximum: " + UI_TIMEOUT + ") test: " + isGone);
     }
 }

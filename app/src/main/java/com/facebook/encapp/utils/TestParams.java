@@ -52,6 +52,9 @@ public class TestParams {
     private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
     ArrayList<Object> mRuntimeParams;
     private int mConcurrentCodings = 1;
+    private boolean mRealtime = false;
+
+    private String mPursuit = "";
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -423,6 +426,19 @@ public class TestParams {
     public int getConcurrentCodings() {
         return mConcurrentCodings;
     }
+
+    public String getPursuit() {
+        return mPursuit;
+    }
+
+    public void setPursuit(String pursuit) {
+        this.mPursuit = pursuit;
+    }
+
+    public boolean isRealtime() {return mRealtime;
+    }
+
+    public void setRealtime(boolean realtime) {this.mRealtime = realtime;}
 
 }
 
