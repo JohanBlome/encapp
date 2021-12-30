@@ -34,7 +34,7 @@ KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
 
 sample_config_json_data = \
     {
-        "tests":
+        'tests':
             [{
               KEY_NAME_DESCRIPTION: 'sample',
               KEY_NAME_INPUT_FILES: [''],
@@ -43,12 +43,12 @@ sample_config_json_data = \
               KEY_NAME_CODECS: ['h264.encoder'],
               KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
               KEY_NAME_RC_MODES: ['cbr'],
-              KEY_NAME_BITRATES: ["500k", "1000k", "1500k", "2M", "2500k"],
+              KEY_NAME_BITRATES: ['500k', '1000k', '1500k', '2M', '2500k'],
               KEY_NAME_I_INTERVALS: [2],
               # DEFAULT, MEDIUM, HUGE, UNLIMITED
               KEY_NAME_I_FRAME_SIZES:['unlimited'],
-              #KEY_NAME_CONFIGURE: [''],
-              #KEY_NAME_RUNTIME_PARAMETER: ['']
+              # KEY_NAME_CONFIGURE: [''],
+              # KEY_NAME_RUNTIME_PARAMETER: ['']
               KEY_NAME_DURATION: 10,
               KEY_NAME_ENC_LOOP: 0
             }]
@@ -77,7 +77,7 @@ def install_app(serial):
 def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      workdir, options):
     if options.no_install:
-        print("Skip install of apk!")
+        print('Skip install of apk!')
     else:
         install_app(serial)
 
@@ -90,13 +90,14 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
-    inputfile = ""
+    inputfile = ''
     tests = test_def.get('tests')
     for test in tests:
-        print(f"push data for test = {test}")
+        print(f'push data for test = {test}')
         if len(options.input) > 0:
-            inputfile = f"/sdcard/{os.path.basename(options.input)}"
-            ret, stdout, stderr = run_cmd(f'adb -s {serial} shell ls {inputfile}')
+            inputfile = f'/sdcard/{os.path.basename(options.input)}'
+            ret, stdout, stderr = run_cmd(
+                f'adb -s {serial} shell ls {inputfile}')
             if len(stderr) > 0:
                 run_cmd(f'adb -s {serial} push {options.input} /sdcard/')
         else:
@@ -113,24 +114,24 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
                         print(f'Media file is missing: {path}')
                         exit(0)
 
-    additional = ""
+    additional = ''
     if len(options.codec) > 0:
-        additional = f"{additional} -e enc {options.codec}"
+        additional = f'{additional} -e enc {options.codec}'
 
     if len(options.input) > 0:
-        additional = f"{additional} -e file {inputfile}"
+        additional = f'{additional} -e file {inputfile}'
 
     if len(options.input_res) > 0:
-        additional = f"{additional} -e ref_res {options.input_res}"
+        additional = f'{additional} -e ref_res {options.input_res}'
 
     if len(options.input_fps) > 0:
-        additional = f"{additional} -e ref_fps {options.input_fps}"
+        additional = f'{additional} -e ref_fps {options.input_fps}'
 
     if len(options.output_fps) > 0:
-        additional = f"{additional} -e fps {options.output_fps}"
+        additional = f'{additional} -e fps {options.output_fps}'
 
     if len(options.output_res) > 0:
-        additional = f"{additional} -e res {options.output_res}"
+        additional = f'{additional} -e res {options.output_res}'
 
     run_cmd(f'adb -s {serial} shell am instrument -w -r {additional} -e test '
             f'/sdcard/{filename} {JUNIT_RUNNER_NAME}')
@@ -193,14 +194,16 @@ def get_options(argv):
                         help='List codecs the devices support')
     parser.add_argument('--desc', default='encapp', help='Test description')
     parser.add_argument('-o', '--output', help='Name output directory')
-    parser.add_argument('--no_install', action='store_true', help='Do not install apk')
+    parser.add_argument('--no_install', action='store_true',
+                        help='Do not install apk')
 
-    parser.add_argument('--codec', help='Override used codec', default = "")
-    parser.add_argument('--input', help='Override input file', default = "")
-    parser.add_argument('--input_res', help='Override input file', default = "")
-    parser.add_argument('--input_fps', help='Override input fps', default = "")
-    parser.add_argument('--output_fps', help='Override output fps', default = "")
-    parser.add_argument('--output_res', help='Override output resolution', default = "")
+    parser.add_argument('--codec', help='Override used codec', default='')
+    parser.add_argument('--input', help='Override input file', default='')
+    parser.add_argument('--input_res', help='Override input file', default='')
+    parser.add_argument('--input_fps', help='Override input fps', default='')
+    parser.add_argument('--output_fps', help='Override output fps', default='')
+    parser.add_argument('--output_res', help='Override output resolution',
+                        default='')
     parser.add_argument('--remove_input', action='store_true')
 
     options = parser.parse_args()
@@ -227,11 +230,11 @@ def main(argv):
     else:
         model, serial = get_device_info(options.serial)
         if type(model) is dict:
-            if "model" in model:
-                model = model.get("model")
+            if 'model' in model:
+                model = model.get('model')
             else:
                 model = list(model.values())[0]
-        print(f"model = {model}")
+        print(f'model = {model}')
         if options.list_codecs is True:
             list_codecs(serial, not options.no_install)
         else:
