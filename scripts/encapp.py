@@ -240,7 +240,7 @@ def main(argv):
         else:
             # get date and time and format it
             now = datetime.now()
-            dt_string = now.strftime('%m-%d-%Y_%H_%M')
+            dt_string = now.strftime('%Y-%m-%d_%H_%M')
             workdir = (
                 f"{options.desc.replace(' ', '_')}_{model}_{dt_string}")
             if options.output is not None:
