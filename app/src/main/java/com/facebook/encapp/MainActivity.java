@@ -265,6 +265,10 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 while (!mPursuitOver) {
+                    if (vcCombinations.size() == 0) {
+                        Log.w(TAG, "warning: no test to run");
+                        break;
+                    }
                     Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
                     for (TestParams vc : vcCombinations) {
                         boolean pursuit = vc.getPursuit().length() > 0;
