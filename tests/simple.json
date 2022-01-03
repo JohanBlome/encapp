@@ -1,8 +1,10 @@
 {
-	"tests": [{
-		"description": "Simple",
-		"input_files": [
-			"../media/320x180_900fr_avc.mp4"
-		]
-     }]
+  "tests": [
+    {
+      "description": "Simple",
+      "input_files": [
+        "../media/320x180_900fr_avc.mp4"
+      ]
+    }
+  ]
 }

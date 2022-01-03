@@ -1,48 +1,50 @@
 {
-    "tests":[{	
-        "description": "Dynamic Request Sync",
-        "input_files": [
-            "../media/320x180_900fr_avc.mp4"
-        ],
-        "use_surface_enc": 0,
-        "input_format": "raw",
-        "input_resolution": "320x180",
-        "input_fps": "30",
-        "codecs": [
-            "encoder.avc"
-        ],
-        "encode_resolutions": [
-            "1280x720"
-        ],
-        "rc_modes": [
-            "cbr"
-        ],
-        "bitrates": [
-            "1000k"
-        ],
-        "i_intervals": [
-            2000
-        ],
-        "i_frame_sizes": [
-            "unlimited"
-        ],
-        "runtime_parameters": [
-            {
-                "name": "request-sync" ,
-                "type": "int",
-                "settings": [
-                    "30",
-                    "31",
-                    "60",
-                    "62",
-                    "90",
-                    "93",
-                    "120",
-                    "123"
-                ]
-            }
-        ],
-        "duration": 6,
-        "enc_loop": 0
-    }]
+  "tests": [
+    {
+      "description": "Dynamic Request Sync",
+      "input_files": [
+        "../media/320x180_900fr_avc.mp4"
+      ],
+      "use_surface_enc": 0,
+      "input_format": "raw",
+      "input_resolution": "320x180",
+      "input_fps": "30",
+      "codecs": [
+        "encoder.avc"
+      ],
+      "encode_resolutions": [
+        "1280x720"
+      ],
+      "rc_modes": [
+        "cbr"
+      ],
+      "bitrates": [
+        "1000k"
+      ],
+      "i_intervals": [
+        2000
+      ],
+      "i_frame_sizes": [
+        "unlimited"
+      ],
+      "runtime_parameters": [
+        {
+          "name": "request-sync",
+          "type": "int",
+          "settings": [
+            "30",
+            "31",
+            "60",
+            "62",
+            "90",
+            "93",
+            "120",
+            "123"
+          ]
+        }
+      ],
+      "duration": 6,
+      "enc_loop": 0
+    }
+  ]
 }

@@ -8,11 +8,11 @@ import pandas as pd
 import re
 
 
-INDEX_FILE_NAME = "encapp_index.csv"
+INDEX_FILE_NAME = 'encapp_index.csv'
 
 
 def getFilesInDir(directory, options):
-    regexp = "^encapp_.*json$"
+    regexp = '^encapp_.*json$'
     files = []
     for path in os.listdir(directory):
         full_path = os.path.join(directory, path)
@@ -44,7 +44,7 @@ def indexCurrentDir(options):
                                  data['settings']['bitrate'],
                                  data['settings']['meanbitrate']])
         except Exception as exc:
-            print("json " + df + ", load failed: "+str(exc))
+            print('json ' + df + ', load failed: ' + str(exc))
 
     labels = ['file', 'media', 'codec', 'gop', 'fps', 'width', 'height',
               'bitrate', 'real_bitrate']
@@ -57,12 +57,12 @@ def search(options):
     try:
         data = pd.read_csv(INDEX_FILE_NAME)
     except Exception:
-        sys.stderr.write("Error when reading index, reindex\n")
+        sys.stderr.write('Error when reading index, reindex\n')
         indexCurrentDir(options)
         try:
             data = pd.read_csv(INDEX_FILE_NAME)
         except Exception:
-            sys.stderr.write("Failed to read index file")
+            sys.stderr.write('Failed to read index file')
             exit(-1)
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
@@ -124,7 +124,7 @@ def main():
     data = data.sort_values(by=['codec', 'gop', 'fps', 'height', 'bitrate'])
     if options.print_data:
         for _index, row in data.iterrows():
-            print("{:s},{:s},{:s},{:d},{:d},{:d},{:d},{:d},{:d}".format(
+            print('{:s},{:s},{:s},{:d},{:d},{:d},{:d},{:d},{:d}'.format(
                   row['file'],
                   row['media'],
                   row['codec'],
