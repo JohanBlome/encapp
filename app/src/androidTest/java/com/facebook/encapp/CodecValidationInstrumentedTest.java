@@ -2,21 +2,20 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
-import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.filters.SdkSuppress;
-import androidx.test.rule.ActivityTestRule;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.uiautomator.By;
-import androidx.test.uiautomator.SearchCondition;
-import androidx.test.uiautomator.UiDevice;
-import androidx.test.uiautomator.Until;
 import android.util.Log;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
 import java.util.HashMap;
+
+import androidx.test.filters.SdkSuppress;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.ActivityTestRule;
+import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.SearchCondition;
+import androidx.test.uiautomator.UiDevice;
+import androidx.test.uiautomator.Until;
 
 import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
@@ -48,7 +47,6 @@ import static org.junit.Assert.assertThat;
  *
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
-@RunWith(AndroidJUnit4.class)
 @SdkSuppress(minSdkVersion = 25)
 public class CodecValidationInstrumentedTest {
     private static final String TAG = "instrumentation";
@@ -56,7 +54,7 @@ public class CodecValidationInstrumentedTest {
     private static final int LAUNCH_TIMEOUT = 0;
 
     private static final String TARGET_PACKAGE =
-            InstrumentationRegistry.getTargetContext().getPackageName();
+            InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();
     private static final String MODE =
             InstrumentationRegistry.getArguments().getString("mod");
     private static final String ENCODER =
@@ -248,7 +246,7 @@ public class CodecValidationInstrumentedTest {
                 LAUNCH_TIMEOUT);
 
         // Launch the app
-        Context context = InstrumentationRegistry.getContext();
+        Context context = InstrumentationRegistry.getInstrumentation().getContext();
         final Intent intent = context.getPackageManager()
                 .getLaunchIntentForPackage(TARGET_PACKAGE);
 
