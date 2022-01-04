@@ -10,8 +10,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
-import androidx.core.app.ActivityCompat;
-import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
@@ -20,6 +18,7 @@ import android.widget.TextView;
 import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.JSONTestCaseBuilder;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
+import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SessionParam;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -29,13 +28,15 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Vector;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
-    private HashMap<String, String> mExtraDataHashMap;
+    private Bundle mExtraData;
     TextureView mTextureView;
     private int mEncodingsRunning = 0;
     private final Object mEncodingLockObject = new Object();
@@ -56,12 +57,10 @@ public class MainActivity extends AppCompatActivity {
         // Need to check permission strategy
         getInstrumentedTest();
         boolean useNewMethod = true;
-        if (mExtraDataHashMap != null && mExtraDataHashMap.size() > 0) {
-            String old_method = mExtraDataHashMap.get("old_auth");
-            if (old_method != null) {
-                useNewMethod = (old_method.equals("true") || old_method.equals("1"))?false: true;
-            }
+        if (mExtraData != null && mExtraData.size() > 0) {
+            useNewMethod = !mExtraData.getBoolean(ParseData.OLD_AUTH_METHOD, false);
         }
+
         if ( Build.VERSION.SDK_INT >= 30 && useNewMethod && ! Environment.isExternalStorageManager()) {
             Log.d(TAG, "Check ExternalStorageManager");
             //request for the permission
@@ -169,9 +168,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private boolean getInstrumentedTest() {
         Intent intent = getIntent();
-        mExtraDataHashMap = (HashMap<String, String>) intent.getSerializableExtra("map");
+        Bundle bundle = intent.getExtras();
+        if (bundle != null && bundle.containsKey(ParseData.TEST_CONFIG)) {
+            mExtraData = bundle;
+        }
 
-        return mExtraDataHashMap != null;
+        return mExtraData != null;
     }
 
     public void increaseEncodingsInflight() {
@@ -194,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Instrumentation test - let us start!");
         final TextView logText = findViewById(R.id.logText);
 
-        if (mExtraDataHashMap.containsKey("list_codecs")) {
+        if (mExtraData.containsKey(ParseData.LIST_CODECS)) {
             listCodecs();
             try {
                 if (mUIHoldtimeSec > 0) {
@@ -214,50 +216,50 @@ public class MainActivity extends AppCompatActivity {
         }
 
         int overrideConcurrent = 1;
-        if (mExtraDataHashMap.containsKey("conc")) {
-            overrideConcurrent = Integer.parseInt(mExtraDataHashMap.get("conc"));
+        if (mExtraData.containsKey(ParseData.MULTIPLE_CONC_SESSIONS)) {
+            overrideConcurrent = mExtraData.getInt(ParseData.MULTIPLE_CONC_SESSIONS, 0);
         }
 
         boolean tmp = true; // By default always write encoded file
-        if (mExtraDataHashMap.containsKey("write")) {
-            tmp = !mExtraDataHashMap.get("write").equals("false");
+        if (mExtraData.containsKey(ParseData.WRITE_FILE)) {
+            tmp = mExtraData.getBoolean(ParseData.WRITE_FILE);
         }
 
         SessionParam sp = new SessionParam();
         final boolean writeOutput = tmp;
         // Override the filename in the json configure by adding cli "-e -file FILENAME"
-        if (mExtraDataHashMap.containsKey("file")) {
-            sp.setInputFile(mExtraDataHashMap.get("file"));
+        if (mExtraData.containsKey(ParseData.FILE)) {
+            sp.setInputFile(mExtraData.getString(ParseData.FILE));
         }
 
         // A new input size is probably needed in that case
-        if (mExtraDataHashMap.containsKey("ref_res")) {
-            sp.setInputResolution(mExtraDataHashMap.get("ref_res"));
+        if (mExtraData.containsKey(ParseData.REF_RESOLUTION)) {
+            sp.setInputResolution(mExtraData.getString(ParseData.REF_RESOLUTION));
         }
 
-        if (mExtraDataHashMap.containsKey("ref_fps")) {
-            sp.setInputFps(mExtraDataHashMap.get("ref_fps"));
+        if (mExtraData.containsKey(ParseData.REF_FPS)) {
+            sp.setInputFps(mExtraData.getString(ParseData.REF_FPS));
         }
 
-        if (mExtraDataHashMap.containsKey("fps")) {
-            sp.setOutputFps(mExtraDataHashMap.get("fps"));
+        if (mExtraData.containsKey(ParseData.FPS)) {
+            sp.setOutputFps(mExtraData.getString(ParseData.FPS));
         }
 
-        if (mExtraDataHashMap.containsKey("enc")) {
-            sp.setOutputCodec(mExtraDataHashMap.get("enc"));
+        if (mExtraData.containsKey(ParseData.ENCODER)) {
+            sp.setOutputCodec(mExtraData.getString(ParseData.ENCODER));
         }
 
-        if (mExtraDataHashMap.containsKey("res")) {
-            sp.setOutputResolution(mExtraDataHashMap.get("res"));
+        if (mExtraData.containsKey(ParseData.RESOLUTION)) {
+            sp.setOutputResolution(mExtraData.getString(ParseData.RESOLUTION));
         }
 
         /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 Vector<TestParams> vcCombinations = null;
-                if (mExtraDataHashMap.containsKey("test")) {
+                if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
                     vcCombinations = new Vector<>();
-                    if (!JSONTestCaseBuilder.parseFile(mExtraDataHashMap.get("test"), vcCombinations, sp)) {
+                    if (!JSONTestCaseBuilder.parseFile(mExtraData.getString(ParseData.TEST_CONFIG), vcCombinations, sp)) {
                         Assert.assertTrue("Failed to parse tests", false);
                     }
                 } else {
@@ -367,37 +369,37 @@ public class MainActivity extends AppCompatActivity {
 
 
         //Check if there are settings
-        if (mExtraDataHashMap.containsKey("enc")) {
-            String data = mExtraDataHashMap.get("enc");
+        if (mExtraData.containsKey(ParseData.ENCODER)) {
+            String data = mExtraData.getString(ParseData.ENCODER);
             encoders = data.split(",");
         }
-        if (mExtraDataHashMap.containsKey("bit")) {
-            String data = mExtraDataHashMap.get("bit");
+        if (mExtraData.containsKey(ParseData.BITRATE)) {
+            String data = mExtraData.getString(ParseData.BITRATE);
             bitrates = data.split(",");
         }
-        if (mExtraDataHashMap.containsKey("res")) {
-            String data = mExtraDataHashMap.get("res");
+        if (mExtraData.containsKey(ParseData.RESOLUTION)) {
+            String data = mExtraData.getString(ParseData.RESOLUTION);
             Log.d(TAG, "res data: " + data);
             resolutions = data.split(",");
         }
-        if (mExtraDataHashMap.containsKey("key")) {
-            String data = mExtraDataHashMap.get("key");
+        if (mExtraData.containsKey(ParseData.KEYFRAME)) {
+            String data = mExtraData.getString(ParseData.KEYFRAME);
             keys = data.split(",");
         }
-        if (mExtraDataHashMap.containsKey("fps")) {
-            String data = mExtraDataHashMap.get("fps");
+        if (mExtraData.containsKey(ParseData.FPS)) {
+            String data = mExtraData.getString(ParseData.FPS);
             fps = data.split(",");
         }
-        if (mExtraDataHashMap.containsKey("mod")) {
-            String data = mExtraDataHashMap.get("mod");
+        if (mExtraData.containsKey(ParseData.MODE)) {
+            String data = mExtraData.getString(ParseData.MODE);
             mod = data.split(",");
         }
 
-        mUIHoldtimeSec = mExtraDataHashMap.containsKey("ui_hold_sec") ? Integer.parseInt(mExtraDataHashMap.get("ui_hold_sec")): 0;
+        mUIHoldtimeSec = mExtraData.getInt(ParseData.TEST_UI_HOLD_TIME_SEC,0);
 
-        String iframesize = (mExtraDataHashMap.get("ifsize") != null) ? mExtraDataHashMap.get("ifsize") : "DEFAULT";
-        int ref_fps = (mExtraDataHashMap.get("ref_fps") != null) ? Integer.parseInt(mExtraDataHashMap.get("ref_fps")) : 30;
-        String ref_resolution = (mExtraDataHashMap.get("ref_res") != null) ? mExtraDataHashMap.get("ref_res") : "1280x720";
+        String iframesize = mExtraData.getString(ParseData.IFRAME_SIZE_PRESET, "DEFAULT");
+        int ref_fps = mExtraData.getInt(ParseData.REF_FPS, 30);
+        String ref_resolution = mExtraData.getString(ParseData.REF_RESOLUTION,"1280x720");
         if (resolutions == null) {
             resolutions = new String[]{ref_resolution};
         }
@@ -421,12 +423,11 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setBitrateMode(mod[mC]);
 
                                 constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));
-                                if (mExtraDataHashMap.containsKey("tlc")) {
-                                    constraints.setTemporalLayerCount(Integer.parseInt(mExtraDataHashMap.get("tlc")));
+                                if (mExtraData.containsKey(ParseData.TEMPORAL_LAYER_COUNT)) {
+                                    constraints.setTemporalLayerCount(mExtraData.getInt(ParseData.TEMPORAL_LAYER_COUNT,1));
                                 }
 
-                                boolean keySkipFrames = (mExtraDataHashMap.containsKey("skip_frames")) && Boolean.parseBoolean(mExtraDataHashMap.get("skip_frames"));
-                                constraints.setSkipFrames(keySkipFrames);
+                                constraints.setSkipFrames(mExtraData.getBoolean(ParseData.SKIPFRAMES, false));
                                 vc.add(constraints);
                             }
                         }

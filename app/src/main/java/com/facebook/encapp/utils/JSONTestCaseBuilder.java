@@ -1,7 +1,6 @@
 package com.facebook.encapp.utils;
 
 import android.os.Build;
-import androidx.annotation.RequiresApi;
 import android.util.Log;
 import android.util.Size;
 
@@ -20,9 +19,34 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Vector;
 
+import androidx.annotation.RequiresApi;
+
 
 public class JSONTestCaseBuilder {
     private static final String TAG = "testcasebuilder";
+
+    public static String DESCRIPTION = "description"; // Name or description of the test case
+    public static String INPUT_FORMAT = "input_format"; // raw or mp4
+    public static String INPUT_FPS = "input_fps";
+    public static String DURATION = "duration";
+    public static String LOOP = "loop";
+    public static String CONCURRENT = "conc";
+    public static String USE_SURFACE_ENC = "use_surface_enc";
+    public static String I_INTERVALS = "i_intervals";
+    public static String I_FRAME_SIZES = "i_frame_sizes";
+    public static String SKIP_FRAMES = "skip_frames";
+    public static String INPUT_FILES = "input_files";
+    public static String INPUT_RESOLUTION = "input_resolution";
+    public static String BITRATES = "bitrates";
+    public static String ENCODE_RESOLUTIONS = "encode_resolutions";
+    public static String CODECS = "codecs";
+    public static String FRAMERATES = "fps";
+    public static String RC_MODES = "rc_modes"; // Bitrate control mode
+    public static String PURSUIT = "pursuit";
+    public static String REALTIME = "realtime";
+    public static String CONFIGURE = "configure";
+    public static String RUNTIME_PARAMETERS = "runtime_parameters";
+
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static boolean parseFile(String filename, Vector<TestParams> vcs, SessionParam session) throws IOException {
@@ -90,45 +114,45 @@ public class JSONTestCaseBuilder {
                                 Object data_object = test.get(case_key);
                                 Log.d(TAG, "Key  = " + case_key  + " - " + data_object);
 
-                                if (case_key.equals("description")) {
+                                if (case_key.equals(DESCRIPTION)) {
                                     description = test.getString(case_key);
-                                } else if (case_key.equals("input_format")) {
+                                } else if (case_key.equals(INPUT_FORMAT)) {
                                     input_format = test.getString(case_key);
-                                } else if (case_key.equals("input_resolution")) {
+                                } else if (case_key.equals(INPUT_RESOLUTION)) {
                                     input_resolution = test.getString(case_key);
-                                } else if (case_key.equals("duration")) {
+                                } else if (case_key.equals(DURATION)) {
                                     duration = test.getString(case_key);
-                                } else if (case_key.equals("loop")) {
+                                } else if (case_key.equals(LOOP)) {
                                     enc_loop = test.getString(case_key);
-                                } else if (case_key.equals("conc")) {
+                                } else if (case_key.equals(CONCURRENT)) {
                                     conc = test.getString(case_key);
-                                } else if (case_key.equals("use_surface_enc")) {
+                                } else if (case_key.equals(USE_SURFACE_ENC)) {
                                     use_surface_enc = test.getString(case_key);
-                                } else if (case_key.equals("input_fps")) {
+                                } else if (case_key.equals(INPUT_FPS)) {
                                     input_fps = test.getString(case_key);
-                                } else if (case_key.equals("i_intervals")) {
+                                } else if (case_key.equals(I_INTERVALS)) {
                                     i_intervals = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("i_frame_sizes")) {
+                                } else if (case_key.equals(I_FRAME_SIZES)) {
                                     i_frame_sizes = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("skip_frames")) {
+                                } else if (case_key.equals(SKIP_FRAMES)) {
                                     skip_frames = test.getString(case_key);
-                                } else if (case_key.equals("input_files")) {
+                                } else if (case_key.equals(INPUT_FILES)) {
                                     input_files = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("bitrates")) {
+                                } else if (case_key.equals(BITRATES)) {
                                     bitrates = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("encode_resolutions")) {
+                                } else if (case_key.equals(ENCODE_RESOLUTIONS)) {
                                     encode_resolutions = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("codecs")) {
+                                } else if (case_key.equals(CODECS)) {
                                     codecs = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("fps")) {
+                                } else if (case_key.equals(FRAMERATES)) {
                                     fps = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("rc_modes")) {
+                                } else if (case_key.equals(RC_MODES)) {
                                     mod = getStringArray((JSONArray) data_object);
-                                } else if (case_key.equals("pursuit")) {
+                                } else if (case_key.equals(PURSUIT)) {
                                     pursuit = test.getString(case_key);
-                                } else if (case_key.equals("realtime")) {
+                                } else if (case_key.equals(REALTIME)) {
                                     realtime = test.getString(case_key);
-                                } else if (case_key.equals("configure")) {
+                                } else if (case_key.equals(CONFIGURE)) {
                                     JSONArray config_array = (JSONArray) data_object;
                                 /*
                                 "configure": [{
@@ -151,7 +175,7 @@ public class JSONTestCaseBuilder {
                                         }
                                     }
 
-                                } else if (case_key.equals("runtime_parameters")) {
+                                } else if (case_key.equals(RUNTIME_PARAMETERS)) {
                                 /*
                                  "runtime_parameters": [
                                     {
