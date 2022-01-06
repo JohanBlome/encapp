@@ -107,8 +107,7 @@ public class JSONTestCaseBuilder {
         String[] encode_resolutions = {"1280x720"};
         String[] codecs = {"OMX.google.h264.encoder"};
         String[] fps = {"30"};
-        String[] mod = {"VBR"};
-        String rc_mode = "vbr";
+        String[] mod = {"CBR"};
         String[] input_files = {};
         String[] i_frame_sizes = {"default"};
         String[] i_intervals = {"10"};
