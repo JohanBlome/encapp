@@ -293,8 +293,9 @@ This will install a prebuild apk, push the videofile and run the test.
 $ encapp.py sample_config.json
 
 To run on a specific device, use
-
+```
 $ encapp.py --test sample_config.json --serial [device serial number]
+```
 The script will automatically push the input files to the device.
 If the input file(s) are not in the working directory, use absolute path(s)
 
@@ -302,4 +303,34 @@ The script saves all encoded videos and stats in an output directory per run.
 Stat files are in JSON format.
 
 If you do not want to install the prebuild apk, run
+```
 $ encapp.py --install false sample_config.json
+```
+
+(7) Navigating results
+
+The names json result files does not give any clues as to what settings have been used.
+To figure that out run:
+```
+$ encapp_search.py
+```
+Running it without any arguments will index all parsable json files in the current folder and below.
+
+To find all 1080p files run:
+```
+$ encapp_search.py -s 1920x1080
+```
+
+
+(8) Calculate quality degradation
+
+Run
+
+
+```
+$ encapp_quality.py --header --media MEDIA_FOLDER $(encapp_search.py)
+
+```
+
+Since the json file only contains the name of the source for an encoding the source folder needs to be provided.
+The output will be a csv file (default name is 'quality.csv') containing vmaf, ssim, psnr and other relevant properties.
