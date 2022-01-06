@@ -137,13 +137,13 @@ def main():
     else:
         files = data['file'].values
         for fl in files:
+            directory, filename = os.path.split(fl)
             if options.video:
-                directory, filename = os.path.split(fl)
                 video = data.loc[data['file'] == fl]
                 name = directory + '/' + video['media'].values[0]
-                print(name)
             else:
-                print(fl)
+                name = directory + '/' + fl
+            print(name)
 
 
 if __name__ == '__main__':
