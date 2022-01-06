@@ -127,13 +127,8 @@ def run_quality(test_file, options):
             distorted = f'{encodedfile}.yuv'
 
             #Scale
-            if raw:
-                adb_cmd = f'{FFMPEG_SILENT}  -f rawvideo -pix_fmt {pix_fmt} ' \
-                          f'-s {output_res} -i {encodedfile} -f rawvideo ' \
-                          f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
-            else:
-                adb_cmd = f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo ' \
-                          f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
+            adb_cmd = f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo ' \
+                      f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
 
             run_cmd(adb_cmd)
         if raw:
