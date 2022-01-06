@@ -107,11 +107,11 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         else:
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
-                for fl in input_files:
+                for file in input_files:
                     if len(json_folder) > 0:
-                        path = f'{json_folder}/{fl}'
+                        path = f'{json_folder}/{file}'
                     else:
-                        path = f'{fl}'
+                        path = f'{file}'
                     if exists(path):
                         run_cmd(f'adb -s {serial} push {path} /sdcard/')
                     else:
@@ -123,6 +123,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         with open(json_name, "w") as outfile:
             json.dump(test, outfile)
         run_cmd(f'adb -s {serial} push {json_name} /sdcard/')
+        os.remove(json_name)
 
         additional = ''
         if len(options.codec) > 0:
@@ -168,11 +169,15 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
             run_cmd(adb_cmd)
 
-        print('Done')
-
-        if options.remove_input:
-            adb_cmd = f'adb -s {serial} shell rm {inputfile}'
-            run_cmd(adb_cmd)
+        adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
+        if input_files is not None:
+                for file in input_files:
+                    base_file_name = os.path.basename(file)
+                    run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
+        if len(options.input) > 0:
+            base_file_name = os.path.basename(inputfile)
+            run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
+        run_cmd(adb_cmd)
 
 
 def list_codecs(serial, install):
@@ -214,7 +219,6 @@ def get_options(argv):
     parser.add_argument('--output_fps', help='Override output fps', default='')
     parser.add_argument('--output_res', help='Override output resolution',
                         default='')
-    parser.add_argument('--remove_input', action='store_true')
 
     options = parser.parse_args()
 

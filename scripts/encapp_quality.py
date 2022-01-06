@@ -97,12 +97,16 @@ def run_quality(test_file, options):
                 pix_fmt = 'nv12'
 
 
-        input_width = input_media_format.get('width')
-        input_height = input_media_format.get('height')
+        if len(options.override_reference) > 0:
+            input_res = options.reference_resolution
+        else:
+            input_width = input_media_format.get('width')
+            input_height = input_media_format.get('height')
+            input_res = f'{input_width}x{input_height}'
         output_media_format = test.get('encoder_media_format')
         output_width = output_media_format.get('width')
         output_height = output_media_format.get('height')
-        input_res = f'{input_width}x{input_height}'
+     
         output_res = f'{output_width}x{output_height}'
 
         reference = source
@@ -118,17 +122,13 @@ def run_quality(test_file, options):
             force_scale = 'scale=in_range=limited:out_range=limited[o];[o]'
         if options.lr_fr:
             force_scale = 'scale=in_range=limited:out_range=full[o];[o]'
+
         if input_res != output_res:
             distorted = f'{encodedfile}.yuv'
 
             #Scale
-            if raw:
-                adb_cmd = f'{FFMPEG_SILENT}  -f rawvideo -pix_fmt {pix_fmt} ' \
-                          f'-s {output_res} -i {encodedfile} -f rawvideo ' \
-                          f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
-            else:
-                adb_cmd = f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo ' \
-                          f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
+            adb_cmd = f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo ' \
+                      f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
 
             run_cmd(adb_cmd)
         if raw:
@@ -201,6 +201,9 @@ def get_options(argv):
     parser.add_argument('-ref', '--override_reference',
                         help='Override reference, used when source is '\
                         ' downsampled prior to encoding',
+                        default='')
+    parser.add_argument('-ref_res', '--reference_resolution',
+                        help='Overriden reference resolution WxH',                        
                         default='')
     parser.add_argument('--header',
                         help='print header to output',
