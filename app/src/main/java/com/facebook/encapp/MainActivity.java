@@ -266,6 +266,7 @@ public class MainActivity extends AppCompatActivity {
                     vcCombinations = buildSettingsFromCommandline();
                 }
 
+                int pursuit = vcCombinations.firstElement().getPursuit() - 1;
                 while (!mPursuitOver) {
                     if (vcCombinations.size() == 0) {
                         Log.w(TAG, "warning: no test to run");
@@ -273,16 +274,17 @@ public class MainActivity extends AppCompatActivity {
                     }
                     Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
                     for (TestParams vc : vcCombinations) {
-                        boolean pursuit = vc.getPursuit().length() > 0;
+                        Log.d(TAG, "pursuit = " + pursuit);
                         int vcConc = vc.getConcurrentCodings();
                         int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
 
-                        if (!pursuit) {
+                        if (pursuit == 0) {
                             mPursuitOver = true;
                         }
-                        if (concurrent > 1 || pursuit) {
+                        if (concurrent > 1 || pursuit != 0) {
                             increaseEncodingsInflight();
                             Log.d(TAG, "Start another threaded encoding " + mEncodingsRunning );
+                            Log.d(TAG, "pursuit = " + pursuit);
                             (new Thread(new Runnable() {
                                 @Override
                                 public void run() {
@@ -294,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
                             })).start();
 
                             Log.d(TAG, "Concurrent or pursuit");
-                            while (mEncodingsRunning >= concurrent && !pursuit) {
+                            while (mEncodingsRunning >= concurrent && pursuit == 0) {
                                 try {
                                     Log.d(TAG, "Sleep 200ms");
                                     Thread.sleep(200);
@@ -303,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
 
-                            if (pursuit) {
+                            if (pursuit != 0) {
                                 Log.d(TAG, "pursuit sleep 1 sec, encodings: " + mEncodingsRunning );
                                 try {
                                     Thread.sleep(1000);
@@ -312,6 +314,7 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                             }
+                            if (pursuit > 0) pursuit -= 1;
                         } else {
                             increaseEncodingsInflight();
                             Log.d(TAG, "start encoding, no sep thread");
@@ -481,13 +484,14 @@ public class MainActivity extends AppCompatActivity {
             }
 
             Log.d(TAG, "Done one encoding: " + mEncodingsRunning);
+            mPursuitOver = true;
             if (status.length() > 0) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         logText.append("\nEncoding failed: " + settings);
                         logText.append("\n" + status);
-                        if (vc.getPursuit().length() > 0) {
+                        if (vc.getPursuit() == 0) {
                             Log.d(TAG, "Pursuit over");
                             mPursuitOver = true;
                         } else {

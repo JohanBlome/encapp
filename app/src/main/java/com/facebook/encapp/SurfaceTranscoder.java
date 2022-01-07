@@ -28,7 +28,12 @@ public class SurfaceTranscoder extends BufferEncoder {
 
     public String encode(TestParams vc,
                          boolean writeFile) {
-        Log.d(TAG, "**** Surface Transcode - " + vc.getDescription() + " ***");
+        boolean noEncoding = vc.noEncoding();
+        if (noEncoding) {
+            Log.d(TAG, "**** Surface Decode, no encode ***");
+        } else {
+            Log.d(TAG, "**** Surface Transcode - " + vc.getDescription() + " ***");
+        }
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
         mFramesAdded = 0;
@@ -53,19 +58,32 @@ public class SurfaceTranscoder extends BufferEncoder {
             }
             mExtractor.selectTrack(trackNum);
             inputFormat = mExtractor.getTrackFormat(trackNum);
-            mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+            if (vc.getDecoder().length() > 0) {
+                Log.d(TAG, "Create decoder by name: " + vc.getDecoder());
+                mDecoder = MediaCodec.createByCodecName(vc.getDecoder());
+            } else {
+                Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+            }
         } catch (IOException e) {
+            mExtractor.release();
             e.printStackTrace();
+            return "Failed to create decoder";
         }
-
+        boolean isVP = false;
+        boolean isQCom = false;
         int keyFrameInterval = vc.getKeyframeRate();
+
         MediaFormat format;
         try {
-            String codecName = getCodecName(vc);
-            mStats.setCodec(codecName);
-            Log.d(TAG, "Create codec by name: " + codecName);
-            mCodec = MediaCodec.createByCodecName(codecName);
-
+            if (!noEncoding) {
+                String codecName = getCodecName(vc);
+                mStats.setCodec(codecName);
+                Log.d(TAG, "Create encoder by name: " + codecName);
+                mCodec = MediaCodec.createByCodecName(codecName);
+            } else {
+                mStats.setCodec(Statistics.NA);
+            }
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
                 return "no input format";
@@ -81,7 +99,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 Log.d(TAG, "Color transfer set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER));
             }
             if (inputFormat.containsKey(MediaFormat.KEY_COLOR_STANDARD)) {
-                vc.addConfigureSetting( new ConfigureParam(MediaFormat.KEY_COLOR_STANDARD, inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD)));
+                vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_STANDARD, inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD)));
                 Log.d(TAG, "Color standard set: " + inputFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD));
             }
 
@@ -89,24 +107,30 @@ public class SurfaceTranscoder extends BufferEncoder {
             Log.d(TAG, "Set color format");
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 
-            mInputSurfaceReference = new AtomicReference<>();
+
             mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-            setConfigureParams(vc, format);
-            mCodec.configure(
-                    format,
-                    null /* surface */,
-                    null /* crypto */,
-                    MediaCodec.CONFIGURE_FLAG_ENCODE);
-            checkConfigureParams(vc, mCodec.getInputFormat());
-            mInputSurfaceReference.set(mCodec.createInputSurface());
-            mInputSurface = new InputSurface(mInputSurfaceReference.get());
-            mInputSurface.makeCurrent();
+            if (!noEncoding) {
+                mInputSurfaceReference = new AtomicReference<>();
+                setConfigureParams(vc, format);
+                mCodec.configure(
+                        format,
+                        null /* surface */,
+                        null /* crypto */,
+                        MediaCodec.CONFIGURE_FLAG_ENCODE);
+                checkConfigureParams(vc, mCodec.getInputFormat());
+                mInputSurfaceReference.set(mCodec.createInputSurface());
+                mInputSurface = new InputSurface(mInputSurfaceReference.get());
+                mInputSurface.makeCurrent();
+            }
 
             mOutputSurface = new OutputSurface();
             mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
             mDecoder.start();
+            mStats.setDecoderName(mDecoder.getName());
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
-            mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+            if (!noEncoding) {
+                mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+            }
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
             return "Failed to create codec";
@@ -114,35 +138,36 @@ public class SurfaceTranscoder extends BufferEncoder {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
         }
+        if (!noEncoding) {
+            try {
+                mCodec.start();
+            } catch (Exception ex) {
+                Log.e(TAG, "Start failed: " + ex.getMessage());
+                return "Start encoding failed";
+            }
+        }
+        mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+        float referenceFrameRate = vc.getmReferenceFPS();
+        mKeepInterval = referenceFrameRate / (float) mFrameRate;
+        calculateFrameTiming();
 
-        try {
-            mCodec.start();
-        } catch (Exception ex) {
-            Log.e(TAG, "Start failed: " + ex.getMessage());
-            return "Start encoding failed";
+        if (!noEncoding) {
+            Log.d(TAG, "Create muxer");
+            mMuxer = createMuxer(mCodec, format, true);
+            isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
+            isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
         }
 
         int inFramesCount = 0;
-        int outFramesCount = 0;
-        mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
-        float mReferenceFrameRate = vc.getmReferenceFPS();
-        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        calculateFrameTiming();
-        Log.e(TAG, "ref " + mReferenceFrameRate+", fps " + mFrameRate +", keepint. =  " + mKeepInterval + ", mFrameTime = " + mFrameTime);
+
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
-        boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
-
-        Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, format, true);
-
         long totalTime = 0;
         long last_pts = 0;
         int current_loop = 1;
         while (loop + 1 >= current_loop) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop);
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop + " / "+loop);
             }
             try {
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
@@ -171,7 +196,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                                 mStats.startDecodingFrame(mExtractor.getSampleTime(), mExtractor.getSampleSize(), mExtractor.getSampleFlags());
                                 mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                             } catch (MediaCodec.CodecException cex) {
-                                Log.d(TAG, "End of stream: "+ cex.getMessage());
+                                Log.d(TAG, "End of stream: " + cex.getMessage());
                             }
                             break;
                         }
@@ -188,13 +213,13 @@ public class SurfaceTranscoder extends BufferEncoder {
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    long pts =  computePresentationTime(inFramesCount); //info.presentationTimeUs;
+                    long pts = info.presentationTimeUs;
                     mStats.stopDecodingFrame(pts);
                     setRuntimeParameters(inFramesCount);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int) ((float) (inFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int) ((float) ((inFramesCount + 1)) / mKeepInterval);
-                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                    if (currentFrameNbr == nextFrameNbr || mDropNext || noEncoding) {
                         mDecoder.releaseOutputBuffer(index, false); //Skip this and read again
                         mDropNext = false;
                         mSkipped++;
@@ -227,33 +252,34 @@ public class SurfaceTranscoder extends BufferEncoder {
                 inFramesCount++;
             }
 
-            index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-            if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                //Just ignore
-            } else if (index >= 0) {
-                mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                                (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                ByteBuffer data = mCodec.getOutputBuffer(index);
-                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                    MediaFormat oformat = mCodec.getOutputFormat();
-                    Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: " + oformat);
-                    checkConfig(oformat);
+            if (!noEncoding) {
+                index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    //Just ignore
+                } else if (index >= 0) {
+                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                            (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                    ByteBuffer data = mCodec.getOutputBuffer(index);
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        MediaFormat oformat = mCodec.getOutputFormat();
+                        Log.e(TAG, "BUFFER_FLAG_CODEC_CONFIG: " + oformat);
+                        checkConfig(oformat);
 
-                    if (mWriteFile) {
-                        mVideoTrack = mMuxer.addTrack(oformat);
-                        Log.d(TAG, "Start muxer");
-                        mMuxer.start();
+                        if (mWriteFile) {
+                            mVideoTrack = mMuxer.addTrack(oformat);
+                            Log.d(TAG, "Start muxer");
+                            mMuxer.start();
+                        }
+                        mCodec.releaseOutputBuffer(index, false /* render */);
+                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        break;
+                    } else {
+                        mFramesAdded += 1;
+                        totalTime += info.presentationTimeUs;
+                        if (mMuxer != null)
+                            mMuxer.writeSampleData(mVideoTrack, data, info);
+                        mCodec.releaseOutputBuffer(index, false /* render */);
                     }
-                    mCodec.releaseOutputBuffer(index, false /* render */);
-                } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    break;
-                } else {
-                    ++outFramesCount;
-                    mFramesAdded += 1;
-                    totalTime += info.presentationTimeUs;
-                    if (mMuxer != null)
-                        mMuxer.writeSampleData(mVideoTrack, data, info);
-                    mCodec.releaseOutputBuffer(index, false /* render */);
                 }
             }
         }

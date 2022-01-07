@@ -29,6 +29,7 @@ public class Statistics {
     private long mStopTime;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
+    private String mDecoderName = "";
 
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
@@ -36,6 +37,7 @@ public class Statistics {
     TestParams mVc;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
+    public static String NA = "na";
 
     public Statistics(String desc, TestParams vc) {
         mDesc = desc;
@@ -161,6 +163,11 @@ public class Statistics {
         JSONObject mediaformat = new JSONObject();
         if (format == null) {
             return mediaformat;
+        }
+        try {
+            mediaformat.put("decoder", mDecoderName);
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
@@ -359,5 +366,9 @@ public class Statistics {
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setDecoderName(String decoderName) {
+        mDecoderName = decoderName;
     }
 }

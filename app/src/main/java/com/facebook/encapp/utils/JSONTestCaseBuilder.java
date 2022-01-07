@@ -46,6 +46,8 @@ public class JSONTestCaseBuilder {
     public static String REALTIME = "realtime";
     public static String CONFIGURE = "configure";
     public static String RUNTIME_PARAMETERS = "runtime_parameters";
+    public static String ENCODE = "encode";
+    public static String DECODER = "decoder"; //choose specific codec for decoding
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -123,6 +125,8 @@ public class JSONTestCaseBuilder {
         String skip_frames = "false";
         String pursuit = "";
         String realtime = "false";
+        String encode = "false";
+        String decoder = "";
         ArrayList<Object> runtime_parameters = new ArrayList<>();
 
         JSONObject test = o1;
@@ -171,6 +175,10 @@ public class JSONTestCaseBuilder {
                 pursuit = test.getString(case_key);
             } else if (case_key.equals(REALTIME)) {
                 realtime = test.getString(case_key);
+            } else if (case_key.equals(ENCODE)) {
+                encode = test.getString(case_key);
+            } else if (case_key.equals(DECODER)) {
+                decoder = test.getString(case_key);
             } else if (case_key.equals(CONFIGURE)) {
                 JSONArray config_array = (JSONArray) data_object;
             /*
@@ -281,8 +289,10 @@ public class JSONTestCaseBuilder {
                                         testParams.setLoopCount(Integer.parseInt(enc_loop));
                                         testParams.setConcurrentCodings(Integer.parseInt(conc));
                                         testParams.setDescription(description);
-                                        testParams.setPursuit(pursuit);
+                                        testParams.setPursuit(Integer.parseInt(pursuit));
                                         testParams.setRealtime(Boolean.parseBoolean(realtime));
+                                        if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
+                                        testParams.setDecoder(decoder);
                                         vc.add(testParams);
                                     }
                                 }

@@ -52,9 +52,11 @@ public class TestParams {
     private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
     ArrayList<Object> mRuntimeParams;
     private int mConcurrentCodings = 1;
+    private String mDecoder = "";
     private boolean mRealtime = false;
 
-    private String mPursuit = "";
+    private int mPursuit = 0;
+    private boolean mNoEncoding = false;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -427,11 +429,11 @@ public class TestParams {
         return mConcurrentCodings;
     }
 
-    public String getPursuit() {
+    public int getPursuit() {
         return mPursuit;
     }
 
-    public void setPursuit(String pursuit) {
+    public void setPursuit(int pursuit) {
         this.mPursuit = pursuit;
     }
 
@@ -439,6 +441,15 @@ public class TestParams {
     }
 
     public void setRealtime(boolean realtime) {this.mRealtime = realtime;}
+
+    public boolean noEncoding() {return mNoEncoding; }
+
+    public void setNoEncoding(boolean noEncoding) {mNoEncoding = noEncoding;}
+
+
+    public String getDecoder() {return mDecoder;}
+
+    public void setDecoder(String decoder) {mDecoder = decoder;}
 
 }
 
