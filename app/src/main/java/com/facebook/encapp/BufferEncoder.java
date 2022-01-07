@@ -7,7 +7,6 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
 import android.util.Log;
 
 import com.facebook.encapp.utils.Assert;
@@ -25,6 +24,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.Vector;
 
+import androidx.annotation.NonNull;
+
 
 /**
  * Created by jobl on 2018-02-27.
@@ -34,7 +35,7 @@ class BufferEncoder {
     // Qualcomm added extended omx parameters
 
 
-    protected static final String TAG = "encoder";
+    protected static final String TAG = "encapp";
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000000;
 
     protected int mFrameRate = 30;
@@ -52,7 +53,7 @@ class BufferEncoder {
     protected String mFilename;
     protected boolean mDropNext;
     protected HashMap<Integer, ArrayList<RuntimeParam>> mRuntimeParams;
-    int mLTRCount = 0;
+    protected HashMap<Integer, ArrayList<RuntimeParam>> mDecoderRuntimeParams;
     boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     private long mFilePntr;
     private FileReader mYuvReader;
@@ -77,7 +78,7 @@ class BufferEncoder {
         mStats.start();
         mYuvReader = new FileReader();
 
-        vc.addConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
+        vc.addEncoderConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible));
         int loop = vc.getLoopCount();
 
@@ -96,7 +97,7 @@ class BufferEncoder {
 
             format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
             checkConfigureParams(vc, format);
-            setConfigureParams(vc, format);
+            setConfigureParams(vc, vc.getEncoderConfigure(), format);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             Log.d(TAG, "Format of encoder");
             checkConfig(format);
@@ -272,7 +273,7 @@ class BufferEncoder {
      */
     private int queueInputBufferEncoder(
             MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
-        setRuntimeParameters(frameCount);
+        setRuntimeParameters(frameCount, mCodec, mRuntimeParams);
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
@@ -424,8 +425,7 @@ class BufferEncoder {
         return codecName;
     }
 
-    protected void setConfigureParams(TestParams vc, MediaFormat format) {
-        ArrayList<ConfigureParam> params = vc.getExtraConfigure();
+    protected void setConfigureParams(TestParams vc,  ArrayList<ConfigureParam> params, MediaFormat format) {
         for (ConfigureParam param : params) {
             if (param.value instanceof Integer) {
                 format.setInteger(param.name, (Integer) param.value);
@@ -437,7 +437,7 @@ class BufferEncoder {
     }
 
     protected void checkConfigureParams(TestParams vc, MediaFormat format) {
-        ArrayList<ConfigureParam> params = vc.getExtraConfigure();
+        ArrayList<ConfigureParam> params = vc.getEncoderConfigure();
         Log.d(TAG, "checkConfigureParams: " + params.toString() + ", l = " + params.size());
         for (ConfigureParam param : params) {
             try {
@@ -493,10 +493,10 @@ class BufferEncoder {
         }
     }
 
-    protected void setRuntimeParameters(int frameCount) {
-        if (mRuntimeParams != null && !mRuntimeParams.isEmpty()) {
+    protected void setRuntimeParameters(int frameCount,  MediaCodec codec, HashMap<Integer, ArrayList<RuntimeParam>> runtimeParamList) {
+        if (runtimeParamList != null && !runtimeParamList.isEmpty()) {
             Bundle params = new Bundle();
-            ArrayList<RuntimeParam> runtimeParams = mRuntimeParams.get(Integer.valueOf(frameCount));
+            ArrayList<RuntimeParam> runtimeParams = runtimeParamList.get(Integer.valueOf(frameCount));
             if (runtimeParams != null) {
                 for (RuntimeParam param : runtimeParams) {
                     if (param.value == null) {
@@ -522,9 +522,8 @@ class BufferEncoder {
                         Log.d(TAG, "Unknown type: " + param.type);
                     }
                 }
-                mCodec.setParameters(params);
+                codec.setParameters(params);
             }
         }
     }
-
 }

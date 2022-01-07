@@ -45,7 +45,11 @@ public class JSONTestCaseBuilder {
     public static String PURSUIT = "pursuit";
     public static String REALTIME = "realtime";
     public static String CONFIGURE = "configure";
-    public static String RUNTIME_PARAMETERS = "runtime_parameters";
+    public static String CONFIGURE_DECODER = "configure_decoder";
+    public static String Encoder_RUNTIME_PARAMETERS = "runtime_parameters";
+    public static String DECODER_RUNTIME_PARAMETERS = "decoder_runtime_parameters";
+    public static String ENCODE = "encode";
+    public static String DECODER = "decoder"; //choose specific codec for decoding
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -112,6 +116,7 @@ public class JSONTestCaseBuilder {
         String[] i_frame_sizes = {"default"};
         String[] i_intervals = {"10"};
         ArrayList<ConfigureParam> config_extra = new ArrayList<>();
+        ArrayList<ConfigureParam> config_decoder = new ArrayList<>();
         String description = "";
         String input_format = "";
         String input_resolution = "1280x720";
@@ -123,7 +128,10 @@ public class JSONTestCaseBuilder {
         String skip_frames = "false";
         String pursuit = "";
         String realtime = "false";
-        ArrayList<Object> runtime_parameters = new ArrayList<>();
+        String encode = "false";
+        String decoder = "";
+        ArrayList<Object> encoder_runtime_parameters = new ArrayList<>();
+        ArrayList<Object> decoder_runtime_parameters = new ArrayList<>();
 
         JSONObject test = o1;
         Log.d(TAG, "\n\n test: " + test + " new test collection");
@@ -171,6 +179,10 @@ public class JSONTestCaseBuilder {
                 pursuit = test.getString(case_key);
             } else if (case_key.equals(REALTIME)) {
                 realtime = test.getString(case_key);
+            } else if (case_key.equals(ENCODE)) {
+                encode = test.getString(case_key);
+            } else if (case_key.equals(DECODER)) {
+                decoder = test.getString(case_key);
             } else if (case_key.equals(CONFIGURE)) {
                 JSONArray config_array = (JSONArray) data_object;
             /*
@@ -180,7 +192,7 @@ public class JSONTestCaseBuilder {
                 "setting" : "android.generic.2"
             }],
             */
-                Log.d(TAG, "Configure: " + config_array.toString());
+                Log.d(TAG, "Configure encoder: " + config_array.toString());
                 for (int pnum = 0; pnum < config_array.length(); pnum++) {
                     JSONObject param = config_array.getJSONObject(pnum);
                     String type = param.getString("type");
@@ -194,7 +206,30 @@ public class JSONTestCaseBuilder {
                     }
                 }
 
-            } else if (case_key.equals(RUNTIME_PARAMETERS)) {
+            }  else if (case_key.equals(CONFIGURE_DECODER)) {
+                JSONArray config_array = (JSONArray) data_object;
+            /*
+            "configure": [{
+                "name": "tl-schema",
+                "type": "string",
+                "setting" : "android.generic.2"
+            }],
+            */
+                Log.d(TAG, "Configure decoder: " + config_array.toString());
+                for (int pnum = 0; pnum < config_array.length(); pnum++) {
+                    JSONObject param = config_array.getJSONObject(pnum);
+                    String type = param.getString("type");
+                    Log.d(TAG, "type = "+type);
+                    if (type.toLowerCase(Locale.US).equals("int")) {
+                        config_decoder.add(new ConfigureParam(param.getString("name"), param.getInt("setting")));
+                    } else if (type.toLowerCase(Locale.US).equals("float") | type.toLowerCase(Locale.US).equals("double")) {
+                        config_decoder.add(new ConfigureParam(param.getString("name"), param.getDouble("setting")));
+                    } else if (type.toLowerCase(Locale.US).equals("string")) {
+                        config_decoder.add(new ConfigureParam(param.getString("name"), param.getString("setting")));
+                    }
+                }
+
+            } else if (case_key.equals(Encoder_RUNTIME_PARAMETERS)) {
             /*
              "runtime_parameters": [
                 {
@@ -218,7 +253,33 @@ public class JSONTestCaseBuilder {
                 JSONArray runtime_array = (JSONArray) data_object;
                 for (int rp = 0; rp < runtime_array.length(); rp++) {
                     JSONObject param = runtime_array.getJSONObject(rp);
-                    parseSetting(param, runtime_parameters);
+                    parseSetting(param, encoder_runtime_parameters);
+                }
+            } else if (case_key.equals(DECODER_RUNTIME_PARAMETERS)) {
+            /*
+             "runtime_parameters": [
+                {
+                    "name": "vendor.qti-ext-enc-ltr.mark-frame",
+                    "type" : "int",
+                    "settings": [
+                        "10",
+                        "20"
+                    ]
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr.use-frame" ,
+                    "type": "int",
+                    "settings": [
+                        {"40" : "10"},
+                        {"60" : "20"}
+                    ]
+                }
+            ],
+             */
+                JSONArray runtime_array = (JSONArray) data_object;
+                for (int rp = 0; rp < runtime_array.length(); rp++) {
+                    JSONObject param = runtime_array.getJSONObject(rp);
+                    parseSetting(param, decoder_runtime_parameters);
                 }
             }
         }
@@ -275,14 +336,18 @@ public class JSONTestCaseBuilder {
                                         testParams.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(i_frame_sizes[iS].toUpperCase(Locale.US)));
                                         testParams.setSkipFrames(Boolean.parseBoolean(skip_frames));
                                         testParams.setInputfile(input_files[iF]);
-                                        testParams.setRuntimeParameters(runtime_parameters);
-                                        testParams.setExtraConfigure(config_extra);
+                                        testParams.setEncoderRuntimeParameters(encoder_runtime_parameters);
+                                        testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
+                                        testParams.setEncoderConfigure(config_extra);
+                                        testParams.setDecoderConfigure(config_decoder);
                                         testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
                                         testParams.setLoopCount(Integer.parseInt(enc_loop));
                                         testParams.setConcurrentCodings(Integer.parseInt(conc));
                                         testParams.setDescription(description);
-                                        testParams.setPursuit(pursuit);
+                                        testParams.setPursuit(Integer.parseInt(pursuit));
                                         testParams.setRealtime(Boolean.parseBoolean(realtime));
+                                        if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
+                                        testParams.setDecoder(decoder);
                                         vc.add(testParams);
                                     }
                                 }

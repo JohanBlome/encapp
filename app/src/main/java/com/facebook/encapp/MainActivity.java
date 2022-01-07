@@ -38,8 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp";
     private Bundle mExtraData;
     TextureView mTextureView;
-    private int mEncodingsRunning = 0;
-    private final Object mEncodingLockObject = new Object();
+    private int mInstancesRunning = 0;
+    private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
 
@@ -176,15 +176,15 @@ public class MainActivity extends AppCompatActivity {
         return mExtraData != null;
     }
 
-    public void increaseEncodingsInflight() {
-        synchronized (mEncodingLockObject) {
-            mEncodingsRunning++;
+    public void increaseTestsInflight() {
+        synchronized (mTestLockObject) {
+            mInstancesRunning++;
         }
     }
 
-    public void decreaseEncodingsInflight() {
-        synchronized (mEncodingLockObject) {
-            mEncodingsRunning--;
+    public void decreaseTestsInflight() {
+        synchronized (mTestLockObject) {
+            mInstancesRunning--;
         }
     }
 
@@ -266,6 +266,7 @@ public class MainActivity extends AppCompatActivity {
                     vcCombinations = buildSettingsFromCommandline();
                 }
 
+                int pursuit = vcCombinations.firstElement().getPursuit();
                 while (!mPursuitOver) {
                     if (vcCombinations.size() == 0) {
                         Log.w(TAG, "warning: no test to run");
@@ -273,28 +274,30 @@ public class MainActivity extends AppCompatActivity {
                     }
                     Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
                     for (TestParams vc : vcCombinations) {
-                        boolean pursuit = vc.getPursuit().length() > 0;
+                        if (pursuit > 0) pursuit -= 1;
+                        Log.d(TAG, "pursuit = " + pursuit);
                         int vcConc = vc.getConcurrentCodings();
                         int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
 
-                        if (!pursuit) {
+                        if (pursuit == 0) {
                             mPursuitOver = true;
                         }
-                        if (concurrent > 1 || pursuit) {
-                            increaseEncodingsInflight();
-                            Log.d(TAG, "Start another threaded encoding " + mEncodingsRunning );
+                        if (concurrent > 1 || pursuit != 0) {
+                            increaseTestsInflight();
+                            Log.d(TAG, "Start another threaded test " + mInstancesRunning);
+                            Log.d(TAG, "pursuit = " + pursuit);
                             (new Thread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Log.d(TAG, "Start threaded encoding");
-                                    RunEncoding(vc, logText, writeOutput);
-                                    Log.d(TAG, "Done threaded encoding");
+                                    Log.d(TAG, "Start threaded test");
+                                    RunTestCase(vc, logText, writeOutput);
+                                    Log.d(TAG, "Done threaded test");
                                 }
 
                             })).start();
 
                             Log.d(TAG, "Concurrent or pursuit");
-                            while (mEncodingsRunning >= concurrent && !pursuit) {
+                            while (mInstancesRunning >= concurrent && pursuit == 0) {
                                 try {
                                     Log.d(TAG, "Sleep 200ms");
                                     Thread.sleep(200);
@@ -303,8 +306,8 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
 
-                            if (pursuit) {
-                                Log.d(TAG, "pursuit sleep 1 sec, encodings: " + mEncodingsRunning );
+                            if (pursuit != 0) {
+                                Log.d(TAG, "pursuit sleep 1 sec, instances: " + mInstancesRunning);
                                 try {
                                     Thread.sleep(1000);
                                 } catch (InterruptedException e) {
@@ -313,16 +316,16 @@ public class MainActivity extends AppCompatActivity {
 
                             }
                         } else {
-                            increaseEncodingsInflight();
-                            Log.d(TAG, "start encoding, no sep thread");
-                            RunEncoding(vc, logText, writeOutput);
-                            Log.d(TAG, "Done encoding");
+                            increaseTestsInflight();
+                            Log.d(TAG, "start test, no sep thread");
+                            RunTestCase(vc, logText, writeOutput);
+                            Log.d(TAG, "Done test");
                         }
                     }
 
                     Log.d(TAG, "All tests queued up, check pursuit over: " + mPursuitOver);
                 }
-                Log.d(TAG, "All encodings queued up, wait for finish");
+                Log.d(TAG, "All tests queued up, wait for finish");
                 // Wait for all transcoding to be finished
                 do {
                     try {
@@ -330,10 +333,10 @@ public class MainActivity extends AppCompatActivity {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    Log.d(TAG, "number of encodings running:" + mEncodingsRunning);
+                    Log.d(TAG, "number of instances running:" + mInstancesRunning);
 
-                } while (mEncodingsRunning > 0);
-                Log.d(TAG, "Done with encodings, encodings: "+mEncodingsRunning);
+                } while (mInstancesRunning > 0);
+                Log.d(TAG, "Done with tests, instances: "+ mInstancesRunning);
                 try {
                     if (mUIHoldtimeSec > 0) {
                         Thread.sleep(mUIHoldtimeSec);
@@ -448,14 +451,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void RunEncoding(TestParams vc, TextView logText, boolean fwriteOutput) {
-        Log.d(TAG, "Run encoding, source : " + vc.getInputfile());
+    private void RunTestCase(TestParams vc, TextView logText, boolean fwriteOutput) {
+        Log.d(TAG, "Run test case, source : " + vc.getInputfile());
         try {
             final String settings = vc.getSettings();
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    logText.append("\n\nStart encoding: " + settings);
+                    if (vc.noEncoding()) {
+                        logText.append("\n\nStart Test of decoder: " + vc.getDescription() +
+                                       "(" + mInstancesRunning +")");
+                    } else {
+                        logText.append("\n\nStart Test: " + settings);
+                    }
                 }
             });
 
@@ -480,14 +488,15 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
-            Log.d(TAG, "Done one encoding: " + mEncodingsRunning);
+            Log.d(TAG, "On test done, instances running: " + mInstancesRunning);
+            mPursuitOver = true;
             if (status.length() > 0) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        logText.append("\nEncoding failed: " + settings);
+                        logText.append("\nTest failed: " + settings);
                         logText.append("\n" + status);
-                        if (vc.getPursuit().length() > 0) {
+                        if (vc.getPursuit() == 0) {
                             Log.d(TAG, "Pursuit over");
                             mPursuitOver = true;
                         } else {
@@ -506,12 +515,12 @@ public class MainActivity extends AppCompatActivity {
                         } catch (ArithmeticException aex) {
                             Log.e(TAG, aex.getMessage());
                         }
-                        logText.append("\nDone encoding: " + settings);
+                        logText.append("\nDone test: " + settings);
                     }
                 });
             }
         } finally {
-            decreaseEncodingsInflight();
+            decreaseTestsInflight();
         }
     }
 }
