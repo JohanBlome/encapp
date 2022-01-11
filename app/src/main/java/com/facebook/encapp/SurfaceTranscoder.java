@@ -163,15 +163,19 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         int inFramesCount = 0;
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        long totalTime = 0;
+        double currentTime = 0;
+        long pts_offset = 0;
         long last_pts = 0;
         int current_loop = 1;
         while (loop + 1 >= current_loop) {
             int index;
             if ((mFramesAdded % 100 == 0 && !noEncoding ) || (inFramesCount % 100 == 0 && noEncoding )) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop + " / "+loop);
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
+                        ", current loop: " + current_loop + " / "+loop + ", current time: " + currentTime + " sec");
             }
             try {
+                int flags = 0;
+
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 if (index >= 0) {
                     if (VP8_IS_BROKEN && isVP && isQCom && inFramesCount > 0 &&
@@ -183,11 +187,16 @@ public class SurfaceTranscoder extends BufferEncoder {
 
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
+                    flags = mExtractor.getSampleFlags();
                     if (size > 0) {
+                        if (currentTime > vc.getDurationSec()) {
+                            break;
+                        }
                         setRuntimeParameters(inFramesCount, mDecoder, mDecoderRuntimeParams);
-                        mStats.startDecodingFrame(mExtractor.getSampleTime(), mExtractor.getSampleSize(), mExtractor.getSampleFlags());
-                        mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), mExtractor.getSampleFlags());
+                        mStats.startDecodingFrame(mExtractor.getSampleTime() + pts_offset, mExtractor.getSampleSize(), flags);
+                        mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), flags);
                     }
+
                     boolean eof = !mExtractor.advance();
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
@@ -216,7 +225,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    long pts = info.presentationTimeUs;
+                    long pts = info.presentationTimeUs + pts_offset;
                     mStats.stopDecodingFrame(pts);
                     setRuntimeParameters(inFramesCount, mCodec, mRuntimeParams);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
@@ -235,9 +244,11 @@ public class SurfaceTranscoder extends BufferEncoder {
                             last_pts = pts;
                         } else {
                             // Loop
-                            pts = (current_loop - 1) * last_pts + pts;
+                            pts_offset += last_pts;
+                            pts = last_pts + pts;
                         }
                         //egl have time in ns
+                        currentTime = pts/1000000.0;
                         mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
                         if (mRealtime) {
@@ -278,7 +289,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                         break;
                     } else {
                         mFramesAdded += 1;
-                        totalTime += info.presentationTimeUs;
                         if (mMuxer != null)
                             mMuxer.writeSampleData(mVideoTrack, data, info);
                         mCodec.releaseOutputBuffer(index, false /* render */);

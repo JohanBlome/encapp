@@ -48,6 +48,7 @@ public class TestParams {
     private Size mRefSize = null;
     private String mDynamic = "";
     private int mLoopCount = 0;
+    private int mDurationSec = -1;
     private String mDescription = "";
     private ArrayList<ConfigureParam> mEncoderConfigure = new ArrayList<>();
     private ArrayList<ConfigureParam> mDecoderConfigure = new ArrayList<>();
@@ -499,10 +500,14 @@ public class TestParams {
 
     public void setNoEncoding(boolean noEncoding) {mNoEncoding = noEncoding;}
 
-
     public String getDecoder() {return mDecoder;}
 
     public void setDecoder(String decoder) {mDecoder = decoder;}
+
+    public int getDurationSec() {return mDurationSec;}
+
+    public void setDurationSec(int duration) {
+        mDurationSec = duration;};
 
 }
 

@@ -139,17 +139,22 @@ class BufferEncoder {
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
 
+        double currentTime = 0;
         long numBytesSubmitted = 0;
         long numBytesDequeued = 0;
         int current_loop = 1;
         while (loop + 1 >= current_loop) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount + ", current loop: " + current_loop + " / "+loop);
+                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
+                        ", current loop: " + current_loop + " / "+loop + ", current time: " + currentTime + " sec");
             }
             try {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
+                int flags = 0;
+                if (currentTime >= vc.getDurationSec()) {
+                    flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                }
                 if (index >= 0) {
                     int size = -1;
                     if (VP8_IS_BROKEN && isVP && isQCom && inFramesCount > 0 &&
@@ -167,7 +172,7 @@ class BufferEncoder {
                                     buffer,
                                     index,
                                     inFramesCount,
-                                    0,
+                                    flags,
                                     mRefFramesizeInBytes);
 
                             inFramesCount++;
@@ -189,7 +194,7 @@ class BufferEncoder {
                                             buffer,
                                             index,
                                             inFramesCount,
-                                            MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                                            flags,
                                             0);
                                     Log.d(TAG, "End of stream");
                                     inFramesCount++;
@@ -239,6 +244,7 @@ class BufferEncoder {
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
+                    currentTime = info.presentationTimeUs/1000000.0;
                 }
             }
         }
