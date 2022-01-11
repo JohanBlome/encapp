@@ -115,7 +115,7 @@ public class JSONTestCaseBuilder {
         String[] input_files = {};
         String[] i_frame_sizes = {"default"};
         String[] i_intervals = {"10"};
-        ArrayList<ConfigureParam> config_extra = new ArrayList<>();
+        ArrayList<ConfigureParam> config_encoder = new ArrayList<>();
         ArrayList<ConfigureParam> config_decoder = new ArrayList<>();
         String description = "";
         String input_format = "";
@@ -130,6 +130,7 @@ public class JSONTestCaseBuilder {
         String realtime = "false";
         String encode = "false";
         String decoder = "";
+
         ArrayList<Object> encoder_runtime_parameters = new ArrayList<>();
         ArrayList<Object> decoder_runtime_parameters = new ArrayList<>();
 
@@ -198,11 +199,11 @@ public class JSONTestCaseBuilder {
                     String type = param.getString("type");
                     Log.d(TAG, "type = "+type);
                     if (type.toLowerCase(Locale.US).equals("int")) {
-                        config_extra.add(new ConfigureParam(param.getString("name"), param.getInt("setting")));
+                        config_encoder.add(new ConfigureParam(param.getString("name"), param.getInt("setting")));
                     } else if (type.toLowerCase(Locale.US).equals("float") | type.toLowerCase(Locale.US).equals("double")) {
-                        config_extra.add(new ConfigureParam(param.getString("name"), param.getDouble("setting")));
+                        config_encoder.add(new ConfigureParam(param.getString("name"), param.getDouble("setting")));
                     } else if (type.toLowerCase(Locale.US).equals("string")) {
-                        config_extra.add(new ConfigureParam(param.getString("name"), param.getString("setting")));
+                        config_encoder.add(new ConfigureParam(param.getString("name"), param.getString("setting")));
                     }
                 }
 
@@ -338,7 +339,7 @@ public class JSONTestCaseBuilder {
                                         testParams.setInputfile(input_files[iF]);
                                         testParams.setEncoderRuntimeParameters(encoder_runtime_parameters);
                                         testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
-                                        testParams.setEncoderConfigure(config_extra);
+                                        testParams.setEncoderConfigure(config_encoder);
                                         testParams.setDecoderConfigure(config_decoder);
                                         testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
                                         testParams.setLoopCount(Integer.parseInt(enc_loop));

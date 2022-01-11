@@ -162,7 +162,6 @@ public class SurfaceTranscoder extends BufferEncoder {
         }
 
         int inFramesCount = 0;
-
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         long totalTime = 0;
         long last_pts = 0;

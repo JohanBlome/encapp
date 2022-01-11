@@ -275,7 +275,6 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
                     for (TestParams vc : vcCombinations) {
                         if (pursuit > 0) pursuit -= 1;
-                        Log.d(TAG, "pursuit = " + pursuit);
                         int vcConc = vc.getConcurrentCodings();
                         int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
 
@@ -285,7 +284,6 @@ public class MainActivity extends AppCompatActivity {
                         if (concurrent > 1 || pursuit != 0) {
                             increaseTestsInflight();
                             Log.d(TAG, "Start another threaded test " + mInstancesRunning);
-                            Log.d(TAG, "pursuit = " + pursuit);
                             (new Thread(new Runnable() {
                                 @Override
                                 public void run() {
