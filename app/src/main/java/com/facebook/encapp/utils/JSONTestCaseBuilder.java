@@ -28,7 +28,7 @@ public class JSONTestCaseBuilder {
     public static String DESCRIPTION = "description"; // Name or description of the test case
     public static String INPUT_FORMAT = "input_format"; // raw or mp4
     public static String INPUT_FPS = "input_fps";
-    public static String DURATION = "duration";
+    public static String DURATION_SEC = "duration";
     public static String LOOP = "loop";
     public static String CONCURRENT = "conc";
     public static String USE_SURFACE_ENC = "use_surface_enc";
@@ -120,7 +120,7 @@ public class JSONTestCaseBuilder {
         String description = "";
         String input_format = "";
         String input_resolution = "1280x720";
-        String duration = "10";
+        String duration_sec = "10";
         String enc_loop = "0";
         String conc = "0";
         String use_surface_enc = "false";
@@ -148,8 +148,8 @@ public class JSONTestCaseBuilder {
                 input_format = test.getString(case_key);
             } else if (case_key.equals(INPUT_RESOLUTION)) {
                 input_resolution = test.getString(case_key);
-            } else if (case_key.equals(DURATION)) {
-                duration = test.getString(case_key);
+            } else if (case_key.equals(DURATION_SEC)) {
+                duration_sec = test.getString(case_key);
             } else if (case_key.equals(LOOP)) {
                 enc_loop = test.getString(case_key);
             } else if (case_key.equals(CONCURRENT)) {
@@ -348,6 +348,7 @@ public class JSONTestCaseBuilder {
                                         testParams.setRealtime(Boolean.parseBoolean(realtime));
                                         if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
                                         testParams.setDecoder(decoder);
+                                        testParams.setDurationSec(Integer.parseInt(duration_sec));
                                         vc.add(testParams);
                                     }
                                 }
