@@ -29,6 +29,7 @@ public class Statistics {
     private long mStopTime;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
+    private String mDecoderName = "";
 
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
@@ -36,6 +37,7 @@ public class Statistics {
     TestParams mVc;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
+    public static String NA = "na";
 
     public Statistics(String desc, TestParams vc) {
         mDesc = desc;
@@ -162,6 +164,11 @@ public class Statistics {
         if (format == null) {
             return mediaformat;
         }
+        try {
+            mediaformat.put("decoder", mDecoderName);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
             for (String feature: features) {
@@ -199,7 +206,7 @@ public class Statistics {
                 }
             }
         } else {
-            ArrayList<ConfigureParam> params = mVc.getExtraConfigure();
+            ArrayList<ConfigureParam> params = mVc.getEncoderConfigure();
             for (ConfigureParam param : params) {
                 try {
                     if (param.value instanceof Integer) {
@@ -243,7 +250,7 @@ public class Statistics {
             settings.put("keyrate",mVc.getKeyframeRate());
             settings.put("iframepreset",mVc.getIframeSizePreset());
 
-            ArrayList<ConfigureParam> configure = mVc.getExtraConfigure();
+            ArrayList<ConfigureParam> configure = mVc.getEncoderConfigure();
             for (ConfigureParam param: configure) {
                 settings.put(param.name, param.value.toString());
             }
@@ -293,6 +300,25 @@ public class Statistics {
             json.put("frames", jsonArray);
 
             if (mDecodingFrames.size() > 0) {
+                runtime = new JSONObject();
+                runtimeList = mVc.getDecoderRuntimeParametersList();
+                for (Object param: runtimeList) {
+                    if (param instanceof RuntimeParam) {
+                        RuntimeParam rt = (RuntimeParam) param;
+                        JSONObject subtype = null;
+                        if (runtime.has(rt.name)) {
+                            subtype = runtime.getJSONObject(rt.name);
+                        } else {
+                            subtype = new JSONObject();
+                            runtime.put(rt.name, subtype);
+                        }
+                        subtype.put(String.valueOf(rt.frame), rt.value.toString());
+                    } else {
+                        Log.e(TAG, "Object is " + param);
+                    }
+                }
+                json.put("decoder_runtime_settings", runtime);
+
                 allFrames = new ArrayList<>(mDecodingFrames.values());
                 Collections.sort(allFrames, compareByPts);
                 counter = 0;
@@ -315,6 +341,8 @@ public class Statistics {
                     }
                 }
                 json.put("decoded_frames", jsonArray);
+
+
             }
 
             //GPU info
@@ -359,5 +387,9 @@ public class Statistics {
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setDecoderName(String decoderName) {
+        mDecoderName = decoderName;
     }
 }

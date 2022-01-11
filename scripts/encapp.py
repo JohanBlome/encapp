@@ -96,6 +96,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     if isinstance(tests, type(None)):
         tests = [test_def]
     counter = 1
+    input_files = None
     for test in tests:
         print(f'push data for test = {test}')
         if len(options.input) > 0:

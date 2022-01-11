@@ -399,20 +399,27 @@ def main():
         with open(inputfile) as json_file:
             alldata = json.load(json_file)
 
+            video_length = 0
+            mean_ms = 0
+            first_frame = 0
+            last_frame = 0
             encoding_data = parse_encoding_data(alldata, inputfile)
-            if encoding_data is None:
-                continue
+            if not isinstance(encoding_data, type(None)):
+                first_frame = np.min(encoding_data['pts'])  # pts is in microsec
+                last_frame = np.max(encoding_data['pts'])  # approx.
+                video_length = (last_frame - first_frame)/pts_mult
+                mean_ms = encoding_data['meanproctime'][0]/msec_to_nano
+
             decoded_data = parse_decoding_data(alldata, inputfile)
+            print(f'{type(decoded_data)}')
             gpu_data = parse_gpu_data(alldata, inputfile)
 
             pts_mult = 1000000
             msec_to_nano = 1000000
             proctime_sec = round(alldata['proctime']/1000000000.0, 2)
             framecount = alldata['framecount']
-            mean_ms = encoding_data['meanproctime'][0]/msec_to_nano
-            first_frame = np.min(encoding_data['pts'])  # pts is in microsec
-            last_frame = np.max(encoding_data['pts'])  # approx.
-            video_length = (last_frame - first_frame)/pts_mult
+
+
             print(f'proctime {proctime_sec} sec, count {framecount}')
             print('__')
             print('file = {:s}'.format(alldata['encodedfile']))
@@ -424,38 +431,37 @@ def main():
             print('bitrate = {:d}'.format(alldata['settings']['bitrate']))
             print('height = {:d}'.format(alldata['settings']['height']))
             print('mean processing time = {:.2f} ms'.format(mean_ms))
-            print('mean frame latency = {:.2f} ms'.format(np.mean(
-                  encoding_data.loc[encoding_data['proctime'] > 0,
-                                    'proctime'])/1000000))
+            if not isinstance(encoding_data, type(None)):
+                print('mean frame latency = {:.2f} ms'.format(np.mean(
+                      encoding_data.loc[encoding_data['proctime'] > 0,
+                                        'proctime'])/1000000))
             print('Encoding speed = {:.2f} times'.format(
                 (video_length/proctime_sec)))
             print('__')
 
-        if accum_data is None:
+        if isinstance(accum_data, type(None)):
             accum_data = encoding_data
-        elif encoding_data is not None:
+        elif not isinstance(encoding_data, type(None)):
             accum_data = accum_data.append(encoding_data)
 
-        if accum_dec_data is None:
+        if isinstance(accum_dec_data, type(None)):
             accum_dec_data = decoded_data
-        elif decoded_data is not None:
+        elif not isinstance(decoded_data, type(None)):
             accum_dec_data = accum_dec_data.append(decoded_data)
 
-        if accum_gpu_data is None:
+        if isinstance(accum_gpu_data, type(None)):
             accum_gpu_data = gpu_data
-        elif gpu_data is not None:
+        elif not isinstance(gpu_data, type(None)):
             accum_gpu_data = accum_gpu_data.append(gpu_data)
+    if not isinstance(encoding_data, type(None)):
+        frames = accum_data.loc[accum_data['size'] > 0]
+        sb.set(style='whitegrid', color_codes=True)
+        # codecs = pd.unique(frames['codec'])
+        # sources = pd.unique(frames['source'])
+        first = np.min(frames['starttime'])
 
-    if accum_data is None:
-        print('Failed to read data')
-        exit(0)
-    frames = accum_data.loc[accum_data['size'] > 0]
-    sb.set(style='whitegrid', color_codes=True)
-    # codecs = pd.unique(frames['codec'])
-    # sources = pd.unique(frames['source'])
-    first = np.min(frames['starttime'])
+        frames, concurrency = calc_infligh(frames, first)
 
-    frames, concurrency = calc_infligh(frames, first)
     if options.inflight:
         plot_inflight_data(frames, 'codec', 'encoding pipeline', options)
 
@@ -472,8 +478,9 @@ def main():
     if options.proctime:
         plot_processingtime(frames, 'codec', 'encoder', options)
 
-    if (options.decode_data and accum_dec_data is not None and
+    if (options.decode_data and not isinstance(accum_dec_data, type(None)) and
             len(accum_dec_data) > 0):
+        print(f'plot decode data')
         first = np.min(accum_dec_data['starttime'])
         accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
         plot_inflight_data(accum_dec_data, 'codec', 'decoding pipeline',

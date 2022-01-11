@@ -49,12 +49,16 @@ public class TestParams {
     private String mDynamic = "";
     private int mLoopCount = 0;
     private String mDescription = "";
-    private ArrayList<ConfigureParam> mExtraConfigure = new ArrayList<>();
-    ArrayList<Object> mRuntimeParams;
+    private ArrayList<ConfigureParam> mEncoderConfigure = new ArrayList<>();
+    private ArrayList<ConfigureParam> mDecoderConfigure = new ArrayList<>();
+    private ArrayList<Object> mRuntimeParams;
+    private ArrayList<Object> mDecoderRuntimeParams;
     private int mConcurrentCodings = 1;
+    private String mDecoder = "";
     private boolean mRealtime = false;
 
-    private String mPursuit = "";
+    private int mPursuit = 0;
+    private boolean mNoEncoding = false;
 
     // Bit rate
     public void setBitRate(int bitRate) {
@@ -301,8 +305,12 @@ public class TestParams {
         return mTemporalLayerCount;
     }
 
-    public void setRuntimeParameters(ArrayList<Object> params) {
+    public void setEncoderRuntimeParameters(ArrayList<Object> params) {
         mRuntimeParams = params;
+    }
+
+    public void setDecoderRuntimeParameters(ArrayList<Object> params) {
+        mDecoderRuntimeParams = params;
     }
 
     private void createBundles(String name, ArrayList<Object> datalist, HashMap<Integer, ArrayList<RuntimeParam>> runtimes) {
@@ -365,6 +373,39 @@ public class TestParams {
         return mRuntimeParams;
     }
 
+    public ArrayList<Object> getDecoderRuntimeParametersList() {
+        return mDecoderRuntimeParams;
+    }
+
+    public HashMap<Integer, ArrayList<RuntimeParam>> getDecoderRuntimeParameters() {
+        //Sort and return a HashMap
+        HashMap<Integer, ArrayList<RuntimeParam>> map = new HashMap<>();
+        if (mDecoderRuntimeParams == null) {
+            Log.w(TAG, "Runtime parameters are null. No cli decoder runtime parameters set.");
+            return map;
+        }
+        for (Object obj: mDecoderRuntimeParams) {
+            if (obj instanceof RuntimeParam) {
+                RuntimeParam param = (RuntimeParam)obj;
+                Integer frame = Integer.valueOf(param.frame);
+                ArrayList<RuntimeParam> list = map.get(frame);
+                if (list == null) {
+                    list = new ArrayList<RuntimeParam>();
+                    map.put(frame, list);
+                }
+                if (param.value instanceof ArrayList) {
+                    createBundles(param.name, (ArrayList<Object>)param.value, map);
+                } else {
+                    list.add(param);
+                }
+            } else {
+                Log.d(TAG, "object is " + obj);
+            }
+        }
+
+        return map;
+    }
+
     public void setInputfile(String inputfile) {
         // Assume that the file is in the root of /sdcard/
         String[] splits = inputfile.split("/");
@@ -407,17 +448,31 @@ public class TestParams {
         return mDescription;
     }
 
-    public void setExtraConfigure(ArrayList<ConfigureParam> extra) {
-        mExtraConfigure = extra;
+    public void setEncoderConfigure(ArrayList<ConfigureParam> param) {
+        mEncoderConfigure = param;
     }
 
-    public void addConfigureSetting(ConfigureParam param) {
-        mExtraConfigure.add(param);
+    public void addEncoderConfigureSetting(ConfigureParam param) {
+        mEncoderConfigure.add(param);
     }
 
-    public ArrayList<ConfigureParam> getExtraConfigure() {
-        return mExtraConfigure;
+    public ArrayList<ConfigureParam> getEncoderConfigure() {
+        return mEncoderConfigure;
     }
+
+    public void setDecoderConfigure(ArrayList<ConfigureParam> param) {
+        mDecoderConfigure = param;
+    }
+
+    public void addDecoderConfigureSetting(ConfigureParam param) {
+        mDecoderConfigure.add(param);
+    }
+
+    public ArrayList<ConfigureParam> getDecoderConfigure() {
+        Log.d(TAG, "getdecoderconfigure size: "+ mDecoderConfigure.size());
+        return mDecoderConfigure;
+    }
+
 
     public void setConcurrentCodings(int count) {
         this.mConcurrentCodings = count;
@@ -427,11 +482,11 @@ public class TestParams {
         return mConcurrentCodings;
     }
 
-    public String getPursuit() {
+    public int getPursuit() {
         return mPursuit;
     }
 
-    public void setPursuit(String pursuit) {
+    public void setPursuit(int pursuit) {
         this.mPursuit = pursuit;
     }
 
@@ -439,6 +494,15 @@ public class TestParams {
     }
 
     public void setRealtime(boolean realtime) {this.mRealtime = realtime;}
+
+    public boolean noEncoding() {return mNoEncoding; }
+
+    public void setNoEncoding(boolean noEncoding) {mNoEncoding = noEncoding;}
+
+
+    public String getDecoder() {return mDecoder;}
+
+    public void setDecoder(String decoder) {mDecoder = decoder;}
 
 }
 
