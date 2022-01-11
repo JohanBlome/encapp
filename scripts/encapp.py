@@ -181,22 +181,24 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         run_cmd(adb_cmd)
 
 
-def list_codecs(serial, install):
+def list_codecs(serial, model, install):
     if install:
         install_app(serial)
 
-    adb_cmd = 'adb -s ' + serial + ' shell am instrument -w -r ' +\
-              '-e list_codecs a -e class ' + TEST_CLASS_NAME + \
-              ' ' + JUNIT_RUNNER_NAME
+    adb_cmd = f'adb -s {serial} shell am instrument -w -r '\
+              f'-e ui_hold_sec 1 '\
+              f'-e list_codecs a -e class {TEST_CLASS_NAME} '\
+              f'{JUNIT_RUNNER_NAME}'
 
     run_cmd(adb_cmd)
-    adb_cmd = 'adb -s ' + serial + ' pull /sdcard/codecs.txt .'
+    filename = f'codecs_{model}.txt'
+    adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
     run_cmd(adb_cmd)
-    with open('codecs.txt', 'r') as codec_file:
+    with open(filename, 'r') as codec_file:
         lines = codec_file.readlines()
         for line in lines:
             print(line.split('\n')[0])
-        print('File is available in current dir')
+        print(f'File is available in current dir as {filename}')
 
 
 def get_options(argv):
@@ -251,7 +253,7 @@ def main(argv):
                 model = list(model.values())[0]
         print(f'model = {model}')
         if options.list_codecs is True:
-            list_codecs(serial, not options.no_install)
+            list_codecs(serial, model, not options.no_install)
         else:
             # get date and time and format it
             now = datetime.now()

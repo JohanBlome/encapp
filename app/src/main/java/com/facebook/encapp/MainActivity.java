@@ -90,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     protected void listCodecs() {
+        Log.d(TAG, "List codecs");
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
 
@@ -169,7 +170,9 @@ public class MainActivity extends AppCompatActivity {
     private boolean getInstrumentedTest() {
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
-        if (bundle != null && bundle.containsKey(ParseData.TEST_CONFIG)) {
+        if (bundle != null &&
+                (bundle.containsKey(ParseData.TEST_CONFIG) ||
+                 bundle.containsKey(ParseData.LIST_CODECS))) {
             mExtraData = bundle;
         }
 
@@ -195,13 +198,17 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "ENTER: performInstrumentedTest");
         Log.d(TAG, "Instrumentation test - let us start!");
         final TextView logText = findViewById(R.id.logText);
-
+        if (mExtraData.containsKey(ParseData.TEST_UI_HOLD_TIME_SEC)) {
+            mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(ParseData.TEST_UI_HOLD_TIME_SEC, "0"));
+        }
         if (mExtraData.containsKey(ParseData.LIST_CODECS)) {
             listCodecs();
             try {
+                Log.d(TAG, "codecs listed, hold time: " + mUIHoldtimeSec);
                 if (mUIHoldtimeSec > 0) {
-                    Thread.sleep(mUIHoldtimeSec);
+                    Thread.sleep(mUIHoldtimeSec * 1000);
                 }
+                Log.d(TAG, "Done sleeping");
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -399,8 +406,6 @@ public class MainActivity extends AppCompatActivity {
             String data = mExtraData.getString(ParseData.MODE);
             mod = data.split(",");
         }
-
-        mUIHoldtimeSec = mExtraData.getInt(ParseData.TEST_UI_HOLD_TIME_SEC,0);
 
         String iframesize = mExtraData.getString(ParseData.IFRAME_SIZE_PRESET, "DEFAULT");
         int ref_fps = mExtraData.getInt(ParseData.REF_FPS, 30);
