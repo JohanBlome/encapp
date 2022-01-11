@@ -266,6 +266,10 @@ public class MainActivity extends AppCompatActivity {
                     vcCombinations = buildSettingsFromCommandline();
                 }
 
+                if (vcCombinations.size() == 0) {
+                    Log.e(TAG, "No test cases created");
+                    return;
+                }
                 int pursuit = vcCombinations.firstElement().getPursuit();
                 while (!mPursuitOver) {
                     if (vcCombinations.size() == 0) {

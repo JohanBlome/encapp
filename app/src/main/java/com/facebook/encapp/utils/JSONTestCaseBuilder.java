@@ -126,7 +126,7 @@ public class JSONTestCaseBuilder {
         String use_surface_enc = "false";
         String input_fps = "30";
         String skip_frames = "false";
-        String pursuit = "";
+        String pursuit = "0";
         String realtime = "false";
         String encode = "false";
         String decoder = "";
@@ -306,7 +306,6 @@ public class JSONTestCaseBuilder {
             encode_resolutions = new String[]{session.getOutputResolution()};
         }
         int index = 0;
-
         Vector<TestParams> vc = new Vector<>();
         for (int iF = 0; iF < input_files.length; iF++) {
             for (int eC = 0; eC < codecs.length; eC++) {
