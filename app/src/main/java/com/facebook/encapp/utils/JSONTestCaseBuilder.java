@@ -128,7 +128,7 @@ public class JSONTestCaseBuilder {
         String skip_frames = "false";
         String pursuit = "0";
         String realtime = "false";
-        String encode = "false";
+        String encode = "true";
         String decoder = "";
 
         ArrayList<Object> encoder_runtime_parameters = new ArrayList<>();
