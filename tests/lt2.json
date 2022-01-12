@@ -1,0 +1,33 @@
+{
+    "description": "Temporal layering (tl2) Bitrate control",
+    "input_files": [
+        "../media/320x180_900fr_avc.mp4"
+    ],
+    "codecs": [
+        "encoder.avc",
+        "encoder.hevc"
+    ],
+    "rc_modes": [
+        "cbr"
+    ],
+    "bitrates": [
+        "100k"
+    ],
+    "i_intervals": [
+        10
+    ],
+    "configure": [{
+        "name": "ts-schema",
+        "type": "string",
+        "setting" : "android.generic.2"
+    }],
+    "runtime_parameters": [
+        {
+            "name": "video-bitrate" ,
+            "type": "int",
+            "settings": [
+                {"450" : "500k"}                        
+            ]           
+        }
+    ]
+}
