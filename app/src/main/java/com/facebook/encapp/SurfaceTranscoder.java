@@ -189,7 +189,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     int size = mExtractor.readSampleData(buffer, 0);
                     flags = mExtractor.getSampleFlags();
                     if (size > 0) {
-                        if (currentTime > vc.getDurationSec()) {
+                        if (vc.getDurationSec() > 0 && currentTime > vc.getDurationSec()) {
                             break;
                         }
                         setRuntimeParameters(inFramesCount, mDecoder, mDecoderRuntimeParams);

@@ -152,7 +152,7 @@ class BufferEncoder {
             try {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
-                if (currentTime >= vc.getDurationSec()) {
+                if (vc.getDurationSec() > 0 && currentTime >= vc.getDurationSec()) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                 }
                 if (index >= 0) {

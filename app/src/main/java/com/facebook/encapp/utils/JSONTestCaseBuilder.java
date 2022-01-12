@@ -120,7 +120,7 @@ public class JSONTestCaseBuilder {
         String description = "";
         String input_format = "";
         String input_resolution = "1280x720";
-        String duration_sec = "10";
+        String duration_sec = "-1";
         String enc_loop = "0";
         String conc = "0";
         String use_surface_enc = "false";
