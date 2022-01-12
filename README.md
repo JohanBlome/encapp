@@ -275,59 +275,111 @@ raw file:
 ##### (6.b) Json test definition settings
 
 Definitions of the keys in the sample json file
-* 'bitrates':
->  A list of encoding bitrates
-* 'codecs':
->  A list of encoders
-* 'conc':
->  The number of concurrent tests to run
-* 'configure':
->  Configure encoding parameters (see below for more information)
-* 'configure_decoder':
->  As above but for the decoder
-* 'decoder':
->  Normally decoder is created based on encoded file type but the specific decoder can be specified here.
-* 'description':
->  Description of the test. It can be empty
-* 'enc_loop':
->  The number of time looping encoding. This is used for encoding time profiling. When enc_loop is greater than 1, there is no output video
-* 'encode':
->  Boolean to indicate encoding should be permormed, default is true.
-* 'encode_resolutions':
->  A list of encoding resolutions
-* 'framerates':
->  Drop frames to reach a specified frame rate
-* 'duration':
->  Duration of the encoding. This is ignored when enc loop > 0
-* 'i_frame_sizes':
->  An optional parameter.
-* 'i_intervals':
->  A list of I frame intervals
-* 'input_files':
-vA list of input files
-* 'input_fps' :
->  The input frame rate in the raw case
-* 'input_format':
->  Input video format: mp4, nv12, yuv420p
-* 'input_resolution':
->  Input video resolution
-* 'loop':
->  The number of times a sources is looped for a longer input video
-* 'pursuit':
->  Start multiples of a test with a one sec delay. The values can be
-        (1) '-1' for infinite or until failure
-        (2) '0' for no pursuit mde at all (default)
-        (3) X start test until X is reached
-* 'runtime_parameters':
->  Settings corresponding to s certain frame (see below for more information)
-* 'decoder_runtime_parameters':
->  As above but for the decoder
-* 'realtime':
->  Read input video in realtime i.e. wait until next pts
-* 'rc_modes':
->  A list of rate control modes
-* 'temporal_layer_counts':
->  Number of temporal layers
+``` 
+'bitrates':
+	A list of encoding bitrates
+```
+```
+ 'codecs':
+	A list of encoders
+```
+```
+'conc':
+	The number of concurrent tests to run
+```
+```
+'configure':
+	Configure encoding parameters (see below for more information)
+```
+```
+'configure_decoder':
+	As above but for the decoder
+```
+```
+'decoder':
+	Normally decoder is created based on encoded file type but the specific decoder can be specified here.
+```
+```
+'description':
+	Description of the test. It can be empty
+```
+```
+'enc_loop':
+	The number of time looping encoding.
+	This is used for encoding time profiling. 
+	When enc_loop is greater than 1, there is no output video
+```
+```
+'encode':
+	Boolean to indicate encoding should be permormed, default is true.
+```
+```
+'encode_resolutions':
+	A list of encoding resolutions
+```
+```
+'framerates':
+	Drop frames to reach a specified frame rate
+```
+```
+'duration':
+	Duration of the encoding. This is ignored when enc loop > 0
+```
+```
+'i_frame_sizes':
+	An optional parameter.
+```
+```
+'i_intervals':
+	A list of I frame intervals
+```
+```
+'input_files':
+	A list of input files
+```
+```
+'input_fps' :
+	The input frame rate in the raw case
+```
+```
+'input_format':
+	Input video format: mp4, nv12, yuv420p
+```
+```
+'input_resolution':
+	Input video resolution, WxH
+```
+```
+'loop':
+	The number of times a sources is looped for a longer input video
+```
+```
+'pursuit':
+	Start multiples of a test with a one sec delay. The values can be  
+	1. '-1' for infinite or until failure  
+	2.  '0' for no pursuit mde at all (default)  
+	3.   X start test until X is reached
+```
+```
+'runtime_parameters':
+	Settings corresponding to s certain frame (see below for more information)
+```
+```
+'decoder_runtime_parameters':
+	As above but for the decoder
+```
+```
+'realtime':
+	Read input video in realtime i.e. wait until next pts
+```
+```
+'rc_modes':
+	A list of rate control modes
+```
+```
+'temporal_layer_counts':
+	Number of temporal layers
+```
 
 ##### (6.c) Encoder/Decoder configuration
 Additional settings (besides bitrate etc).
