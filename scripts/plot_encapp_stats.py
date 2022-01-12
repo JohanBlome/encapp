@@ -389,6 +389,8 @@ def main():
     accum_data = None
     accum_dec_data = None
     accum_gpu_data = None
+    pts_mult = 1000000
+    msec_to_nano = 1000000
 
     for inputfile in options.files:
         if options.files == 1 and len(options.label) == 0:
@@ -414,8 +416,6 @@ def main():
             print(f'{type(decoded_data)}')
             gpu_data = parse_gpu_data(alldata, inputfile)
 
-            pts_mult = 1000000
-            msec_to_nano = 1000000
             proctime_sec = round(alldata['proctime']/1000000000.0, 2)
             framecount = alldata['framecount']
 
