@@ -23,7 +23,7 @@ This is described in `scripts/offline_transcoding.sh`.
 
 ## 2. Operation
 
-(1) set up the android SDK and NDK in the `local.properties` file.
+#### (1) set up the android SDK and NDK in the `local.properties` file.
 
 Create a `local.properties` file with valid entries for the `ndk.dir` and
 `sdk.dir` variables.
@@ -36,7 +36,7 @@ sdk.dir: /opt/android_sdk/
 
 Note that this file should not be added to the repo.
 
-(2) build the encapp app
+#### (2) build the encapp app
 
 ```
 $ ./gradlew clean
@@ -46,7 +46,7 @@ BUILD SUCCESSFUL in 6s
 61 actionable tasks: 5 executed, 56 up-to-date
 ```
 
-(3) run the `setup.sh` script to install encapp in your android device.
+#### (3) run the `setup.sh` script to install encapp in your android device.
 
 ```
 $ ./setup.sh
@@ -58,7 +58,7 @@ BUILD SUCCESSFUL in 14s
 31 actionable tasks: 3 executed, 28 up-to-date
 ```
 
-(4) run a quick encoding experiment with the app
+#### (4) run a quick encoding experiment with the app
 
 Install the app.
 ```
@@ -142,9 +142,9 @@ $ adb logcat |grep encapp |grep Codec:
 ...
 ```
 
-(5) run a quick encoding experiment with the app
+#### (5) run a quick encoding experiment with the app
 
-(5.a) small qcif encoding
+##### (5.a) small qcif encoding
 
 First, choose one of the codecs from step 4. In this case, we will use `OMX.google.vp8.encoder`.
 
@@ -170,7 +170,7 @@ $ ffprobe -i /tmp/omx.google.vp8.encoder_30fps_176x144_100000bps_iint10_m2.webm
     Stream #0:0: Video: vp8, yuv420p(tv, smpte170m/smpte170m/bt709, progressive), 176x144, SAR 1:1 DAR 11:9, 30 fps, 30 tbr, 1k tbn, 1k tbc (default)
 ```
 
-(5.b) hd encoding
+##### (5.b) hd encoding
 
 Now, let's run the h264 encoder in an HD file. We will just select the codec ("h264"), and let encapp choose the actual encoder.
 
@@ -186,7 +186,7 @@ $ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/KristenAnd
 ```
 
 
-(6) run a multiple encoding experiment with the app
+#### (6) run a multiple encoding experiment with the app
 
 Run
 
@@ -272,21 +272,124 @@ raw file:
 ]
 ```
 
+##### (6.b) Json test definition settings
+
 Definitions of the keys in the sample json file
-'description':  Description of the test. It can be empty
-'input_files':  A list of input files
-'codecs':       A list of encoders
-'encode_resolutions': A list of encoding resolutions
-'rc_modes': A list of rate control modes
-'bitrates': A list of encoding bitrates
-'i_intervals': A list of I frame intervals
-'duration':    Duration of the encoding. This is ignored when enc loop > 0
-'use_surface_enc': Set to 1 use Android Mediacodec surface encoder. Default is 0
-'input_format': Input video format: mp4, nv12, yuv420p
-'input_resolution': Input video resolution
-'i_frame_sizes': An optional parameter.
-'temporal_layer_counts': Number of temporal layers
-'enc_loop': The number of time looping encoding. This is used for encoding time profiling. When enc_loop is greater than 1, there is no output video
+* 'bitrates':
+>  A list of encoding bitrates
+* 'codecs':
+>  A list of encoders
+* 'conc':
+>  The number of concurrent tests to run
+* 'configure':
+>  Configure encoding parameters (see below for more information)
+* 'configure_decoder':
+>  As above but for the decoder
+* 'decoder':
+>  Normally decoder is created based on encoded file type but the specific decoder can be specified here.
+* 'description':
+>  Description of the test. It can be empty
+* 'enc_loop':
+>  The number of time looping encoding. This is used for encoding time profiling. When enc_loop is greater than 1, there is no output video
+* 'encode':
+>  Boolean to indicate encoding should be permormed, default is true.
+* 'encode_resolutions':
+>  A list of encoding resolutions
+* 'framerates':
+>  Drop frames to reach a specified frame rate
+* 'duration':
+>  Duration of the encoding. This is ignored when enc loop > 0
+* 'i_frame_sizes':
+>  An optional parameter.
+* 'i_intervals':
+>  A list of I frame intervals
+* 'input_files':
+vA list of input files
+* 'input_fps' :
+>  The input frame rate in the raw case
+* 'input_format':
+>  Input video format: mp4, nv12, yuv420p
+* 'input_resolution':
+>  Input video resolution
+* 'loop':
+>  The number of times a sources is looped for a longer input video
+* 'pursuit':
+>  Start multiples of a test with a one sec delay. The values can be
+        (1) '-1' for infinite or until failure
+        (2) '0' for no pursuit mde at all (default)
+        (3) X start test until X is reached
+* 'runtime_parameters':
+>  Settings corresponding to s certain frame (see below for more information)
+* 'decoder_runtime_parameters':
+>  As above but for the decoder
+* 'realtime':
+>  Read input video in realtime i.e. wait until next pts
+* 'rc_modes':
+>  A list of rate control modes
+* 'temporal_layer_counts':
+>  Number of temporal layers
+
+##### (6.c) Encoder/Decoder configuration
+Additional settings (besides bitrate etc).
+Example:
+```
+`"configure":
+[{
+    "name": "tl-schema",
+    "type": "string",
+    "setting": "android.generic.2"
+}],
+"configure_decoder":
+[{
+    "name": "vendor.qti-ext-dec-picture-order.enable",
+    "type": "int",
+    "setting": "1"
+},
+{
+  "name": "vendor.qti-ext-dec-low-latency.enable",
+  "type": "int",
+  "setting": "1"
+}]
+```
+##### (6.d) Runtime configuration
+
+Each setting consists of a pair
+FRAME, SETTING
+Where the setting can be an empty string.
+
+Dynamically change framerate:
+```
+`"runtime_parameters":
+[{
+    "name": "fps",
+    "type": "int",
+    "settings": [
+    {
+        "20": "15"
+    },
+    {
+        "40": "5"
+    },
+    {
+        "60": "20"
+    },
+    {
+        "80": "30"
+    }]
+}]`
+```
+Low latency (Android api 30)
+"decoder_runtime_parameters":
+```
+[{
+    "name": "low-latency",
+    "type": "int",
+    "settings": [
+    {
+        "0": "1"
+    }]
+}]
+```
 
 Run
 This will install a prebuild apk, push the videofile and run the test.
@@ -307,7 +410,7 @@ If you do not want to install the prebuild apk, run
 $ encapp.py --install false sample_config.json
 ```
 
-(7) Navigating results
+#### (7) Navigating results
 
 The names json result files does not give any clues as to what settings have been used.
 To figure that out run:
