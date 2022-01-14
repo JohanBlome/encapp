@@ -72,7 +72,7 @@ Install the instrumented test infra.
 $ ./gradlew installDebugAndroidTest
 $ adb shell pm list instrumentation
 ...
-instrumentation:com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner (target=com.facebook.encapp)
+instrumentation:com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner (target=com.facebook.encapp)
 ...
 ```
 
@@ -84,7 +84,7 @@ device will ask you for permission to access to `/sdcard/`.
 Figure 1 shows ![an android device asking for permission to run encapp](doc/encapp_permission.jpeg)
 
 ```
-$ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+$ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunneradb shell am instrument -w -r -e list_codecs a -e ui_hold_sec 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
 INSTRUMENTATION_STATUS: class=com.facebook.encapp.CodecValidationInstrumentedTest
 INSTRUMENTATION_STATUS: current=1
 INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
@@ -102,10 +102,9 @@ INSTRUMENTATION_STATUS: test=automateValidation
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 17.285
+Time: 28.422
 
 OK (1 test)
-
 
 INSTRUMENTATION_CODE: -1
 ```
@@ -157,7 +156,7 @@ $ adb push /tmp/akiyo_qcif.yuv /sdcard/
 
 Now run the vp8 encoder (`OMX.google.vp8.encoder`):
 ```
-$ adb shell am instrument -w -r -e key 10 -e enc OMX.google.vp8.encoder -e file /sdcard/akiyo_qcif.yuv -e test_timeout 20 -e video_timeout 3 -e res 176x144 -e ref_res 176x144 -e bit 100 -e mod cbr -e fps 30 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+$ adb shell am instrument -w -r -e key 10 -e enc OMX.google.vp8.encoder -e file /sdcard/akiyo_qcif.yuv -e test_timeout 20 -e video_timeout 3 -e res 176x144 -e ref_res 176x144 -e bit 100 -e mod cbr -e fps 30 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
 ...
 ```
 
@@ -181,7 +180,7 @@ $ adb push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
 ```
 
 ```
-$ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/KristenAndSara_1280x720_60.yuv -e test_timeout 20 -e video_timeout 3 -e res 1280x720 -e ref_res 1280x720 -e bit 100 -e mod cbr -e fps 60 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/android.support.test.runner.AndroidJUnitRunner
+$ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/KristenAndSara_1280x720_60.yuv -e test_timeout 20 -e video_timeout 3 -e res 1280x720 -e ref_res 1280x720 -e bit 100 -e mod cbr -e fps 60 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
 ...
 ```
 
