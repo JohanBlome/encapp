@@ -1,61 +1,62 @@
+
 {
-  "tests": [
-    {
-      "description": "Dynamic LTR",
-      "input_files": [
-        "../media/320x180_900fr_avc.mp4"
-      ],
-      "configure": [
-        {
-          "name": "vendor.qti-ext-enc-caps-ltr.max-count",
-          "type": "int",
-          "setting": "6"
-        },
-        {
-          "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
-          "type": "int",
-          "setting": "2"
-        }
-      ],
-      "runtime_parameters": [
-        {
-          "name": "vendor.qti-ext-enc-ltr.mark-frame",
-          "type": "int",
-          "settings": [
-            {
-              "10": "0"
-            },
-            {
-              "20": "1"
-            },
-            {
-              "150": "0"
-            }
-          ]
-        },
-        {
-          "name": "vendor.qti-ext-enc-ltr.use-frame",
-          "type": "int",
-          "settings": [
-            {
-              "40": "0"
-            },
-            {
-              "60": "1"
-            },
-            {
-              "90": "0"
-            },
-            {
-              "120": "1"
-            },
-            {
-              "180": "0"
-            }
-          ]
-        }
-      ],
-      "duration": 10
-    }
-  ]
+  "description": "Dynamic LTR",
+  "input_files": [
+	"../media/charlies_320x180_30fps_h264_30sec.mp4"
+  ],
+  "codecs": [
+	"encoder.avc"
+   ],
+  "configure": [
+	{
+	  "name": "vendor.qti-ext-enc-caps-ltr.max-count",
+	  "type": "int",
+	  "setting": "6"
+	},
+	{
+	  "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
+	  "type": "int",
+	  "setting": "2"
+	}
+  ],
+  "runtime_parameters": [
+	{
+	  "name": "vendor.qti-ext-enc-ltr.mark-frame",
+	  "type": "int",
+	  "settings": [
+		{
+		  "10": "0"
+		},
+		{
+		  "20": "1"
+		},
+		{
+		  "150": "0"
+		}
+	  ]
+	},
+	{
+	  "name": "vendor.qti-ext-enc-ltr.use-frame",
+	  "type": "int",
+	  "settings": [
+		{
+		  "40": "0"
+		},
+		{
+		  "60": "1"
+		},
+		{
+		  "90": "0"
+		},
+		{
+		  "120": "1"
+		},
+		{
+		  "180": "0"
+		}
+	  ]
+	}
+  ],
+  "duration": 10
 }
+

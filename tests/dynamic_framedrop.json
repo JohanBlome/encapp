@@ -1,0 +1,29 @@
+{
+    "description": "Dynamic Frame Drop",
+    "input_files": [
+        "../media/charlies_320x180_30fps_h264_30sec.mp4"
+    ],
+    "use_surface_enc": 0,
+    "input_format": "raw",
+    "input_resolution": "320x180",
+    "input_fps": "30",
+    "encode_resolutions": [
+        "320x180"
+    ],
+    "bitrates": [
+        "300k"
+    ],
+    "runtime_parameters": [
+        {
+            "name": "drop",
+            "type": "int",
+            "settings": [
+                "30",
+                "60",
+                "90",
+                "120"
+            ]
+        }
+    ],
+    "duration": 6
+}

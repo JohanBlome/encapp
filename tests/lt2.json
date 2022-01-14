@@ -1,11 +1,10 @@
 {
     "description": "Temporal layering (tl2) Bitrate control",
     "input_files": [
-        "../media/320x180_900fr_avc.mp4"
+        "../media/charlies_320x180_30fps_h264_30sec.mp4"
     ],
     "codecs": [
-        "encoder.avc",
-        "encoder.hevc"
+        "encoder.avc"
     ],
     "rc_modes": [
         "cbr"
@@ -14,7 +13,7 @@
         "100k"
     ],
     "i_intervals": [
-        10
+        30
     ],
     "configure": [{
         "name": "ts-schema",
