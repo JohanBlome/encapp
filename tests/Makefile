@@ -13,7 +13,8 @@ lint: \
     idr.json \
     lt2.json \
     ltr.json \
-    simple.json
+    simple.qcif.json \
+    simple.720p.json
 	echo "TMPFILE: ${TMPFILE}"
 	@for file in $^ ; do \
 		echo "processing $$file" ; \
