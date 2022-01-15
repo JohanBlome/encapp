@@ -109,7 +109,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
                 for file in input_files:
-                    if len(json_folder) > 0:
+                    if len(json_folder) > 0 and not os.path.isabs(file):
                         path = f'{json_folder}/{file}'
                     else:
                         path = f'{file}'
