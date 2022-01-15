@@ -21,7 +21,9 @@ FFMPEG_SILENT = 'ffmpeg  -hide_banner -loglevel error -y '
 
 
 def parse_quality(vmaf_file, ssim_file, psnr_file):
-    """ Read calculated log/output files and pick relevant vmaf/ssim/psnr data """
+    """Read calculated log/output files and pick relevant vmaf/ssim/psnr
+       data
+    """
     # currently only vmaf
     vmaf = -1
     with open(vmaf_file) as input_file:
@@ -56,8 +58,9 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
 
 
 def run_quality(test_file, options):
-    """ Compare the output found in test_file with the source/reference \
-        found in options.media directory or overriden """
+    """Compare the output found in test_file with the source/reference
+       found in options.media directory or overriden
+    """
     with open(test_file, 'r') as input_file:
         test = json.load(input_file)
 
@@ -68,7 +71,7 @@ def run_quality(test_file, options):
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format"
 
-    #Assume encoded file in same directory as test result json file
+    # Assume encoded file in same directory as test result json file
     directory, _ = os.path.split(test_file)
     encodedfile = directory + '/' + test.get('encodedfile')
 
@@ -78,8 +81,10 @@ def run_quality(test_file, options):
 
     settings = test.get('settings')
     fps = settings.get('fps')
-    if exists(vmaf_file) and exists(ssim_file) and exists(psnr_file) and not options.recalc:
-        print(f'All quality indicators already calculated for media, {vmaf_file}')
+    if (exists(vmaf_file) and exists(ssim_file) and exists(psnr_file) and
+            not options.recalc):
+        print('All quality indicators already calculated for media, '
+              f'{vmaf_file}')
     else:
         input_media_format = test.get('decoder_media_format')
         raw = True
@@ -91,11 +96,10 @@ def run_quality(test_file, options):
         else:
             input_media_format = test.get('encoder_media_format')
         if len(pix_fmt) == 0:
-            #See if source contains a clue
+            # See if source contains a clue
             pix_fmt = 'yuv420p'
             if source.find('nv12') > -1:
                 pix_fmt = 'nv12'
-
 
         if len(options.override_reference) > 0:
             input_res = options.reference_resolution
@@ -106,7 +110,7 @@ def run_quality(test_file, options):
         output_media_format = test.get('encoder_media_format')
         output_width = output_media_format.get('width')
         output_height = output_media_format.get('height')
-     
+
         output_res = f'{output_width}x{output_height}'
 
         reference = source
@@ -126,44 +130,47 @@ def run_quality(test_file, options):
         if input_res != output_res:
             distorted = f'{encodedfile}.yuv'
 
-            #Scale
-            adb_cmd = f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo ' \
-                      f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
+            # Scale
+            adb_cmd = (f'{FFMPEG_SILENT} -i {encodedfile} -f rawvideo '
+                       f'-pix_fmt {pix_fmt} -s {input_res} {distorted}')
 
             run_cmd(adb_cmd)
         if raw:
-            ref_part = f'-f rawvideo -pix_fmt {pix_fmt} -s {input_res} ' \
-                       f'-r {fps} -i {reference} '
+            ref_part = (f'-f rawvideo -pix_fmt {pix_fmt} -s {input_res} '
+                        f'-r {fps} -i {reference} ')
         else:
             ref_part = f'-r {fps} -i {reference} '
 
         if input_res != output_res:
-            dist_part = f'-f rawvideo -pix_fmt {pix_fmt} '\
-                        f'-s {input_res} -r {fps} -i {distorted} '
+            dist_part = (f'-f rawvideo -pix_fmt {pix_fmt} '
+                         f'-s {input_res} -r {fps} -i {distorted}')
         else:
             dist_part = f'-r {fps} -i {distorted} '
 
         # Do calculations
         if options.recalc or not exists(vmaf_file):
-            adb_cmd = f'{FFMPEG_SILENT} {ref_part} {dist_part} ' \
-                      f'-filter_complex \"{force_scale}libvmaf=log_path={vmaf_file}\" -report ' \
-                      '-f null - 2>&1 '
+            adb_cmd = (f'{FFMPEG_SILENT} {ref_part} {dist_part} '
+                       '-filter_complex '
+                       f'"{force_scale}libvmaf=log_path={vmaf_file}" '
+                       '-report -f null - 2>&1 ')
             run_cmd(adb_cmd)
         else:
             print(f'vmaf already calculated for media, {vmaf_file}')
 
         if options.recalc or not exists(ssim_file):
-            adb_cmd = f'ffmpeg {dist_part} {ref_part} ' \
-                      f'-filter_complex \"{force_scale}ssim=stats_file={ssim_file}.all\" ' \
-                      f'-f null - 2>&1 | grep SSIM > {ssim_file}'
+            adb_cmd = (f'ffmpeg {dist_part} {ref_part} '
+                       '-filter_complex '
+                       f'"{force_scale}ssim=stats_file={ssim_file}.all" '
+                       f'-f null - 2>&1 | grep SSIM > {ssim_file}')
             run_cmd(adb_cmd)
         else:
             print(f'ssim already calculated for media, {ssim_file}')
 
         if options.recalc or not exists(psnr_file):
-            adb_cmd = f'ffmpeg {dist_part} {ref_part} ' \
-                      f'-filter_complex \"{force_scale}psnr=stats_file={psnr_file}.all\" ' \
-                      f'-f null - 2>&1 | grep PSNR > {psnr_file}'
+            adb_cmd = (f'ffmpeg {dist_part} {ref_part} '
+                       '-filter_complex '
+                       f'"{force_scale}psnr=stats_file={psnr_file}.all" '
+                       f'-f null - 2>&1 | grep PSNR > {psnr_file}')
             run_cmd(adb_cmd)
         else:
             print(f'psnr already calculated for media, {psnr_file}')
@@ -174,14 +181,18 @@ def run_quality(test_file, options):
     if exists(vmaf_file):
         vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
 
-        #media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,ssim,psnr,file
+        # media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,
+        # ssim,psnr,file
         file_size = os.stat(encodedfile).st_size
-        data = f"{encodedfile}, {settings.get('codec')}, {settings.get('gop')}, " \
-               f"{settings.get('fps')}, {settings.get('width')}, {settings.get('height')}, " \
-               f"{settings.get('bitrate')}, {settings.get('meanbitrate')}, " \
-               f"{file_size}, {vmaf}, {ssim}, {psnr}, {test_file}\n"
+        data = (f"{encodedfile}, {settings.get('codec')}, "
+                f"{settings.get('gop')}, "
+                f"{settings.get('fps')}, {settings.get('width')}, "
+                f"{settings.get('height')}, "
+                f"{settings.get('bitrate')}, {settings.get('meanbitrate')}, "
+                f"{file_size}, {vmaf}, {ssim}, {psnr}, {test_file}\n")
         return data
     return None
+
 
 def get_options(argv):
     """ Parse cli args """
@@ -199,26 +210,29 @@ def get_options(argv):
                         help='pixel format i.e. nv12 or yuv420p',
                         default='')
     parser.add_argument('-ref', '--override_reference',
-                        help='Override reference, used when source is '\
-                        ' downsampled prior to encoding',
+                        help=('Override reference, used when source is '
+                              ' downsampled prior to encoding'),
                         default='')
     parser.add_argument('-ref_res', '--reference_resolution',
-                        help='Overriden reference resolution WxH',                        
+                        help='Overriden reference resolution WxH',
                         default='')
     parser.add_argument('--header',
                         help='print header to output',
                         action='store_true')
     parser.add_argument('--fr_fr',
-                        help='force full range to full range on distorted file',
+                        help=('force full range to full range on '
+                              'distorted file'),
                         action='store_true')
     parser.add_argument('--lr_fr',
                         help='force lr range to full range on distorted file',
                         action='store_true')
     parser.add_argument('--lr_lr',
-                        help='force limited range to limited range on distorted file',
+                        help=('force limited range to limited range on '
+                              'distorted file'),
                         action='store_true')
     parser.add_argument('--fr_lr',
-                        help='force full range to limited range on distorted file',
+                        help=('force full range to limited range on '
+                              'distorted file'),
                         action='store_true')
     parser.add_argument('--recalc',
                         help='recalculate regardless of status',
@@ -234,14 +248,15 @@ def get_options(argv):
 
 
 def main(argv):
-    """ Calculate video quality properties (vmaf/ssim/psnr) and write \
-        'a csv with relevant data """
+    """Calculate video quality properties (vmaf/ssim/psnr) and write
+       a csv with relevant data
+    """
     options = get_options(argv)
 
     with open(options.output, 'a') as output:
         if options.header:
-            output.write('media,codec,gop,fps,width,height,' \
-                         'bitrate,real_bitrate,size,vmaf,ssim,'\
+            output.write('media,codec,gop,fps,width,height,'
+                         'bitrate,real_bitrate,size,vmaf,ssim,'
                          'psnr,file\n')
         for test in options.test:
             data = run_quality(test, options)
