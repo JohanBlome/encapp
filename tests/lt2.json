@@ -15,18 +15,22 @@
     "i_intervals": [
         30
     ],
-    "configure": [{
-        "name": "ts-schema",
-        "type": "string",
-        "setting" : "android.generic.2"
-    }],
+    "configure": [
+        {
+            "name": "ts-schema",
+            "type": "string",
+            "setting": "android.generic.2"
+        }
+    ],
     "runtime_parameters": [
         {
-            "name": "video-bitrate" ,
+            "name": "video-bitrate",
             "type": "int",
             "settings": [
-                {"450" : "500k"}                        
-            ]           
+                {
+                    "450": "500k"
+                }
+            ]
         }
     ]
 }
