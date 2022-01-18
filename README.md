@@ -1,200 +1,208 @@
 # encapp
-Easy way to test video encoders in Android in large scale.
 
-This tool provides an easy way to test an android video encoder by easily combining parameters like:
+encapp is a tool to test video encoders in Android.
+
+It provides an easy way to test an android video encoder by easily combining parameters like:
 
 * codecs
 * bitrate
 * framerate
 * i-frame interval
 * coding mode
+* others
 
 encapp also has support for dynamically changing framerate, bitrate, and ltr.
-This is described in `scripts/offline_transcoding.sh`.
+
+This document describes how to use the tool. For tool development, check [README.dev.md](README.dev.md).
 
 
-## 1. Prerequisites
+# 1. Prerequisites
 
+For running encapp:
 * adb connection to the device being tested.
 * ffmpeg with decoding support for the codecs to be tested
-* android sdk setup and environment variables set
-* android ndk
 
 
-## 2. Operation
-
-#### (1) set up the android SDK and NDK in the `local.properties` file.
-
-Create a `local.properties` file with valid entries for the `ndk.dir` and
-`sdk.dir` variables.
+# 2. Operation: Get a List of Available Codecs
 
 ```
-$ cat local.properties
-ndk.dir: /opt/android_ndk/android-ndk-r19/
-sdk.dir: /opt/android_sdk/
-```
+$ ./scripts/encapp.py --list
+adb devices -l
+adb -s <serial> shell ls /sdcard/
+model = <model_name>
+adb -s <serial> install -g proj/encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
+adb -s <serial> install -g proj/encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
+adb -s <serial> shell am instrument -w -r -e ui_hold_sec 1 -e list_codecs a -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <serial> pull /sdcard/codecs.txt codecs_<model_name>.txt
+--- List of supported encoders  ---
 
-Note that this file should not be added to the repo.
+        MediaCodec {
+            name: OMX.google.h264.encoder
+            type {
+                mime_type: video/avc
+                max_supported_instances: 32
+                color {
+                    format: 2135033992
+                    name: COLOR_FormatYUV420Flexible
+                }
+                color {
+                    format: 19
+                    name: COLOR_FormatYUV420Planar
+                }
+                ...
+            }
+        }
 
-#### (2) build the encapp app
+*******
+--- List of supported decoders  ---
 
-```
-$ ./gradlew clean
-$ ./gradlew build
-...
-BUILD SUCCESSFUL in 6s
-61 actionable tasks: 5 executed, 56 up-to-date
-```
-
-#### (3) run the `setup.sh` script to install encapp in your android device.
-
-```
-$ ./setup.sh
-...
-Installing APK 'com.facebook.encapp-v1.0-debug.apk' on 'Pixel - 10' for app:debug
-Installed on 4 devices.
-
-BUILD SUCCESSFUL in 14s
-31 actionable tasks: 3 executed, 28 up-to-date
-```
-
-#### (4) run a quick encoding experiment with the app
-
-Install the app.
-```
-$ adb install ./app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
-$ adb shell cmd package list package |grep encapp
-package:com.facebook.encapp
-```
-
-Install the instrumented test infra.
-```
-$ ./gradlew installDebugAndroidTest
-$ adb shell pm list instrumentation
-...
-instrumentation:com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner (target=com.facebook.encapp)
-...
-```
-
-Run the `list_codecs` function.
-
-Note that, for the very first time you run the instrumentation codecs, the
-device will ask you for permission to access to `/sdcard/`.
-
-Figure 1 shows ![an android device asking for permission to run encapp](doc/encapp_permission.jpeg)
+        MediaCodec {
+            name: OMX.google.h264.decoder
+            type {
+                mime_type: video/avc
+                max_supported_instances: 32
+                color {
+                    format: 2135033992
+                    name: COLOR_FormatYUV420Flexible
+                }
+                ...
+            }
+        }
 
 ```
-$ adb shell am instrument -w -r -e list_codecs a -e test_timeout 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunneradb shell am instrument -w -r -e list_codecs a -e ui_hold_sec 20 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
-INSTRUMENTATION_STATUS: class=com.facebook.encapp.CodecValidationInstrumentedTest
-INSTRUMENTATION_STATUS: current=1
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=1
-INSTRUMENTATION_STATUS: stream=
-com.facebook.encapp.CodecValidationInstrumentedTest:
-INSTRUMENTATION_STATUS: test=automateValidation
-INSTRUMENTATION_STATUS_CODE: 1
-INSTRUMENTATION_STATUS: class=com.facebook.encapp.CodecValidationInstrumentedTest
-INSTRUMENTATION_STATUS: current=1
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=1
-INSTRUMENTATION_STATUS: stream=.
-INSTRUMENTATION_STATUS: test=automateValidation
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_RESULT: stream=
 
-Time: 28.422
+Note: The `scripts/encapp.py` scripts will install a prebuild apk before running the test. If you have several devices attached to your host, you can use either the "`ANDROID_SERIAL`" environment variable or the "`--serial <serial>`" CLI option.
 
-OK (1 test)
 
-INSTRUMENTATION_CODE: -1
-```
+# 3. Operation: Run an Encoding Experiment Using encapp
 
-```
-$ adb logcat |grep encapp |grep Codec:
-...
-11-13 12:06:41.004  2789  2789 D encapp  : Codec:c2.android.aac.encoder type: audio/mp4a-latm
-11-13 12:06:41.004  2789  2789 D encapp  : Codec:OMX.google.aac.encoder type: audio/mp4a-latm
-11-13 12:06:41.004  2789  2789 D encapp  : Codec:c2.android.amrnb.encoder type: audio/3gpp
-11-13 12:06:41.005  2789  2789 D encapp  : Codec:OMX.google.amrnb.encoder type: audio/3gpp
-11-13 12:06:41.005  2789  2789 D encapp  : Codec:c2.android.amrwb.encoder type: audio/amr-wb
-11-13 12:06:41.005  2789  2789 D encapp  : Codec:OMX.google.amrwb.encoder type: audio/amr-wb
-11-13 12:06:41.005  2789  2789 D encapp  : Codec:c2.android.flac.encoder type: audio/flac
-11-13 12:06:41.005  2789  2789 D encapp  : Codec:OMX.google.flac.encoder type: audio/flac
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:c2.android.opus.encoder type: audio/opus
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:c2.qti.avc.encoder type: video/avc
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:OMX.qcom.video.encoder.avc type: video/avc
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:c2.qti.hevc.encoder type: video/hevc
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:OMX.qcom.video.encoder.hevc type: video/hevc
-11-13 12:06:41.006  2789  2789 D encapp  : Codec:c2.qti.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:OMX.qcom.video.encoder.vp8 type: video/x-vnd.on2.vp8
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:c2.android.avc.encoder type: video/avc
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:OMX.google.h264.encoder type: video/avc
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:c2.android.h263.encoder type: video/3gpp
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:OMX.google.h263.encoder type: video/3gpp
-11-13 12:06:41.007  2789  2789 D encapp  : Codec:c2.android.hevc.encoder type: video/hevc
-11-13 12:06:41.008  2789  2789 D encapp  : Codec:c2.android.mpeg4.encoder type: video/mp4v-es
-11-13 12:06:41.008  2789  2789 D encapp  : Codec:OMX.google.mpeg4.encoder type: video/mp4v-es
-11-13 12:06:41.008  2789  2789 D encapp  : Codec:c2.android.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:06:41.008  2789  2789 D encapp  : Codec:OMX.google.vp8.encoder type: video/x-vnd.on2.vp8
-11-13 12:06:41.008  2789  2789 D encapp  : Codec:c2.android.vp9.encoder type: video/x-vnd.on2.vp9
-11-13 12:06:41.009  2789  2789 D encapp  : Codec:OMX.google.vp9.encoder type: video/x-vnd.on2.vp9
-...
-```
+## 3.1. Small QCIF Encoding
 
-#### (5) run a quick encoding experiment with the app
-
-##### (5.a) small qcif encoding
-
-First, choose one of the codecs from step 4. In this case, we will use `OMX.google.vp8.encoder`.
+First, select one of the codecs from step 4. In this case, we will use `OMX.google.h264.encoder`.
 
 Push the (raw) video file to be encoded into the device. Note that we are using a QCIF video (176x144).
 ```
 $ wget https://media.xiph.org/video/derf/y4m/akiyo_qcif.y4m -O /tmp/akiyo_qcif.y4m
-$ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt yuv420p /tmp/akiyo_qcif.yuv
-$ adb push /tmp/akiyo_qcif.yuv /sdcard/
+$ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt nv12 /tmp/akiyo_qcif.yuv
 ```
 
-Now run the vp8 encoder (`OMX.google.vp8.encoder`):
+Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
-$ adb shell am instrument -w -r -e key 10 -e enc OMX.google.vp8.encoder -e file /sdcard/akiyo_qcif.yuv -e test_timeout 20 -e video_timeout 3 -e res 176x144 -e ref_res 176x144 -e bit 100 -e mod cbr -e fps 30 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
-...
+$ soumaya01 ./scripts/encapp.py tests/simple.qcif.json 
+adb devices -l
+adb -s <serial> shell ls /sdcard/
+model = <model_name>
+adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
+adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
+adb -s <serial> rm /sdcard/encapp_*
+tests [{'description': 'Simple QCIF Test', 'input_files': ['/tmp/akiyo_qcif.yuv'], 'input_resolution': '176x144', 'input_fps': '30', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['176x144'], 'bitrates': ['100k']}]
+push data for test = {'description': 'Simple QCIF Test', 'input_files': ['/tmp/akiyo_qcif.yuv'], 'input_resolution': '176x144', 'input_fps': '30', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['176x144'], 'bitrates': ['100k']}
+adb -s <serial> push /tmp/akiyo_qcif.yuv /sdcard/
+adb -s <serial> push simple.qcif.json_1.json /sdcard/
+adb -s <serial> shell am instrument -w -r  -e test /sdcard/simple.qcif.json_1.json com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <serial> shell ls /sdcard/
+mkdir encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
+pull encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json to encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
+adb -s <serial> pull /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
+adb -s <serial> shell rm /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json
+pull encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4 to encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
+adb -s <serial> pull /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4 encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
+adb -s <serial> shell rm /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4
+adb -s <serial> shell rm /sdcard/akiyo_qcif.yuv
+adb -s <serial> shell rm /sdcard/simple.qcif.json_1.json
 ```
 
-And pull the encoded file:
-```
-$ adb pull /sdcard/omx.google.vp8.encoder_30fps_176x144_100000bps_iint10_m2.webm /tmp/
-$ ffprobe -i /tmp/omx.google.vp8.encoder_30fps_176x144_100000bps_iint10_m2.webm
-...
-  Duration: 00:00:02.93, start: 0.000000, bitrate: 113 kb/s
-    Stream #0:0: Video: vp8, yuv420p(tv, smpte170m/smpte170m/bt709, progressive), 176x144, SAR 1:1 DAR 11:9, 30 fps, 30 tbr, 1k tbn, 1k tbc (default)
-```
+Results are copied into a directory called `encapp_*`. They include:
+* encoded video, using the mp4 container for h264, and the ivf container for vp8 and vp9
+* json file containing per-frame information
 
-##### (5.b) hd encoding
+
+## 3.2. HD Video Encoding
 
 Now, let's run the h264 encoder in an HD file. We will just select the codec ("h264"), and let encapp choose the actual encoder.
 
 ```
 $ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m
 $ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tmp/KristenAndSara_1280x720_60.yuv
-$ adb push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
 ```
 
 ```
-$ adb shell am instrument -w -r -e key 10 -e enc h264 -e file /sdcard/KristenAndSara_1280x720_60.yuv -e test_timeout 20 -e video_timeout 3 -e res 1280x720 -e ref_res 1280x720 -e bit 100 -e mod cbr -e fps 60 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
-...
+$ soumaya01 ./scripts/encapp.py tests/simple.720p.json 
+adb devices -l
+adb -s <serial> shell ls /sdcard/
+model = <model_name>
+adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
+adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
+adb -s <serial> rm /sdcard/encapp_*
+tests [{'description': 'Simple HD Test', 'input_files': ['/tmp/KristenAndSara_1280x720_60.yuv'], 'input_resolution': '1280x720', 'input_fps': '60', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['1280x720'], 'bitrates': ['1000k']}]
+push data for test = {'description': 'Simple HD Test', 'input_files': ['/tmp/KristenAndSara_1280x720_60.yuv'], 'input_resolution': '1280x720', 'input_fps': '60', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['1280x720'], 'bitrates': ['1000k']}
+adb -s <serial> push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
+adb -s <serial> push simple.720p.json_1.json /sdcard/
+adb -s <serial> shell am instrument -w -r  -e test /sdcard/simple.720p.json_1.json com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <serial> shell ls /sdcard/
+mkdir encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
+pull encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json to encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
+adb -s <serial> pull /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
+adb -s <serial> shell rm /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json
+pull encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4 to encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
+adb -s <serial> pull /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4 encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
+adb -s <serial> shell rm /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4
+adb -s <serial> shell rm /sdcard/KristenAndSara_1280x720_60.yuv
+adb -s <serial> shell rm /sdcard/simple.720p.json_1.json
+
 ```
 
 
-#### (6) run a multiple encoding experiment with the app
+# 4. Multiple Encoding Experiments
 
-Run
+First at all create your own json configuration file:
 
 ```
-$ encapp_tests.py --config sample_config.json
+$ encapp_tests.py --config myconfig.json
+$ cat myconfig.json
+[
+    {
+        "description": "sample",
+        "input_files": [
+            ""
+        ],
+        "use_surface_enc": 1,
+        "input_format": "mp4",
+        "input_resolution": "1280x720",
+        "codecs": [
+            "hevc"
+        ],
+        "encode_resolutions": [
+            "1280x720"
+        ],
+        "rc_modes": [
+            "cbr"
+        ],
+        "bitrates": [
+            500,
+            1000,
+            1500,
+            2000,
+            2500
+        ],
+        "i_intervals": [
+            2
+        ],
+        "i_frame_sizes": [
+            "unlimited"
+        ],
+        "temporal_layer_counts": [
+            1
+        ],
+        "duration": 10,
+        "enc_loop": 0
+    }
+]
 ```
 
-Open the `sample_config.json` file in a editor and edit the test.
-example, mp4 file:
+Open the `myconfig.json` file in a editor and edit the test to add a file in "`input_files`".
+
+Example 1: using an already-encoded (mp4) file (the script will convert it to raw before sending it to the device):
 
 ```
  [
@@ -233,7 +241,7 @@ example, mp4 file:
 ]
 ```
 
-raw file:
+Example 2: using a raw file:
 ```
 [
     {
@@ -271,125 +279,53 @@ raw file:
 ]
 ```
 
-##### (6.b) Json test definition settings
+# 5. JSON Test Definition Settings
 
 Definitions of the keys in the sample json file
-``` 
-'bitrates':
-	A list of encoding bitrates
-```
-```
- 'codecs':
-	A list of encoders
-```
-```
-'conc':
-	The number of concurrent tests to run
-```
-```
-'configure':
-	Configure encoding parameters (see below for more information)
-```
-```
-'configure_decoder':
-	As above but for the decoder
-```
-```
-'decoder':
-	Normally decoder is created based on encoded file type but the specific decoder can be specified here.
-```
-```
-'description':
-	Description of the test. It can be empty
-```
-```
-'enc_loop':
-	The number of time looping encoding.
-	This is used for encoding time profiling. 
-	When enc_loop is greater than 1, there is no output video
-```
-```
-'encode':
-	Boolean to indicate encoding should be permormed, default is true.
-```
-```
-'encode_resolutions':
-	A list of encoding resolutions
-```
-```
-'framerates':
-	Drop frames to reach a specified frame rate
-```
-```
-'duration':
-	Duration of the encoding. This is ignored when enc loop > 0
-```
-```
-'i_frame_sizes':
-	An optional parameter.
-```
-```
-'i_intervals':
-	A list of I frame intervals
-```
-```
-'input_files':
-	A list of input files
-```
-```
-'input_fps' :
-	The input frame rate in the raw case
-```
-```
-'input_format':
-	Input video format: mp4, nv12, yuv420p
-```
-```
-'input_resolution':
-	Input video resolution, WxH
-```
-```
-'loop':
-	The number of times a sources is looped for a longer input video
-```
-```
-'pursuit':
-	Start multiples of a test with a one sec delay. The values can be  
-	1. '-1' for infinite or until failure  
-	2.  '0' for no pursuit mde at all (default)  
-	3.   X start test until X is reached
-```
-```
-'runtime_parameters':
-	Settings corresponding to s certain frame (see below for more information)
-```
-```
-'decoder_runtime_parameters':
-	As above but for the decoder
-```
-```
-'realtime':
-	Read input video in realtime i.e. wait until next pts
-```
-```
-'rc_modes':
-	A list of rate control modes
-```
-```
-'temporal_layer_counts':
-	Number of temporal layers
-```
 
-##### (6.c) Encoder/Decoder configuration
+* '`bitrates`': list of encoding bitrates
+* '`codecs`': list of encoders
+* '`conc`': number of concurrent tests to run
+* '`configure`': configure encoding parameters (see below for more information)
+* '`configure_decoder`': configure decoder parameters
+* '`decoder`': Normally decoder is created based on encoded file type but the specific decoder can be specified here.
+* '`description`': test description (may be empty)
+* '`enc_loop`': number of times the encoding loop is run. Used for encoding time profiling. When `enc_loop` is greater than 1, there is no output video
+* '`encode`': Boolean to indicate whether encoding should be performed [default: true]
+* '`encode_resolutions`': list of encoding resolutions
+* '`framerates`': list of encoding framerates (drop frames to reach a specified frame rate)
+* '`duration`': duration of the encoding (ignored when `enc_loop` > 0)
+* '`i_frame_sizes`': ??? [optional parameter]
+* '`i_intervals`': list of I-frame intervals
+* '`input_files`': list of input files
+* '`input_fps`': input frame rate [for raw inputs]
+* '`input_format`': input video format: mp4, nv12, yuv420p [for raw inputs]
+* '`input_resolution`': input video resolution, as "`<width>x<height>`" [for raw inputs]
+* '`loop`': number of times a source is looped [use to get a longer input video]
+* '`pursuit`': pursuitmode. Start multiples of a test with a one sec delay. Values can be:
+	* (1) '-1`': for infinite or until failure
+	* (2) '0`': for no pursuit mode at all [default]
+	* (3)  "`<X>`": start test until X is reached
+* '`runtime_parameters`': settings corresponding to a certain frame (see below for more information)
+* '`decoder_runtime_parameters`': `runtime_parameters` for the decoder
+* '`realtime`': read input video in realtime i.e. wait until next pts
+* '`rc_modes`': list of rate control modes
+* '`temporal_layer_counts`': number of temporal layers
+
+
+## 5.1. Encoder/Decoder Configuration
+
 Additional settings (besides bitrate etc).
+
 Example:
 ```
-`"configure":
+"configure":
 [{
     "name": "tl-schema",
     "type": "string",
     "setting": "android.generic.2"
 }],
+
 "configure_decoder":
 [{
     "name": "vendor.qti-ext-dec-picture-order.enable",
@@ -402,13 +338,12 @@ Example:
   "setting": "1"
 }]
 ```
-##### (6.d) Runtime configuration
 
-Each setting consists of a pair
-FRAME, SETTING
-Where the setting can be an empty string.
+## 5.2. Runtime Configuration
 
-Dynamically change framerate:
+Each setting consists of a pair `{FRAME_NUM, VALUE}`, where the VALUE can be an empty string.
+
+* Dynamically change framerate:
 ```
 `"runtime_parameters":
 [{
@@ -429,9 +364,10 @@ Dynamically change framerate:
     }]
 }]`
 ```
-Low latency (Android api 30)
-"decoder_runtime_parameters":
+
+* Low latency (Android API 30)
 ```
+"decoder_runtime_parameters":
 [{
     "name": "low-latency",
     "type": "int",
@@ -442,32 +378,15 @@ Low latency (Android api 30)
 }]
 ```
 
-Run
-This will install a prebuild apk, push the videofile and run the test.
-$ encapp.py sample_config.json
 
-To run on a specific device, use
-```
-$ encapp.py --test sample_config.json --serial [device serial number]
-```
-The script will automatically push the input files to the device.
-If the input file(s) are not in the working directory, use absolute path(s)
-
-The script saves all encoded videos and stats in an output directory per run.
-Stat files are in JSON format.
-
-If you do not want to install the prebuild apk, run
-```
-$ encapp.py --install false sample_config.json
-```
-
-#### (7) Navigating results
+# 6. Navigating results
 
 The names json result files does not give any clues as to what settings have been used.
 To figure that out run:
 ```
 $ encapp_search.py
 ```
+
 Running it without any arguments will index all parsable json files in the current folder and below.
 
 To find all 1080p files run:
@@ -476,14 +395,12 @@ $ encapp_search.py -s 1920x1080
 ```
 
 
-(8) Calculate quality degradation
+Example: Calculate quality degradation
 
 Run
 
-
 ```
 $ encapp_quality.py --header --media MEDIA_FOLDER $(encapp_search.py)
-
 ```
 
 Since the json file only contains the name of the source for an encoding the source folder needs to be provided.

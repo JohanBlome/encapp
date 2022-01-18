@@ -1,0 +1,21 @@
+{
+    "tests": [
+        {
+            "description": "Simple HD Test",
+            "input_files": [
+                "/tmp/KristenAndSara_1280x720_60.yuv"
+            ],
+            "input_resolution": "1280x720",
+            "input_fps": "60",
+            "codecs": [
+                "OMX.google.h264.encoder"
+            ],
+            "encode_resolutions": [
+                "1280x720"
+            ],
+            "bitrates": [
+                "1000k"
+            ]
+        }
+    ]
+}

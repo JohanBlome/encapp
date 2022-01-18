@@ -87,7 +87,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
-    #run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
+    # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
     inputfile = ''
@@ -109,7 +109,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
                 for file in input_files:
-                    if len(json_folder) > 0:
+                    if len(json_folder) > 0 and not os.path.isabs(file):
                         path = f'{json_folder}/{file}'
                     else:
                         path = f'{file}'
@@ -145,11 +145,12 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         if len(options.output_res) > 0:
             additional = f'{additional} -e res {options.output_res}'
 
-        run_cmd(f'adb -s {serial} shell am instrument -w -r {additional} -e test '
-                f'/sdcard/{json_name} {JUNIT_RUNNER_NAME}')
+        run_cmd(f'adb -s {serial} shell am instrument -w -r {additional} '
+                f'-e test /sdcard/{json_name} {JUNIT_RUNNER_NAME}')
         adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
         ret, stdout, stderr = run_cmd(adb_cmd)
-        output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
+        output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
+                                  re.MULTILINE)
 
         base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
         sub_dir = '_'.join([base_file_name, 'files'])
@@ -172,9 +173,9 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
 
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
         if input_files is not None:
-                for file in input_files:
-                    base_file_name = os.path.basename(file)
-                    run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
+            for file in input_files:
+                base_file_name = os.path.basename(file)
+                run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
         if len(options.input) > 0:
             base_file_name = os.path.basename(inputfile)
             run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
