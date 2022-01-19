@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     performInstrumentedTest();
-                    finish();
+                    exit();
                 }
             })).start();
         } else {
@@ -88,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
+
 
     protected void listCodecs() {
         Log.d(TAG, "List codecs");
@@ -353,15 +354,6 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        TextView mTvTestRun = findViewById(R.id.tv_testrun);
-                        Log.d(TAG, "Hide view! - Do not hide!");
-                        //mTvTestRun.setVisibility(View.GONE);
-                    }
-                });
             } catch(IOException e){
                 Log.e(TAG, "@Exception when running tests: "+e.getMessage());
                 e.printStackTrace();

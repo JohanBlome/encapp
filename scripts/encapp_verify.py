@@ -13,7 +13,7 @@ import re
 import shutil
 import encapp as ep
 import encapp_search as es
-from encapp_tests import run_cmd
+from encapp import run_cmd
 from datetime import datetime
 
 default_tests = ['simple.180p.json', 
