@@ -16,7 +16,7 @@ import encapp_search as es
 from encapp_tests import run_cmd
 from datetime import datetime
 
-default_tests = ['simple.json', 
+default_tests = ['simple.180p.json', 
                  'bitrates.json', 
                  'dynamic_bitrate.json',
                  'dynamic_framerate.json',

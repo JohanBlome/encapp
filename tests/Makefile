@@ -9,10 +9,12 @@ lint: \
     dynamic_bitrate.json \
     dynamic_framedrop.json \
     dynamic_framerate.json \
+    dynamic_idr.json \
     extraconfig.json \
     idr.json \
     lt2.json \
     ltr.json \
+    ltr-2ref.json \
     simple.qcif.json \
     simple.720p.json
 	echo "TMPFILE: ${TMPFILE}"
@@ -22,7 +24,3 @@ lint: \
 		jq --indent 4 . $$file > ${TMPFILE}; \
 		mv ${TMPFILE} $$file; \
 	done
-
-
-
-
