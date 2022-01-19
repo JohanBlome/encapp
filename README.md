@@ -30,9 +30,8 @@ $ ./scripts/encapp.py --list
 adb devices -l
 adb -s <serial> shell ls /sdcard/
 model = <model_name>
-adb -s <serial> install -g proj/encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
 adb -s <serial> install -g proj/encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
-adb -s <serial> shell am instrument -w -r -e ui_hold_sec 1 -e list_codecs a -e class com.facebook.encapp.CodecValidationInstrumentedTest com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
+adb -s <serial> shell am start -W -e ui_hold_sec 3 -e list_codecs a com.facebook.encapp/.MainActivity
 adb -s <serial> pull /sdcard/codecs.txt codecs_<model_name>.txt
 --- List of supported encoders  ---
 
@@ -88,28 +87,20 @@ $ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt nv12 /tmp/akiyo_qcif.yuv
 
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
-$ soumaya01 ./scripts/encapp.py tests/simple.qcif.json 
+$ encapp.py /media/johan/data/code/encapp/tests/simple.qcif.json 
 adb devices -l
-adb -s <serial> shell ls /sdcard/
-model = <model_name>
-adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
-adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
-adb -s <serial> rm /sdcard/encapp_*
+adb -s <serial>  shell ls /sdcard/
+adb -s <serial>  rm /sdcard/encapp_*
 tests [{'description': 'Simple QCIF Test', 'input_files': ['/tmp/akiyo_qcif.yuv'], 'input_resolution': '176x144', 'input_fps': '30', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['176x144'], 'bitrates': ['100k']}]
 push data for test = {'description': 'Simple QCIF Test', 'input_files': ['/tmp/akiyo_qcif.yuv'], 'input_resolution': '176x144', 'input_fps': '30', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['176x144'], 'bitrates': ['100k']}
-adb -s <serial> push /tmp/akiyo_qcif.yuv /sdcard/
-adb -s <serial> push simple.qcif.json_1.json /sdcard/
-adb -s <serial> shell am instrument -w -r  -e test /sdcard/simple.qcif.json_1.json com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
-adb -s <serial> shell ls /sdcard/
-mkdir encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
-pull encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json to encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
-adb -s <serial> pull /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
-adb -s <serial> shell rm /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.json
-pull encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4 to encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
-adb -s <serial> pull /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4 encapp_<model_name>_2022-01-14_18_28/simple.qcif_files/
-adb -s <serial> shell rm /sdcard/encapp_2b0c8ef4-a938-4896-8bb9-0fc854a08498.mp4
-adb -s <serial> shell rm /sdcard/akiyo_qcif.yuv
-adb -s <serial> shell rm /sdcard/simple.qcif.json_1.json
+adb -s <serial>  push /tmp/akiyo_qcif.yuv /sdcard/
+adb -s <serial>  shell am start -W  -e test /sdcard/simple.qcif.json_1.json com.facebook.encapp/.MainActivity
+mkdir encapp_<serial> __<date>/simple.qcif_files/
+pull encapp_e992d472-143f-4289-ae2b-fbde81ff3c4f.json to encapp_Portal__2022-01-18_23_37/simple.qcif_files/
+pull encapp_e992d472-143f-4289-ae2b-fbde81ff3c4f.mp4 to encapp_Portal__2022-01-18_23_37/simple.qcif_files/
+adb -s <serial>  shell rm /sdcard/akiyo_qcif.yuv
+adb -s <serial>  shell rm /sdcard/simple.qcif.json_1.json
+
 ```
 
 Results are copied into a directory called `encapp_*`. They include:
@@ -122,33 +113,24 @@ Results are copied into a directory called `encapp_*`. They include:
 Now, let's run the h264 encoder in an HD file. We will just select the codec ("h264"), and let encapp choose the actual encoder.
 
 ```
-$ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m
+$ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m -O /tmp/KristenAndSara_1280x720_60.y4m
 $ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tmp/KristenAndSara_1280x720_60.yuv
 ```
 
 ```
-$ soumaya01 ./scripts/encapp.py tests/simple.720p.json 
+$ encapp.py tests/simple.720p.json 
 adb devices -l
-adb -s <serial> shell ls /sdcard/
-model = <model_name>
-adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/androidTest/debug/com.facebook.encapp-v1.0-debug-androidTest.apk 
-adb -s <serial> install -g encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
-adb -s <serial> rm /sdcard/encapp_*
+adb -s <serial>  shell ls /sdcard/
+adb -s <serial>  rm /sdcard/encapp_*
 tests [{'description': 'Simple HD Test', 'input_files': ['/tmp/KristenAndSara_1280x720_60.yuv'], 'input_resolution': '1280x720', 'input_fps': '60', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['1280x720'], 'bitrates': ['1000k']}]
 push data for test = {'description': 'Simple HD Test', 'input_files': ['/tmp/KristenAndSara_1280x720_60.yuv'], 'input_resolution': '1280x720', 'input_fps': '60', 'codecs': ['OMX.google.h264.encoder'], 'encode_resolutions': ['1280x720'], 'bitrates': ['1000k']}
-adb -s <serial> push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
-adb -s <serial> push simple.720p.json_1.json /sdcard/
-adb -s <serial> shell am instrument -w -r  -e test /sdcard/simple.720p.json_1.json com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner
-adb -s <serial> shell ls /sdcard/
-mkdir encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
-pull encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json to encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
-adb -s <serial> pull /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
-adb -s <serial> shell rm /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.json
-pull encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4 to encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
-adb -s <serial> pull /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4 encapp_<model_name>_2022-01-14_18_28/simple.720p_files/
-adb -s <serial> shell rm /sdcard/encapp_11efc7af-3737-44eb-8de9-d997e60ec57f.mp4
-adb -s <serial> shell rm /sdcard/KristenAndSara_1280x720_60.yuv
-adb -s <serial> shell rm /sdcard/simple.720p.json_1.json
+adb -s <serial>  push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
+adb -s <serial>  shell am start -W  -e test /sdcard/simple.720p.json_1.json com.facebook.encapp/.MainActivity
+mkdir encapp_<serial> __<date>/simple.720p_files/
+pull encapp_851b3fff-10cb-48b0-8244-b83424c84b01.json to encapp_Portal__2022-01-18_23_33/simple.720p_files/
+pull encapp_851b3fff-10cb-48b0-8244-b83424c84b01.mp4 to encapp_Portal__2022-01-18_23_33/simple.720p_files/
+adb -s <serial>  shell rm /sdcard/KristenAndSara_1280x720_60.yuv
+adb -s <serial>  shell rm /sdcard/simple.720p.json_1.json
 
 ```
 

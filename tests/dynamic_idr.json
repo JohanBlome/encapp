@@ -1,0 +1,35 @@
+{
+    "description": "Dynamic Request Sync",
+    "input_files": [
+        "../media/charlies_320x180_30fps_h264_30sec.mp4"
+    ],
+    "input_resolution": "320x180",
+    "input_fps": "30",
+    "codecs": [
+        "encoder.avc"
+    ],
+    "encode_resolutions": [
+        "320x180"
+    ],
+    "bitrates": [
+        "300k"
+    ],
+    "i_intervals": [
+        60
+    ],
+    "i_frame_sizes": [
+        "unlimited"
+    ],
+    "runtime_parameters": [
+        {
+            "name": "request-sync",
+            "type": "int",
+            "settings": [
+                "30",
+                "60",
+                "90",
+                "120"
+            ]
+        }
+    ]
+}

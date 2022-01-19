@@ -262,19 +262,21 @@ public class Statistics {
 
             JSONObject runtime = new JSONObject();
             ArrayList<Object> runtimeList = mVc.getRuntimeParametersList();
-            for (Object param: runtimeList) {
-                if (param instanceof RuntimeParam) {
-                    RuntimeParam rt = (RuntimeParam) param;
-                    JSONObject subtype = null;
-                    if (runtime.has(rt.name)) {
-                        subtype = runtime.getJSONObject(rt.name);
+            if (runtimeList != null) {
+                for (Object param : runtimeList) {
+                    if (param instanceof RuntimeParam) {
+                        RuntimeParam rt = (RuntimeParam) param;
+                        JSONObject subtype = null;
+                        if (runtime.has(rt.name)) {
+                            subtype = runtime.getJSONObject(rt.name);
+                        } else {
+                            subtype = new JSONObject();
+                            runtime.put(rt.name, subtype);
+                        }
+                        subtype.put(String.valueOf(rt.frame), rt.value.toString());
                     } else {
-                        subtype = new JSONObject();
-                        runtime.put(rt.name, subtype);
+                        Log.e(TAG, "Object is " + param);
                     }
-                    subtype.put(String.valueOf(rt.frame), rt.value.toString());
-                } else {
-                    Log.e(TAG, "Object is " + param);
                 }
             }
             json.put("runtime_settings", runtime);

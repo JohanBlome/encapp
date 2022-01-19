@@ -138,7 +138,10 @@ class BufferEncoder {
 
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-
+        if (isVP) {
+            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mMuxer.start();
+        }
         double currentTime = 0;
         long numBytesSubmitted = 0;
         long numBytesDequeued = 0;
@@ -240,7 +243,7 @@ class BufferEncoder {
                     numBytesDequeued += info.size;
                     ++outFramesCount;
 
-                    if (mMuxer != null) {
+                    if (mMuxer != null && mVideoTrack != -1) {
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
@@ -505,6 +508,7 @@ class BufferEncoder {
             ArrayList<RuntimeParam> runtimeParams = runtimeParamList.get(Integer.valueOf(frameCount));
             if (runtimeParams != null) {
                 for (RuntimeParam param : runtimeParams) {
+                    Log.d("ltr", "Runtime: "+param.name + "@"+frameCount+", vl = "+ param.value.toString());
                     if (param.value == null) {
                         params.putInt(param.name, frameCount);
                     } else if (param.type.equals("int")) {
@@ -518,8 +522,9 @@ class BufferEncoder {
                             } else if (sval.endsWith("M")) {
                                 val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('M'))) * 1000000;
                             } else {
-                                Integer.parseInt(sval);
+                                val = Integer.parseInt(sval);
                             }
+                            Log.d("ltr","put val " + val);
                             params.putInt(param.name, val);
                         }
                     } else if (param.type.equals("bundle")) {

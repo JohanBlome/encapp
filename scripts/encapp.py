@@ -6,13 +6,13 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
+import subprocess
 import json
 import sys
 import argparse
 import re
+import time
 
-from encapp_tests import run_cmd
-from encapp_tests import get_device_info
 from datetime import datetime
 from os.path import exists
 
@@ -55,28 +55,135 @@ sample_config_json_data = \
     }
 
 
-TEST_CLASS_NAME = 'com.facebook.encapp.CodecValidationInstrumentedTest'
-JUNIT_RUNNER_NAME = \
-    'com.facebook.encapp.test/androidx.test.runner.AndroidJUnitRunner'
+ACTIVITY = 'com.facebook.encapp/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
+
+
+def run_cmd_silent(cmd):
+    ret = True
+    try:
+        process = subprocess.Popen(cmd, shell=True,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+    except Exception:
+        ret = False
+        print('Failed to run command: ' + cmd)
+
+    return ret, stdout.decode(), stderr.decode()
+
+def run_cmd(cmd):
+    ret = True
+    try:
+        print(cmd, sep=' ')
+        process = subprocess.Popen(cmd, shell=True,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+    except Exception:
+        ret = False
+        print('Failed to run command: ' + cmd)
+
+    return ret, stdout.decode(), stderr.decode()
+
+
+# returns info (device model and serial number) about the device where the
+# test will be run
+def get_device_info(serial_inp, debug=0):
+    # list all available devices
+    adb_cmd = 'adb devices -l'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    assert ret, 'error: failed to get adb devices'
+
+    # parse list
+    device_info = {}
+    for line in stdout.split('\n'):
+        if line == 'List of devices attached' or line == '':
+            continue
+        serial = line.split()[0]
+        item_dict = {}
+        for item in line.split()[1:]:
+            # ':' used to separate key/values
+            if ':' in item:
+                key, val = item.split(':', 1)
+                item_dict[key] = val
+        # ensure the 'model' field exists
+        if 'model' not in item_dict:
+            item_dict['model'] = 'generic'
+        device_info[serial] = item_dict
+    assert len(device_info) > 0, 'error: no devices connected'
+    if debug > 2:
+        print('available devices: %r' % device_info)
+
+    # select output device
+    serial, model = None, None
+    if serial_inp is None:
+        # if user did not select a serial_inp, make sure there is only one
+        # device available
+        assert len(device_info) == 1, (
+            'error: need to choose a device %r' % list(device_info.keys()))
+        serial = list(device_info.keys())[0]
+        model = device_info[serial]
+
+    else:
+        # if user forced a serial number, make sure it is available
+        assert serial_inp in device_info, (
+            'error: device %s not available' % serial_inp)
+        serial = serial_inp
+        model = device_info[serial]['model']
+
+    if debug > 0:
+        print('selecting device: serial: %s model: %s' % (serial, model))
+
+    # remove any files that are generated in previous runs
+    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
+    ret, stdout, stderr = run_cmd(adb_cmd)
+    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
+    for file in output_files:
+        if file == '':
+            continue
+        # remove the output
+        adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
+        run_cmd(adb_cmd)
+
+    return model, serial
+
+
+def wait_for_exit(serial):
+    adb_cmd = f'adb -s {serial} shell pidof com.facebook.encapp'
+    pid = -1
+    current = -1
+
+    while (pid == current or pid == -1):
+        if pid == -1:
+            ret, stdout, stderr = run_cmd_silent(adb_cmd)
+            pid = -1
+            if len(stdout) > 0:
+                pid = int(ret)
+        time.sleep(1)
+        ret, stdout, stderr = run_cmd_silent(adb_cmd)
+        current = -2
+        if len(stdout) > 0:
+            current = int(ret)
+        else:
+            current = -1
+        # TODO: time out
 
 
 def install_app(serial):
     script_path = os.path.realpath(__file__)
     path, __ = os.path.split(script_path)
-    run_cmd(f'adb -s {serial} install -g '
-            f'{path}/../app/build/outputs/apk/androidTest/debug/'
-            'com.facebook.encapp-v1.0-debug-androidTest.apk ')
 
-    run_cmd(f'adb -s {serial} install -g '
+    run_cmd_silent(f'adb -s {serial} install -g '
             f'{path}/../app/build/outputs/apk/debug/'
             'com.facebook.encapp-v1.0-debug.apk')
 
 
 def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      workdir, options):
-    if options.no_install:
+    result_json = []
+    if options.no_install != None and options.no_install:
         print('Skip install of apk!')
     else:
         install_app(serial)
@@ -99,12 +206,12 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     input_files = None
     for test in tests:
         print(f'push data for test = {test}')
-        if len(options.input) > 0:
+        if options != None and len(options.input) > 0:
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
-            ret, stdout, stderr = run_cmd(
+            ret, stdout, stderr = run_cmd_silent(
                 f'adb -s {serial} shell ls {inputfile}')
             if len(stderr) > 0:
-                run_cmd(f'adb -s {serial} push {options.input} /sdcard/')
+                run_cmd_silent(f'adb -s {serial} push {options.input} /sdcard/')
         else:
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
@@ -123,32 +230,33 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         counter += 1
         with open(json_name, "w") as outfile:
             json.dump(test, outfile)
-        run_cmd(f'adb -s {serial} push {json_name} /sdcard/')
+        run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
         os.remove(json_name)
 
         additional = ''
-        if len(options.codec) > 0:
+        if options.codec != None and len(options.codec) > 0:
             additional = f'{additional} -e enc {options.codec}'
 
-        if len(options.input) > 0:
+        if options.input != None and len(options.input) > 0:
             additional = f'{additional} -e file {inputfile}'
 
-        if len(options.input_res) > 0:
+        if options != None and len(options.input_res) > 0:
             additional = f'{additional} -e ref_res {options.input_res}'
 
-        if len(options.input_fps) > 0:
+        if options != None and len(options.input_fps) > 0:
             additional = f'{additional} -e ref_fps {options.input_fps}'
 
-        if len(options.output_fps) > 0:
+        if options != None and len(options.output_fps) > 0:
             additional = f'{additional} -e fps {options.output_fps}'
 
-        if len(options.output_res) > 0:
+        if options != None and len(options.output_res) > 0:
             additional = f'{additional} -e res {options.output_res}'
 
-        run_cmd(f'adb -s {serial} shell am instrument -w -r {additional} '
-                f'-e test /sdcard/{json_name} {JUNIT_RUNNER_NAME}')
+        run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
+                f'/sdcard/{json_name} {ACTIVITY}')
+        wait_for_exit(serial)
         adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-        ret, stdout, stderr = run_cmd(adb_cmd)
+        ret, stdout, stderr = run_cmd_silent(adb_cmd)
         output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                                   re.MULTILINE)
 
@@ -165,33 +273,36 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             print(f'pull {file} to {output_dir}')
 
             adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
-            run_cmd(adb_cmd)
+            run_cmd_silent(adb_cmd)
 
             # remove the json file on the device too
             adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
-            run_cmd(adb_cmd)
+            run_cmd_silent(adb_cmd)
+            if file.endswith('.json'):
+                path, filename = os.path.split(file)
+                result_json.append(f'{output_dir}/{filename}')
 
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
         if input_files is not None:
-            for file in input_files:
-                base_file_name = os.path.basename(file)
-                run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
-        if len(options.input) > 0:
+                for file in input_files:
+                    base_file_name = os.path.basename(file)
+                    run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
+        if options != None and len(options.input) > 0:
             base_file_name = os.path.basename(inputfile)
             run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
         run_cmd(adb_cmd)
-
+    return result_json
 
 def list_codecs(serial, model, install):
     if install:
         install_app(serial)
 
-    adb_cmd = f'adb -s {serial} shell am instrument -w -r '\
-              f'-e ui_hold_sec 1 '\
-              f'-e list_codecs a -e class {TEST_CLASS_NAME} '\
-              f'{JUNIT_RUNNER_NAME}'
+    adb_cmd = f'adb -s {serial} shell am start '\
+              f'-e ui_hold_sec 3 '\
+              f'-e list_codecs a {ACTIVITY}'
 
-    run_cmd(adb_cmd)
+    run_cmd_silent(adb_cmd)
+    wait_for_exit(serial)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
     run_cmd(adb_cmd)
@@ -224,11 +335,7 @@ def get_options(argv):
     parser.add_argument('--output_res', help='Override output resolution',
                         default='')
 
-    options = parser.parse_args()
-
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit()
+    options = parser.parse_args(argv[1:])
 
     if options.serial is None and 'ANDROID_SERIAL' in os.environ:
         # read serial number from ANDROID_SERIAL env variable

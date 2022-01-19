@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
         }
         // Need to check permission strategy
-        getInstrumentedTest();
+        getTestSettings();
         boolean useNewMethod = true;
         if (mExtraData != null && mExtraData.size() > 0) {
             useNewMethod = !mExtraData.getBoolean(ParseData.OLD_AUTH_METHOD, false);
@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Log.d(TAG, "Passed all permission checks");
-        if (getInstrumentedTest()) {
+        if (getTestSettings()) {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
 
             mTvTestRun.setVisibility(View.VISIBLE);
@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     performInstrumentedTest();
-                    finish();
+                    exit();
                 }
             })).start();
         } else {
@@ -88,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
+
 
     protected void listCodecs() {
         Log.d(TAG, "List codecs");
@@ -167,16 +168,15 @@ public class MainActivity extends AppCompatActivity {
      *
      * @return
      */
-    private boolean getInstrumentedTest() {
+    private boolean getTestSettings() {
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
-        if (bundle != null &&
-                (bundle.containsKey(ParseData.TEST_CONFIG) ||
-                 bundle.containsKey(ParseData.LIST_CODECS))) {
+        if (bundle != null) {
             mExtraData = bundle;
+            return true;
         }
 
-        return mExtraData != null;
+        return false;
     }
 
     public void increaseTestsInflight() {
@@ -353,15 +353,6 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        TextView mTvTestRun = findViewById(R.id.tv_testrun);
-                        Log.d(TAG, "Hide view! - Do not hide!");
-                        //mTvTestRun.setVisibility(View.GONE);
-                    }
-                });
             } catch(IOException e){
                 Log.e(TAG, "@Exception when running tests: "+e.getMessage());
                 e.printStackTrace();
@@ -375,7 +366,7 @@ public class MainActivity extends AppCompatActivity {
         String[] bitrates = {"1000"};
         String[] resolutions = null;
         String[] encoders = {"hevc"};
-        String[] keys = {"default"};
+        String[] keys = {"10"};
         String[] fps = {"30"};
         String[] mod = {"vbr"};
 
@@ -431,6 +422,7 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setReferenceSize(SizeUtils.parseXString(ref_resolution));
                                 constraints.setCodecName(encoders[eC]);
                                 constraints.setBitrateMode(mod[mC]);
+                                constraints.setInputfile(mExtraData.getString(ParseData.FILE));
 
                                 constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));
                                 if (mExtraData.containsKey(ParseData.TEMPORAL_LAYER_COUNT)) {

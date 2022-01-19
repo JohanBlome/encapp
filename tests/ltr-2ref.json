@@ -1,5 +1,5 @@
 {
-    "description": "Dynamic LTR - 4 frame refs",
+    "description": "Dynamic LTR",
     "input_files": [
         "../media/charlies_320x180_30fps_h264_30sec.mp4"
     ],
@@ -16,12 +16,12 @@
         {
             "name": "vendor.qti-ext-enc-caps-ltr.max-count",
             "type": "int",
-            "setting": "6"
+            "setting": "2"
         },
         {
             "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
             "type": "int",
-            "setting": "4"
+            "setting": "2"
         }
     ],
     "runtime_parameters": [
@@ -33,13 +33,7 @@
                     "60": "1"
                 },
                 {
-                    "120": "2"
-                },
-                {
-                    "180": "3"
-                },
-                {
-                    "240": "0"
+                    "120": "0"
                 }
             ]
         },
@@ -51,28 +45,16 @@
                     "400": "1"
                 },
                 {
-                    "500": "2"
+                    "500": "0"
                 },
                 {
-                    "600": "3"
+                    "600": "0"
                 },
                 {
-                    "700": "0"
+                    "700": "1"
                 },
                 {
-                    "800": "2"
-                },
-                {
-                    "810": "3"
-                },
-                {
-                    "820": "2"
-                },
-                {
-                    "830": "1"
-                },
-                {
-                    "840": "0"
+                    "800": "0"
                 }
             ]
         }

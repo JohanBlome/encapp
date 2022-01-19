@@ -29,7 +29,7 @@ public class SystemLoad {
             Log.e(TAG, "GPU model: "+tmp);
         }
         mGPUInfo.put("gpu_model", tmp.trim());
-        tmp = readSystemData("sys/class/kgsl/kgsl-3d0/min_clock_mhz");
+        tmp = readSystemData("/sys/class/kgsl/kgsl-3d0/min_clock_mhz");
         mGPUInfo.put("gpu_min_clock", tmp.trim());
         tmp = readSystemData("/sys/class/kgsl/kgsl-3d0/max_clock_mhz");
         mGPUInfo.put("gpu_max_clock", tmp.trim());
