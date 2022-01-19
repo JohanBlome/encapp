@@ -10,8 +10,13 @@ import re
 
 INDEX_FILE_NAME = 'encapp_index.csv'
 
+def getProperties(json):
+    data = get_data(True)
+    _, filename = os.path.split(json)
+    row = data.loc[data['file'].str.contains(filename)]
+    return row;
 
-def getFilesInDir(directory, options):
+def getFilesInDir(directory, recursive):
     regexp = '^encapp_.*json$'
     files = []
     for path in os.listdir(directory):
@@ -20,14 +25,14 @@ def getFilesInDir(directory, options):
             if re.match(regexp, path):
                 files.append(full_path)
         else:
-            if not options.no_rec:
-                files = files + getFilesInDir(full_path, options)
+            if recursive:
+                files = files + getFilesInDir(full_path, recursive)
     return files
 
 
-def indexCurrentDir(options):
+def indexCurrentDir(recursive):
     current_dir = os.getcwd()
-    files = getFilesInDir(current_dir, options)
+    files = getFilesInDir(current_dir, recursive)
     settings = []
 
     for df in files:
@@ -53,17 +58,23 @@ def indexCurrentDir(options):
     pdata.to_csv(INDEX_FILE_NAME, index=False)
 
 
-def search(options):
+def get_data(recursive):
     try:
         data = pd.read_csv(INDEX_FILE_NAME)
     except Exception:
         sys.stderr.write('Error when reading index, reindex\n')
-        indexCurrentDir(options)
+        indexCurrentDir(recursive)
         try:
             data = pd.read_csv(INDEX_FILE_NAME)
         except Exception:
             sys.stderr.write('Failed to read index file')
             exit(-1)
+    return data
+
+
+def search(options):
+    data = get_data(not options.no_rec)
+
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
     if options.bitrate:

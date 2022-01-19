@@ -76,7 +76,8 @@ def install_app(serial):
 
 def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      workdir, options):
-    if options.no_install:
+    result_json = []
+    if options.no_install != None and options.no_install:
         print('Skip install of apk!')
     else:
         install_app(serial)
@@ -99,7 +100,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     input_files = None
     for test in tests:
         print(f'push data for test = {test}')
-        if len(options.input) > 0:
+        if options != None and len(options.input) > 0:
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
             ret, stdout, stderr = run_cmd(
                 f'adb -s {serial} shell ls {inputfile}')
@@ -127,22 +128,22 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         os.remove(json_name)
 
         additional = ''
-        if len(options.codec) > 0:
+        if options.codec != None and len(options.codec) > 0:
             additional = f'{additional} -e enc {options.codec}'
 
-        if len(options.input) > 0:
+        if options.input != None and len(options.input) > 0:
             additional = f'{additional} -e file {inputfile}'
 
-        if len(options.input_res) > 0:
+        if options != None and len(options.input_res) > 0:
             additional = f'{additional} -e ref_res {options.input_res}'
 
-        if len(options.input_fps) > 0:
+        if options != None and len(options.input_fps) > 0:
             additional = f'{additional} -e ref_fps {options.input_fps}'
 
-        if len(options.output_fps) > 0:
+        if options != None and len(options.output_fps) > 0:
             additional = f'{additional} -e fps {options.output_fps}'
 
-        if len(options.output_res) > 0:
+        if options != None and len(options.output_res) > 0:
             additional = f'{additional} -e res {options.output_res}'
 
         run_cmd(f'adb -s {serial} shell am instrument -w -r {additional} -e test '
@@ -155,7 +156,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         sub_dir = '_'.join([base_file_name, 'files'])
         output_dir = f'{workdir}/{sub_dir}/'
         run_cmd(f'mkdir {output_dir}')
-
+        
         for file in output_files:
             if file == '':
                 print('No file found')
@@ -169,17 +170,20 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             # remove the json file on the device too
             adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
             run_cmd(adb_cmd)
+            if file.endswith('.json'):
+                path, filename = os.path.split(file)
+                result_json.append(f'{output_dir}/{filename}')
 
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
         if input_files is not None:
                 for file in input_files:
                     base_file_name = os.path.basename(file)
                     run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
-        if len(options.input) > 0:
+        if options != None and len(options.input) > 0:
             base_file_name = os.path.basename(inputfile)
             run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
         run_cmd(adb_cmd)
-
+    return result_json
 
 def list_codecs(serial, model, install):
     if install:
@@ -199,7 +203,6 @@ def list_codecs(serial, model, install):
         for line in lines:
             print(line.split('\n')[0])
         print(f'File is available in current dir as {filename}')
-
 
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -223,11 +226,7 @@ def get_options(argv):
     parser.add_argument('--output_res', help='Override output resolution',
                         default='')
 
-    options = parser.parse_args()
-
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit()
+    options = parser.parse_args(argv)
 
     if options.serial is None and 'ANDROID_SERIAL' in os.environ:
         # read serial number from ANDROID_SERIAL env variable

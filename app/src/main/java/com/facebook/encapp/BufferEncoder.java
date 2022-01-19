@@ -505,6 +505,7 @@ class BufferEncoder {
             ArrayList<RuntimeParam> runtimeParams = runtimeParamList.get(Integer.valueOf(frameCount));
             if (runtimeParams != null) {
                 for (RuntimeParam param : runtimeParams) {
+                    Log.d("ltr", "Runtime: "+param.name + "@"+frameCount+", vl = "+ param.value.toString());
                     if (param.value == null) {
                         params.putInt(param.name, frameCount);
                     } else if (param.type.equals("int")) {
@@ -518,8 +519,9 @@ class BufferEncoder {
                             } else if (sval.endsWith("M")) {
                                 val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('M'))) * 1000000;
                             } else {
-                                Integer.parseInt(sval);
+                                val = Integer.parseInt(sval);
                             }
+                            Log.d("ltr","put val " + val);
                             params.putInt(param.name, val);
                         }
                     } else if (param.type.equals("bundle")) {
