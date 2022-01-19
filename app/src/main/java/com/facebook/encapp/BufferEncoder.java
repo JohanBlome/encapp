@@ -420,7 +420,7 @@ class BufferEncoder {
 
         if (matching.size() > 1) {
             StringBuilder sb = new StringBuilder();
-            sb.append("\nAmbigous codecs \n" + matching.size() + " codecs matching.\n");
+            sb.append("\nAmbigous codecs for " + id + "\n" + matching.size() + " codecs matching.\n");
             for (MediaCodecInfo info : matching) {
                 sb.append(info.getName() + "\n");
             }

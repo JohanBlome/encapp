@@ -190,3 +190,30 @@ $ adb push /tmp/KristenAndSara_1280x720_60.yuv /sdcard/
 $ adb shell am start -W -e enc OMX.google.vp8.encoder -e ref_res 1280x720 -e file /sdcard/KristenAndSara_1280x720_60.yuv -e bit 100 -e mod cbr -e fps 60 -e ifsize unlimited -e skfr false -e debug false -e ltrc 1 com.facebook.encapp/.MainActivity
 ...
 ```
+
+## 4. Regression test
+
+encapp.verify.py will run through the tests defined in 'tests/' folder and try to verify:
+    * bitrate
+    * key frames
+    * temporal layers
+    * long temporal references (Qalcomm ltr)
+
+Just like encapp.py overrides for input and encoder is vailable.
+Run the test just like they are defined:
+
+'''
+$ encapp_verify.py
+'''
+
+Override the input, encoding resolution and codec:
+'''
+$ encapp_verify.py -i /media/johan/data/media_encapp/<encoded>.mp4  -os 1920x1080 -c encoder.avc
+'''
+
+Overrride input and run specific test:
+'''
+$ encapp_verify.py -i /tmp/KristenAndSara_1280x720_60.yuv -is 1280x720 -if 30 -os 1280x720 -of 30 -t <PATH>/encapp/tests/simple.qcif.json
+'''
+
+For a raw input both input and output resolution and fps needs to be specified even if raw buffer will not allow scaling (which surface encoding does).

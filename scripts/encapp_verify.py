@@ -17,7 +17,7 @@ import encapp_search as es
 from encapp import run_cmd
 
 
-DEFAULT_TESTS = ['simple.180p.json',
+DEFAULT_TESTS = ['simple.qcif.json',
                  'bitrates.json',
                  'dynamic_bitrate.json',
                  'dynamic_framerate.json',
@@ -320,7 +320,11 @@ def check_mean_bitrate_deviation(resultpath):
                     for item in filtered:
                         accum += item['size']
                     # Calc mean in bits per second
-                    mean = (fps * 8 * accum/len(filtered))
+                    num = len(filtered)
+                    if num > 0:
+                        mean = (fps * 8 * accum/num)
+                    else:
+                        mean = 0
                     ratio = mean / target_bitrate
                     bitrate_error_perc = int((ratio - 1) * 100)
                     dyn_data.append([int(previous_limit), int(limit),
@@ -374,12 +378,18 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('-d', '--dir', default='encapp_verify')
+    parser.add_argument('-i', '--input', help='Replace all test defined ' \
+                                                    'sources with input', default='')
+    parser.add_argument('-is', '--input_res', help='Override input file', default='')
+    parser.add_argument('-if', '--input_fps', help='Override input fps', default='')
+    parser.add_argument('-os', '--output_res', help='Override input file', default='')
+    parser.add_argument('-of', '--output_fps', help='Override input fps', default='')
+    parser.add_argument('-c', '--codec', help='Override encoder', default='')
     parser.add_argument('-t', '--test', nargs="+",)
     parser.add_argument('-r', '--result', nargs="+",)
-    parser.add_argument('-c', '--codec', nargs="+",)
+
 
     options = parser.parse_args(argv[1:])
-
     result_string = ""
     model = None
     serial = None
@@ -423,9 +433,19 @@ def main(argv):
                     os.remove(es.INDEX_FILE_NAME)
 
                 args = []
-                if options.codec is not None and len(options.codec) > 0:
-                    args.append('--codec')
-                    args.append(options.codec[0])
+                args.append(__file__)
+                args.append('--codec')
+                args.append(options.codec)
+                args.append('--input')
+                args.append(options.input)
+                args.append('--input_res')
+                args.append(options.input_res)
+                args.append('--input_fps')
+                args.append(options.input_fps)
+                args.append('--output_res')
+                args.append(options.output_res)
+                args.append('--output_fps')
+                args.append(options.output_fps)
 
                 print(f'test: {test}, path = {test_path}')
                 encapp_options = ep.get_options(args)
