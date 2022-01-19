@@ -252,10 +252,6 @@ public class MainActivity extends AppCompatActivity {
             sp.setOutputFps(mExtraData.getString(ParseData.FPS));
         }
 
-        if (mExtraData.containsKey(ParseData.ENCODER)) {
-            sp.setOutputCodec(mExtraData.getString(ParseData.ENCODER));
-        }
-
         if (mExtraData.containsKey(ParseData.RESOLUTION)) {
             sp.setOutputResolution(mExtraData.getString(ParseData.RESOLUTION));
         }
