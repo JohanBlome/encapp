@@ -1,15 +1,12 @@
 {
     "description": "Dynamic Request Sync",
     "input_files": [
-        "../media/charlies_320x180_30fps_h264_30sec.mp4"
+        "/tmp/akiyo_qcif.yuv"
     ],
-    "input_resolution": "320x180",
+    "input_resolution": "176x144",
     "input_fps": "30",
-    "codecs": [
-        "encoder.avc"
-    ],
     "encode_resolutions": [
-        "320x180"
+        "176x144"
     ],
     "bitrates": [
         "300k"

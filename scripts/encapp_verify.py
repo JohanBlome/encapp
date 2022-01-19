@@ -17,7 +17,7 @@ import encapp_search as es
 from encapp import run_cmd
 
 
-DEFAULT_TESTS = ['simple.180p.json',
+DEFAULT_TESTS = ['simple.qcif.json',
                  'bitrates.json',
                  'dynamic_bitrate.json',
                  'dynamic_framerate.json',
@@ -320,7 +320,11 @@ def check_mean_bitrate_deviation(resultpath):
                     for item in filtered:
                         accum += item['size']
                     # Calc mean in bits per second
-                    mean = (fps * 8 * accum/len(filtered))
+                    num = len(filtered)
+                    if num > 0:
+                        mean = (fps * 8 * accum/num)
+                    else:
+                        mean = 0
                     ratio = mean / target_bitrate
                     bitrate_error_perc = int((ratio - 1) * 100)
                     dyn_data.append([int(previous_limit), int(limit),

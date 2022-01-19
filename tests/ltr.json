@@ -1,10 +1,13 @@
 {
     "description": "Dynamic LTR - 4 frame refs",
     "input_files": [
-        "../media/charlies_320x180_30fps_h264_30sec.mp4"
+        "/tmp/akiyo_qcif.yuv"
     ],
-    "input_resolution": "320x180",
+    "input_resolution": "176x144",
     "input_fps": "30",
+    "encode_resolutions": [
+        "176x144"
+    ],
     "codecs": [
         "encoder.avc"
     ],
