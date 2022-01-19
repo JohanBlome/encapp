@@ -131,7 +131,7 @@ def get_device_info(serial_inp, debug=0):
         assert serial_inp in device_info, (
             'error: device %s not available' % serial_inp)
         serial = serial_inp
-        model = device_info[serial]['model']
+        model = device_info[serial]
 
     if debug > 0:
         print('selecting device: serial: %s model: %s' % (serial, model))
