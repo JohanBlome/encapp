@@ -1,102 +1,102 @@
 {
-  "tests": [
-    {
-      "description": "Configure TL and ltr count 2",
-      "input_files": [
-        "../media/320x180_900fr_nv12.yuv"
-      ],
-      "input_resolution": "320x180",
-      "input_fps": "30",
-      "codecs": [
-        "encoder.avc"
-      ],
-      "encode_resolutions": [
-        "320x180"
-      ],
-      "configure": [
+    "tests": [
         {
-          "name": "tl-schema",
-          "type": "string",
-          "setting": "android.generic.2"
+            "description": "Configure TL and ltr count 2",
+            "input_files": [
+                "../media/320x180_900fr_nv12.yuv"
+            ],
+            "input_resolution": "320x180",
+            "input_fps": "30",
+            "codecs": [
+                "encoder.avc"
+            ],
+            "encode_resolutions": [
+                "320x180"
+            ],
+            "configure": [
+                {
+                    "name": "tl-schema",
+                    "type": "string",
+                    "setting": "android.generic.2"
+                },
+                {
+                    "name": "vendor.qti-ext-enc-caps-ltr.max-count",
+                    "type": "int",
+                    "setting": "6"
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
+                    "type": "int",
+                    "setting": "2"
+                }
+            ],
+            "duration": 10
         },
         {
-          "name": "vendor.qti-ext-enc-caps-ltr.max-count",
-          "type": "int",
-          "setting": "6"
+            "description": "Temporal layers",
+            "input_files": [
+                "../media/320x180_900fr_avc.mp4"
+            ],
+            "codecs": [
+                "encoder.avc"
+            ],
+            "encode_resolutions": [
+                "320x180"
+            ],
+            "configure": [
+                {
+                    "name": "tl-schema",
+                    "type": "string",
+                    "setting": "android.generic.2"
+                }
+            ]
         },
         {
-          "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
-          "type": "int",
-          "setting": "2"
+            "description": "Dynamic LTR",
+            "input_files": [
+                "../media/320x180_900fr_avc.mp4"
+            ],
+            "codecs": [
+                "encoder.avc"
+            ],
+            "configure": [
+                {
+                    "name": "vendor.qti-ext-enc-caps-ltr.max-count",
+                    "type": "int",
+                    "setting": "6"
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
+                    "type": "int",
+                    "setting": "2"
+                }
+            ],
+            "runtime_parameters": [
+                {
+                    "name": "vendor.qti-ext-enc-ltr.mark-frame",
+                    "type": "int",
+                    "settings": [
+                        {
+                            "10": "0"
+                        },
+                        {
+                            "20": "1"
+                        }
+                    ]
+                },
+                {
+                    "name": "vendor.qti-ext-enc-ltr.use-frame",
+                    "type": "int",
+                    "settings": [
+                        {
+                            "40": "0"
+                        },
+                        {
+                            "60": "1"
+                        }
+                    ]
+                }
+            ]
         }
-      ],
-      "duration": 10
-    },
-    {
-      "description": "Temporal layers",
-      "input_files": [
-        "../media/320x180_900fr_avc.mp4"
-      ],
-      "codecs": [
-        "encoder.avc"
-      ],
-      "encode_resolutions": [
-        "320x180"
-      ],
-      "configure": [
-        {
-          "name": "tl-schema",
-          "type": "string",
-          "setting": "android.generic.2"
-        }
-      ]
-    },
-    {
-      "description": "Dynamic LTR",
-      "input_files": [
-        "../media/320x180_900fr_avc.mp4"
-      ],
-      "codecs": [
-        "encoder.avc"
-      ],
-      "configure": [
-        {
-          "name": "vendor.qti-ext-enc-caps-ltr.max-count",
-          "type": "int",
-          "setting": "6"
-        },
-        {
-          "name": "vendor.qti-ext-enc-ltr-count.num-ltr-frames",
-          "type": "int",
-          "setting": "2"
-        }
-      ],
-      "runtime_parameters": [
-        {
-          "name": "vendor.qti-ext-enc-ltr.mark-frame",
-          "type": "int",
-          "settings": [
-            {
-              "10": "0"
-            },
-            {
-              "20": "1"
-            }
-          ]
-        },
-        {
-          "name": "vendor.qti-ext-enc-ltr.use-frame",
-          "type": "int",
-          "settings": [
-            {
-              "40": "0"
-            },
-            {
-              "60": "1"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+    ]
 }

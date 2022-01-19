@@ -88,7 +88,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
-    #run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
+    # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
     inputfile = ''
@@ -110,7 +110,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
                 for file in input_files:
-                    if len(json_folder) > 0:
+                    if len(json_folder) > 0 and not os.path.isabs(file):
                         path = f'{json_folder}/{file}'
                     else:
                         path = f'{file}'
@@ -150,13 +150,14 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
                 f'/sdcard/{json_name} {JUNIT_RUNNER_NAME}')
         adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
         ret, stdout, stderr = run_cmd(adb_cmd)
-        output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
+        output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
+                                  re.MULTILINE)
 
         base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
         sub_dir = '_'.join([base_file_name, 'files'])
         output_dir = f'{workdir}/{sub_dir}/'
         run_cmd(f'mkdir {output_dir}')
-        
+
         for file in output_files:
             if file == '':
                 print('No file found')
@@ -203,6 +204,7 @@ def list_codecs(serial, model, install):
         for line in lines:
             print(line.split('\n')[0])
         print(f'File is available in current dir as {filename}')
+
 
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)

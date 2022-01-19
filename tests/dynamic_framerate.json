@@ -1,10 +1,8 @@
-
 {
     "description": "Dynamic Framerate",
     "input_files": [
         "../media/charlies_320x180_30fps_h264_30sec.mp4"
     ],
-  
     "input_resolution": "320x180",
     "input_fps": "30",
     "encode_resolutions": [
@@ -34,5 +32,4 @@
         }
     ],
     "duration": 10
-    
 }

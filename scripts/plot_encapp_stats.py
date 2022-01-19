@@ -407,8 +407,10 @@ def main():
             last_frame = 0
             encoding_data = parse_encoding_data(alldata, inputfile)
             if not isinstance(encoding_data, type(None)):
-                first_frame = np.min(encoding_data['pts'])  # pts is in microsec
-                last_frame = np.max(encoding_data['pts'])  # approx.
+                # pts is in microsec
+                first_frame = np.min(encoding_data['pts'])
+                # approx.
+                last_frame = np.max(encoding_data['pts'])
                 video_length = (last_frame - first_frame)/pts_mult
                 mean_ms = encoding_data['meanproctime'][0]/msec_to_nano
 
@@ -418,7 +420,6 @@ def main():
 
             proctime_sec = round(alldata['proctime']/1000000000.0, 2)
             framecount = alldata['framecount']
-
 
             print(f'proctime {proctime_sec} sec, count {framecount}')
             print('__')
@@ -480,7 +481,7 @@ def main():
 
     if (options.decode_data and not isinstance(accum_dec_data, type(None)) and
             len(accum_dec_data) > 0):
-        print(f'plot decode data')
+        print('plot decode data')
         first = np.min(accum_dec_data['starttime'])
         accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
         plot_inflight_data(accum_dec_data, 'codec', 'decoding pipeline',

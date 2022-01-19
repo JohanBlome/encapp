@@ -1,8 +1,8 @@
 {
     "description": "Bitrates",
     "input_files": [
-    "../media/charlies_320x180_30fps_h264_30sec.mp4"
-    ],    
+        "../media/charlies_320x180_30fps_h264_30sec.mp4"
+    ],
     "input_resolution": "320x180",
     "input_fps": "30",
     "rc_modes": [
@@ -18,4 +18,3 @@
         "3200k"
     ]
 }
-  
