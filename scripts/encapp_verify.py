@@ -478,7 +478,10 @@ def main(argv):
                 now = datetime.now()
                 dt_string = now.strftime('%Y-%m-%d_%H_%M')
                 dut.write(f"\nTest performed: {dt_string}")
-                dut.write(f"\nDUT: {model['product']}, serial: {serial}")
+                if isinstance(model, str):
+                    dut.write(f"\nDUT: {model}, serial: {serial}")
+                else:
+                    dut.write(f"\nDUT: {model['product']}, serial: {serial}")
 
         if os.path.exists(f'{workdir}/dut.txt'):
             with open(f'{workdir}/dut.txt', 'r') as dut:
