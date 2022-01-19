@@ -403,8 +403,6 @@ def main(argv):
                 if options.codec is not None and len(options.codec) >  0:
                     args.append('--codec')
                     args.append(options.codec[0])
-                if options.test is None:
-                    args.append(test_path)
 
                 print(f'test: {test}, path = {test_path}')
                 epOptions = ep.get_options(args)

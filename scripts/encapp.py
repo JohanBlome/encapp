@@ -228,7 +228,7 @@ def get_options(argv):
     parser.add_argument('--output_res', help='Override output resolution',
                         default='')
 
-    options = parser.parse_args(argv)
+    options = parser.parse_args(argv[1:])
 
     if options.serial is None and 'ANDROID_SERIAL' in os.environ:
         # read serial number from ANDROID_SERIAL env variable
