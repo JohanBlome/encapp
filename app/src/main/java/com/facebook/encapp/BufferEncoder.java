@@ -138,7 +138,10 @@ class BufferEncoder {
 
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-
+        if (isVP) {
+            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mMuxer.start();
+        }
         double currentTime = 0;
         long numBytesSubmitted = 0;
         long numBytesDequeued = 0;
@@ -240,7 +243,7 @@ class BufferEncoder {
                     numBytesDequeued += info.size;
                     ++outFramesCount;
 
-                    if (mMuxer != null) {
+                    if (mMuxer != null && mVideoTrack != -1) {
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
