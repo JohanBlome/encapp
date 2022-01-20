@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Process;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.TextureView;
@@ -138,7 +139,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void exit() {
-        System.exit(0);
+        Log.d(TAG, "Finish and remove");
+        finishAndRemoveTask();
+        Process.killProcess(Process.myPid());
+        Log.d(TAG, "EXIT");
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -476,6 +480,7 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Get stats");
             final Statistics stats = transcoder.getStatistics();
             try {
+                Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
                 FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
                 stats.writeJSON(fw);
                 fw.close();
