@@ -40,7 +40,7 @@ def parse_bitrate(bitrate):
         if bitrate.find('k') > -1:
             bitrate_num = int(str(bitrate).replace('k', '000'))
         elif bitrate.find('M') > -1:
-            bitrate_num = int(str(bitrate).replace('k', '000000'))
+            bitrate_num = int(str(bitrate).replace('M', '000000'))
         return bitrate_num
     else:
         return bitrate
