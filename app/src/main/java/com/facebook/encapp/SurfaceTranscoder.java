@@ -301,8 +301,14 @@ public class SurfaceTranscoder extends BufferEncoder {
         Log.d(TAG, "Done transcoding");
         try {
             if (mCodec != null) {
+                mCodec.flush();
                 mCodec.stop();
                 mCodec.release();
+            }
+            if (mDecoder != null) {
+                mDecoder.flush();
+                mDecoder.stop();
+                mDecoder.release();
             }
         } catch (IllegalStateException iex) {
             Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
@@ -315,7 +321,12 @@ public class SurfaceTranscoder extends BufferEncoder {
         } catch (IllegalStateException iex) {
             Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
         }
-
+        if (mOutputSurface != null)
+            mOutputSurface.release();
+        if (mInputSurface != null)
+            mInputSurface.release();
+        if (mExtractor != null)
+            mExtractor.release();
         return "";
     }
 }

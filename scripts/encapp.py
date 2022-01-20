@@ -154,22 +154,21 @@ def get_device_info(serial_inp, debug=0):
 def wait_for_exit(serial):
     adb_cmd = f'adb -s {serial} shell pidof com.facebook.encapp'
     pid = -1
-    current = -1
-
-    while (pid == current or pid == -1):
+    current = 1
+    while (current != -1):
         if pid == -1:
             ret, stdout, stderr = run_cmd_silent(adb_cmd)
             pid = -1
             if len(stdout) > 0:
-                pid = int(ret)
+                pid = int(stdout)
         time.sleep(1)
         ret, stdout, stderr = run_cmd_silent(adb_cmd)
         current = -2
         if len(stdout) > 0:
-            current = int(ret)
+            current = int(stdout)
         else:
             current = -1
-        # TODO: time out
+    print(f'Exit from {pid}')
 
 
 def install_app(serial):
@@ -232,6 +231,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         counter += 1
         with open(json_name, "w") as outfile:
             json.dump(test, outfile)
+
         run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
         os.remove(json_name)
 
@@ -281,8 +281,8 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
             run_cmd_silent(adb_cmd)
             if file.endswith('.json'):
-                path, filename = os.path.split(file)
-                result_json.append(f'{output_dir}/{filename}')
+                path, tmpname = os.path.split(file)
+                result_json.append(f'{output_dir}/{tmpname}')
 
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
         if input_files is not None:
