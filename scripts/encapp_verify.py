@@ -26,6 +26,7 @@ DEFAULT_TESTS = ['simple.qcif.json',
                  'ltr.json',
                  'ltr-2ref.json']
 
+
 def parse_schema(schema):
     match = re.search('android.generic.([0-9]*)', schema)
     if match:
@@ -44,6 +45,7 @@ def parse_bitrate(bitrate):
     else:
         return bitrate
 
+
 def get_nal_data(videopath, codec):
     ending = ""
     if codec.find('avc') or codec.find('h264') or codec.find('264'):
@@ -56,7 +58,8 @@ def get_nal_data(videopath, codec):
         print(f'videopath = {videopath}')
 
         if not os.path.exists(f'{filename}.{ending}.nal'):
-            cmd = f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb {filename}.{ending}'
+            cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb '
+                   f'{filename}.{ending}')
             run_cmd(cmd)
 
             if ending == '264':
@@ -70,17 +73,18 @@ def get_nal_data(videopath, codec):
 
     return ""
 
+
 def check_pair_values(ref, data, ok_range):
     not_found = []
     wrong_value = []
     for key in ref.keys():
         found = False
-        wrong = True
         for ext in range(0, ok_range):
             if int(key) + ext in data:
                 # verify value
                 if ref[key] != data[int(key) + ext]:
-                    wrong_value.append([int(key), int(ref[key]), int(data[int(key) + ext])])
+                    wrong_value.append([int(key), int(ref[key]),
+                                        int(data[int(key) + ext])])
                 found = True
                 break
 
@@ -112,23 +116,25 @@ def check_long_term_ref(resultpath):
             directory, __ = os.path.split(file)
             encoder_settings = result.get('settings')
             testname = result.get('test')
-            bitrate = parse_bitrate(encoder_settings.get('bitrate'))
+            # bitrate = parse_bitrate(encoder_settings.get('bitrate'))
             runtime_settings = result.get('runtime_settings')
 
             mark_frame = None
             use_frame = None
             if runtime_settings is not None and len(runtime_settings) > 0:
-                mark_frame = runtime_settings.get('vendor.qti-ext-enc-ltr.mark-frame')
-                use_frame = runtime_settings.get('vendor.qti-ext-enc-ltr.use-frame')
+                mark_frame = runtime_settings.get(
+                    'vendor.qti-ext-enc-ltr.mark-frame')
+                use_frame = runtime_settings.get(
+                    'vendor.qti-ext-enc-ltr.use-frame')
 
             reg_long_term_id = "long_term_frame_idx { ([0-9]*) }"
             reg_long_pic_id = "long_term_pic_num { ([0-9]*) }"
             lt_mark = {}
             lt_use = {}
             if mark_frame is not None and use_frame is not None:
-                nal_file = get_nal_data(f"{directory}/{result.get('encodedfile')}",
+                nal_file = get_nal_data(f'{directory}/'
+                                        f"{result.get('encodedfile')}",
                                         encoder_settings.get('codec'))
-                nal_data = ""
                 frame = 0
                 with open(nal_file) as nal:
                     line = "-1"
@@ -151,50 +157,57 @@ def check_long_term_ref(resultpath):
 
                 result_string += f'\n\n----- {testname} -----'
                 result_string += f'\n\nSource: {file}'
-                # each mark frame will cause a use frame so merge the mark with the use
+                # each mark frame will cause a use frame so merge the mark
+                # with the use
                 for item in lt_mark:
                     use_frame[item] = lt_mark[item]
 
                 ok_range = 2
-                not_found, wrong_values = check_pair_values(mark_frame, lt_mark, ok_range)
+                not_found, wrong_values = check_pair_values(
+                    mark_frame, lt_mark, ok_range)
                 result_string += '\n(1) Verify long term reference mark'
                 if len(not_found) == 0 and len(wrong_values) == 0:
-                    result_string += f'\nMarked ltr frames correct (within ' \
-                                     f'{ok_range} frames)'
+                    result_string += ('\nMarked ltr frames correct (within '
+                                      f'{ok_range} frames)')
                 else:
-                    if  len(not_found) > 0:
-                        result_string += f'\nFollowing ltr frames not found ' \
-                                         f'(within {ok_range}: {not_found})'
-                    if  len(wrong_values) > 0:
-                        result_string += f'\nFollowing ltr frames have wrong ' \
-                                         f'value (within {ok_range}: {wrong_values})'
+                    if len(not_found) > 0:
+                        result_string += ('\nFollowing ltr frames not found '
+                                          f'(within {ok_range}: {not_found})')
+                    if len(wrong_values) > 0:
+                        result_string += ('\nFollowing ltr frames have wrong '
+                                          f'value (within {ok_range}: '
+                                          f'{wrong_values})')
                         for item in wrong_values:
-                            result_string += f'frame: {item} = {wrong_values[item]}'
+                            result_string += (f'frame: {item} = '
+                                              f'{wrong_values[item]}')
 
-                not_found, wrong_values = check_pair_values(use_frame, lt_use, 3)
+                not_found, wrong_values = check_pair_values(
+                    use_frame, lt_use, 3)
                 result_string += '\n(2) Verify long term reference use setting'
                 if len(not_found) == 0 and len(wrong_values) == 0:
                     print(f'{not_found} - {{not_found}}')
-                    result_string += f'Used ltr frames correct (within {ok_range})'
+                    result_string += ('Used ltr frames correct (within '
+                                      f'{ok_range})')
                 else:
-                    if  len(not_found) > 0:
-                        result_string += f'\nFollowing ltr use frames not found'\
-                                         f' (within {ok_range} frames):\n{not_found})'
-                    if  len(wrong_values) > 0:
-                        result_string += f'\nFollowing ltr use frames have wrong' \
-                                         f' value (within {ok_range}):'
+                    if len(not_found) > 0:
+                        result_string += ('\nFollowing ltr use frames not '
+                                          f'found (within {ok_range} frames):'
+                                          f'\n{not_found})')
+                    if len(wrong_values) > 0:
+                        result_string += ('\nFollowing ltr use frames have '
+                                          f'wrong value (within {ok_range}):')
                         for item in wrong_values:
-                            result_string += '\nframe {:4d} - ref: {:2d}, should' \
-                                             ' have been {:2d}' \
-                                             .format(item[0], item[2], item[1])
-
+                            result_string += ('\nframe {:4d} - ref: {:2d}, '
+                                              'should have been {:2d}'
+                                              .format(item[0], item[2],
+                                                      item[1]))
 
     return result_string
+
 
 def check_temporal_layer(resultpath):
     result_string = ''
     # "ts-schema": "android.generic.2"
-    status = []
 
     for file in resultpath:
         with open(file) as resultfile:
@@ -208,7 +221,8 @@ def check_temporal_layer(resultpath):
                 layer_count = parse_schema(schema)
                 layer_size = []
                 for index in range(0, layer_count):
-                    layer = list(filter(lambda x: ((x['frame'] + index) % layer_count), frames))
+                    layer = list(filter(lambda x: ((x['frame'] + index) %
+                                                   layer_count), frames))
                     accum = 0
                     for item in layer:
                         accum += item['size']
@@ -221,10 +235,10 @@ def check_temporal_layer(resultpath):
                 result_string += f'\n\n----- {testname} -----'
                 for size in layer_size:
                     ratio = size[1] / total_size
-                    result_string += '\nlayer {:d}:{:3d}%, {:s}' \
-                                     .format(size[0],
-                                             int(round(ratio * 100, 0)),
-                                             resultfilename)
+                    result_string += ('\nlayer {:d}:{:3d}%, {:s}'
+                                      .format(size[0],
+                                              int(round(ratio * 100, 0)),
+                                              resultfilename))
 
     return result_string
 
@@ -257,7 +271,6 @@ def check_idr_placement(resultpath):
                     status.append([testname, "Runtime sync request", passed,
                                    gop, resultfilename])
 
-
             # gop, either static gop or distance from last?
             gop = encoder_settings.get('gop')
             fps = encoder_settings.get('fps')
@@ -267,8 +280,7 @@ def check_idr_placement(resultpath):
                 for frame in idr_ids:
                     if frame % frame_gop != 0:
                         passed = False
-            #TODO: check for missing key frames
-
+            # TODO: check for missing key frames
             status.append([testname, "Even gop", passed, gop, resultfilename])
 
     labels = ['test', 'subtest', 'passed', 'gop', 'file']
@@ -279,9 +291,10 @@ def check_idr_placement(resultpath):
         result_string += f'\n\n----- {name} -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            result_string += '\n{:s} \"{:s}\", gop {:2d} sec, {:s}' \
-                             .format({True:'passed', False: 'failed'}[row.passed],
-                                     row.subtest, row.gop, row.file)
+            result_string += ('\n{:s} \"{:s}\", gop {:2d} sec, {:s}'
+                              .format({True: 'passed', False: 'failed'}
+                                      [row.passed], row.subtest, row.gop,
+                                      row.file))
 
     return result_string
 
@@ -331,23 +344,28 @@ def check_mean_bitrate_deviation(resultpath):
                                      int(target_bitrate), int(round(mean, 0)),
                                      int(round(bitrate_error_perc, 0))])
                     if limit in dynamic_video_bitrate:
-                        target_bitrate = parse_bitrate(dynamic_video_bitrate[limit])
+                        target_bitrate = parse_bitrate(
+                            dynamic_video_bitrate[limit])
                     previous_limit = limit
-                result_string += f'\n\n----- {testname}, runtime bitrate changes -----'
-                result_string += f"\n Codec: {encoder_settings.get('codec')}, " \
-                                 f"{encoder_settings.get('height')}p@{fps}fps"
+                result_string += (f'\n\n----- {testname}, runtime bitrate '
+                                  'changes -----')
+                result_string += (f"\n Codec: {encoder_settings.get('codec')}"
+                                  f", {encoder_settings.get('height')}"
+                                  f'p@{fps}fps')
                 for item in dyn_data:
-                    result_string += '\n{:3d}% error in {:4d}:{:4d} ({:4d}kbps)' \
-                                     'for {:4d}kbps, {:s}' \
-                                     .format(item[4], item[0], item[1],
-                                             int(item[3]/1000), int(item[2]/1000),
-                                             resultfilename)
+                    result_string += ('\n{:3d}% error in {:4d}:{:4d} '
+                                      '({:4d}kbps) for {:4d}kbps, {:s}'
+                                      .format(item[4], item[0], item[1],
+                                              int(item[3]/1000),
+                                              int(item[2]/1000),
+                                              resultfilename))
             else:
                 mean_bitrate = encoder_settings.get('meanbitrate')
                 ratio = mean_bitrate / bitrate
                 bitrate_error_perc = int((ratio - 1) * 100)
-                bitrate_error.append([testname, bitrate_error_perc, int(bitrate),
-                                      mean_bitrate, resultfilename])
+                bitrate_error.append([testname, bitrate_error_perc,
+                                      int(bitrate), mean_bitrate,
+                                      resultfilename])
 
     labels = ['test', 'error', 'bitrate', 'real_bitrate', 'file']
     data = pd.DataFrame.from_records(bitrate_error, columns=labels,
@@ -358,9 +376,9 @@ def check_mean_bitrate_deviation(resultpath):
         result_string += f'\n\n----- {name} -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            result_string += '\n{:3d} % error for {:4d}kbps ({:4d}kbps), {:s}' \
+            result_string += ('\n{:3d} % error for {:4d}kbps ({:4d}kbps), {:s}'
                               .format(row.error, int(row.bitrate/1000),
-                                      int(row.real_bitrate/1000), row.file)
+                                      int(row.real_bitrate/1000), row.file))
 
     return result_string
 
@@ -378,16 +396,20 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('-d', '--dir', default='encapp_verify')
-    parser.add_argument('-i', '--input', help='Replace all test defined ' \
-                                                    'sources with input', default='')
-    parser.add_argument('-is', '--input_res', help='Override input file', default='')
-    parser.add_argument('-if', '--input_fps', help='Override input fps', default='')
-    parser.add_argument('-os', '--output_res', help='Override input file', default='')
-    parser.add_argument('-of', '--output_fps', help='Override input fps', default='')
+    parser.add_argument(
+        '-i', '--input',
+        help='Replace all test defined sources with input', default='')
+    parser.add_argument(
+        '-is', '--input_res', help='Override input file', default='')
+    parser.add_argument(
+        '-if', '--input_fps', help='Override input fps', default='')
+    parser.add_argument(
+        '-os', '--output_res', help='Override input file', default='')
+    parser.add_argument(
+        '-of', '--output_fps', help='Override input fps', default='')
     parser.add_argument('-c', '--codec', help='Override encoder', default='')
     parser.add_argument('-t', '--test', nargs="+",)
     parser.add_argument('-r', '--result', nargs="+",)
-
 
     options = parser.parse_args(argv[1:])
     result_string = ""
@@ -415,7 +437,7 @@ def main(argv):
         model, serial = ep.get_device_info(options.serial)
 
         if options.test is not None:
-            #check if list
+            # check if list
             tests = options.test
         else:
             tests = DEFAULT_TESTS
@@ -463,15 +485,18 @@ def main(argv):
                 temporal_string += check_temporal_layer(result)
                 ltr_string += check_long_term_ref(result)
 
-    result_string += print_partial_result('Verify bitrate accuracy', bitrate_string)
+    result_string += print_partial_result(
+        'Verify bitrate accuracy', bitrate_string)
     result_string += print_partial_result('Verify idr accuracy', idr_string)
-    result_string += print_partial_result('Verify check temporal layer accuracy', temporal_string)
-    result_string += print_partial_result('Verify long term reference settings', ltr_string)
+    result_string += print_partial_result(
+        'Verify check temporal layer accuracy', temporal_string)
+    result_string += print_partial_result(
+        'Verify long term reference settings', ltr_string)
 
     print(f'\nRESULTS\n{result_string}')
     with open(f'{workdir}/RESULT.txt', "w") as output:
         output.write(result_string)
-        output.write(f'\n---------')
+        output.write('\n---------')
         extra = ""
         if model is not None and serial is not None:
             with open(f'{workdir}/dut.txt', 'w') as dut:
@@ -488,5 +513,7 @@ def main(argv):
                 extra = dut.read()
         output.write(f'\n{extra}')
         output.write('\n')
+
+
 if __name__ == '__main__':
     main(sys.argv)
