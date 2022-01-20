@@ -73,6 +73,7 @@ def run_cmd_silent(cmd):
 
     return ret, stdout.decode(), stderr.decode()
 
+
 def run_cmd(cmd):
     ret = True
     try:
@@ -176,14 +177,14 @@ def install_app(serial):
     path, __ = os.path.split(script_path)
 
     run_cmd_silent(f'adb -s {serial} install -g '
-            f'{path}/../app/build/outputs/apk/debug/'
-            'com.facebook.encapp-v1.0-debug.apk')
+                   f'{path}/../app/build/outputs/apk/debug/'
+                   'com.facebook.encapp-v1.0-debug.apk')
 
 
 def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      workdir, options):
     result_json = []
-    if options.no_install != None and options.no_install:
+    if options.no_install is not None and options.no_install:
         print('Skip install of apk!')
     else:
         install_app(serial)
@@ -206,12 +207,13 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     input_files = None
     for test in tests:
         print(f'push data for test = {test}')
-        if options != None and len(options.input) > 0:
+        if options is not None and len(options.input) > 0:
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
             ret, stdout, stderr = run_cmd_silent(
                 f'adb -s {serial} shell ls {inputfile}')
             if len(stderr) > 0:
-                run_cmd_silent(f'adb -s {serial} push {options.input} /sdcard/')
+                run_cmd_silent(f'adb -s {serial} push {options.input} '
+                               '/sdcard/')
         else:
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
@@ -234,22 +236,22 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         os.remove(json_name)
 
         additional = ''
-        if options.codec != None and len(options.codec) > 0:
+        if options.codec is not None and len(options.codec) > 0:
             additional = f'{additional} -e enc {options.codec}'
 
-        if options.input != None and len(options.input) > 0:
+        if options.input is not None and len(options.input) > 0:
             additional = f'{additional} -e file {inputfile}'
 
-        if options != None and len(options.input_res) > 0:
+        if options is not None and len(options.input_res) > 0:
             additional = f'{additional} -e ref_res {options.input_res}'
 
-        if options != None and len(options.input_fps) > 0:
+        if options is not None and len(options.input_fps) > 0:
             additional = f'{additional} -e ref_fps {options.input_fps}'
 
-        if options != None and len(options.output_fps) > 0:
+        if options is not None and len(options.output_fps) > 0:
             additional = f'{additional} -e fps {options.output_fps}'
 
-        if options != None and len(options.output_res) > 0:
+        if options is not None and len(options.output_res) > 0:
             additional = f'{additional} -e res {options.output_res}'
 
         run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
@@ -284,14 +286,15 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
 
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
         if input_files is not None:
-                for file in input_files:
-                    base_file_name = os.path.basename(file)
-                    run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
-        if options != None and len(options.input) > 0:
+            for file in input_files:
+                base_file_name = os.path.basename(file)
+                run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
+        if options is not None and len(options.input) > 0:
             base_file_name = os.path.basename(inputfile)
             run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
         run_cmd(adb_cmd)
     return result_json
+
 
 def list_codecs(serial, model, install):
     if install:

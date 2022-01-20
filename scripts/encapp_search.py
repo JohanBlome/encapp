@@ -10,11 +10,13 @@ import re
 
 INDEX_FILE_NAME = 'encapp_index.csv'
 
+
 def getProperties(json):
     data = get_data(True)
     _, filename = os.path.split(json)
     row = data.loc[data['file'].str.contains(filename)]
-    return row;
+    return row
+
 
 def getFilesInDir(directory, recursive):
     regexp = '^encapp_.*json$'
