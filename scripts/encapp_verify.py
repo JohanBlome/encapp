@@ -256,6 +256,9 @@ def check_idr_placement(resultpath):
             frames = result.get('frames')
             iframes = list(filter(lambda x: (x['iframe'] == 1), frames))
             idr_ids = []
+            # gop, either static gop or distance from last?
+            gop = encoder_settings.get('gop')
+            fps = encoder_settings.get('fps')
             for frame in iframes:
                 idr_ids.append(frame['frame'])
 
@@ -271,9 +274,6 @@ def check_idr_placement(resultpath):
                     status.append([testname, "Runtime sync request", passed,
                                    gop, resultfilename])
 
-            # gop, either static gop or distance from last?
-            gop = encoder_settings.get('gop')
-            fps = encoder_settings.get('fps')
             frame_gop = gop * fps
             passed = True
             if frame_gop < len(frames):
