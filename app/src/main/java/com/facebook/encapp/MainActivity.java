@@ -401,7 +401,6 @@ public class MainActivity extends AppCompatActivity {
             mod = data.split(",");
         }
 
-        String iframesize = mExtraData.getString(ParseData.IFRAME_SIZE_PRESET, "DEFAULT");
         int ref_fps = mExtraData.getInt(ParseData.REF_FPS, 30);
         String ref_resolution = mExtraData.getString(ParseData.REF_RESOLUTION,"1280x720");
         if (resolutions == null) {
@@ -427,7 +426,6 @@ public class MainActivity extends AppCompatActivity {
                                 constraints.setBitrateMode(mod[mC]);
                                 constraints.setInputfile(mExtraData.getString(ParseData.FILE));
 
-                                constraints.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(iframesize.toUpperCase(Locale.US)));
                                 if (mExtraData.containsKey(ParseData.TEMPORAL_LAYER_COUNT)) {
                                     constraints.setTemporalLayerCount(mExtraData.getInt(ParseData.TEMPORAL_LAYER_COUNT,1));
                                 }

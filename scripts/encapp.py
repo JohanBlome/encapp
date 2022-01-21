@@ -26,7 +26,6 @@ KEY_NAME_I_INTERVALS = 'i_intervals'
 KEY_NAME_DURATION = 'duration'
 KEY_NAME_INPUT_FORMAT = 'input_format'
 KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
-KEY_NAME_I_FRAME_SIZES = 'i_frame_sizes'
 KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
 KEY_NAME_ENC_LOOP = 'enc_loop'
 KEY_NAME_CONFIGURE = 'configure'
@@ -46,7 +45,6 @@ sample_config_json_data = \
               KEY_NAME_BITRATES: ['500k', '1000k', '1500k', '2M', '2500k'],
               KEY_NAME_I_INTERVALS: [2],
               # DEFAULT, MEDIUM, HUGE, UNLIMITED
-              KEY_NAME_I_FRAME_SIZES:['unlimited'],
               # KEY_NAME_CONFIGURE: [''],
               # KEY_NAME_RUNTIME_PARAMETER: ['']
               KEY_NAME_DURATION: 10,

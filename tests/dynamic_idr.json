@@ -14,9 +14,6 @@
     "i_intervals": [
         60
     ],
-    "i_frame_sizes": [
-        "unlimited"
-    ],
     "runtime_parameters": [
         {
             "name": "request-sync",

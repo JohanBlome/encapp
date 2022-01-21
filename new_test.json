@@ -26,9 +26,6 @@
         "i_intervals": [
             2
         ],
-        "i_frame_sizes": [
-            "unlimited"
-        ],
         "temporal_layer_counts": [
             1
         ],
