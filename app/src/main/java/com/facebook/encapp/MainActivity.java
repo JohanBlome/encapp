@@ -259,6 +259,9 @@ public class MainActivity extends AppCompatActivity {
         if (mExtraData.containsKey(ParseData.RESOLUTION)) {
             sp.setOutputResolution(mExtraData.getString(ParseData.RESOLUTION));
         }
+        if (mExtraData.containsKey(ParseData.ENCODER)) {
+            sp.setOutputCodec(mExtraData.getString(ParseData.ENCODER));
+        }
 
         /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
