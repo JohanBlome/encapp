@@ -33,7 +33,6 @@ public class JSONTestCaseBuilder {
     public static String CONCURRENT = "conc";
     public static String USE_SURFACE_ENC = "use_surface_enc";
     public static String I_INTERVALS = "i_intervals";
-    public static String I_FRAME_SIZES = "i_frame_sizes";
     public static String SKIP_FRAMES = "skip_frames";
     public static String INPUT_FILES = "input_files";
     public static String INPUT_RESOLUTION = "input_resolution";
@@ -113,7 +112,6 @@ public class JSONTestCaseBuilder {
         String[] fps = {"30"};
         String[] mod = {"CBR"};
         String[] input_files = {};
-        String[] i_frame_sizes = {"default"};
         String[] i_intervals = {"10"};
         ArrayList<ConfigureParam> config_encoder = new ArrayList<>();
         ArrayList<ConfigureParam> config_decoder = new ArrayList<>();
@@ -160,8 +158,6 @@ public class JSONTestCaseBuilder {
                 input_fps = test.getString(case_key);
             } else if (case_key.equals(I_INTERVALS)) {
                 i_intervals = getStringArray((JSONArray) data_object);
-            } else if (case_key.equals(I_FRAME_SIZES)) {
-                i_frame_sizes = getStringArray((JSONArray) data_object);
             } else if (case_key.equals(SKIP_FRAMES)) {
                 skip_frames = test.getString(case_key);
             } else if (case_key.equals(INPUT_FILES)) {
@@ -314,46 +310,42 @@ public class JSONTestCaseBuilder {
                         for (int fC = 0; fC < fps.length; fC++) {
                             for (int bC = 0; bC < bitrates.length; bC++) {
                                 for (int kC = 0; kC < i_intervals.length; kC++) {
-                                    for (int iS = 0; iS < i_frame_sizes.length; iS++) {
-                                        TestParams testParams = new TestParams();
-                                        Size videoSize = SizeUtils.parseXString(encode_resolutions[vC]);
-                                        testParams.setVideoSize(videoSize);
-                                        if (bitrates[bC].endsWith("k")) {
-                                            testParams.setBitRate(Math.round(Float.parseFloat(
-                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('k'))) * 1000));
-                                        } else if (bitrates[bC].endsWith("M")) {
-                                            testParams.setBitRate(Math.round(Float.parseFloat(
-                                                    bitrates[bC].substring(0, bitrates[bC].lastIndexOf('M'))) * 1000000));
-                                        } else {
-                                            testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC])));
-                                        }
-                                        testParams.setBitrateMode(mod[mC]);
-                                        testParams.setKeyframeInterval(Integer.parseInt(i_intervals[kC]));
-                                        testParams.setFPS(Integer.parseInt(fps[fC]));
-                                        testParams.setReferenceFPS(Float.parseFloat(input_fps));
-                                        testParams.setCodecName(codecs[eC]);
-                                        testParams.setBitrateMode(mod[mC].toLowerCase());
-                                        testParams.setIframeSizePreset(TestParams.IFRAME_SIZE_PRESETS.valueOf(i_frame_sizes[iS].toUpperCase(Locale.US)));
-                                        testParams.setSkipFrames(Boolean.parseBoolean(skip_frames));
-                                        testParams.setInputfile(input_files[iF]);
-                                        testParams.setEncoderRuntimeParameters(encoder_runtime_parameters);
-                                        testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
-                                        testParams.setEncoderConfigure(config_encoder);
-                                        testParams.setDecoderConfigure(config_decoder);
-                                        testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
-                                        testParams.setLoopCount(Integer.parseInt(enc_loop));
-                                        testParams.setConcurrentCodings(Integer.parseInt(conc));
-                                        testParams.setDescription(description);
-                                        testParams.setPursuit(Integer.parseInt(pursuit));
-                                        testParams.setRealtime(Boolean.parseBoolean(realtime));
-                                        if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
-                                        testParams.setDecoder(decoder);
-                                        testParams.setDurationSec(Integer.parseInt(duration_sec));
-                                        vc.add(testParams);
+                                    TestParams testParams = new TestParams();
+                                    Size videoSize = SizeUtils.parseXString(encode_resolutions[vC]);
+                                    testParams.setVideoSize(videoSize);
+                                    if (bitrates[bC].endsWith("k")) {
+                                        testParams.setBitRate(Math.round(Float.parseFloat(
+                                                bitrates[bC].substring(0, bitrates[bC].lastIndexOf('k'))) * 1000));
+                                    } else if (bitrates[bC].endsWith("M")) {
+                                        testParams.setBitRate(Math.round(Float.parseFloat(
+                                                bitrates[bC].substring(0, bitrates[bC].lastIndexOf('M'))) * 1000000));
+                                    } else {
+                                        testParams.setBitRate(Math.round(Float.parseFloat(bitrates[bC])));
                                     }
+                                    testParams.setBitrateMode(mod[mC]);
+                                    testParams.setKeyframeInterval(Integer.parseInt(i_intervals[kC]));
+                                    testParams.setFPS(Integer.parseInt(fps[fC]));
+                                    testParams.setReferenceFPS(Float.parseFloat(input_fps));
+                                    testParams.setCodecName(codecs[eC]);
+                                    testParams.setBitrateMode(mod[mC].toLowerCase());
+                                    testParams.setSkipFrames(Boolean.parseBoolean(skip_frames));
+                                    testParams.setInputfile(input_files[iF]);
+                                    testParams.setEncoderRuntimeParameters(encoder_runtime_parameters);
+                                    testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
+                                    testParams.setEncoderConfigure(config_encoder);
+                                    testParams.setDecoderConfigure(config_decoder);
+                                    testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
+                                    testParams.setLoopCount(Integer.parseInt(enc_loop));
+                                    testParams.setConcurrentCodings(Integer.parseInt(conc));
+                                    testParams.setDescription(description);
+                                    testParams.setPursuit(Integer.parseInt(pursuit));
+                                    testParams.setRealtime(Boolean.parseBoolean(realtime));
+                                    if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
+                                    testParams.setDecoder(decoder);
+                                    testParams.setDurationSec(Integer.parseInt(duration_sec));
+                                    vc.add(testParams);
                                 }
                             }
-
                         }
                     }
                 }

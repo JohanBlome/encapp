@@ -248,7 +248,6 @@ public class Statistics {
             settings.put("height", s.getHeight());
             settings.put("encmode",mVc.bitrateModeName());
             settings.put("keyrate",mVc.getKeyframeRate());
-            settings.put("iframepreset",mVc.getIframeSizePreset());
 
             ArrayList<ConfigureParam> configure = mVc.getEncoderConfigure();
             for (ConfigureParam param: configure) {

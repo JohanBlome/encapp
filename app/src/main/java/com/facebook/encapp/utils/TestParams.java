@@ -34,7 +34,6 @@ public class TestParams {
     private int mLtrCount = 1;
     private String mCodecName = "";
 
-    private IFRAME_SIZE_PRESETS mIframeSize = IFRAME_SIZE_PRESETS.DEFAULT;
     //Bitrate mode 3,4 is
     //OMX_Video_ControlRateVariableSkipFrames,
     //OMX_Video_ControlRateConstantSkipFrames,
@@ -290,14 +289,6 @@ public class TestParams {
         return str.toString();
     }
 
-
-    public void setIframeSizePreset(IFRAME_SIZE_PRESETS preset) {
-        mIframeSize = preset;
-    }
-
-    public IFRAME_SIZE_PRESETS getIframeSizePreset() {
-        return mIframeSize;
-    }
 
     public void setTemporalLayerCount( int temporalLayerCount ) {
         mTemporalLayerCount = temporalLayerCount;
