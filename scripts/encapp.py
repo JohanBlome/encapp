@@ -178,6 +178,64 @@ def install_app(serial):
                    'com.facebook.encapp-v1.0-debug.apk')
 
 
+def run_test(workdir, json_path, json_name,
+             input_files, result_json, serial, options):
+    run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
+
+    additional = ''
+    if options.codec is not None and len(options.codec) > 0:
+        additional = f'{additional} -e enc {options.codec}'
+
+    if options.input is not None and len(options.input) > 0:
+        additional = f'{additional} -e file {options.input}'
+
+    if options is not None and len(options.input_res) > 0:
+        additional = f'{additional} -e ref_res {options.input_res}'
+
+    if options is not None and len(options.input_fps) > 0:
+        additional = f'{additional} -e ref_fps {options.input_fps}'
+
+    if options is not None and len(options.output_fps) > 0:
+        additional = f'{additional} -e fps {options.output_fps}'
+
+    if options is not None and len(options.output_res) > 0:
+        additional = f'{additional} -e res {options.output_res}'
+
+    run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
+            f'/sdcard/{json_name} {ACTIVITY}')
+    wait_for_exit(serial)
+    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
+    ret, stdout, stderr = run_cmd_silent(adb_cmd)
+    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
+                              re.MULTILINE)
+
+    base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
+    sub_dir = '_'.join([base_file_name, 'files'])
+    output_dir = f'{workdir}/{sub_dir}/'
+    run_cmd(f'mkdir {output_dir}')
+
+    for file in output_files:
+        if file == '':
+            print('No file found')
+            continue
+        # pull the output file
+        print(f'pull {file} to {output_dir}')
+
+        adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
+        run_cmd_silent(adb_cmd)
+
+        # remove the json file on the device too
+        adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
+        run_cmd_silent(adb_cmd)
+        if file.endswith('.json'):
+            path, tmpname = os.path.split(file)
+            result_json.append(f'{output_dir}/{tmpname}')
+
+    adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
+    run_cmd(adb_cmd)
+    return result_json
+
+
 def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      workdir, options):
     result_json = []
@@ -201,10 +259,12 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     if isinstance(tests, type(None)):
         tests = [test_def]
     counter = 1
-    input_files = None
+    all_input_files = []
+    # push media files to the device
     for test in tests:
         print(f'push data for test = {test}')
         if options is not None and len(options.input) > 0:
+            all_input_files.append(inputfile)
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
             ret, stdout, stderr = run_cmd_silent(
                 f'adb -s {serial} shell ls {inputfile}')
@@ -219,78 +279,31 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
                         path = f'{json_folder}/{file}'
                     else:
                         path = f'{file}'
+                    all_input_files.append(f'/sdcard/{os.path.basename(path)}')
                     if exists(path):
                         run_cmd(f'adb -s {serial} push {path} /sdcard/')
                     else:
                         print(f'Media file is missing: {path}')
                         exit(0)
 
-        json_name = f'{filename}_{counter}.json'
-        counter += 1
-        with open(json_name, "w") as outfile:
-            json.dump(test, outfile)
+    # run test(s)
+    if not options.no_split:
+        for test in tests:
+            json_name = f'{filename}_{counter}.json'
+            counter += 1
+            with open(json_name, "w") as outfile:
+                json.dump(test, outfile)
+            run_test(workdir, json_path, json_name, input_files,
+                     result_json, serial, options)
+            os.remove(json_name)
+    else:
+        run_test(workdir, json_folder, filename, input_files,
+                 result_json, serial, options)
 
-        run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
-        os.remove(json_name)
+    if len(all_input_files) > 0:
+        for file in all_input_files:
+            run_cmd(f'adb -s {serial} shell rm {file}')
 
-        additional = ''
-        if options.codec is not None and len(options.codec) > 0:
-            additional = f'{additional} -e enc {options.codec}'
-
-        if options.input is not None and len(options.input) > 0:
-            additional = f'{additional} -e file {inputfile}'
-
-        if options is not None and len(options.input_res) > 0:
-            additional = f'{additional} -e ref_res {options.input_res}'
-
-        if options is not None and len(options.input_fps) > 0:
-            additional = f'{additional} -e ref_fps {options.input_fps}'
-
-        if options is not None and len(options.output_fps) > 0:
-            additional = f'{additional} -e fps {options.output_fps}'
-
-        if options is not None and len(options.output_res) > 0:
-            additional = f'{additional} -e res {options.output_res}'
-
-        run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
-                f'/sdcard/{json_name} {ACTIVITY}')
-        wait_for_exit(serial)
-        adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-        ret, stdout, stderr = run_cmd_silent(adb_cmd)
-        output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
-                                  re.MULTILINE)
-
-        base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
-        sub_dir = '_'.join([base_file_name, 'files'])
-        output_dir = f'{workdir}/{sub_dir}/'
-        run_cmd(f'mkdir {output_dir}')
-
-        for file in output_files:
-            if file == '':
-                print('No file found')
-                continue
-            # pull the output file
-            print(f'pull {file} to {output_dir}')
-
-            adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
-            run_cmd_silent(adb_cmd)
-
-            # remove the json file on the device too
-            adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
-            run_cmd_silent(adb_cmd)
-            if file.endswith('.json'):
-                path, tmpname = os.path.split(file)
-                result_json.append(f'{output_dir}/{tmpname}')
-
-        adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
-        if input_files is not None:
-            for file in input_files:
-                base_file_name = os.path.basename(file)
-                run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
-        if options is not None and len(options.input) > 0:
-            base_file_name = os.path.basename(inputfile)
-            run_cmd(f'adb -s {serial} shell rm /sdcard/{base_file_name}')
-        run_cmd(adb_cmd)
     return result_json
 
 
@@ -335,6 +348,7 @@ def get_options(argv):
     parser.add_argument('--output_fps', help='Override output fps', default='')
     parser.add_argument('--output_res', help='Override output resolution',
                         default='')
+    parser.add_argument('--no_split', action='store_true')
 
     options = parser.parse_args(argv[1:])
 
@@ -347,7 +361,6 @@ def get_options(argv):
 
 def main(argv):
     options = get_options(argv)
-
     if options.config is not None:
         if options.config.endswith('.json') is False:
             print('Error: the config file should have .json extension')
