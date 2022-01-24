@@ -22,5 +22,7 @@ lint: \
 		echo "processing $$file" ; \
 		rm -f ${TMPFILE}; \
 		jq --indent 4 . $$file > ${TMPFILE}; \
-		mv ${TMPFILE} $$file; \
+		if [[ $$? -eq "0" ]]; then \
+			mv ${TMPFILE} $$file; \
+		fi \
 	done
