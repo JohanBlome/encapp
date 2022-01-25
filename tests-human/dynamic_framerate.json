@@ -1,0 +1,31 @@
+{
+    "common": {
+        "id": "dynamic_framerate",
+        "description": "Dynamic Framerate Test"
+    },
+    "input": {
+        "filename": "foo.yuv",
+        "resolution": "176x144",
+        "pix-fmt": "nv12",
+        "framerate": 30,
+        "duration": 300,
+        "dynamic-framerate": [
+            [
+                60,
+                120,
+                180,
+                240
+            ],
+            [
+                15,
+                5,
+                20,
+                30
+            ]
+        ]
+    },
+    "configure": {
+        "codec": "OMX.google.h264.encoder",
+        "bitrate": "300 kbps"
+    }
+}

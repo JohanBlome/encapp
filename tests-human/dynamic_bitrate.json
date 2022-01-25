@@ -1,0 +1,43 @@
+{
+    "common": {
+        "id": "dynamic_bitrate",
+        "description": "Dynamic Bitrate Test"
+    },
+    "input": {
+        "filename": "foo.yuv",
+        "resolution": "176x144",
+        "pix-fmt": "nv12",
+        "framerate": 30
+    },
+    "configure": {
+        "codec": "OMX.google.h264.encoder",
+        "bitrate": "300 kbps"
+    },
+    "runtime": [
+        [
+            150,
+            "video-bitrate",
+            "100 kbps"
+        ],
+        [
+            300,
+            "video-bitrate",
+            "200 kbps"
+        ],
+        [
+            450,
+            "video-bitrate",
+            "300 kbps"
+        ],
+        [
+            600,
+            "video-bitrate",
+            "1 Mbps"
+        ],
+        [
+            750,
+            "video-bitrate",
+            "500 kbps"
+        ]
+    ]
+}
