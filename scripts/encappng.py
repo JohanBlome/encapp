@@ -21,6 +21,12 @@ ACTIVITY = 'com.facebook.encapp/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
+SCRIPT_PATH = os.path.realpath(__file__)
+SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
+MAIN_APK = os.path.join(
+    SCRIPT_DIR,
+    '/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk')
+
 
 def run_cmd(cmd, silent=False):
     ret = True
@@ -121,12 +127,7 @@ def wait_for_exit(serial):
 
 
 def install_app(serial):
-    script_path = os.path.realpath(__file__)
-    path, __ = os.path.split(script_path)
-
-    run_cmd(f'adb -s {serial} install -g '
-            f'{path}/../app/build/outputs/apk/debug/'
-            'com.facebook.encapp-v1.0-debug.apk', silent=True)
+    run_cmd(f'adb -s {serial} install -g {MAIN_APK}', silent=True)
 
 
 def run_test(workdir, json_path, json_name,
