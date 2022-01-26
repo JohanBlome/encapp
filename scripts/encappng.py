@@ -22,24 +22,11 @@ ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
 
-def run_cmd_silent(cmd):
+def run_cmd(cmd, silent=False):
     ret = True
     try:
-        process = subprocess.Popen(cmd, shell=True,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-    except Exception:
-        ret = False
-        print('Failed to run command: ' + cmd)
-
-    return ret, stdout.decode(), stderr.decode()
-
-
-def run_cmd(cmd):
-    ret = True
-    try:
-        print(cmd, sep=' ')
+        if not silent:
+            print(cmd, sep=' ')
         process = subprocess.Popen(cmd, shell=True,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -119,12 +106,12 @@ def wait_for_exit(serial):
     current = 1
     while (current != -1):
         if pid == -1:
-            ret, stdout, stderr = run_cmd_silent(adb_cmd)
+            ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
             pid = -1
             if len(stdout) > 0:
                 pid = int(stdout)
         time.sleep(1)
-        ret, stdout, stderr = run_cmd_silent(adb_cmd)
+        ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
         current = -2
         if len(stdout) > 0:
             current = int(stdout)
@@ -137,14 +124,14 @@ def install_app(serial):
     script_path = os.path.realpath(__file__)
     path, __ = os.path.split(script_path)
 
-    run_cmd_silent(f'adb -s {serial} install -g '
-                   f'{path}/../app/build/outputs/apk/debug/'
-                   'com.facebook.encapp-v1.0-debug.apk')
+    run_cmd(f'adb -s {serial} install -g '
+            f'{path}/../app/build/outputs/apk/debug/'
+            'com.facebook.encapp-v1.0-debug.apk', silent=True)
 
 
 def run_test(workdir, json_path, json_name,
              input_files, result_json, serial, options):
-    run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
+    run_cmd(f'adb -s {serial} push {json_name} /sdcard/', silent=True)
 
     additional = ''
     if options.codec is not None and len(options.codec) > 0:
@@ -169,7 +156,7 @@ def run_test(workdir, json_path, json_name,
             f'/sdcard/{json_name} {ACTIVITY}')
     wait_for_exit(serial)
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd_silent(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
 
@@ -186,11 +173,11 @@ def run_test(workdir, json_path, json_name,
         print(f'pull {file} to {output_dir}')
 
         adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
-        run_cmd_silent(adb_cmd)
+        run_cmd(adb_cmd, silent=True)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
-        run_cmd_silent(adb_cmd)
+        run_cmd(adb_cmd, silent=True)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(f'{output_dir}/{tmpname}')
@@ -230,11 +217,11 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
         if options is not None and len(options.input) > 0:
             all_input_files.append(inputfile)
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
-            ret, stdout, stderr = run_cmd_silent(
-                f'adb -s {serial} shell ls {inputfile}')
+            ret, stdout, stderr = run_cmd(
+                f'adb -s {serial} shell ls {inputfile}', silent=True)
             if len(stderr) > 0:
-                run_cmd_silent(f'adb -s {serial} push {options.input} '
-                               '/sdcard/')
+                run_cmd(f'adb -s {serial} push {options.input} '
+                        '/sdcard/', silent=True)
         else:
             input_files = test.get('input_files')
             if input_files is not None:
@@ -279,7 +266,7 @@ def list_codecs(serial, model, install):
               f'-e ui_hold_sec 3 '\
               f'-e list_codecs a {ACTIVITY}'
 
-    run_cmd_silent(adb_cmd)
+    run_cmd(adb_cmd, silent=True)
     wait_for_exit(serial)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
