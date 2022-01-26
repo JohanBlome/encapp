@@ -16,42 +16,6 @@ import time
 from datetime import datetime
 from os.path import exists
 
-KEY_NAME_DESCRIPTION = 'description'
-KEY_NAME_INPUT_FILES = 'input_files'
-KEY_NAME_CODECS = 'codecs'
-KEY_NAME_ENCODE_RESOLUTIONS = 'encode_resolutions'
-KEY_NAME_RC_MODES = 'rc_modes'
-KEY_NAME_BITRATES = 'bitrates'
-KEY_NAME_I_INTERVALS = 'i_intervals'
-KEY_NAME_DURATION = 'duration'
-KEY_NAME_INPUT_FORMAT = 'input_format'
-KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
-KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
-KEY_NAME_ENC_LOOP = 'enc_loop'
-KEY_NAME_CONFIGURE = 'configure'
-KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
-
-sample_config_json_data = \
-    {
-        'tests':
-            [{
-              KEY_NAME_DESCRIPTION: 'sample',
-              KEY_NAME_INPUT_FILES: [''],
-              KEY_NAME_INPUT_FORMAT: 'mp4',
-              KEY_NAME_INPUT_RESOLUTION: '1280x720',
-              KEY_NAME_CODECS: ['h264.encoder'],
-              KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
-              KEY_NAME_RC_MODES: ['cbr'],
-              KEY_NAME_BITRATES: ['500k', '1000k', '1500k', '2M', '2500k'],
-              KEY_NAME_I_INTERVALS: [2],
-              # DEFAULT, MEDIUM, HUGE, UNLIMITED
-              # KEY_NAME_CONFIGURE: [''],
-              # KEY_NAME_RUNTIME_PARAMETER: ['']
-              KEY_NAME_DURATION: 10,
-              KEY_NAME_ENC_LOOP: 0
-            }]
-    }
-
 
 ACTIVITY = 'com.facebook.encapp/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
@@ -272,7 +236,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
                 run_cmd_silent(f'adb -s {serial} push {options.input} '
                                '/sdcard/')
         else:
-            input_files = test.get(KEY_NAME_INPUT_FILES)
+            input_files = test.get('input_files')
             if input_files is not None:
                 for file in input_files:
                     if len(json_folder) > 0 and not os.path.isabs(file):
@@ -362,10 +326,7 @@ def get_options(argv):
 def main(argv):
     options = get_options(argv)
     if options.config is not None:
-        if options.config.endswith('.json') is False:
-            print('Error: the config file should have .json extension')
-        with open(options.config, 'w') as fp:
-            json.dump(sample_config_json_data, fp, indent=4)
+        pass
     else:
         model, serial = get_device_info(options.serial)
         if type(model) is dict:
