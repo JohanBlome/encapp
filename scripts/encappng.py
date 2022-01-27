@@ -39,7 +39,7 @@ default_values = {
     'func': 'help',
     'install': False,
     'infile': None,
-    'outdir': None,
+    'output': None,
 }
 
 
@@ -361,10 +361,10 @@ def get_options(argv):
             metavar='input-file',
             help='input file',)
     parser.add_argument(
-            'outdir', type=str, nargs='?',
-            default=default_values['outdir'],
-            metavar='output-dir',
-            help='output dir',)
+            'output', type=str, nargs='?',
+            default=default_values['output'],
+            metavar='output',
+            help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
 
