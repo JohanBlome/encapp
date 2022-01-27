@@ -17,8 +17,9 @@ import encapp_search as es
 from encapp import run_cmd
 
 
-DEFAULT_TESTS = ['simple.qcif.json',
+DEFAULT_TESTS = ['simple.qcif.json',                 
                  'bitrates.json',
+                 'bitrates_surface.json',
                  'dynamic_bitrate.json',
                  'dynamic_framerate.json',
                  'idr.json',
@@ -234,11 +235,12 @@ def check_temporal_layer(resultpath):
 
                 result_string += f'\n\n----- {testname} -----'
                 for size in layer_size:
-                    ratio = size[1] / total_size
-                    result_string += ('\nlayer {:d}:{:3d}%, {:s}'
-                                      .format(size[0],
-                                              int(round(ratio * 100, 0)),
-                                              resultfilename))
+                    if total_size > 0:
+                        ratio = size[1] / total_size
+                        result_string += ('\nlayer {:d}:{:3d}%, {:s}'
+                                          .format(size[0],
+                                                  int(round(ratio * 100, 0)),
+                                                  resultfilename))
 
     return result_string
 

@@ -179,7 +179,7 @@ def install_app(serial):
 
 
 def run_test(workdir, json_path, json_name,
-             input_files, result_json, serial, options):
+             result_json, serial, options):
     run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
 
     additional = ''
@@ -263,9 +263,9 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     # push media files to the device
     for test in tests:
         print(f'push data for test = {test}')
-        if options is not None and len(options.input) > 0:
-            all_input_files.append(inputfile)
+        if options is not None and len(options.input) > 0:            
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
+            all_input_files.append(inputfile)
             ret, stdout, stderr = run_cmd_silent(
                 f'adb -s {serial} shell ls {inputfile}')
             if len(stderr) > 0:
@@ -293,11 +293,11 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             counter += 1
             with open(json_name, "w") as outfile:
                 json.dump(test, outfile)
-            run_test(workdir, json_path, json_name, input_files,
+            run_test(workdir, json_path, json_name,
                      result_json, serial, options)
             os.remove(json_name)
     else:
-        run_test(workdir, json_folder, filename, input_files,
+        run_test(workdir, json_folder, filename,
                  result_json, serial, options)
 
     if len(all_input_files) > 0:

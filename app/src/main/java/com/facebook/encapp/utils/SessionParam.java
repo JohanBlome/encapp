@@ -10,6 +10,11 @@ public class SessionParam {
     }
 
     public String getOutputResolution() {
+
+        if (mOutputResolution == null) {
+            return mInputResolution;
+        }
+
         return mOutputResolution;
     }
 

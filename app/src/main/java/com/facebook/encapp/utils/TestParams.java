@@ -24,8 +24,7 @@ public class TestParams {
 
     private String mVideoEncoderIdentifier;
     private int mBitRate;
-    private Size mVideoSize; // Used for resolution values
-    private Size mVideoScaleSize; // Used for resolution values
+    private Size mVideoSize = null; // Used for resolution values
     private int mKeyframeRate;
     private float mFPS;
     private float mReferenceFPS;
@@ -56,6 +55,7 @@ public class TestParams {
     private int mConcurrentCodings = 1;
     private String mDecoder = "";
     private boolean mRealtime = false;
+    private boolean mUseSurfaceencoding = false;
 
     private int mPursuit = 0;
     private boolean mNoEncoding = false;
@@ -75,6 +75,10 @@ public class TestParams {
     }
 
     public Size getVideoSize() {
+        if (mVideoSize == null) {
+            return mRefSize;
+        }
+
         return mVideoSize;
     }
 
@@ -500,6 +504,10 @@ public class TestParams {
     public void setDurationSec(int duration) {
         mDurationSec = duration;};
 
+    public boolean doSurfaceEncoding() {return mUseSurfaceencoding;}
+
+    public void setUseSurfaceEncoding(boolean surfaceencoding) {
+        mUseSurfaceencoding = surfaceencoding;};
 }
 
 
