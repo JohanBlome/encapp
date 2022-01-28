@@ -134,6 +134,7 @@ public class JSONTestCaseBuilder {
 
         JSONObject test = o1;
         Log.d(TAG, "\n\n test: " + test + " new test collection");
+
         for (Iterator<String> it = test.keys(); it.hasNext(); ) {
             String case_key = it.next();
 
@@ -303,6 +304,7 @@ public class JSONTestCaseBuilder {
         }
         int index = 0;
         Vector<TestParams> vc = new Vector<>();
+        Log.d(TAG, "Build cases");
         for (int iF = 0; iF < input_files.length; iF++) {
             for (int eC = 0; eC < codecs.length; eC++) {
                 for (int mC = 0; mC < mod.length; mC++) {
@@ -310,8 +312,11 @@ public class JSONTestCaseBuilder {
                         for (int fC = 0; fC < fps.length; fC++) {
                             for (int bC = 0; bC < bitrates.length; bC++) {
                                 for (int kC = 0; kC < i_intervals.length; kC++) {
+                                    Log.d(TAG, "Build params");
                                     TestParams testParams = new TestParams();
+                                    Log.d(TAG, "Set enc size: "+encode_resolutions[vC]);
                                     Size videoSize = SizeUtils.parseXString(encode_resolutions[vC]);
+                                    Log.d(TAG, "Set size" + videoSize);
                                     testParams.setVideoSize(videoSize);
                                     if (bitrates[bC].endsWith("k")) {
                                         testParams.setBitRate(Math.round(Float.parseFloat(
@@ -334,6 +339,7 @@ public class JSONTestCaseBuilder {
                                     testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
                                     testParams.setEncoderConfigure(config_encoder);
                                     testParams.setDecoderConfigure(config_decoder);
+                                    Log.d(TAG, "Set ref size");
                                     testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
                                     testParams.setLoopCount(Integer.parseInt(enc_loop));
                                     testParams.setConcurrentCodings(Integer.parseInt(conc));
@@ -343,6 +349,8 @@ public class JSONTestCaseBuilder {
                                     if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
                                     testParams.setDecoder(decoder);
                                     testParams.setDurationSec(Integer.parseInt(duration_sec));
+                                    testParams.setUseSurfaceEncoding(Boolean.parseBoolean(use_surface_enc));
+                                    Log.d(TAG, "Add case");
                                     vc.add(testParams);
                                 }
                             }

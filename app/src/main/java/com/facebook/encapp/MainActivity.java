@@ -246,6 +246,8 @@ public class MainActivity extends AppCompatActivity {
         // A new input size is probably needed in that case
         if (mExtraData.containsKey(ParseData.REF_RESOLUTION)) {
             sp.setInputResolution(mExtraData.getString(ParseData.REF_RESOLUTION));
+            // reset output resolution
+            sp.setOutputResolution(null);
         }
 
         if (mExtraData.containsKey(ParseData.REF_FPS)) {
@@ -467,11 +469,16 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            final BufferEncoder transcoder;
+            final Encoder transcoder;
 
             if (vc.getInputfile().toLowerCase(Locale.US).contains(".raw") ||
                     vc.getInputfile().toLowerCase(Locale.US).contains(".yuv")) {
-                transcoder = new BufferEncoder();
+                if (vc.doSurfaceEncoding()) {
+                    transcoder = new SurfaceEncoder(this);
+                } else {
+                    transcoder = new BufferEncoder();
+                }
+
             } else {
                 transcoder = new SurfaceTranscoder();
             }

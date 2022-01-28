@@ -8,9 +8,16 @@ public class FrameInfo {
     long mStopTime;
     boolean mIsIframe;
     int mFlags;
+    int mOriginalFrame;
 
     public FrameInfo(long pts) {
         mPts = pts;
+        mOriginalFrame = -1; // When this does not make sense
+    }
+
+    public FrameInfo(long pts, int originalFrame) {
+        mPts = pts;
+        mOriginalFrame = originalFrame;
     }
 
     public void setSize(long size) {
@@ -24,6 +31,8 @@ public class FrameInfo {
     public long getPts(){
         return mPts;
     }
+
+    public int getOriginalFrame() {return mOriginalFrame;}
 
     public void isIFrame(boolean isIFrame) {
         mIsIframe = isIFrame;

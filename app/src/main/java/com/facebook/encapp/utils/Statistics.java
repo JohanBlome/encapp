@@ -82,8 +82,8 @@ public class Statistics {
         mLoad.stop();
     }
 
-    public void startEncodingFrame(long pts) {
-        FrameInfo frame = new FrameInfo(pts);
+    public void startEncodingFrame(long pts, int originalFrame) {
+        FrameInfo frame = new FrameInfo(pts, originalFrame);
         frame.start();
         mEncodingFrames.put(Long.valueOf(pts), frame);
         mEncodingProcessingFrames += 1;
@@ -95,6 +95,10 @@ public class Statistics {
             frame.stop();
             frame.setSize(size);
             frame.isIFrame(isIFrame);
+            mEncodingFrames.put(frame.getPts(), frame);
+            if (pts != frame.getPts()) {
+                Log.e(TAG, "Warning, pts differs: " + pts + " vs " + frame.getPts() + " for frame: " + frame.getOriginalFrame());
+            }
         }
         mEncodingProcessingFrames -= 1;
     }

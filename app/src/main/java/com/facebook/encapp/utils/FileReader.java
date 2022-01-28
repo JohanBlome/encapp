@@ -33,8 +33,10 @@ public class FileReader {
         try {
             synchronized (this) {
                 Log.e(TAG, "Close file");
-                mBis.close();
-                mBis = null;
+                if (mBis != null) {
+                    mBis.close();
+                    mBis = null;
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();

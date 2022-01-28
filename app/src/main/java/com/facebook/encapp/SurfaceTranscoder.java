@@ -254,7 +254,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         if (mRealtime) {
                             sleepUntilNextFrame();
                         }
-                        mStats.startEncodingFrame(pts);
+                        mStats.startEncodingFrame(pts, inFramesCount);
                     }
 
                 }
