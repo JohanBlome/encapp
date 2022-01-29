@@ -246,8 +246,6 @@ public class MainActivity extends AppCompatActivity {
         // A new input size is probably needed in that case
         if (mExtraData.containsKey(ParseData.REF_RESOLUTION)) {
             sp.setInputResolution(mExtraData.getString(ParseData.REF_RESOLUTION));
-            // reset output resolution
-            sp.setOutputResolution(null);
         }
 
         if (mExtraData.containsKey(ParseData.REF_FPS)) {
