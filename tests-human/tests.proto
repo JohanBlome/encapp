@@ -1,0 +1,101 @@
+syntax = "proto2";
+
+package encapp;
+
+message Common {
+  optional string id = 1;
+  optional string description = 2;
+  optional string operation = 3;
+  optional string start = 4;
+}
+
+message Input {
+  optional string filepath = 1;
+  optional string resolution = 2;
+  enum PixFmt {
+    yuv420p = 0;
+    nv12 = 1;
+  }
+  optional PixFmt pix_fmt = 3;
+  optional int32 framerate = 4;
+  optional string duration = 5;
+}
+
+message Configure {
+  message Parameter {
+    optional string key = 1;
+    optional string type = 2;
+    optional string value = 3;
+  }
+  repeated Parameter parameter = 1;
+  // known shortcuts
+  optional string codec = 2;
+  optional bool encode = 3;
+  optional bool surface = 4;
+  optional string mime = 5;
+  optional string bitrate = 6;
+  enum BitrateMode {
+    cq = 0;
+    vbr = 1;
+    cbr = 2;
+    cbr_fd = 3;
+  }
+  optional BitrateMode bitrate_mode = 7;
+  optional uint64 durationUs = 8;
+  optional string resolution = 9;
+  optional string color_format = 10;
+  optional string color_standard = 11;
+  optional string color_range = 12;
+  optional string color_transfer = 13;
+  optional string color_transfer_request = 14;
+  optional int32 frame_rate = 15;
+  optional int32 i_frame_interval = 16;
+  optional int32 intra_refresh_period = 17;
+  optional int32 latency = 18;
+  optional int64 repeat_previous_frame_after = 19;
+  optional string ts_schema = 20;
+}
+
+message Runtime {
+  message Parameter {
+    optional int64 framenum = 1;
+    optional string key = 2;
+    optional string type = 3;
+    optional string value = 4;
+  }
+  repeated Parameter parameter = 1;
+  // known shortcuts
+  message VideoBitrateParameter {
+    optional int64 framenum = 1;
+    optional string bitrate = 2;
+  }
+  repeated VideoBitrateParameter video_bitrate = 2;
+  repeated int64 drop = 3;
+  message DynamicFramerateParameter {
+    optional int64 framenum = 1;
+    optional int32 framerate = 2;
+  }
+  repeated DynamicFramerateParameter dynamic_framerate = 4;
+  repeated int64 request_sync = 5;
+}
+
+message Parallel {
+  repeated Test test = 1;
+}
+
+message Serial {
+  repeated Test test = 1;
+}
+
+message Test {
+  optional Common common = 1;
+  optional Input input = 2;
+  optional Configure configure = 3;
+  optional Runtime runtime = 4;
+  optional Parallel parallel = 5;
+  optional Serial serial = 6;
+}
+
+message Tests {
+  optional Test test = 1;
+}

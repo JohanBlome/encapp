@@ -1,0 +1,29 @@
+test {
+    common {
+        id: "tl2"
+        description: "Temporal Layering (TL2) Bitrate Control Test"
+    }
+    input {
+        filepath: "foo.yuv"
+        resolution: "176x144"
+        pix_fmt: nv12
+        framerate: 30
+    }
+    configure {
+        codec: "avc"
+        bitrate: "250 kbps"
+        bitrate_mode: cbr
+        i_frame_interval: 30
+        parameter {
+            key: "ts-schema"
+            value: "android.generic.2"
+        }
+    }
+    runtime {
+        parameter {
+            framenum: 450
+            key: "video-bitrate"
+            value: "500 kbps"
+        }
+    }
+}
