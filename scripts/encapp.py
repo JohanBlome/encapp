@@ -180,7 +180,8 @@ def install_app(serial):
 
 def run_test(workdir, json_path, json_name,
              result_json, serial, options):
-    run_cmd_silent(f'adb -s {serial} push {json_name} /sdcard/')
+    print(f'Run test: s{json_path}, {json_name}')
+    run_cmd(f'adb -s {serial} push {json_path}/{json_name} /sdcard/')
 
     additional = ''
     if options.codec is not None and len(options.codec) > 0:
@@ -253,6 +254,9 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
 
     json_folder = os.path.dirname(json_path)
+    if len(json_folder) == 0:
+        json_folder = '.'
+
     inputfile = ''
     tests = test_def.get('tests')
     print(f'tests {tests}')
@@ -275,25 +279,30 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             input_files = test.get(KEY_NAME_INPUT_FILES)
             if input_files is not None:
                 for file in input_files:
-                    if len(json_folder) > 0 and not os.path.isabs(file):
+                    if file[0] != "/":
                         path = f'{json_folder}/{file}'
                     else:
                         path = f'{file}'
-                    all_input_files.append(f'/sdcard/{os.path.basename(path)}')
-                    if exists(path):
-                        run_cmd(f'adb -s {serial} push {path} /sdcard/')
-                    else:
-                        print(f'Media file is missing: {path}')
-                        exit(0)
+                    inputfile = f'/sdcard/{os.path.basename(path)}'
+                    ret, stdout, stderr = run_cmd_silent(
+                        f'adb -s {serial} shell ls {inputfile}')
+                    if len(stderr) > 0:
+                        all_input_files.append(path)
+                        if exists(path):
+                            run_cmd(f'adb -s {serial} push {path} /sdcard/')
+                        else:
+                            print(f'Media file is missing: {path}')
+                            exit(0)
 
     # run test(s)
     if not options.no_split:
+        print(f'No split: {tests}')
         for test in tests:
             json_name = f'{filename}_{counter}.json'
             counter += 1
             with open(json_name, "w") as outfile:
                 json.dump(test, outfile)
-            run_test(workdir, json_path, json_name,
+            run_test(workdir, './', json_name,
                      result_json, serial, options)
             os.remove(json_name)
     else:
