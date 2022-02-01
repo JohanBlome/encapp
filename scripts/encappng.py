@@ -301,13 +301,12 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     # run test(s)
     if not options.no_split:
         for test in tests:
-            json_name = f'{filename}_{counter}.json'
+            json_filename = f'{filename}_{counter}.json'
             counter += 1
-            with open(json_name, "w") as outfile:
-                json.dump(test, outfile)
-            run_test(workdir, json_path, json_name, input_files,
+            write_json_file(test, json_filename, options.debug)
+            run_test(workdir, json_path, json_filename, input_files,
                      result_json, serial, options)
-            os.remove(json_name)
+            os.remove(json_filename)
     else:
         run_test(workdir, json_folder, filename, input_files,
                  result_json, serial, options)
