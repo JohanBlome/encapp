@@ -40,7 +40,6 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         mWriteFile = writeFile;
         mStats = new Statistics("surface encoder", vc);
-        mStats.start();
         int loop = vc.getLoopCount();
 
         mExtractor = new MediaExtractor();
@@ -167,17 +166,22 @@ public class SurfaceTranscoder extends BufferEncoder {
         long pts_offset = 0;
         long last_pts = 0;
         int current_loop = 1;
-        while (loop + 1 >= current_loop) {
+        boolean done = false;
+        mStats.start();
+        while (!done) {
             int index;
             if ((mFramesAdded % 100 == 0 && !noEncoding ) || (inFramesCount % 100 == 0 && noEncoding )) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
+                Log.d(TAG, "SurfaceTranscoder, Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
                         ", current loop: " + current_loop + " / "+loop + ", current time: " + currentTime + " sec");
             }
             try {
                 int flags = 0;
-
+                if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                    flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                    done = true;
+                }
                 index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-                if (index >= 0) {
+                if (index >= 0 && !done) {
                     if (VP8_IS_BROKEN && isVP && isQCom && inFramesCount > 0 &&
                             keyFrameInterval > 0 && inFramesCount % (mFrameRate * keyFrameInterval) == 0) {
                         Bundle params = new Bundle();
@@ -185,34 +189,37 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mCodec.setParameters(params);
                     }
 
-                    ByteBuffer buffer = mDecoder.getInputBuffer(index);
-                    int size = mExtractor.readSampleData(buffer, 0);
-                    flags = mExtractor.getSampleFlags();
-                    if (size > 0) {
-                        if (vc.getDurationSec() > 0 && currentTime > vc.getDurationSec()) {
-                            break;
+                    int size = -1;
+                    while (size < 0) {
+                        ByteBuffer buffer = mDecoder.getInputBuffer(index);
+                        size = mExtractor.readSampleData(buffer, 0);
+                        flags = mExtractor.getSampleFlags();
+
+                        if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0 ) {
+                            Log.d(TAG, "Decoder eos!!!");
+                            done = true;
+                        }
+
+                        if (done) {
+                            flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         }
                         setRuntimeParameters(inFramesCount, mDecoder, mDecoderRuntimeParams);
-                        mStats.startDecodingFrame(mExtractor.getSampleTime() + pts_offset, mExtractor.getSampleSize(), flags);
-                        mDecoder.queueInputBuffer(index, 0, size, mExtractor.getSampleTime(), flags);
-                    }
+                        long pts = mExtractor.getSampleTime()  + pts_offset;
+                        last_pts = pts;
 
-                    boolean eof = !mExtractor.advance();
-                    if (eof) {
-                        mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-                        current_loop++;
+                        mStats.startDecodingFrame(pts, mExtractor.getSampleSize(), flags);
+                        mDecoder.queueInputBuffer(index, 0, size, pts, flags);
 
-                        if (current_loop > loop) {
-                            Log.d(TAG, "End of stream!");
-                            try {
-                                mStats.startDecodingFrame(mExtractor.getSampleTime(), mExtractor.getSampleSize(), mExtractor.getSampleFlags());
-                                mDecoder.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                            } catch (MediaCodec.CodecException cex) {
-                                Log.d(TAG, "End of stream: " + cex.getMessage());
-                            }
-                            break;
+                        boolean eof = !mExtractor.advance();
+                        if (eof) {
+                            mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                            current_loop++;
+                            pts_offset = last_pts + mFrameTime;
+                            Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
                         }
-                        Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
+                        if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                            done = true;
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -222,10 +229,11 @@ public class SurfaceTranscoder extends BufferEncoder {
             index = mDecoder.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 //Just ignore
+                Log.d(TAG, "Try again later");
                 continue;
             } else if (index >= 0) {
                 if (info.size > 0) {
-                    long pts = info.presentationTimeUs + pts_offset;
+                    long pts = info.presentationTimeUs;
                     mStats.stopDecodingFrame(pts);
                     setRuntimeParameters(inFramesCount, mCodec, mRuntimeParams);
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
@@ -240,13 +248,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mOutputSurface.awaitNewImage();
                         mOutputSurface.drawImage();
 
-                        if (pts > last_pts) {
-                            last_pts = pts;
-                        } else {
-                            // Loop
-                            pts_offset += last_pts;
-                            pts = last_pts + pts;
-                        }
                         //egl have time in ns
                         currentTime = pts/1000000.0;
                         mInputSurface.setPresentationTime(pts * 1000);
@@ -255,15 +256,16 @@ public class SurfaceTranscoder extends BufferEncoder {
                             sleepUntilNextFrame();
                         }
                         mStats.startEncodingFrame(pts, inFramesCount);
+                        inFramesCount++;
                     }
 
                 }
 
-                if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0 || done) {
                     ///Done
+                    Log.d(TAG, "Signal eos");
                     mCodec.signalEndOfInputStream();
                 }
-                inFramesCount++;
             }
 
             if (!noEncoding) {
@@ -286,12 +288,17 @@ public class SurfaceTranscoder extends BufferEncoder {
                         }
                         mCodec.releaseOutputBuffer(index, false /* render */);
                     } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        Log.d(TAG, "End of stream");
+                        done = true;
                         break;
                     } else {
                         mFramesAdded += 1;
-                        if (mMuxer != null)
+
+                        if (mMuxer != null) {
                             mMuxer.writeSampleData(mVideoTrack, data, info);
+                        }
                         mCodec.releaseOutputBuffer(index, false /* render */);
+
                     }
                 }
             }

@@ -63,7 +63,6 @@ class SurfaceEncoder extends Encoder {
         mRealtime = vc.isRealtime();
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
-        mStats.start();
         mYuvReader = new FileReader();
         RenderScript rs = RenderScript.create(mContext);
         yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
@@ -152,20 +151,24 @@ class SurfaceEncoder extends Encoder {
             mMuxer.start();
         }
         double currentTime = 0;
-        long numBytesSubmitted = 0;
-        long numBytesDequeued = 0;
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
-        long time = (System.nanoTime() + 500) / 1000;
-        while (loop + 1 >= current_loop) {
+        boolean done = false;
+        mStats.start();
+        while (!done) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
+                Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
                         ", current loop: " + current_loop + " / "+loop + ", current time: " + currentTime + " sec");
             }
             try {
                 int flags = 0;
-                if (vc.getDurationSec() > 0 && currentTime >= vc.getDurationSec()) {
+                if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                    flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                    done = true;
+                }
+                if (vc.getDurationSec() > 0 && currentTime >= vc.getDurationSec() |
+                        vc.getDurationFrames() > 0 && inFramesCount > vc.getDurationFrames()) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                 }
                 if (VP8_IS_BROKEN && isVP && isQCom && inFramesCount > 0 &&
@@ -176,7 +179,7 @@ class SurfaceEncoder extends Encoder {
                 }
                 int size = -1;
 
-                while (size < 0) {
+                while (size < 0 && !done) {
                     try {
                         size = queueInputBufferEncoder(
                                 mCodec,
@@ -192,15 +195,21 @@ class SurfaceEncoder extends Encoder {
                         continue;
                     } else if (size <= 0) {
                         mYuvReader.closeFile();
-
                         current_loop++;
-                        //????
-                        Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                        mYuvReader.openFile(vc.getInputfile());
-                        Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                        Log.d(TAG, "Check loop: " + current_loop + " vs " +vc.getLoopCount());
+                        Log.d(TAG, "Check time: " + currentTime + " vs " +vc.getDurationSec());
+                        Log.d(TAG, "Check frames: " + inFramesCount + " vs " +vc.getDurationFrames());
+                        if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                            done = true;
+                        }
+
+                        if (!done) {
+                            Log.d(TAG, " *********** OPEN FILE AGAIN *******");
+                            mYuvReader.openFile(vc.getInputfile());
+                            Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                        }
                     }
                 }
-                numBytesSubmitted += size;
 
 
             } catch (Exception ex) {
@@ -225,7 +234,6 @@ class SurfaceEncoder extends Encoder {
                 } else {
                     mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
                                     (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                    numBytesDequeued += info.size;
                     ++outFramesCount;
 
                     if (mMuxer != null && mVideoTrack != -1) {
@@ -301,8 +309,12 @@ class SurfaceEncoder extends Encoder {
             mBitmapRender.drawFrame(mBitmap);
             mInputSurface.setPresentationTime(ptsUsec * 1000);
             mInputSurface.swapBuffers();
+            if (mRealtime) {
+                sleepUntilNextFrame();
+            }
             mStats.startEncodingFrame(ptsUsec, frameCount);
         } else {
+            Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             read = -1;
         }
 

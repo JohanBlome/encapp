@@ -33,7 +33,6 @@ class BufferEncoder extends Encoder {
         mRealtime = vc.isRealtime();
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
-        mStats.start();
         mYuvReader = new FileReader();
 
         vc.addEncoderConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
@@ -101,10 +100,10 @@ class BufferEncoder extends Encoder {
             mMuxer.start();
         }
         double currentTime = 0;
-        long numBytesSubmitted = 0;
-        long numBytesDequeued = 0;
         int current_loop = 1;
-        while (loop + 1 >= current_loop) {
+        boolean done = false;
+        mStats.start();
+        while (!done) {
             int index;
             if (mFramesAdded % 100 == 0) {
                 Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
@@ -113,8 +112,10 @@ class BufferEncoder extends Encoder {
             try {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
-                if (vc.getDurationSec() > 0 && currentTime >= vc.getDurationSec()) {
+
+                if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                    done = true;
                 }
                 if (index >= 0) {
                     int size = -1;
@@ -126,7 +127,7 @@ class BufferEncoder extends Encoder {
                     }
 
                     ByteBuffer buffer = mCodec.getInputBuffer(index);
-                    while (size < 0) {
+                    while (size < 0 && !done) {
                         try {
                             size = queueInputBufferEncoder(
                                     mCodec,
@@ -144,31 +145,18 @@ class BufferEncoder extends Encoder {
                             continue;
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
-
                             current_loop++;
-                            if (current_loop > loop) {
-                                try {
-                                    size = queueInputBufferEncoder(
-                                            mCodec,
-                                            buffer,
-                                            index,
-                                            inFramesCount,
-                                            flags,
-                                            0);
-                                    Log.d(TAG, "End of stream");
-                                    inFramesCount++;
-                                } catch (IllegalStateException isx) {
-                                    Log.e(TAG, "Queue encoder failed, " + index + ", mess: " + isx.getMessage());
-                                }
-                                break;
+                            if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                                done = true;
                             }
-                            Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                            mYuvReader.openFile(vc.getInputfile());
-                            Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+
+                            if (!done) {
+                                Log.d(TAG, " *********** OPEN FILE AGAIN *******");
+                                mYuvReader.openFile(vc.getInputfile());
+                                Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                            }
                         }
                     }
-                    numBytesSubmitted += size;
-                    // if (size == 0) break;
                 } else {
                     Log.w(TAG, "dequeueInputBuffer, no index, " + index);
                 }
@@ -194,7 +182,6 @@ class BufferEncoder extends Encoder {
                 } else {
                     mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
                                     (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                    numBytesDequeued += info.size;
                     ++outFramesCount;
                     if (mMuxer != null && mVideoTrack != -1) {
                         ByteBuffer data = mCodec.getOutputBuffer(index);

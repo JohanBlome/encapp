@@ -6,6 +6,8 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import numpy as np
 
+# pd.options.mode.chained_assignment = 'raise'
+
 # "id": "encapp_3d989dae-2218-43a8-a96c-c4856f362c4b",
 # "description": "surface encoder",
 # "date": "Mon Jul 20 15:18:35 PDT 2020",
@@ -119,20 +121,12 @@ def plot_bitrate(data, variant, description, options):
 def plot_processingtime(data, variant, description, options):
     print('Plot processing time, latency and average per frame processing')
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
-    sb.lineplot(x=data['pts']/1000000,
-                y=data['proctime']/1000000,
-                ci='sd', data=data,
-                hue=variant,
-                ax=axs)
-
     p = sb.lineplot(x=data['pts']/1000000,
-                    y=data['meanproctime']/1000000,
-                    ci=None,
-                    data=data,
-                    legend=False,
+                    y=data['proctime']/1000000,
+                    ci='sd', data=data,
                     hue=variant,
-                    ax=axs,
-                    label='mean proc time (ms)')
+                    ax=axs)
+
     axs.set_title('Proc time in ms')
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
 
@@ -256,12 +250,9 @@ def parse_encoding_data(json, inputfile):
         data['source'] = inputfile
         data['codec'] = json['settings']['codec']
         data['description'] = json['description']
+        data['test'] = json['test']
         data['bitrate'] = json['settings']['bitrate']
         data['height'] = json['settings']['height']
-        proctime = json['proctime']
-        framecount = json['framecount']
-        mean = proctime/framecount
-        data['meanproctime'] = mean
         data['duration_ms'] = round((data['pts'].shift(-1, axis='index',
                                      fill_value=0) - data['pts']) / 1000, 2)
         data['fps'] = round(1000.0/(data['duration_ms']), 2)
@@ -290,9 +281,6 @@ def parse_decoding_data(json, inputfile):
                 decoded_data['height'] = 'unknown height'
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
-            framecount = len(decoded_data)
-            mean = sum(decoded_data['proctime']/framecount)
-            decoded_data['meanproctime'] = mean
             decoded_data.fillna(0)
     except Exception as ex:
         print(f'Filed to parse decode data for {inputfile}: {ex}')
@@ -326,7 +314,7 @@ def parse_gpu_data(json, inputfile):
 
 def calc_infligh(frames, time_ref):
     sources = pd.unique(frames['source'])
-    tmp = []
+    coding = []
     for source in sources:
         # Calculate how many frames starts encoding before a frame has finished
         # relying on the accurace of the System.nanoTime()
@@ -336,18 +324,18 @@ def calc_infligh(frames, time_ref):
         stop = np.max(filtered['stoptime'])
         # Calculate a time where the start offset (if existing) does not
         # blur the numbers
-        tmp.append([source, start - time_ref, stop - time_ref])
+        coding.append([source, start - time_ref, stop - time_ref])
         for row in filtered.iterrows():
             start = row[1]['starttime']
             stop = row[1]['stoptime']
-            intime = (filtered.loc[(filtered['starttime'] > start) &
+            intime = (filtered.loc[(filtered['stoptime'] > start) &
                                    (filtered['starttime'] < stop)])
             count = len(intime)
             inflight.append(count)
         frames.loc[frames['source'] == source, 'inflight'] = inflight
 
     labels = ['source', 'starttime', 'stoptime']
-    concurrent = pd.DataFrame.from_records(tmp, columns=labels,
+    concurrent = pd.DataFrame.from_records(coding, columns=labels,
                                            coerce_float=True)
 
     # calculate how many new encoding are started before stoptime
@@ -355,8 +343,8 @@ def calc_infligh(frames, time_ref):
     for row in concurrent.iterrows():
         start = row[1]['starttime']
         stop = row[1]['stoptime']
-        count = (len(concurrent.loc[(concurrent['starttime'] > start) &
-                                    (concurrent['starttime'] < stop)]) + 1)
+        count = (len(concurrent.loc[(concurrent['stoptime'] > start) &
+                                    (concurrent['starttime'] < stop)]))
         inflight.append(count)
     concurrent['conc'] = inflight
     return frames, concurrent
@@ -366,13 +354,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('files', nargs='+', help='file to analyze')
     parser.add_argument('--label', default='')
-    parser.add_argument('-c', '--concurrency', action='store_true')
-    parser.add_argument('-pt', '--proctime', action='store_true')
+    parser.add_argument('-c', '--concurrency', action='store_true',
+                        help='plot encodings overlapping in time')
+    parser.add_argument('-pt', '--proctime', action='store_true',
+                        help='plot processing time per frame for a codec')
     parser.add_argument('-br', '--bitrate', action='store_true')
     parser.add_argument('-fs', '--framesize', action='store_true')
-    parser.add_argument('-if', '--inflight', action='store_true')
-    parser.add_argument('-dd', '--decode_data', action='store_true')
-    parser.add_argument('-gd', '--gpu_data', action='store_true')
+    parser.add_argument('-if', '--inflight', action='store_true',
+                        help='plot number of frames in the codec '
+                             'simultanously')
+    parser.add_argument('-dd', '--decode_data', action='store_true',
+                        help='plot data for decoder')
+    parser.add_argument('-gd', '--gpu_data', action='store_true',
+                        help='plot performance data for the gpu')
     options = parser.parse_args()
 
     return options
@@ -390,7 +384,6 @@ def main():
     accum_dec_data = None
     accum_gpu_data = None
     pts_mult = 1000000
-    msec_to_nano = 1000000
 
     for inputfile in options.files:
         if options.files == 1 and len(options.label) == 0:
@@ -402,40 +395,49 @@ def main():
             alldata = json.load(json_file)
 
             video_length = 0
-            mean_ms = 0
             first_frame = 0
             last_frame = 0
             encoding_data = parse_encoding_data(alldata, inputfile)
+            first_frame_start = -1
+            last_frame_end = -1
             if not isinstance(encoding_data, type(None)):
                 # pts is in microsec
                 first_frame = np.min(encoding_data['pts'])
                 # approx.
                 last_frame = np.max(encoding_data['pts'])
+                first_frame_start = np.min(encoding_data['starttime'])
+                last_frame_end = np.max(encoding_data['stoptime'])
                 video_length = (last_frame - first_frame)/pts_mult
-                mean_ms = encoding_data['meanproctime'][0]/msec_to_nano
 
             decoded_data = parse_decoding_data(alldata, inputfile)
             print(f'{type(decoded_data)}')
             gpu_data = parse_gpu_data(alldata, inputfile)
 
-            proctime_sec = round(alldata['proctime']/1000000000.0, 2)
+            proctime_sec = round((last_frame_end-first_frame_start) /
+                                 1000000000.0, 2)
             framecount = alldata['framecount']
 
-            print(f'proctime {proctime_sec} sec, count {framecount}')
             print('__')
-            print('file = {:s}'.format(alldata['encodedfile']))
-            print(f'framecount = {framecount}')
-            print('video length = {:.2f} sec, start, stop = {:.2f}/{:.2f}'.
-                  format(video_length, first_frame, last_frame))
-            print(f'total time = {proctime_sec} sec')
-            print('codec = {:s}'.format(alldata['settings']['codec']))
-            print('bitrate = {:d}'.format(alldata['settings']['bitrate']))
-            print('height = {:d}'.format(alldata['settings']['height']))
-            print('mean processing time = {:.2f} ms'.format(mean_ms))
+            print('Media = {:s}'.format(alldata['encodedfile']))
+            print('Test run = {:s}'.format(alldata['test']))
+            print('Description = {:s}'.format(alldata['description']))
+            print('Video length = {:.2f}'.format(video_length))
+            print(f'Framecount = {framecount}')
+            print(f'Proctime {proctime_sec} sec')
+            print(f'Total time = {proctime_sec} sec')
+            print('Codec = {:s}'.format(alldata['settings']['codec']))
+            print('Nitrate = {:d}'.format(alldata['settings']['bitrate']))
+            print('Height = {:d}'.format(alldata['settings']['height']))
+            # Mean processing incuded file reading and format changes etc.
+            print('Mean processing time = {:.2f} ms'.
+                  format(1000 * proctime_sec/framecount))
             if not isinstance(encoding_data, type(None)):
-                print('mean frame latency = {:.2f} ms'.format(np.mean(
-                      encoding_data.loc[encoding_data['proctime'] > 0,
-                                        'proctime'])/1000000))
+                # Latency is the time it takes for the
+                # frame to pass the encoder
+                mean_latency = np.mean(encoding_data.
+                                       loc[encoding_data['proctime'] > 0,
+                                           'proctime'])/1000000
+                print('Mean frame latency = {:.2f} ms'.format(mean_latency))
             print('Encoding speed = {:.2f} times'.format(
                 (video_length/proctime_sec)))
             print('__')
@@ -454,6 +456,8 @@ def main():
             accum_gpu_data = gpu_data
         elif not isinstance(gpu_data, type(None)):
             accum_gpu_data = accum_gpu_data.append(gpu_data)
+    concurrency = None
+    frames = None
     if not isinstance(encoding_data, type(None)):
         frames = accum_data.loc[accum_data['size'] > 0]
         sb.set(style='whitegrid', color_codes=True)
@@ -470,18 +474,18 @@ def main():
             len(concurrency) > 1):
         plot_concurrency(concurrency, 'conc', options)
 
-    if options.framesize:
-        plot_framesize(frames, 'codec', 'encoder', options)
+    if frames is not None:
+        if options.framesize:
+            plot_framesize(frames, 'test', 'encoder', options)
 
-    if options.bitrate:
-        plot_bitrate(frames, 'codec', 'encoder', options)
+        if options.bitrate:
+            plot_bitrate(frames, 'test', 'encoder', options)
 
-    if options.proctime:
-        plot_processingtime(frames, 'codec', 'encoder', options)
+        if options.proctime:
+            plot_processingtime(frames, 'test', 'encoder', options)
 
     if (options.decode_data and not isinstance(accum_dec_data, type(None)) and
             len(accum_dec_data) > 0):
-        print('plot decode data')
         first = np.min(accum_dec_data['starttime'])
         accum_dec_data, concurrency = calc_infligh(accum_dec_data, first)
         plot_inflight_data(accum_dec_data, 'codec', 'decoding pipeline',

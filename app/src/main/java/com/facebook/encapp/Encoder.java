@@ -290,4 +290,23 @@ public abstract class Encoder {
             }
         }
     }
+
+    boolean doneReading(TestParams vc, int loop, double time, int frame) {
+        boolean done = false;
+        if (vc.getDurationFrames() > 0) {
+            if ( frame >= vc.getDurationFrames() ) {
+                done = true;
+            }
+        } else if (vc.getDurationSec() > 0) {
+            if ( time >= vc.getDurationSec() ) {
+                done = true;
+            }
+        } else if (loop > vc.getLoopCount() ) {
+            if (vc.getLoopCount() <= 1) {
+                done = true;
+            }
+        }
+
+        return done;
+    }
 }
