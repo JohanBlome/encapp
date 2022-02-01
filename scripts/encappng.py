@@ -17,6 +17,9 @@ from datetime import datetime
 from os.path import exists
 
 
+__version__ = '0.1'
+
+
 ACTIVITY = 'com.facebook.encapp/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
@@ -331,6 +334,10 @@ def encode_test(options, model, serial):
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+            '-v', '--version', action='store_true',
+            dest='version', default=False,
+            help='Print version',)
+    parser.add_argument(
             '-d', '--debug', action='count',
             dest='debug', default=default_values['debug'],
             help='Increase verbosity (use multiple times for more)',)
@@ -367,6 +374,8 @@ def get_options(argv):
             help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
+    if options.version:
+        return options
 
     # implement help
     if options.func == 'help':
@@ -382,6 +391,9 @@ def get_options(argv):
 
 def main(argv):
     options = get_options(argv)
+    if options.version:
+        print('version: %s' % __version__)
+        sys.exit(0)
 
     # get serial number
     model, serial = get_device_info(options.serial, options.debug)
