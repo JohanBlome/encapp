@@ -549,28 +549,22 @@ def convert_test(infile, outfile, debug):
 
 
 def encode_test(options, model, serial):
+    # convert the human-friendly input into a valid apk input
+    test_config = read_json_file(options.infile, options.debug)
+
     # get date and time and format it
     now = datetime.now()
     dt_string = now.strftime('%Y-%m-%d_%H_%M')
 
-    # get working directory directory
+    # get working directory at the host
     if options.output is not None:
         workdir = options.output
     else:
         workdir = f'{options.desc.replace(" ", "_")}_{model}_{dt_string}'
     os.system('mkdir -p ' + workdir)
 
-    # read input file
-    with open(options.infile, 'r') as fp:
-        if options.debug > 0:
-            print(f"infile: {options.infile} install: {options.install}")
-        input_config = json.load(fp)
-
-    # convert the human-friendly input into a valid apk input
-    test_config = convert_config(input_config, options)
-
     # run the encode test
-    run_encode_tests(input_config,
+    run_encode_tests(test_config,
                      options.infile,
                      model,
                      serial,
