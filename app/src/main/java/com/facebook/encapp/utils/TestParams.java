@@ -47,6 +47,7 @@ public class TestParams {
     private String mDynamic = "";
     private int mLoopCount = 0;
     private int mDurationSec = -1;
+    private int mDurationFrames = -1;
     private String mDescription = "";
     private ArrayList<ConfigureParam> mEncoderConfigure = new ArrayList<>();
     private ArrayList<ConfigureParam> mDecoderConfigure = new ArrayList<>();
@@ -501,8 +502,11 @@ public class TestParams {
 
     public int getDurationSec() {return mDurationSec;}
 
-    public void setDurationSec(int duration) {
-        mDurationSec = duration;};
+    public void setDurationSec(int duration) {mDurationSec = duration;};
+
+    public int getDurationFrames() {return mDurationFrames;}
+
+    public void setDurationFrames(int frames) {mDurationFrames = frames;}
 
     public boolean doSurfaceEncoding() {return mUseSurfaceencoding;}
 

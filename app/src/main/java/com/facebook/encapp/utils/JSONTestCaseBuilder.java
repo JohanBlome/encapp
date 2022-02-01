@@ -29,6 +29,7 @@ public class JSONTestCaseBuilder {
     public static String INPUT_FORMAT = "input_format"; // raw or mp4
     public static String INPUT_FPS = "input_fps";
     public static String DURATION_SEC = "duration";
+    public static String DURATION_FRAMES = "frames";
     public static String LOOP = "loop";
     public static String CONCURRENT = "conc";
     public static String USE_SURFACE_ENC = "use_surface_enc";
@@ -119,7 +120,8 @@ public class JSONTestCaseBuilder {
         String input_format = "";
         String input_resolution = "1280x720";
         String duration_sec = "-1";
-        String enc_loop = "0";
+        String duration_frames = "-1";
+        String enc_loop = "1";
         String conc = "0";
         String use_surface_enc = "false";
         String input_fps = "30";
@@ -149,6 +151,8 @@ public class JSONTestCaseBuilder {
                 input_resolution = test.getString(case_key);
             } else if (case_key.equals(DURATION_SEC)) {
                 duration_sec = test.getString(case_key);
+            } else if (case_key.equals(DURATION_FRAMES)) {
+                duration_frames = test.getString(case_key);
             } else if (case_key.equals(LOOP)) {
                 enc_loop = test.getString(case_key);
             } else if (case_key.equals(CONCURRENT)) {
@@ -312,11 +316,8 @@ public class JSONTestCaseBuilder {
                         for (int fC = 0; fC < fps.length; fC++) {
                             for (int bC = 0; bC < bitrates.length; bC++) {
                                 for (int kC = 0; kC < i_intervals.length; kC++) {
-                                    Log.d(TAG, "Build params");
                                     TestParams testParams = new TestParams();
-                                    Log.d(TAG, "Set enc size: "+encode_resolutions[vC]);
                                     Size videoSize = SizeUtils.parseXString(encode_resolutions[vC]);
-                                    Log.d(TAG, "Set size" + videoSize);
                                     testParams.setVideoSize(videoSize);
                                     if (bitrates[bC].endsWith("k")) {
                                         testParams.setBitRate(Math.round(Float.parseFloat(
@@ -339,7 +340,6 @@ public class JSONTestCaseBuilder {
                                     testParams.setDecoderRuntimeParameters(encoder_runtime_parameters);
                                     testParams.setEncoderConfigure(config_encoder);
                                     testParams.setDecoderConfigure(config_decoder);
-                                    Log.d(TAG, "Set ref size");
                                     testParams.setReferenceSize(SizeUtils.parseXString(input_resolution));
                                     testParams.setLoopCount(Integer.parseInt(enc_loop));
                                     testParams.setConcurrentCodings(Integer.parseInt(conc));
@@ -349,8 +349,9 @@ public class JSONTestCaseBuilder {
                                     if (!Boolean.parseBoolean(encode)) testParams.setNoEncoding(true);
                                     testParams.setDecoder(decoder);
                                     testParams.setDurationSec(Integer.parseInt(duration_sec));
+                                    testParams.setDurationFrames(Integer.parseInt(duration_frames));
                                     testParams.setUseSurfaceEncoding(Boolean.parseBoolean(use_surface_enc));
-                                    Log.d(TAG, "Add case");
+                                    Log.d(TAG, "Add case: " + testParams.getDescription());
                                     vc.add(testParams);
                                 }
                             }
