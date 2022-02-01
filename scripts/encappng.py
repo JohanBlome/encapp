@@ -7,6 +7,7 @@ and save encoded video and rate distortion results in the directory
 
 import os
 import subprocess
+import humanfriendly
 import json
 import sys
 import argparse
@@ -34,6 +35,7 @@ FUNC_CHOICES = {
     'help': 'show help options',
     'install': 'install apks',
     'list': 'list codecs and devices supported',
+    'convert': 'convert a human-friendly config into a java config',
     'encode': 'run test case(s)',
 }
 
@@ -43,6 +45,46 @@ default_values = {
     'install': False,
     'infile': None,
     'output': None,
+}
+
+
+OPERATION_TYPES = ('batch', 'realtime')
+PIX_FMT_TYPES = ('yuv420p', 'nv12')
+KNOWN_CONFIGURE_TYPES = {
+    'codec': str,
+    'encode': bool,
+    'surface': bool,
+    'mime': str,
+    'bitrate': int,
+    'bitrate-mode': int,
+    'durationUs': int,
+    'resolution': str,
+    'width': int,
+    'height': int,
+    'color-format': int,
+    'color-standard': int,
+    'color-range': int,
+    'color-transfer': int,
+    'color-transfer-request': int,
+    'frame-rate': int,
+    'i-frame-interval': int,
+    'intra-refresh-period': int,
+    'latency': int,
+    'repeat-previous-frame-after': int,
+    'ts-schema': str,
+}
+KNOWN_RUNTIME_TYPES = {
+    'video-bitrate': int,
+    'request-sync': None,
+}
+TYPE_LIST = (
+    'int', 'float', 'str', 'bool', 'null',
+)
+BITRATE_MODE_VALUES = {
+    'cq': 0,
+    'vbr': 1,
+    'cbr': 2,
+    'cbr_fd': 3,
 }
 
 
@@ -295,9 +337,216 @@ def list_codecs(serial, model):
         print(f'File is available in current dir as {filename}')
 
 
-def convert_config(input_config, options):
-    test_config = ''
+def read_json_file(infile, debug):
+    # read input file
+    with open(infile, 'r') as fp:
+        if debug > 0:
+            print(f'infile: {infile}')
+        input_config = json.load(fp)
+    return input_config
+
+
+def write_json_file(config, outfile, debug):
+    # read input file
+    if outfile is None or outfile == '-':
+        outfile = '/dev/fd/1'
+    with open(outfile, 'w') as fp:
+        if debug > 0:
+            print(f'outfile: {outfile}')
+        fp.write(json.dumps(config, indent=4))
+    return
+
+
+def is_int(s):
+    if isinstance(s, int):
+        return True
+    return (s[1:].isdigit() if s[0] in ('-', '+') else s.isdigit())
+
+
+# convert a value (in either time or frame units) into frame units
+def convert_to_frames(value, fps=30):
+    if is_int(value):
+        # value is already fps
+        return int(value)
+    # check if it can be parsed as a duration (time)
+    try:
+        sec = humanfriendly.parse_timespan(value)
+    except humanfriendly.InvalidTimespan:
+        print('error: invalid frame value "%s"' % value)
+        sys.exit(-1)
+    return int(sec * fps)
+
+
+def convert_bitrate(value):
+    try:
+        bitrate = humanfriendly.parse_size(value)
+    except humanfriendly.InvalidSize:
+        print('error: invalid bitrate size "%s"' % value)
+        sys.exit(-1)
+    return bitrate
+
+
+def convert_resolution(resolution):
+    assert 'x' in resolution, 'invalid resolution value: "%s"' % resolution
+    width, height = [int(item) for item in resolution.split('x')]
+    return width, height
+
+
+def check_test_config(test_config, root=True):
+    # check common parameters
+    assert 'common' in test_config, 'need a "common" key'
+    assert isinstance(test_config['common'], dict)
+    if root:
+        assert 'id' in test_config['common'], 'need an "id" key in "common"'
+        assert ' ' not in test_config['common']['id']
+        assert 'description' in test_config['common'], (
+            'need an "description" key in "common"')
+    if 'operation' in test_config['common']:
+        assert test_config['common']['operation'] in OPERATION_TYPES
+    if 'start' in test_config['common']:
+        test_config['common']['start'] = convert_to_frames(
+            test_config['common']['start'])
+
+    # check input parameters
+    assert 'input' in test_config, 'need a "input" key'
+    assert isinstance(test_config['input'], dict)
+    assert 'filepath' in test_config['input'], (
+            'need an "filepath" key in "input"')
+    if 'resolution' in test_config['input']:
+        width, height = convert_resolution(test_config['input']['resolution'])
+        test_config['input']['width'] = width
+        test_config['input']['height'] = height
+        del test_config['input']['resolution']
+    if 'width' in test_config['input']:
+        test_config['input']['width'] = int(test_config['input']['width'])
+    if 'height' in test_config['input']:
+        test_config['input']['height'] = int(test_config['input']['height'])
+    if 'pix-fmt' in test_config['input']:
+        assert test_config['input']['pix-fmt'] in PIX_FMT_TYPES
+    if 'framerate' in test_config['input']:
+        test_config['input']['framerate'] = int(
+            test_config['input']['framerate'])
+    if 'duration' in test_config['input']:
+        test_config['input']['duration'] = convert_to_frames(
+            test_config['input']['duration'])
+    if 'drops' in test_config['input']:
+        assert isinstance(test_config['input']['drops'], list), (
+            'drops must be a list of integers')
+        assert all(isinstance(item, int) for item in
+                   test_config['input']['drops']), (
+                   'drops must be a list of integers')
+    if 'dynamic-framerate' in test_config['input']:
+        msg = 'dynamic-framerate must be 2 lists of integers'
+        assert isinstance(test_config['input']['dynamic-framerate'], list), msg
+        assert len(test_config['input']['dynamic-framerate']) == 2, msg
+        assert isinstance(test_config['input']['dynamic-framerate'][0],
+                          list), msg
+        assert isinstance(test_config['input']['dynamic-framerate'][1],
+                          list), msg
+        assert all(isinstance(item, int) for item in
+                   test_config['input']['dynamic-framerate'][0]), msg
+        assert all(isinstance(item, int) for item in
+                   test_config['input']['dynamic-framerate'][1]), msg
+
+    # check configure parameters
+    assert 'configure' in test_config, 'need a "configure" key'
+    assert isinstance(test_config['configure'], dict)
+    assert 'codec' in test_config['configure'], (
+        'need a "codec" key in "configure"')
+    new_test_config_configure = {}
+    for key, v in test_config['configure'].items():
+        if isinstance(v, list):
+            # explicit entry (list(type, value))
+            msg = 'explicit entry syntax: list(type, value)'
+            assert len(v) == 2, msg
+            _type, value = v
+            assert _type in TYPE_LIST, msg
+        else:
+            # implicit entry (value)
+            _type = 'null'
+            value = v
+        # check if well-known type
+        if key in KNOWN_CONFIGURE_TYPES:
+            msg = 'error checking key: %r value: %r' % (key, value)
+            _type = KNOWN_CONFIGURE_TYPES[key].__name__
+            # shortcuts
+            if key == 'bitrate':
+                if isinstance(value, str):
+                    value = convert_bitrate(value)
+                _type = 'int'
+            elif key == 'bitrate-mode':
+                if isinstance(value, str):
+                    assert value in BITRATE_MODE_VALUES.keys(), (
+                        'invalid bitrate-mode value: "%s"' % value)
+                    value = BITRATE_MODE_VALUES[value]
+                _type = 'int'
+            elif key == 'resolution':
+                width, height = convert_resolution(value)
+                new_test_config_configure['width'] = ['int', width]
+                new_test_config_configure['height'] = ['int', height]
+                continue
+            assert isinstance(value, KNOWN_CONFIGURE_TYPES[key]), msg
+            # assert isinstance(value, _type), msg
+        new_test_config_configure[key] = [_type, value]
+    test_config['configure'] = new_test_config_configure
+
+    # check runtime parameters
+    if 'runtime' in test_config:
+        assert isinstance(test_config['runtime'], list)
+        new_test_config_runtime = []
+        for it in test_config['runtime']:
+            msg = 'element "%r" must be runtime parameter: (int, key [, val])'
+            assert isinstance(it, list)
+            assert len(it) in (2, 3, 4), msg
+            assert isinstance(it[0], int)
+            framenum = it[0]
+            assert isinstance(it[1], str)
+            key = it[1]
+            if len(it) == 2:
+                _type = 'null'
+                value = None
+            elif len(it) == 3:
+                msg = 'incorrect well-known runtime parameter: %r' % it
+                assert key in KNOWN_RUNTIME_TYPES.keys(), msg
+                _type = KNOWN_RUNTIME_TYPES[key].__name__
+                value = it[2]
+            elif len(it) == 4:
+                _type = it[2]
+                value = it[3]
+            # shortcuts
+            if key == 'video-bitrate':
+                if isinstance(value, str):
+                    value = convert_bitrate(value)
+                _type = 'int'
+            new_test_config_runtime.append([framenum, key, _type, value])
+        # sort parameters by framenum
+        test_config['runtime'] = sorted(new_test_config_runtime)
+
+    # check parallel parameters
+    if 'parallel' in test_config:
+        assert isinstance(test_config['parallel'], list)
+        assert len(test_config['parallel']) > 0
+        new_test_config_parallel = []
+        for config in test_config['parallel']:
+            new_test_config_parallel.append(check_test_config(config, False))
+        test_config['parallel'] = new_test_config_parallel
+
+    # check serial parameters
+    if 'serial' in test_config:
+        assert isinstance(test_config['serial'], list)
+        assert len(test_config['serial']) > 0
+        new_test_config_serial = []
+        for config in test_config['serial']:
+            new_test_config_serial.append(check_test_config(config, False))
+        test_config['serial'] = new_test_config_serial
+
     return test_config
+
+
+def convert_test(infile, outfile, debug):
+    test_config = read_json_file(infile, debug)
+    test_config = check_test_config(test_config, True)
+    write_json_file(test_config, outfile, debug)
 
 
 def encode_test(options, model, serial):
@@ -393,6 +642,11 @@ def main(argv):
     options = get_options(argv)
     if options.version:
         print('version: %s' % __version__)
+        sys.exit(0)
+
+    if options.func == 'convert':
+        # convert the human-friendly input into a valid apk input
+        convert_test(options.infile, options.output, options.debug)
         sys.exit(0)
 
     # get serial number
