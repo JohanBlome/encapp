@@ -36,7 +36,7 @@ FUNC_CHOICES = {
     'install': 'install apks',
     'list': 'list codecs and devices supported',
     'convert': 'convert a human-friendly config into a java config',
-    'encode': 'run test case(s)',
+    'codec': 'run codec test case',
 }
 
 default_values = {
@@ -248,8 +248,8 @@ def run_test(workdir, json_path, json_name,
     return result_json
 
 
-def run_encode_tests(test_def, json_path, model, serial, test_desc,
-                     workdir, options):
+def run_codec_tests(test_def, json_path, model, serial, test_desc,
+                    workdir, options):
     result_json = []
     if options.no_install is not None and options.no_install:
         print('Skip install of apk!')
@@ -548,7 +548,7 @@ def convert_test(infile, outfile, debug):
     write_json_file(test_config, outfile, debug)
 
 
-def encode_test(options, model, serial):
+def codec_test(options, model, serial):
     # convert the human-friendly input into a valid apk input
     test_config = read_json_file(options.infile, options.debug)
 
@@ -563,14 +563,14 @@ def encode_test(options, model, serial):
         workdir = f'{options.desc.replace(" ", "_")}_{model}_{dt_string}'
     os.system('mkdir -p ' + workdir)
 
-    # run the encode test
-    run_encode_tests(test_config,
-                     options.infile,
-                     model,
-                     serial,
-                     options.desc if options.desc is not None else '',
-                     workdir,
-                     options)
+    # run the codec test
+    run_codec_tests(test_config,
+                    options.infile,
+                    model,
+                    serial,
+                    options.desc if options.desc is not None else '',
+                    workdir,
+                    options)
 
 
 def get_options(argv):
@@ -660,10 +660,10 @@ def main(argv):
     if options.func == 'list':
         list_codecs(serial)
 
-    elif options.func == 'encode':
+    elif options.func == 'codec':
         # ensure there is an input configuration
         assert options.infile is not None, 'error: need a valid input file'
-        encode_test(options, model)
+        codec_test(options, model)
 
 
 if __name__ == '__main__':
