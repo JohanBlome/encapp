@@ -21,15 +21,19 @@ from os.path import exists
 __version__ = '0.1'
 
 
-ACTIVITY = 'com.facebook.encapp/.MainActivity'
+APPNAME_MAIN = 'com.facebook.encapp'
+APPNAME_TEST = 'com.facebook.encapp.test'
+ACTIVITY = f'{APPNAME_MAIN}/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
 SCRIPT_PATH = os.path.realpath(__file__)
 SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
-MAIN_APK = os.path.join(
-    SCRIPT_DIR,
-    '/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk')
+APK_DIR = os.path.join(SCRIPT_DIR, '../app/build/outputs/apk')
+APK_NAME_MAIN = f'{APPNAME_MAIN}-v1.0-debug.apk'
+APK_MAIN = os.path.join(APK_DIR, 'debug', APK_NAME_MAIN)
+APK_NAME_TEST = f'{APPNAME_MAIN}-v1.0-debug-androidTest.apk'
+APK_TEST = os.path.join(APK_DIR, 'androidTest/debug', APK_NAME_TEST)
 
 FUNC_CHOICES = {
     'help': 'show help options',
@@ -183,7 +187,7 @@ def get_device_info(serial_inp, debug=0):
 
 
 def wait_for_exit(serial, debug=0):
-    adb_cmd = f'adb -s {serial} shell pidof com.facebook.encapp'
+    adb_cmd = f'adb -s {serial} shell pidof {APPNAME_MAIN}'
     pid = -1
     current = 1
     while (current != -1):
@@ -203,7 +207,8 @@ def wait_for_exit(serial, debug=0):
 
 
 def install_app(serial, debug=0):
-    run_cmd(f'adb -s {serial} install -g {MAIN_APK}', debug)
+    run_cmd(f'adb -s {serial} install -g {APK_MAIN}', debug)
+    run_cmd(f'adb -s {serial} install -g {APK_TEST}', debug)
 
 
 def run_test(workdir, json_path, json_name,
