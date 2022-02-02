@@ -43,11 +43,12 @@ default_values = {
     'debug': 0,
     'func': 'help',
     'install': False,
+    'invfile': None,
     'incfile': None,
     'output': None,
 }
 
-
+RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.raw')
 OPERATION_TYPES = ('batch', 'realtime')
 PIX_FMT_TYPES = ('yuv420p', 'nv12')
 KNOWN_CONFIGURE_TYPES = {
@@ -85,6 +86,21 @@ BITRATE_MODE_VALUES = {
     'vbr': 1,
     'cbr': 2,
     'cbr_fd': 3,
+}
+FFPROBE_FIELDS = {
+    'codec_name': 'codec-name',
+    'width': 'width',
+    'height': 'height',
+    'pix_fmt': 'pix-fmt',
+    'color_range': 'color-range',
+    'color_space': 'color-space',
+    'color_transfer': 'color-transfer',
+    'color_primaries': 'color-primaries',
+    'r_frame_rate': 'framerate',
+    'duration': 'duration',
+}
+R_FRAME_RATE_MAP = {
+    '30/1': 30,
 }
 
 
@@ -390,7 +406,7 @@ def convert_resolution(resolution):
     return width, height
 
 
-def check_test_config(test_config, root=True):
+def convert_test_config(test_config, root=True):
     # check common parameters
     assert 'common' in test_config, 'need a "common" key'
     assert isinstance(test_config['common'], dict)
@@ -526,7 +542,7 @@ def check_test_config(test_config, root=True):
         assert len(test_config['parallel']) > 0
         new_test_config_parallel = []
         for config in test_config['parallel']:
-            new_test_config_parallel.append(check_test_config(config, False))
+            new_test_config_parallel.append(convert_test_config(config, False))
         test_config['parallel'] = new_test_config_parallel
 
     # check serial parameters
@@ -535,15 +551,34 @@ def check_test_config(test_config, root=True):
         assert len(test_config['serial']) > 0
         new_test_config_serial = []
         for config in test_config['serial']:
-            new_test_config_serial.append(check_test_config(config, False))
+            new_test_config_serial.append(convert_test_config(config, False))
         test_config['serial'] = new_test_config_serial
 
     return test_config
 
 
-def convert_test(incfile, outfile, debug):
+def merge_test_config(test_config, invfile_config):
+    for key, value in invfile_config.items():
+        test_config['input'][key] = value
+        if 'parallel' in test_config:
+            new_test_config_parallel = []
+            for config in test_config['parallel']:
+                config = merge_test_config(config, invfile_config)
+                new_test_config_parallel.append(config)
+            test_config['parallel'] = new_test_config_parallel
+        if 'serial' in test_config:
+            new_test_config_serial = []
+            for config in test_config['serial']:
+                config = merge_test_config(config, invfile_config)
+                new_test_config_serial.append(config)
+            test_config['serial'] = new_test_config_serial
+    return test_config
+
+
+def convert_test(incfile, invfile_config, outfile, debug):
     test_config = read_json_file(incfile, debug)
-    test_config = check_test_config(test_config, True)
+    test_config = convert_test_config(test_config, True)
+    test_config = merge_test_config(test_config, invfile_config)
     write_json_file(test_config, outfile, debug)
 
 
@@ -604,6 +639,11 @@ def get_options(argv):
                                        FUNC_CHOICES.items())),
             help='function arg',)
     parser.add_argument(
+            '-i', type=str, dest='invfile',
+            default=default_values['invfile'],
+            metavar='input-video-file',
+            help='input video file',)
+    parser.add_argument(
             'incfile', type=str, nargs='?',
             default=default_values['incfile'],
             metavar='input-config-file',
@@ -630,15 +670,67 @@ def get_options(argv):
     return options
 
 
+def video_is_raw(invfile):
+    extension = os.path.splitext(invfile)[1]
+    return extension in RAW_EXTENSION_LIST
+
+
+def parse_ffprobe_output(stdout):
+    invfile_config = {}
+    for line in stdout.split('\n'):
+        if not line:
+            # ignore empty lines
+            continue
+        if line in ('[STREAM]', '[/STREAM]'):
+            # ignore start/end of stream
+            continue
+        key, value = line.split('=')
+        # store interesting fields
+        if key in FFPROBE_FIELDS.keys():
+            # process some values
+            if key == 'r_frame_rate':
+                value = R_FRAME_RATE_MAP[value]
+            elif key == 'width' or key == 'height':
+                value = int(value)
+            elif key == 'duration':
+                value = float(value)
+            key = FFPROBE_FIELDS[key]
+            invfile_config[key] = value
+    return invfile_config
+
+
+def get_video_info(invfile):
+    assert os.path.exists(invfile), (
+        'input video file (%s) does not exist' % invfile)
+    assert os.path.isfile(invfile), (
+        'input video file (%s) is not a file' % invfile)
+    assert os.access(invfile, os.R_OK), (
+        'input video file (%s) is not readable' % invfile)
+    if video_is_raw(invfile):
+        return {}
+    # check using ffprobe
+    cmd = f'ffprobe -v quiet -select_streams v -show_streams {invfile}'
+    ret, stdout, stderr = run_cmd(cmd, silent=True)
+    assert ret, f'error: failed to analyze file {invfile}'
+    invfile_config = parse_ffprobe_output(stdout)
+    invfile_config['filepath'] = invfile
+    return invfile_config
+
+
 def main(argv):
     options = get_options(argv)
     if options.version:
         print('version: %s' % __version__)
         sys.exit(0)
 
+    invfile_config = {}
+    if options.invfile is not None:
+        invfile_config = get_video_info(options.invfile)
+
     if options.func == 'convert':
         # convert the human-friendly input into a valid apk input
-        convert_test(options.incfile, options.output, options.debug)
+        convert_test(options.incfile, invfile_config, options.output,
+                     options.debug)
         sys.exit(0)
 
     # get model and serial number
