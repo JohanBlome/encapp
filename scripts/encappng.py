@@ -43,7 +43,7 @@ default_values = {
     'debug': 0,
     'func': 'help',
     'install': False,
-    'infile': None,
+    'incfile': None,
     'output': None,
 }
 
@@ -319,7 +319,6 @@ def run_codec_tests(test_def, json_path, model, serial, test_desc,
 
 
 def list_codecs(serial, model):
-
     adb_cmd = f'adb -s {serial} shell am start '\
               f'-e ui_hold_sec 3 '\
               f'-e list_codecs a {ACTIVITY}'
@@ -336,11 +335,11 @@ def list_codecs(serial, model):
         print(f'File is available in current dir as {filename}')
 
 
-def read_json_file(infile, debug):
+def read_json_file(incfile, debug):
     # read input file
-    with open(infile, 'r') as fp:
+    with open(incfile, 'r') as fp:
         if debug > 0:
-            print(f'infile: {infile}')
+            print(f'incfile: {incfile}')
         input_config = json.load(fp)
     return input_config
 
@@ -542,15 +541,15 @@ def check_test_config(test_config, root=True):
     return test_config
 
 
-def convert_test(infile, outfile, debug):
-    test_config = read_json_file(infile, debug)
+def convert_test(incfile, outfile, debug):
+    test_config = read_json_file(incfile, debug)
     test_config = check_test_config(test_config, True)
     write_json_file(test_config, outfile, debug)
 
 
 def codec_test(options, model, serial):
     # convert the human-friendly input into a valid apk input
-    test_config = read_json_file(options.infile, options.debug)
+    test_config = read_json_file(options.incfile, options.debug)
 
     # get date and time and format it
     now = datetime.now()
@@ -565,7 +564,7 @@ def codec_test(options, model, serial):
 
     # run the codec test
     run_codec_tests(test_config,
-                    options.infile,
+                    options.incfile,
                     model,
                     serial,
                     options.desc if options.desc is not None else '',
@@ -605,10 +604,10 @@ def get_options(argv):
                                        FUNC_CHOICES.items())),
             help='function arg',)
     parser.add_argument(
-            'infile', type=str, nargs='?',
-            default=default_values['infile'],
-            metavar='input-file',
-            help='input file',)
+            'incfile', type=str, nargs='?',
+            default=default_values['incfile'],
+            metavar='input-config-file',
+            help='input configuration file',)
     parser.add_argument(
             'output', type=str, nargs='?',
             default=default_values['output'],
@@ -639,11 +638,12 @@ def main(argv):
 
     if options.func == 'convert':
         # convert the human-friendly input into a valid apk input
-        convert_test(options.infile, options.output, options.debug)
+        convert_test(options.incfile, options.output, options.debug)
         sys.exit(0)
 
-    # get serial number
+    # get model and serial number
     model, serial = get_device_info(options.serial, options.debug)
+    # TODO(chema): fix this
     if type(model) is dict:
         if 'model' in model:
             model = model.get('model')
@@ -662,7 +662,8 @@ def main(argv):
 
     elif options.func == 'codec':
         # ensure there is an input configuration
-        assert options.infile is not None, 'error: need a valid input file'
+        assert options.incfile is not None, (
+            'error: need a valid input configuration file')
         codec_test(options, model)
 
 
