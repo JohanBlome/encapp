@@ -38,6 +38,7 @@ APK_TEST = os.path.join(APK_DIR, 'androidTest/debug', APK_NAME_TEST)
 FUNC_CHOICES = {
     'help': 'show help options',
     'install': 'install apks',
+    'uninstall': 'uninstall apks',
     'list': 'list codecs and devices supported',
     'convert': 'convert a human-friendly config into a java config',
     'codec': 'run codec test case',
@@ -209,6 +210,36 @@ def wait_for_exit(serial, debug=0):
 def install_app(serial, debug=0):
     run_cmd(f'adb -s {serial} install -g {APK_MAIN}', debug)
     run_cmd(f'adb -s {serial} install -g {APK_TEST}', debug)
+
+
+def uninstall_app(serial, debug=0):
+    package_list = installed_apps(serial, debug)
+    if APPNAME_MAIN in package_list:
+        run_cmd(f'adb -s {serial} uninstall {APPNAME_MAIN}', debug)
+    else:
+        print(f'warning: {APPNAME_MAIN} not installed')
+    if APPNAME_TEST in package_list:
+        run_cmd(f'adb -s {serial} uninstall {APPNAME_TEST}', debug)
+    else:
+        print(f'warning: {APPNAME_TEST} not installed')
+
+
+def parse_pm_list_packages(stdout):
+    package_list = []
+    for line in stdout.split('\n'):
+        # ignore blank lines
+        if not line:
+            continue
+        if line.startswith('package:'):
+            package_list.append(line[len('package:'):])
+    return package_list
+
+
+def installed_apps(serial, debug=0):
+    ret, stdout, stderr = run_cmd(f'adb -s {serial} shell pm list packages',
+                                  debug)
+    assert ret, 'error: failed to get installed app list'
+    return parse_pm_list_packages(stdout)
 
 
 def run_test(workdir, json_path, json_name,
@@ -753,6 +784,10 @@ def main(argv):
     # install app
     if options.func == 'install' or options.install:
         install_app(serial, options.debug)
+
+    # uninstall app
+    if options.func == 'uninstall':
+        uninstall_app(serial, options.debug)
 
     # run function
     if options.func == 'list':
