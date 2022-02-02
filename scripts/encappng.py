@@ -104,10 +104,10 @@ R_FRAME_RATE_MAP = {
 }
 
 
-def run_cmd(cmd, silent=False):
+def run_cmd(cmd, debug=0):
     ret = True
     try:
-        if not silent:
+        if debug > 0:
             print(cmd, sep=' ')
         process = subprocess.Popen(cmd, shell=True,
                                    stdout=subprocess.PIPE,
@@ -125,7 +125,7 @@ def run_cmd(cmd, silent=False):
 def get_device_info(serial_inp, debug=0):
     # list all available devices
     adb_cmd = 'adb devices -l'
-    ret, stdout, stderr = run_cmd(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
     assert ret, 'error: failed to get adb devices'
 
     # parse list
@@ -170,30 +170,30 @@ def get_device_info(serial_inp, debug=0):
 
     # remove any files that are generated in previous runs
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
     for file in output_files:
         if file == '':
             continue
         # remove the output
         adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
-        run_cmd(adb_cmd)
+        run_cmd(adb_cmd, debug)
 
     return model, serial
 
 
-def wait_for_exit(serial):
+def wait_for_exit(serial, debug=0):
     adb_cmd = f'adb -s {serial} shell pidof com.facebook.encapp'
     pid = -1
     current = 1
     while (current != -1):
         if pid == -1:
-            ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
+            ret, stdout, stderr = run_cmd(adb_cmd, debug)
             pid = -1
             if len(stdout) > 0:
                 pid = int(stdout)
         time.sleep(1)
-        ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
+        ret, stdout, stderr = run_cmd(adb_cmd, debug)
         current = -2
         if len(stdout) > 0:
             current = int(stdout)
@@ -202,13 +202,13 @@ def wait_for_exit(serial):
     print(f'Exit from {pid}')
 
 
-def install_app(serial):
-    run_cmd(f'adb -s {serial} install -g {MAIN_APK}', silent=True)
+def install_app(serial, debug=0):
+    run_cmd(f'adb -s {serial} install -g {MAIN_APK}', debug)
 
 
 def run_test(workdir, json_path, json_name,
              input_files, result_json, serial, options):
-    run_cmd(f'adb -s {serial} push {json_name} /sdcard/', silent=True)
+    run_cmd(f'adb -s {serial} push {json_name} /sdcard/', options.debug)
 
     additional = ''
     if options.codec is not None and len(options.codec) > 0:
@@ -230,17 +230,17 @@ def run_test(workdir, json_path, json_name,
         additional = f'{additional} -e res {options.output_res}'
 
     run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
-            f'/sdcard/{json_name} {ACTIVITY}')
-    wait_for_exit(serial)
+            f'/sdcard/{json_name} {ACTIVITY}', options.debug)
+    wait_for_exit(serial, options.debug)
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd, silent=True)
+    ret, stdout, stderr = run_cmd(adb_cmd, options.debug)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
 
     base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
     sub_dir = '_'.join([base_file_name, 'files'])
     output_dir = f'{workdir}/{sub_dir}/'
-    run_cmd(f'mkdir {output_dir}')
+    run_cmd(f'mkdir {output_dir}', options.debug)
 
     for file in output_files:
         if file == '':
@@ -250,17 +250,17 @@ def run_test(workdir, json_path, json_name,
         print(f'pull {file} to {output_dir}')
 
         adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
-        run_cmd(adb_cmd, silent=True)
+        run_cmd(adb_cmd, options.debug)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
-        run_cmd(adb_cmd, silent=True)
+        run_cmd(adb_cmd, options.debug)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(f'{output_dir}/{tmpname}')
 
     adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
-    run_cmd(adb_cmd)
+    run_cmd(adb_cmd, options.debug)
     return result_json
 
 
@@ -270,15 +270,15 @@ def run_codec_tests(test_def, json_path, model, serial, test_desc,
     if options.no_install is not None and options.no_install:
         print('Skip install of apk!')
     else:
-        install_app(serial)
+        install_app(serial, options.debug)
 
     if test_def is None:
         raise Exception('No test files')
 
     path, filename = os.path.split(json_path)
     # remove old encapp files on device (!)
-    run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
-    # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
+    run_cmd(f'adb -s {serial} rm /sdcard/encapp_*', options.debug)
+    # run_cmd(f'adb -s {serial} push {json_path} /sdcard/', options.debug)
 
     json_folder = os.path.dirname(json_path)
     inputfile = ''
@@ -295,10 +295,10 @@ def run_codec_tests(test_def, json_path, model, serial, test_desc,
             all_input_files.append(inputfile)
             inputfile = f'/sdcard/{os.path.basename(options.input)}'
             ret, stdout, stderr = run_cmd(
-                f'adb -s {serial} shell ls {inputfile}', silent=True)
+                f'adb -s {serial} shell ls {inputfile}', options.debug)
             if len(stderr) > 0:
                 run_cmd(f'adb -s {serial} push {options.input} '
-                        '/sdcard/', silent=True)
+                        '/sdcard/', options.debug)
         else:
             input_files = test.get('input_files')
             if input_files is not None:
@@ -309,7 +309,8 @@ def run_codec_tests(test_def, json_path, model, serial, test_desc,
                         path = f'{file}'
                     all_input_files.append(f'/sdcard/{os.path.basename(path)}')
                     if exists(path):
-                        run_cmd(f'adb -s {serial} push {path} /sdcard/')
+                        run_cmd(f'adb -s {serial} push {path} /sdcard/',
+                                options.debug)
                     else:
                         print(f'Media file is missing: {path}')
                         exit(0)
@@ -329,21 +330,21 @@ def run_codec_tests(test_def, json_path, model, serial, test_desc,
 
     if len(all_input_files) > 0:
         for file in all_input_files:
-            run_cmd(f'adb -s {serial} shell rm {file}')
+            run_cmd(f'adb -s {serial} shell rm {file}', options.debug)
 
     return result_json
 
 
-def list_codecs(serial, model):
+def list_codecs(serial, model, debug=0):
     adb_cmd = f'adb -s {serial} shell am start '\
               f'-e ui_hold_sec 3 '\
               f'-e list_codecs a {ACTIVITY}'
 
-    run_cmd(adb_cmd, silent=True)
-    wait_for_exit(serial)
+    run_cmd(adb_cmd, debug)
+    wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
-    run_cmd(adb_cmd)
+    run_cmd(adb_cmd, debug)
     with open(filename, 'r') as codec_file:
         lines = codec_file.readlines()
         for line in lines:
@@ -699,7 +700,7 @@ def parse_ffprobe_output(stdout):
     return invfile_config
 
 
-def get_video_info(invfile):
+def get_video_info(invfile, debug=0):
     assert os.path.exists(invfile), (
         'input video file (%s) does not exist' % invfile)
     assert os.path.isfile(invfile), (
@@ -710,7 +711,7 @@ def get_video_info(invfile):
         return {}
     # check using ffprobe
     cmd = f'ffprobe -v quiet -select_streams v -show_streams {invfile}'
-    ret, stdout, stderr = run_cmd(cmd, silent=True)
+    ret, stdout, stderr = run_cmd(cmd, debug)
     assert ret, f'error: failed to analyze file {invfile}'
     invfile_config = parse_ffprobe_output(stdout)
     invfile_config['filepath'] = invfile
@@ -746,11 +747,11 @@ def main(argv):
 
     # install app
     if options.func == 'install' or options.install:
-        install_app(serial)
+        install_app(serial, options.debug)
 
     # run function
     if options.func == 'list':
-        list_codecs(serial)
+        list_codecs(serial, model, options.debug)
 
     elif options.func == 'codec':
         # ensure there is an input configuration
