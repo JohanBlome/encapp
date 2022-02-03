@@ -1,0 +1,167 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "common": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "unique id"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "human-readable description"
+                },
+                "operation": {
+                    "type": "string",
+                    "description": "human-readable description"
+                },
+                "start": {
+                    "type": "integer",
+                    "description": "start time for test (in frames)"
+                }
+            },
+            "required": [
+                "id",
+                "description"
+            ],
+            "additionalProperties": false
+        },
+
+        "input": {
+            "type": "object",
+            "properties": {
+                "filepath": {
+                    "type": "string",
+                    "description": "full file path at the DUT"
+                },
+                "width": {
+                    "type": "integer",
+                    "description": "file width"
+                },
+                "height": {
+                    "type": "integer",
+                    "description": "file height"
+                },
+                "pix_fmt": {
+                    "type": "string",
+                    "description": "file pixel format (ffmpeg format)"
+                },
+                "framerate": {
+                    "type": "integer",
+                    "description": "file frame rate (fps)"
+                },
+                "duration": {
+                    "type": "integer",
+                    "description": "duration of the file (frames)"
+                },
+                "drops": {
+                    "type": "array",
+                    "description": "list of frames to be dropped (number)",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                },
+                "dynamic-framerate": {
+                    "type": "array",
+                    "description": "list of frames to be dropped (number)",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "minItems": 1
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                }
+            },
+            "required": [
+                "filepath"
+            ],
+            "additionalProperties": false
+        },
+
+        "configure": {
+            "type": "object",
+            "properties": {
+                "codec": {
+                    "type": "array",
+                    "prefixItems": [
+                        {
+                            "const": "string"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": {
+                "type": "array",
+                "prefixItems": [
+                    {
+                        "enum": [
+                            "integer",
+                            "float",
+                            "string",
+                            "boolean"
+                        ]
+                    },
+                    {
+                        "type": "string"
+                    }
+                ]
+            },
+            "required": [
+                "codec"
+            ]
+        },
+
+        "runtime": {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "prefixItems": [
+                    {
+                        "type": "integer"
+                    },
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "enum": [
+                            "integer",
+                            "float",
+                            "string",
+                            "boolean"
+                        ]
+                    },
+                    {
+                        "type": "string"
+                    }
+                ],
+                "minItems": 3,
+                "maxItems": 4
+            }
+        },
+
+        "parallel": {
+            "type": "array",
+            "items": {
+                "$ref": "#"
+            }
+        },
+
+        "serial": {
+            "type": "array",
+            "items": {
+                "$ref": "#"
+            }
+        }
+    },
+    "additionalProperties": false
+}

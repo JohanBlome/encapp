@@ -1,0 +1,118 @@
+{
+    "common": {
+        "id": "full",
+        "description": "Simple QCIF Test",
+        "operation": "batch",
+        "start": "1 sec"
+    },
+    "input": {
+        "filepath": "foo.yuv",
+        "width": 176,
+        "height": 144,
+        "resolution": "176x144",
+        "pix-fmt": "nv12",
+        "framerate": 30,
+        "duration": "10 sec"
+    },
+    "configure": {
+        "codec": "OMX.google.h264.encoder",
+        "vendor.qti-ext-enc-caps-ltr.max-count": ["int", 6],
+        "encode": true,
+        "surface": false,
+        "mime": "video/avc",
+        "bitrate": "100 kbps",
+        "bitrate-mode": "cbr",
+        "i-frame-interval": 2,
+        "ts-schema": "android.generic.2",
+        "vendor.qti-ext-enc-caps-ltr.max-count": [ "int", 6 ],
+        "vendor.qti-ext-enc-ltr-count.num-ltr-frames": [ "int", 2 ]
+    },
+    "runtime": [
+        [ 10, "drop" ],
+        [ 100, "drop" ],
+        [ 1000, "drop" ],
+        [ 60, "dynamic-framerate", 15 ],
+        [ 120, "dynamic-framerate", 5 ],
+        [ 180, "dynamic-framerate", 20 ],
+        [ 240, "dynamic-framerate", 30 ],
+        [ 150, "video-bitrate", "100 kbps" ],
+        [ 300, "video-bitrate", "200 kbps" ],
+        [ 450, "video-bitrate", "300 kbps" ],
+        [ 600, "video-bitrate", "1 Mbps" ],
+        [ 750, "video-bitrate", "500000 bps" ],
+        [ 30, "request-sync" ],
+        [ 60, "request-sync" ],
+        [ 90, "request-sync" ],
+        [ 120, "request-sync" ],
+        [ 10, "vendor.qti-ext-enc-ltr.mark-frame", "int", 0 ],
+        [ 20, "vendor.qti-ext-enc-ltr.mark-frame", "int", 1 ],
+        [ 40, "vendor.qti-ext-enc-ltr.use-frame", "int", 0 ],
+        [ 60, "vendor.qti-ext-enc-ltr.use-frame", "int", 1 ]
+    ],
+    "serial": [
+        {
+            "common": {
+                "description": "Configure TL and ltr count 2"
+            },
+            "input": {
+                "filepath": "/sdcard/320x180_900fr_nv12.yuv",
+                "resolution": "320x180",
+                "framerate": 30,
+                "duration": 300
+            },
+            "configure": {
+                "codec": "encoder.avc",
+                "resolution": "320x180",
+                "ts-schema": "android.generic.2",
+                "vendor.qti-ext-enc-caps-ltr.max-count": [ "int", 6 ],
+                "vendor.qti-ext-enc-ltr-count.num-ltr-frames": [ "int", 2 ]
+            }
+        },
+        {
+            "common": {
+                "description": "Temporal layers"
+            },
+            "input": {
+                "filepath": "/sdcard/320x180_900fr_avc.mp4",
+                "resolution": "320x180"
+            },
+            "configure": {
+                "codec": "encoder.avc",
+                "ts-schema": "android.generic.2"
+            }
+        }
+    ],
+    "parallel": [
+        {
+            "common": {
+                "description": "Configure TL and ltr count 2"
+            },
+            "input": {
+                "filepath": "/sdcard/320x180_900fr_nv12.yuv",
+                "resolution": "320x180",
+                "framerate": 30,
+                "duration": 300
+            },
+            "configure": {
+                "codec": "encoder.avc",
+                "resolution": "320x180",
+                "ts-schema": "android.generic.2",
+                "vendor.qti-ext-enc-caps-ltr.max-count": [ "int", 6 ],
+                "vendor.qti-ext-enc-ltr-count.num-ltr-frames": [ "int", 2 ]
+            }
+        },
+        {
+            "common": {
+                "description": "Temporal layers"
+            },
+            "input": {
+                "filepath": "/sdcard/320x180_900fr_avc.mp4",
+                "resolution": "320x180"
+            },
+            "configure": {
+                "codec": "encoder.avc",
+                "ts-schema": "android.generic.2"
+            }
+        }
+    ]
+}

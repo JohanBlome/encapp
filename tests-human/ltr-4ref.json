@@ -5,7 +5,7 @@
         "realtime": "true"
     },
     "input": {
-        "filename": "foo.yuv",
+        "filepath": "foo.yuv",
         "resolution": "176x144",
         "pix-fmt": "nv12",
         "framerate": 30,

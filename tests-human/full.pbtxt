@@ -1,0 +1,202 @@
+test {
+    common {
+        id: "full"
+        description: "Simple QCIF Test"
+        operation: "batch"
+        start: "1 sec"
+    }
+    input {
+        filepath: "foo.yuv"
+        resolution: "176x144"
+        pix_fmt: nv12
+        framerate: 30
+        duration: "10 sec"
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        encode: true
+        surface: false
+        mime: "video/avc"
+        bitrate: "100 kbps"
+        bitrate_mode: cbr
+        i_frame_interval: 60
+        parameter {
+            key: "ts-schema"
+            value: "android.generic.2"
+        }
+        parameter {
+            key: "vendor.qti-ext-enc-caps-ltr.max-count"
+            type: "int"
+            value: "6"
+        }
+        parameter {
+            key: "vendor.qti-ext-enc-ltr-count.num-ltr-frames"
+            type: "int"
+            value: "2"
+        }
+    }
+    runtime {
+        drop: 10
+        drop: 100
+        drop: 1000
+        dynamic_framerate {
+            framenum: 60
+            framerate: 15
+        }
+        dynamic_framerate {
+            framenum: 120
+            framerate: 5
+        }
+        dynamic_framerate {
+            framenum: 180
+            framerate: 20
+        }
+        dynamic_framerate {
+            framenum: 240
+            framerate: 30
+        }
+        parameter {
+            framenum: 150
+            key: "video-bitrate"
+            value: "100 kbps"
+        }
+        video_bitrate {
+            framenum: 300
+            bitrate: "200 kbps"
+        }
+        video_bitrate {
+            framenum: 450
+            bitrate: "300 kbps"
+        }
+        video_bitrate {
+            framenum: 600
+            bitrate: "1 Mbps"
+        }
+        video_bitrate {
+            framenum: 750
+            bitrate: "500000 bps"
+        }
+        request_sync: 30
+        request_sync: 60
+        request_sync: 90
+        request_sync: 120
+        parameter {
+            framenum: 10
+            key: "vendor.qti-ext-enc-ltr.mark-frame"
+            type: "int"
+            value: "0"
+        }
+        parameter {
+            framenum: 20
+            key: "vendor.qti-ext-enc-ltr.mark-frame"
+            type: "int"
+            value: "1"
+        }
+        parameter {
+            framenum: 40
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: "int"
+            value: "0"
+        }
+        parameter {
+            framenum: 60
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: "int"
+            value: "1"
+        }
+    }
+    serial {
+        test {
+            common {
+                description: "Configure TL and ltr count 2"
+            }
+            input {
+                filepath: "/sdcard/320x180_900fr_nv12.yuv"
+                resolution: "320x180"
+                framerate: 30
+                duration: "300"
+            }
+            configure {
+                codec: "encoder.avc"
+                resolution: "320x180"
+                parameter {
+                    key: "ts-schema"
+                    value: "android.generic.2"
+                }
+                parameter {
+                    key: "vendor.qti-ext-enc-caps-ltr.max-count"
+                    type: "int"
+                    value: "6"
+                }
+                parameter {
+                    key: "vendor.qti-ext-enc-ltr-count.num-ltr-frames"
+                    type: "int"
+                    value: "2"
+                }
+            }
+        }
+        test {
+            common {
+                description: "Temporal layers"
+            }
+            input {
+                filepath: "/sdcard/320x180_900fr_avc.mp4"
+                resolution: "320x180"
+            }
+            configure {
+                codec: "encoder.avc"
+                parameter {
+                    key: "ts-schema"
+                    value: "android.generic.2"
+                }
+            }
+        }
+    }
+    parallel {
+        test {
+            common {
+                description: "Configure TL and ltr count 2"
+            }
+            input {
+                filepath: "/sdcard/320x180_900fr_nv12.yuv"
+                resolution: "320x180"
+                framerate: 30
+                duration: "300"
+            }
+            configure {
+                codec: "encoder.avc"
+                resolution: "320x180"
+                parameter {
+                    key: "ts-schema"
+                    value: "android.generic.2"
+                }
+                parameter {
+                    key: "vendor.qti-ext-enc-caps-ltr.max-count"
+                    type: "int"
+                    value: "6"
+                }
+                parameter {
+                    key: "vendor.qti-ext-enc-ltr-count.num-ltr-frames"
+                    type: "int"
+                    value: "2"
+                }
+            }
+        }
+        test {
+            common {
+                description: "Temporal layers"
+            }
+            input {
+                filepath: "/sdcard/320x180_900fr_avc.mp4"
+                resolution: "320x180"
+            }
+            configure {
+                codec: "encoder.avc"
+                parameter {
+                    key: "ts-schema"
+                    value: "android.generic.2"
+                }
+            }
+        }
+    }
+}
