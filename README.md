@@ -13,7 +13,9 @@ It provides an easy way to test an android video encoder by easily combining par
 
 encapp also has support for dynamically changing framerate, bitrate, and ltr.
 
-This document describes how to use the tool. For tool development, check [README.dev.md](README.dev.md).
+This document describes how to use the tool.
+* for tool development, check [README.dev.md](README.dev.md).
+* for details on test configuration, check [README.test.md](README.test.md).
 
 
 # 1. Prerequisites
