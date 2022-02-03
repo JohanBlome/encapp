@@ -36,6 +36,7 @@ The operation of encapp for a single test is relatively simple: It opens a codec
 
 
 ## 2.1. ByteBuffer Operation (ByteEncoder.java)
+
 Quick question on encapp: I was looking at the `BufferEncoder::encode()` method. I can see that the method:
 
 * (1) creates an encoder (`MediaCodec.createByCodecName(...)`)
@@ -217,17 +218,6 @@ List of valid keys:
     * python world will allow time units too
   * example: 300  // play 300 frames at the original file framerate, then quit
 
-* "drops": list(int)
-  * optional: if added, it will cause a list of frames to be dropped
-  * refers to absolute frames being sent to the encoder
-    * if combined with "duration", it will cause only 1 frame drop per entry
-  * example: [30, 60, 90, 120]  // drop frames 30, 60, 90, and 120
-
-* "dynamic-framerate": list(list(int), list(int))
-  * optional: if added, it will adjust the frame rate passed to the encoder, effectively dropping frames
-  * refers to absolute frames being sent to the encoder
-  * example: [[60, 120, 180], [15, 5, 20]]  // drop as many frames as necessary to only feed 15 fps starting at frame 60, 5 fps at frame 120, and 20 fps at frame 180
-
 Shortcuts (host side only):
 * "resolution": str
   * compat way to express both "width" and "height"
@@ -349,6 +339,13 @@ The "runtime" key includes a list of parameters that are packed into a Bundle an
 Format is `list([framenum, "key", "type", value])`. Note that the list should be sorted by framenum.
 
 Any key that can be passed in the `param` `Bundle` dictionary (i.e. any `PARAMETER_KEY_*` key) can be passed here:
+* "drops": null
+  * optional: if added, it will cause a frame to be dropped
+  * refers to absolute frames being sent to the encoder
+    * if combined with "duration", it will cause only 1 frame drop per entry
+* "dynamic-framerate": int
+  * optional: if added, it will adjust the frame rate passed to the encoder, effectively dropping frames
+  * refers to absolute frames being sent to the encoder
 * "video-bitrate": `PARAMETER_KEY_VIDEO_BITRATE` in MediaCodec
   * change a video encoder's target bitrate on the fly
 * "request-sync": `PARAMETER_KEY_REQUEST_SYNC_FRAME` in MediaCodec

@@ -82,6 +82,8 @@ KNOWN_CONFIGURE_TYPES = {
 KNOWN_RUNTIME_TYPES = {
     'video-bitrate': int,
     'request-sync': None,
+    'drop': None,
+    'dynamic-framerate': int,
 }
 TYPE_LIST = (
     'int', 'float', 'str', 'bool', 'null',
@@ -480,24 +482,6 @@ def convert_test_config(test_config, root=True):
     if 'duration' in test_config['input']:
         test_config['input']['duration'] = convert_to_frames(
             test_config['input']['duration'])
-    if 'drops' in test_config['input']:
-        assert isinstance(test_config['input']['drops'], list), (
-            'drops must be a list of integers')
-        assert all(isinstance(item, int) for item in
-                   test_config['input']['drops']), (
-                   'drops must be a list of integers')
-    if 'dynamic-framerate' in test_config['input']:
-        msg = 'dynamic-framerate must be 2 lists of integers'
-        assert isinstance(test_config['input']['dynamic-framerate'], list), msg
-        assert len(test_config['input']['dynamic-framerate']) == 2, msg
-        assert isinstance(test_config['input']['dynamic-framerate'][0],
-                          list), msg
-        assert isinstance(test_config['input']['dynamic-framerate'][1],
-                          list), msg
-        assert all(isinstance(item, int) for item in
-                   test_config['input']['dynamic-framerate'][0]), msg
-        assert all(isinstance(item, int) for item in
-                   test_config['input']['dynamic-framerate'][1]), msg
 
     # check configure parameters
     assert 'configure' in test_config, 'need a "configure" key'

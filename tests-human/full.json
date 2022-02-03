@@ -12,9 +12,7 @@
         "resolution": "176x144",
         "pix-fmt": "nv12",
         "framerate": 30,
-        "duration": "10 sec",
-        "drops": [10, 100, 1000],
-        "dynamic-framerate": [ [60, 120, 180, 240], [15, 5, 20, 30] ]
+        "duration": "10 sec"
     },
     "configure": {
         "codec": "OMX.google.h264.encoder",
@@ -30,6 +28,13 @@
         "vendor.qti-ext-enc-ltr-count.num-ltr-frames": [ "int", 2 ]
     },
     "runtime": [
+        [ 10, "drop" ],
+        [ 100, "drop" ],
+        [ 1000, "drop" ],
+        [ 60, "dynamic-framerate", 15 ],
+        [ 120, "dynamic-framerate", 5 ],
+        [ 180, "dynamic-framerate", 20 ],
+        [ 240, "dynamic-framerate", 30 ],
         [ 150, "video-bitrate", "100 kbps" ],
         [ 300, "video-bitrate", "200 kbps" ],
         [ 450, "video-bitrate", "300 kbps" ],
