@@ -4,20 +4,32 @@
         "description": "Dynamic Frame Drop Test"
     },
     "input": {
-        "filename": "foo.yuv",
+        "filepath": "foo.yuv",
         "resolution": "176x144",
         "pix-fmt": "nv12",
         "framerate": 30,
-        "drop": [
-            30,
-            60,
-            90,
-            120
-        ],
         "duration": 180
     },
     "configure": {
         "codec": "OMX.google.h264.encoder",
         "bitrate": "300 kbps"
-    }
+    },
+    "runtime": [
+        [
+            30,
+            "drop"
+        ],
+        [
+            60,
+            "drop"
+        ],
+        [
+            90,
+            "drop"
+        ],
+        [
+            120,
+            "drop"
+        ]
+    ]
 }

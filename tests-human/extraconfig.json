@@ -9,7 +9,7 @@
                 "description": "Configure TL and ltr count 2"
             },
             "input": {
-                "filename": "/sdcard/320x180_900fr_nv12.yuv",
+                "filepath": "/sdcard/320x180_900fr_nv12.yuv",
                 "resolution": "320x180",
                 "framerate": 30,
                 "duration": 300
@@ -33,7 +33,7 @@
                 "description": "Temporal layers"
             },
             "input": {
-                "filename": "/sdcard/320x180_900fr_avc.mp4",
+                "filepath": "/sdcard/320x180_900fr_avc.mp4",
                 "resolution": "320x180"
             },
             "configure": {
@@ -46,7 +46,7 @@
                 "description": "Dynamic LTR"
             },
             "input": {
-                "filename": "/sdcard/320x180_900fr_avc.mp4",
+                "filepath": "/sdcard/320x180_900fr_avc.mp4",
                 "resolution": "320x180"
             },
             "configure": {
