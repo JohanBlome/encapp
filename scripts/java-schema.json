@@ -49,7 +49,7 @@
                     "description": "file pixel format (ffmpeg format)"
                 },
                 "framerate": {
-                    "type": "integer",
+                    "type": "float",
                     "description": "file frame rate (fps)"
                 },
                 "playout-frames": {
@@ -67,11 +67,11 @@
                 },
                 "dynamic-framerate": {
                     "type": "array",
-                    "description": "list of frames to be dropped (number)",
+                    "description": "new framerate to apply (frames)",
                     "items": {
                         "type": "array",
                         "items": {
-                            "type": "integer"
+                            "type": "float"
                         },
                         "minItems": 1
                     },
