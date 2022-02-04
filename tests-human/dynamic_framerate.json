@@ -8,7 +8,7 @@
         "resolution": "176x144",
         "pix-fmt": "nv12",
         "framerate": 30,
-        "duration": 300
+        "playout-frames": 300
     },
     "configure": {
         "codec": "OMX.google.h264.encoder",

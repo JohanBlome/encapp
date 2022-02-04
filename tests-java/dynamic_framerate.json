@@ -9,7 +9,7 @@
         "height": 144,
         "pix-fmt": "nv12",
         "framerate": 30,
-        "duration": 300,
+        "playout-frames": 300,
         "dynamic-framerate": [
             [
                 60,

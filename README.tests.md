@@ -211,7 +211,7 @@ List of valid keys:
   * required for raw files (i.e. for the encoder), optional for files with self-describing format (including .y4m)
   * example: 30
 
-* "duration": int
+* "playout-frames": int
   * optional: if added, it will cause the file to be played continuously until the exact number of frames happen
   * default unit is frames
     * unit will be frames in the java world
@@ -342,7 +342,7 @@ Any key that can be passed in the `param` `Bundle` dictionary (i.e. any `PARAMET
 * "drops": null
   * optional: if added, it will cause a frame to be dropped
   * refers to absolute frames being sent to the encoder
-    * if combined with "duration", it will cause only 1 frame drop per entry
+    * if combined with "playout-frames", it will cause only 1 frame drop per entry
 * "dynamic-framerate": int
   * optional: if added, it will adjust the frame rate passed to the encoder, effectively dropping frames
   * refers to absolute frames being sent to the encoder

@@ -479,9 +479,9 @@ def convert_test_config(test_config, root=True):
     if 'framerate' in test_config['input']:
         test_config['input']['framerate'] = int(
             test_config['input']['framerate'])
-    if 'duration' in test_config['input']:
-        test_config['input']['duration'] = convert_to_frames(
-            test_config['input']['duration'])
+    if 'playout-frames' in test_config['input']:
+        test_config['input']['playout-frames'] = convert_to_frames(
+            test_config['input']['playout-frames'])
 
     # check configure parameters
     assert 'configure' in test_config, 'need a "configure" key'
