@@ -12,7 +12,7 @@
         "resolution": "176x144",
         "pix-fmt": "nv12",
         "framerate": 30,
-        "duration": "10 sec"
+        "playout-frames": "10 sec"
     },
     "configure": {
         "codec": "OMX.google.h264.encoder",
@@ -58,7 +58,7 @@
                 "filepath": "/sdcard/320x180_900fr_nv12.yuv",
                 "resolution": "320x180",
                 "framerate": 30,
-                "duration": 300
+                "playout-frames": 300
             },
             "configure": {
                 "codec": "encoder.avc",
@@ -91,7 +91,7 @@
                 "filepath": "/sdcard/320x180_900fr_nv12.yuv",
                 "resolution": "320x180",
                 "framerate": 30,
-                "duration": 300
+                "playout-frames": 300
             },
             "configure": {
                 "codec": "encoder.avc",

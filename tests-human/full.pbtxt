@@ -10,7 +10,7 @@ test {
         resolution: "176x144"
         pix_fmt: nv12
         framerate: 30
-        duration: "10 sec"
+        playout_frames: "10 sec"
     }
     configure {
         codec: "OMX.google.h264.encoder"
@@ -114,7 +114,7 @@ test {
                 filepath: "/sdcard/320x180_900fr_nv12.yuv"
                 resolution: "320x180"
                 framerate: 30
-                duration: "300"
+                playout_frames: "300"
             }
             configure {
                 codec: "encoder.avc"
@@ -161,7 +161,7 @@ test {
                 filepath: "/sdcard/320x180_900fr_nv12.yuv"
                 resolution: "320x180"
                 framerate: 30
-                duration: "300"
+                playout_frames: "300"
             }
             configure {
                 codec: "encoder.avc"

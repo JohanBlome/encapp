@@ -10,7 +10,7 @@
         "height": 144,
         "pix-fmt": "nv12",
         "framerate": 30,
-        "duration": 900
+        "playout-frames": 900
     },
     "configure": {
         "codec": [

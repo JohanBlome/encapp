@@ -18,7 +18,7 @@ message Input {
   }
   optional PixFmt pix_fmt = 3;
   optional int32 framerate = 4;
-  optional string duration = 5;
+  optional string playout_frames = 5;
 }
 
 message Configure {

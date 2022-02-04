@@ -12,7 +12,7 @@
                 "filepath": "/sdcard/320x180_900fr_nv12.yuv",
                 "resolution": "320x180",
                 "framerate": 30,
-                "duration": 300
+                "playout-frames": 300
             },
             "configure": {
                 "codec": "encoder.avc",

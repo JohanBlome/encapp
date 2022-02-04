@@ -52,7 +52,7 @@
                     "type": "integer",
                     "description": "file frame rate (fps)"
                 },
-                "duration": {
+                "playout-frames": {
                     "type": "integer",
                     "description": "duration of the file (frames)"
                 },

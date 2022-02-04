@@ -15,7 +15,7 @@
             90,
             120
         ],
-        "duration": 180
+        "playout-frames": 180
     },
     "configure": {
         "codec": [

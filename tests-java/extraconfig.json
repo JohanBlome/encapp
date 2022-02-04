@@ -13,7 +13,7 @@
                 "width": 320,
                 "height": 180,
                 "framerate": 30,
-                "duration": 300
+                "playout-frames": 300
             },
             "configure": {
                 "codec": [

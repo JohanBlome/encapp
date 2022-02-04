@@ -175,7 +175,7 @@ $ cat myconfig.json
         "temporal_layer_counts": [
             1
         ],
-        "duration": 10,
+        "playout-frames": 10,
         "enc_loop": 0
     }
 ]
@@ -214,7 +214,7 @@ Example 1: using an already-encoded (mp4) file (the script will convert it to ra
             1,
             10
         ],
-        "duration": 30
+        "playout-frames": 30
     }
 ]
 ```
@@ -249,7 +249,7 @@ Example 2: using a raw file:
             1,
             10
         ],
-        "duration": 30
+        "playout-frames": 30
     }
 ]
 ```
@@ -269,7 +269,7 @@ Definitions of the keys in the sample json file
 * '`encode`': Boolean to indicate whether encoding should be performed [default: true]
 * '`encode_resolutions`': list of encoding resolutions
 * '`framerates`': list of encoding framerates (drop frames to reach a specified frame rate)
-* '`duration`': duration of the encoding (ignored when `enc_loop` > 0)
+* '`playout-frames`': duration of the encoding (ignored when `enc_loop` > 0)
 * '`i_intervals`': list of I-frame intervals
 * '`input_files`': list of input files
 * '`input_fps`': input frame rate [for raw inputs]
