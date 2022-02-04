@@ -1,6 +1,7 @@
 syntax = "proto2";
 
-package encapp;
+option java_package = "com.facebook.encapp";
+option java_outer_classname = "TestDefinition";
 
 message Common {
   optional string id = 1;

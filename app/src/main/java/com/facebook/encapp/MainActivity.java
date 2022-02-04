@@ -280,6 +280,11 @@ public class MainActivity extends AppCompatActivity {
             try {
                 Vector<TestParams> vcCombinations = null;
                 if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
+                                              /*       Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
+                        Log.d(TAG, "Test path = " + path.getFileName());
+                        tests = TestDefinition.Tests.parseFrom(Files.readAllBytes(path));
+                        Log.d(TAG, "Tests:  " + tests.getTest().getCommon().getDescription());*/
+
                     vcCombinations = new Vector<>();
                     if (!JSONTestCaseBuilder.parseFile(mExtraData.getString(ParseData.TEST_CONFIG), vcCombinations, sp)) {
                         Assert.assertTrue("Failed to parse tests", false);
