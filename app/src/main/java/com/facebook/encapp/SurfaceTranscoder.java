@@ -208,6 +208,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         last_pts = pts;
 
                         mStats.startDecodingFrame(pts, mExtractor.getSampleSize(), flags);
+                        inFramesCount++;
                         mDecoder.queueInputBuffer(index, 0, size, pts, flags);
 
                         boolean eof = !mExtractor.advance();
@@ -256,15 +257,16 @@ public class SurfaceTranscoder extends BufferEncoder {
                             sleepUntilNextFrame();
                         }
                         mStats.startEncodingFrame(pts, inFramesCount);
-                        inFramesCount++;
                     }
 
                 }
 
                 if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0 || done) {
                     ///Done
-                    Log.d(TAG, "Signal eos");
-                    mCodec.signalEndOfInputStream();
+                    if (mCodec != null) {
+                        Log.d(TAG, "Signal eos");
+                        mCodec.signalEndOfInputStream();
+                    }
                 }
             }
 

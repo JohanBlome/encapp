@@ -261,8 +261,8 @@ class SurfaceEncoder extends Encoder {
             }
         }
 
-
-        mYuvReader.closeFile();
+        if (mYuvReader != null)
+            mYuvReader.closeFile();
 
 
         return "";
