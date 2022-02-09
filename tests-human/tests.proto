@@ -9,6 +9,13 @@ message Common {
   optional string start = 4;
 }
 
+enum ValueType {
+  stringType = 0;
+  intType = 1;
+  floatType = 2;
+  longType = 3;
+}
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -17,14 +24,14 @@ message Input {
     nv12 = 1;
   }
   optional PixFmt pix_fmt = 3;
-  optional int32 framerate = 4;
-  optional string playout_frames = 5;
+  optional float framerate = 4;
+  optional int32 playout_frames = 5;
 }
 
 message Configure {
   message Parameter {
     optional string key = 1;
-    optional string type = 2;
+    optional ValueType type = 2;
     optional string value = 3;
   }
   repeated Parameter parameter = 1;
@@ -60,7 +67,7 @@ message Runtime {
   message Parameter {
     optional int64 framenum = 1;
     optional string key = 2;
-    optional string type = 3;
+    optional ValueType type = 3;
     optional string value = 4;
   }
   repeated Parameter parameter = 1;
@@ -73,7 +80,7 @@ message Runtime {
   repeated int64 drop = 3;
   message DynamicFramerateParameter {
     optional int64 framenum = 1;
-    optional int32 framerate = 2;
+    optional float framerate = 2;
   }
   repeated DynamicFramerateParameter dynamic_framerate = 4;
   repeated int64 request_sync = 5;
