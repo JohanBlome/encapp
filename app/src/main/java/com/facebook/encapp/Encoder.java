@@ -9,16 +9,18 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.facebook.encapp.proto.Configure;
+import com.facebook.encapp.proto.DataValueType;
+import com.facebook.encapp.proto.Runtime;
+import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.Assert;
-import com.facebook.encapp.utils.ConfigureParam;
 import com.facebook.encapp.utils.FileReader;
-import com.facebook.encapp.utils.RuntimeParam;
 import com.facebook.encapp.utils.Statistics;
-import com.facebook.encapp.utils.TestParams;
+import com.facebook.encapp.utils.TestDefinitionHelper;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.Vector;
@@ -46,8 +48,9 @@ public abstract class Encoder {
     protected Statistics mStats;
     protected String mFilename;
     protected boolean mDropNext;
-    protected HashMap<Integer, ArrayList<RuntimeParam>> mRuntimeParams;
-    protected HashMap<Integer, ArrayList<RuntimeParam>> mDecoderRuntimeParams;
+    protected Runtime mRuntimeParams;
+  //  protected HashMap<Integer, ArrayList<RuntimeParam>> mDecoderRuntimeParams; TODO: transcoder decoder settings?
+
     boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     protected FileReader mYuvReader;
     protected int mVideoTrack = -1;
@@ -57,10 +60,28 @@ public abstract class Encoder {
     boolean mRealtime = false;
     double mCurrentTime;
     float mReferenceFrameRate = 30;
+    int mOutFramesCount = 0;
+    int mInFramesCount = 0;
+    int mCurrentLoop = 0;
+    Test mTest;
 
     public abstract String encode(
-            TestParams vc,
+            Test td,
             boolean writeFile);
+
+
+    public String checkFilePath(String path) {
+        if (path.startsWith("/sdcard/")) {
+            return path;
+        }
+
+        int last_dir = path.lastIndexOf('/');
+        if (last_dir == -1) {
+            return "/sdcard/" + path;
+        }
+
+        return "/sdcard/" + path.substring(last_dir);
+    }
 
     protected void sleepUntilNextFrame() {
         long now = System.nanoTime();
@@ -189,42 +210,57 @@ public abstract class Encoder {
         return mStats;
     }
 
-    protected String getCodecName(TestParams vc) {
+    protected Test setCodecNameAndIdentifier(Test test) {
+        String partialName = test.getConfigure().getCodec();
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        String id = vc.getCodecName();
         String codecName = "";
-        Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, id);
+        Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, partialName);
 
         if (matching.size() > 1) {
             StringBuilder sb = new StringBuilder();
-            sb.append("\nAmbigous codecs for " + id + "\n" + matching.size() + " codecs matching.\n");
+            sb.append("\nAmbigous codecs for " + partialName + "\n" + matching.size() + " codecs matching.\n");
             for (MediaCodecInfo info : matching) {
                 sb.append(info.getName() + "\n");
             }
             Assert.assertTrue(sb.toString(), false);
         } else if (matching.size() == 0) {
-            Assert.assertTrue("\nNo matching codecs to : " + id, false);
+            Assert.assertTrue("\nNo matching codecs to : " + partialName, false);
         } else {
-            vc.setVideoEncoderIdentifier(matching.elementAt(0).getSupportedTypes()[0]);
-            codecName = matching.elementAt(0).getName();
+            Log.d(TAG, "Set codec and mime: " + codecName);
+            Test.Builder builder = Test.newBuilder(test);
+            Configure configure = Configure.
+                                    newBuilder(test.
+                                            getConfigure())
+                                                .setCodec(matching.get(0).getName())
+                                                .setMime(matching.get(0).getSupportedTypes()[0]).build();
+            builder.setConfigure(configure);
+            return builder.build();
         }
-        return codecName;
+        return test;
     }
 
-    protected void setConfigureParams(TestParams vc, ArrayList<ConfigureParam> params, MediaFormat format) {
-        for (ConfigureParam param : params) {
-            if (param.value instanceof Integer) {
-                format.setInteger(param.name, (Integer) param.value);
-            } else if (param.value instanceof String) {
-                Log.d(TAG, "Set  " + param.name + " to " + param.value);
-                format.setString(param.name, (String) param.value);
+    protected void setConfigureParams(Test test, MediaFormat format) {
+        Configure config = test.getConfigure();
+
+
+        List<Configure.Parameter> params = test.getConfigure().getParameterList();
+        for (Configure.Parameter param : params) {
+            switch (param.getType().getNumber()) {
+                case DataValueType.intType_VALUE:
+                    format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
+                    break;
+                case DataValueType.stringType_VALUE:
+                    format.setString(param.getKey(), param.getValue());
+                    break;
             }
         }
     }
 
-    protected void checkConfigureParams(TestParams vc, MediaFormat format) {
+    public static void checkConfigureParams(Test vc, MediaFormat format) {
+        //TODO:
+        /*
         ArrayList<ConfigureParam> params = vc.getEncoderConfigure();
         Log.d(TAG, "checkConfigureParams: " + params.toString() + ", l = " + params.size());
         for (ConfigureParam param : params) {
@@ -242,10 +278,11 @@ public abstract class Encoder {
             } catch (Exception ex) {
                 Log.e(TAG, param.name + ", Bad behaving Mediaformat query: " + ex.getMessage());
             }
-        }
+        }*/
     }
 
-    protected void checkConfig(MediaFormat format) {
+    public static void checkMediaFormat(MediaFormat format) {
+
         Log.d(TAG, "Check config: version = "+ Build.VERSION.SDK_INT );
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
@@ -278,61 +315,217 @@ public abstract class Encoder {
                 }
 
             }
-        }
-    }
+        } else {
 
-    protected void setRuntimeParameters(int frameCount,  MediaCodec codec, HashMap<Integer, ArrayList<RuntimeParam>> runtimeParamList) {
-        if (runtimeParamList != null && !runtimeParamList.isEmpty()) {
-            Bundle params = new Bundle();
-            ArrayList<RuntimeParam> runtimeParams = runtimeParamList.get(Integer.valueOf(frameCount));
-            if (runtimeParams != null) {
-                for (RuntimeParam param : runtimeParams) {
-                    Log.d("ltr", "Runtime: "+param.name + "@"+frameCount+", vl = "+ param.value.toString());
-                    if (param.value == null) {
-                        params.putInt(param.name, frameCount);
-                    } else if (param.type.equals("int")) {
-                        if (param.name.equals("fps")) {
-                            mKeepInterval = (float) mFrameRate / (float) Integer.parseInt((String)param.value);
-                        } else {
-                            String sval =  param.value.toString();
-                            int val = 0;
-                            if (sval.endsWith("k")) {
-                                val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('k'))) * 1000;
-                            } else if (sval.endsWith("M")) {
-                                val = Integer.parseInt(sval.substring(0, sval.lastIndexOf('M'))) * 1000000;
-                            } else {
-                                val = Integer.parseInt(sval);
+            StringBuilder str = new StringBuilder();
+            String[] keys = {
+                    MediaFormat.KEY_BIT_RATE,
+                    MediaFormat.KEY_BITRATE_MODE,
+                    MediaFormat.KEY_MIME,
+                    MediaFormat.KEY_FRAME_RATE,
+                    MediaFormat.KEY_COLOR_FORMAT,
+                    MediaFormat.KEY_COLOR_RANGE,
+                    MediaFormat.KEY_COLOR_STANDARD,
+                    MediaFormat.KEY_COLOR_TRANSFER,
+                    MediaFormat.KEY_I_FRAME_INTERVAL,
+                    MediaFormat.KEY_LATENCY,
+                    MediaFormat.KEY_LEVEL,
+                    MediaFormat.KEY_PROFILE,
+                    MediaFormat.KEY_SLICE_HEIGHT,
+                    MediaFormat.KEY_SLICE_HEIGHT,
+                    MediaFormat.KEY_TEMPORAL_LAYERING,
+            };
+
+            for (String key : keys) {
+                if (format.containsKey(key)) {
+                    String val = "";
+                    try {
+                        val = format.getString(key);
+                    } catch (ClassCastException ex1) {
+                        try {
+                            val = Integer.toString(format.getInteger(key));
+                        } catch (ClassCastException ex2) {
+                            try {
+                                val = Float.toString(format.getFloat(key));
+                            } catch (ClassCastException ex3) {
+                                try {
+                                    val = Long.toString(format.getLong(key));
+                                } catch (ClassCastException ex4) {
+                                    Log.d(TAG, "Failed to get key: " + key);
+                                }
                             }
-                            Log.d("ltr","put val " + val);
-                            params.putInt(param.name, val);
+
                         }
-                    } else if (param.type.equals("bundle")) {
-                        params.putBundle(param.name, (Bundle)param.value);
-                    } else {
-                        Log.d(TAG, "Unknown type: " + param.type);
+                    }
+                    if (val != null && val.length() > 0) {
+                        Log.d(TAG, "MediaFormat: " + key + " - string: "+ val);
                     }
                 }
-                codec.setParameters(params);
             }
+
         }
     }
-
-    boolean doneReading(TestParams vc, int loop, double time, int frame) {
+    boolean doneReading(Test test, int frame) {
         boolean done = false;
-        if (vc.getDurationFrames() > 0) {
-            if ( frame >= vc.getDurationFrames() ) {
-                done = true;
-            }
-        } else if (vc.getDurationSec() > 0) {
-            if ( time >= vc.getDurationSec() ) {
-                done = true;
-            }
-        } else if (loop > vc.getLoopCount() ) {
-            if (vc.getLoopCount() <= 1) {
+        if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {
+            if ( frame >= test.getInput().getPlayoutFrames()  ) {
                 done = true;
             }
         }
-
         return done;
     }
+
+    public void setRuntimeParameters(int frame) {;
+        // go through all runtime settings and see which are due
+        if (mRuntimeParams == null) return;
+        Bundle bundle = new Bundle();
+        for (Runtime.VideoBitrateParameter bitrate: mRuntimeParams.getVideoBitrateList()) {
+            if (bitrate.getFramenum() == frame) {
+                Log.d(TAG, "Set new bitrate at frame: " + frame+" ( "+ TestDefinitionHelper.magnitudeToInt(bitrate.getBitrate()) +"  bps)");
+                bundle.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE,
+                            TestDefinitionHelper.magnitudeToInt(bitrate.getBitrate()));
+                break;
+            }
+        }
+
+        for (Long sync: mRuntimeParams.getRequestSyncList()) {
+            if (sync == frame) {
+                bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, frame);
+                break;
+            }
+        }
+
+        for (Runtime.Parameter param: mRuntimeParams.getParameterList()) {
+            if (param.getFramenum() == frame) {
+                switch (param.getType().getNumber()) {
+                    case DataValueType.floatType_VALUE:
+                        float fval = Float.parseFloat(param.getValue());
+                        bundle.putFloat(param.getKey(), fval);
+                        break;
+                    case DataValueType.intType_VALUE:
+                        int ival = TestDefinitionHelper.magnitudeToInt(param.getValue());
+                        bundle.putInt(param.getKey(), ival);
+                        break;
+                    case DataValueType.longType_VALUE:
+                        long lval = Long.parseLong(param.getValue());
+                        bundle.putLong(param.getKey(), lval);
+                        break;
+                    case DataValueType.stringType_VALUE:
+                        bundle.putString(param.getKey(), param.getValue());
+                        break;
+                    default:
+                        ///Should not be here
+                }
+            }
+        }
+
+        if (bundle.keySet().size() > 0 && mCodec != null) {
+            mCodec.setParameters(bundle);
+        }
+    }
+
+    boolean dropFrame(long frame) {
+        if (mRuntimeParams == null) return false;
+        for (Long drop: mRuntimeParams.getDropList()) {
+            if (drop.longValue() == frame) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void updateDynamicFramerate(long frame) {
+        if (mRuntimeParams == null) return;
+        for (Runtime.DynamicFramerateParameter rate: mRuntimeParams.getDynamicFramerateList()) {
+            if (rate.getFramenum() ==  frame) {
+                mKeepInterval = (float) mFrameRate / rate.getFramerate();
+                return;
+            }
+        }
+    }
+
+
+    /**
+     * Fills input buffer for encoder from YUV buffers.
+     *
+     * @return size of enqueued data.
+     */
+    protected int queueInputBufferEncoder(
+            MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
+        //TODO: setRuntimeParameters(frameCount, mCodec, mRuntimeParams);
+        buffer.clear();
+        int read = mYuvReader.fillBuffer(buffer, size);
+        int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
+        int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
+        if (currentFrameNbr == nextFrameNbr || mDropNext) {
+            mSkipped++;
+            mDropNext = false;
+            read = -2;
+        } else if (read == size) {
+            mFramesAdded++;
+            long ptsUsec = computePresentationTime(frameCount, mRefFrameTime);
+            if (mRealtime) {
+                sleepUntilNextFrame();
+            }
+            mStats.startEncodingFrame(ptsUsec, frameCount);
+            codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+        } else {
+            read = -1;
+        }
+
+        return read;
+    }
+
+    public class EncoderCallbackHandler extends MediaCodec.Callback {
+
+        @Override
+        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+            Log.d(TAG, "onInputBufferAvailable");
+        }
+
+        @Override
+        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+            if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                MediaFormat oformat = mCodec.getOutputFormat();
+
+                if (mWriteFile) {
+                    mVideoTrack = mMuxer.addTrack(oformat);
+                    mMuxer.start();
+                }
+                mCodec.releaseOutputBuffer(index, false /* render */);
+            } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                //break;
+            } else {
+                try {
+                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                            (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                    ++mOutFramesCount;
+                    if (mMuxer != null && mVideoTrack != -1) {
+                        ByteBuffer data = mCodec.getOutputBuffer(index);
+                        mMuxer.writeSampleData(mVideoTrack, data, info);
+                    }
+
+                    mCodec.releaseOutputBuffer(index, false /* render */);
+                } catch (IllegalStateException ise) {
+                    // Codec may be closed elsewhere...
+                    Log.e(TAG,"Failed to relese buffer");
+                }
+                mCurrentTime = info.presentationTimeUs/1000000.0;
+            }
+        }
+
+        @Override
+        public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
+            Log.d(TAG, "onError: " + e.getDiagnosticInfo());
+        }
+
+        @Override
+        public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+            MediaFormat oformat = mCodec.getOutputFormat();
+            Encoder.checkMediaFormat(oformat);
+        }
+    }
+
+
 }

@@ -9,27 +9,25 @@ import android.media.MediaFormat;
 import android.media.cts.BitmapRender;
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
-import android.os.Bundle;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.util.Log;
+import android.util.Size;
 import android.view.Surface;
 
+import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.CameraSource;
-import com.facebook.encapp.utils.ConfigureParam;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
-import com.facebook.encapp.utils.TestParams;
+import com.facebook.encapp.utils.TestDefinitionHelper;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
-
-import androidx.annotation.NonNull;
 
 
 /**
@@ -50,8 +48,7 @@ class SurfaceEncoder extends Encoder {
     boolean mIsCameraSource = false;
     CameraSource mCameraSource;
     OutputSurface mOutputSurface;
-    int mOutFramesCount = 0;
-    int mInFramesCount = 0;
+
     boolean mUseCameraTimestamp = true;
 
     public SurfaceEncoder(Context context) {
@@ -59,43 +56,51 @@ class SurfaceEncoder extends Encoder {
     }
 
     public String encode(
-            TestParams vc,
+            Test test,
             boolean writeFile) {
-        return encode(vc, writeFile, null);
+        return encode(test, writeFile, null);
     }
 
     public String encode(
-            TestParams vc,
+            Test test,
             boolean writeFile,
             Object synchStart) {
 
-        Log.d(TAG, "** Raw input encoding - " + vc.getDescription() + " **");
-        mRuntimeParams = vc.getRuntimeParameters();
-        mSkipped = 0;
-        mFramesAdded = 0;
-        int loop = vc.getLoopCount();
-        int keyFrameInterval = vc.getKeyframeRate();
-        int width = vc.getReferenceSize().getWidth();
-        int height = vc.getReferenceSize().getHeight();
-        mRefFramesizeInBytes = (int) (width * height* 1.5);
-        mRealtime = vc.isRealtime();
-        mWriteFile = writeFile;
-        mFrameRate = vc.getFPS();
-        mReferenceFrameRate = vc.getmReferenceFPS();
-        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        mStats = new Statistics("raw encoder", vc);
+        Log.d(TAG, "** Raw input encoding - " + test.getCommon().getDescription() + " **");
+        test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
+        if (test.hasRuntime())
+            mRuntimeParams = test.getRuntime();
+        if (test.getInput().hasRealtime())
+            mRealtime = test.getInput().getRealtime();
 
-        if (vc.getInputfile().endsWith("rgba")) {
+        mWriteFile = writeFile;
+        mStats = new Statistics("raw encoder", test);
+
+        Size res = SizeUtils.parseXString(test.getInput().getResolution());
+        int width = res.getWidth();
+        int height = res.getHeight();
+        mRefFramesizeInBytes = (int) (width * height * 1.5);
+        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
+
+        if (test.getInput().getFilepath().endsWith("rgba")) {
             mIsRgbaSource = true;
             mRefFramesizeInBytes = (int) (width * height * 4);
-        } else if (vc.getInputfile().equals("camera")) {
+        } else if (test.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
             mCameraSource = CameraSource.getCamera(mContext);
+            //TODO: handle other fps (i.e. try to set lower or higher fps)
+            // Need to check what frame rate is actually set unless real frame time is being used
             mReferenceFrameRate = 30; //We strive for this at least
             mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
+
+            if (!test.getInput().hasPlayoutFrames()) {
+                // In case we do not have a limit, limit to 60 secs
+                test = TestDefinitionHelper.updatePlayoutFrames(test, 1800);
+                Log.d(TAG, "Set playout limit for camera to 1800 frames");
+            }
         }
 
-        if (!mIsRgbaSource) {
+        if (!mIsRgbaSource && !mIsCameraSource) {
             RenderScript rs = RenderScript.create(mContext);
             yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
@@ -109,40 +114,48 @@ class SurfaceEncoder extends Encoder {
             mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
             mYuvReader = new FileReader();
-            if (!mYuvReader.openFile(vc.getInputfile())) {
+            if (!mYuvReader.openFile(test.getInput().getFilepath())) {
                 return "\nCould not open file";
             }
 
         }
 
 
-        vc.addEncoderConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
-                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface));
-
         MediaFormat format;
 
         try {
-            String codecName = getCodecName(vc);
-            mStats.setCodec(codecName);
-            Log.d(TAG, "Create codec by name: " + codecName);
-            mCodec = MediaCodec.createByCodecName(codecName);
 
-            format = vc.createEncoderMediaFormat(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
-            checkConfigureParams(vc, format);
-            setConfigureParams(vc, vc.getEncoderConfigure(), format);
-            checkConfig(format);
+            //Unless we have a mime, do lookup
+            if (test.getConfigure().getMime().length() == 0) {
+                Log.d(TAG, "codec id: " + test.getConfigure().getCodec());
+                //TODO: throw error on failed lookup
+                test = setCodecNameAndIdentifier(test);
+            }
+
+            mStats.setCodec(test.getConfigure().getCodec());
+            Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
+            mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
+
+            format = TestDefinitionHelper.buildMediaFormat(test);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+            checkMediaFormat(format);
             mInputSurfaceReference = new AtomicReference<>();
-            setConfigureParams(vc, vc.getEncoderConfigure(), format);
-            mCodec.setCallback(new CallbackHandler());
+            Log.d(TAG, "Format of encoder");
+            checkMediaFormat(format);
+
+            mInputSurfaceReference = new AtomicReference<>();
+            mCodec.setCallback(new EncoderCallbackHandler());
             mCodec.configure(
                     format,
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
+            checkMediaFormat(mCodec.getInputFormat());
+
             mInputSurfaceReference.set(mCodec.createInputSurface());
             mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
-            checkConfigureParams(vc, mCodec.getInputFormat());
 
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
@@ -167,16 +180,15 @@ class SurfaceEncoder extends Encoder {
             mCameraSource.registerSurface(mOutputSurface.getSurface(), width, height);
         }
 
-        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
-        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
-        boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
-
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
+
+//TODO: needed?
+        /*boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
             mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
             mMuxer.start();
-        }
+        }*/
 
 
         int current_loop = 1;
@@ -187,26 +199,18 @@ class SurfaceEncoder extends Encoder {
         int errorCounter = 0;
         while (!done) {
             int index;
-            if (mInFramesCount % 100 == 0) {
+
+            if (mFramesAdded % 100 == 0) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        ", current loop: " + current_loop + " / "+loop + ", current time: " + mCurrentTime + " sec");
+                        ", current loop: " + current_loop  + ", current time: " + mCurrentTime + " sec");
             }
             try {
                 int flags = 0;
-                if (doneReading(vc, current_loop, mCurrentTime, mInFramesCount)) {
+                if (doneReading(test, mInFramesCount)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
-                if (vc.getDurationSec() > 0 && mCurrentTime >= vc.getDurationSec() |
-                        vc.getDurationFrames() > 0 && mInFramesCount > vc.getDurationFrames()) {
-                    flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                }
-                if (VP8_IS_BROKEN && isVP && isQCom && mInFramesCount > 0 &&
-                        keyFrameInterval > 0 && mInFramesCount % (mFrameRate * keyFrameInterval) == 0) {
-                    Bundle params = new Bundle();
-                    params.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                    mCodec.setParameters(params);
-                }
+
                 int size = -1;
 
                 if (mIsCameraSource) {
@@ -218,6 +222,9 @@ class SurfaceEncoder extends Encoder {
                         mOutputSurface.drawImage();
                         int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
                         int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+                        setRuntimeParameters(nextFrameNbr);
+                        mDropNext = dropFrame(nextFrameNbr);
+                        updateDynamicFramerate(nextFrameNbr);
 
                         if (currentFrameNbr == nextFrameNbr || mDropNext) {
                             mSkipped++;
@@ -244,6 +251,7 @@ class SurfaceEncoder extends Encoder {
                         if (errorCounter > 10) {
                             Log.e(TAG, "Failed to get next frame: " + ex.getMessage() + " errorCounter = " + errorCounter);
                             break;
+
                         }
                     }
 
@@ -270,14 +278,14 @@ class SurfaceEncoder extends Encoder {
                                 mYuvReader.closeFile();
                             }
                             current_loop++;
-                            if (doneReading(vc, current_loop, mCurrentTime, mInFramesCount)) {
+                            if (doneReading(test, mInFramesCount)) {
                                 done = true;
                             }
 
                             if (!done) {
                                 if (mYuvReader != null) {
                                     Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                    mYuvReader.openFile(vc.getInputfile());
+                                    mYuvReader.openFile(test.getInput().getFilepath());
                                     Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                                 }
                             }
@@ -318,6 +326,7 @@ class SurfaceEncoder extends Encoder {
 
 
     SurfaceTexture mSurfTex = null;
+
     /**
      * Fills input buffer for encoder from YUV buffers.
      *
@@ -325,12 +334,13 @@ class SurfaceEncoder extends Encoder {
      */
     private int queueInputBufferEncoder(
             MediaCodec codec, ByteBuffer buffer, int frameCount, int flags, int size) {
-        setRuntimeParameters(frameCount, mCodec, mRuntimeParams);
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
         int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
-
+        setRuntimeParameters(nextFrameNbr);
+        mDropNext = dropFrame(nextFrameNbr);
+        updateDynamicFramerate(nextFrameNbr);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
             mSkipped++;
             mDropNext = false;
@@ -374,54 +384,5 @@ class SurfaceEncoder extends Encoder {
         return read;
     }
 
-    private class CallbackHandler extends MediaCodec.Callback {
-
-        @Override
-        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            Log.d(TAG, "onInputBufferAvailable");
-        }
-
-        @Override
-        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-            if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                MediaFormat oformat = mCodec.getOutputFormat();
-
-                if (mWriteFile) {
-                    mVideoTrack = mMuxer.addTrack(oformat);
-                    mMuxer.start();
-                }
-                mCodec.releaseOutputBuffer(index, false /* render */);
-            } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                //break;
-            } else {
-                try {
-                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                            (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                    ++mOutFramesCount;
-                    if (mMuxer != null && mVideoTrack != -1) {
-                        ByteBuffer data = mCodec.getOutputBuffer(index);
-                        mMuxer.writeSampleData(mVideoTrack, data, info);
-                    }
-
-                    mCodec.releaseOutputBuffer(index, false /* render */);
-                } catch (IllegalStateException ise) {
-                    // Codec may be closed elsewhere...
-                    Log.e(TAG,"Failed to relese buffer");
-                }
-                mCurrentTime = info.presentationTimeUs/1000000.0;
-            }
-        }
-
-        @Override
-        public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.d(TAG, "onError: " + e.getDiagnosticInfo());
-        }
-
-        @Override
-        public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
-            MediaFormat oformat = mCodec.getOutputFormat();
-            checkConfig(oformat);
-        }
-    }
 
 }

@@ -21,7 +21,7 @@ android {
     sourceSets {
         main {
             proto {
-                main.java.srcDirs += "${protobuf.generatedFilesBaseDir}/main/javalite"
+                main.java.srcDirs += "${protobuf.generatedFilesBaseDir}/debug/javalite"
                 srcDir '../proto/'
             }
         }

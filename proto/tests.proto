@@ -1,6 +1,7 @@
 syntax = "proto2";
 
-option java_package = "com.facebook.encapp";
+option java_multiple_files = true;
+option java_package = "com.facebook.encapp.proto";
 option java_outer_classname = "TestDefinition";
 
 message Common {
@@ -10,11 +11,11 @@ message Common {
   optional string start = 4;
 }
 
-enum ValueType {
-  stringType = 0;
-  intType = 1;
-  floatType = 2;
-  longType = 3;
+enum DataValueType {
+    stringType = 0;
+    intType = 1;
+    floatType = 2;
+    longType = 3;
 }
 
 message Input {
@@ -27,12 +28,14 @@ message Input {
   optional PixFmt pix_fmt = 3;
   optional float framerate = 4;
   optional int32 playout_frames = 5;
+  optional int32 pursuit = 6;
+  optional bool realtime = 7;
 }
 
 message Configure {
   message Parameter {
     optional string key = 1;
-    optional ValueType type = 2;
+    optional DataValueType type = 2;
     optional string value = 3;
   }
   repeated Parameter parameter = 1;
@@ -51,10 +54,27 @@ message Configure {
   optional BitrateMode bitrate_mode = 7;
   optional uint64 durationUs = 8;
   optional string resolution = 9;
+
   optional string color_format = 10;
-  optional string color_standard = 11;
-  optional string color_range = 12;
-  optional string color_transfer = 13;
+  enum ColorStandard {
+    bt601_pal = 2;
+    bt601_ntsc = 4;
+    bt709 = 1;
+    bt202 = 6;
+  }
+  optional ColorStandard color_standard = 11;
+  enum ColorRange {
+    full = 1;
+    limited = 2;
+  }
+  optional ColorRange color_range = 12;
+  enum ColorTransfer {
+    linear = 1;
+    sdr_video = 3;
+    st2084 = 6;
+    hlg = 7;
+  }
+  optional ColorTransfer color_transfer = 13;
   optional string color_transfer_request = 14;
   optional int32 frame_rate = 15;
   optional int32 i_frame_interval = 16;
@@ -62,19 +82,21 @@ message Configure {
   optional int32 latency = 18;
   optional int64 repeat_previous_frame_after = 19;
   optional string ts_schema = 20;
+  optional int32 quality_level = 21;
 }
 
 message Runtime {
   message Parameter {
     optional int64 framenum = 1;
     optional string key = 2;
-    optional ValueType type = 3;
+    optional DataValueType type = 3;
     optional string value = 4;
   }
   repeated Parameter parameter = 1;
   // known shortcuts
   message VideoBitrateParameter {
     optional int64 framenum = 1;
+    //can be just a figure in bps or with prefix, k or M
     optional string bitrate = 2;
   }
   repeated VideoBitrateParameter video_bitrate = 2;
@@ -85,6 +107,25 @@ message Runtime {
   }
   repeated DynamicFramerateParameter dynamic_framerate = 4;
   repeated int64 request_sync = 5;
+}
+
+message DecoderConfigure {
+  message Parameter {
+    optional string key = 1;
+    optional DataValueType type = 2;
+    optional string value = 3;
+  }
+  repeated Parameter parameter = 1;
+}
+
+message DecoderRuntime {
+  message Parameter {
+    optional int64 framenum = 1;
+    optional string key = 2;
+    optional DataValueType type = 3;
+    optional string value = 4;
+  }
+  repeated Parameter parameter = 1;
 }
 
 message Parallel {
@@ -100,10 +141,12 @@ message Test {
   optional Input input = 2;
   optional Configure configure = 3;
   optional Runtime runtime = 4;
-  optional Parallel parallel = 5;
-  optional Serial serial = 6;
+  optional DecoderConfigure decoder_configure = 5;
+  optional DecoderRuntime decoder_runtime = 6;
+  optional Parallel parallel = 7;
 }
 
 message Tests {
-  optional Test test = 1;
+  //Tests are serial unless included in another test as parallell
+  repeated Test test = 1;
 }
