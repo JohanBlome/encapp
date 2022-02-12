@@ -46,6 +46,7 @@ class SurfaceEncoder extends Encoder {
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     BitmapRender mBitmapRender = null;
     SurfaceTexture mSurfaceTexture;
+    boolean mIsRgbaSource = false;
 
     public SurfaceEncoder(Context context) {
         mContext = context;
@@ -58,25 +59,31 @@ class SurfaceEncoder extends Encoder {
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
         mFramesAdded = 0;
-        mRefFramesizeInBytes = (int) (vc.getReferenceSize().getWidth() *
-                vc.getReferenceSize().getHeight() * 1.5);
+        int width = vc.getReferenceSize().getWidth();
+        int height = vc.getReferenceSize().getHeight();
+        mRefFramesizeInBytes = (int) (width * height* 1.5);
         mRealtime = vc.isRealtime();
         mWriteFile = writeFile;
         mStats = new Statistics("raw encoder", vc);
         mYuvReader = new FileReader();
-        RenderScript rs = RenderScript.create(mContext);
-        yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
-        Type.Builder yuvType = new Type.Builder(rs, Element.U8(rs)).setX(mRefFramesizeInBytes);
-        mYuvIn = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
-        int width = vc.getReferenceSize().getWidth();
-        int height = vc.getReferenceSize().getHeight();
-        Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
+        if (vc.getInputfile().endsWith("rgba")) {
+            mIsRgbaSource = true;
+            mRefFramesizeInBytes = (int) (width * height * 4);
+        }
 
-        Log.d(TAG, "ref Width x height  = " + width + "x"+ height);
-        Log.d(TAG, "enc Width x height  = " + vc.getVideoSize().getWidth() + "x"+ vc.getVideoSize().getHeight());
-        mYuvOut = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+        if (!mIsRgbaSource) {
+            RenderScript rs = RenderScript.create(mContext);
+            yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
 
+            Type.Builder yuvType = new Type.Builder(rs, Element.U8(rs)).setX(mRefFramesizeInBytes);
+            mYuvIn = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
+            Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
+
+            Log.d(TAG, "ref Width x height  = " + width + "x" + height);
+            Log.d(TAG, "enc Width x height  = " + vc.getVideoSize().getWidth() + "x" + vc.getVideoSize().getHeight());
+            mYuvOut = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+        }
 
         mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         vc.addEncoderConfigureSetting(new ConfigureParam(MediaFormat.KEY_COLOR_FORMAT,
@@ -293,11 +300,16 @@ class SurfaceEncoder extends Encoder {
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
-            mYuvIn.copyFrom(buffer.array());
-            yuvToRgbIntrinsic.setInput(mYuvIn);
-            yuvToRgbIntrinsic.forEach(mYuvOut);
 
-            mYuvOut.copyTo(mBitmap);
+            if (!mIsRgbaSource) {
+                mYuvIn.copyFrom(buffer.array());
+                yuvToRgbIntrinsic.setInput(mYuvIn);
+                yuvToRgbIntrinsic.forEach(mYuvOut);
+
+                mYuvOut.copyTo(mBitmap);
+            } else {
+                mBitmap.copyPixelsFromBuffer(buffer);
+            }
             mInputSurface.makeCurrent();
 
             if (mBitmapRender == null){

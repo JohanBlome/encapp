@@ -470,7 +470,8 @@ public class MainActivity extends AppCompatActivity {
             final Encoder transcoder;
 
             if (vc.getInputfile().toLowerCase(Locale.US).contains(".raw") ||
-                    vc.getInputfile().toLowerCase(Locale.US).contains(".yuv")) {
+                    vc.getInputfile().toLowerCase(Locale.US).contains(".yuv") ||
+                    vc.getInputfile().toLowerCase(Locale.US).contains(".rgba")) {
                 if (vc.doSurfaceEncoding()) {
                     transcoder = new SurfaceEncoder(this);
                 } else {
