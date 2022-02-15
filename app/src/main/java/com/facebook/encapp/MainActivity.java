@@ -65,11 +65,17 @@ public class MainActivity extends AppCompatActivity {
         if ( Build.VERSION.SDK_INT >= 30 && useNewMethod && ! Environment.isExternalStorageManager()) {
             Log.d(TAG, "Check ExternalStorageManager");
             //request for the permission
+
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             Uri uri = Uri.fromParts("package", getPackageName(), null);
             intent.setData(uri);
-            startActivity(intent);
-            Assert.assertTrue("Failed to get permission as ExternalStorageManager", Environment.isExternalStorageManager());
+            try {
+                startActivity(intent);
+            }
+            catch( android.content.ActivityNotFoundException ex) {
+                Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
+                System.exit(-1);
+            }
         }
 
         Log.d(TAG, "Passed all permission checks");
@@ -77,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
             TextView mTvTestRun = findViewById(R.id.tv_testrun);
 
             mTvTestRun.setVisibility(View.VISIBLE);
+
             (new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -159,6 +166,9 @@ public class MainActivity extends AppCompatActivity {
                 int permission = ActivityCompat.checkSelfPermission(context, permName);
                 if (permission != PackageManager.PERMISSION_GRANTED) {
                     nonGrantedPerms.add(permName);
+                    Log.d(TAG, "Permission NOT granted: " + permName);
+                } else {
+                    Log.d(TAG, "Permission granted: " + permName);
                 }
             }
         } catch (PackageManager.NameNotFoundException ignored) {
@@ -205,6 +215,7 @@ public class MainActivity extends AppCompatActivity {
         if (mExtraData.containsKey(ParseData.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(ParseData.TEST_UI_HOLD_TIME_SEC, "0"));
         }
+
         if (mExtraData.containsKey(ParseData.LIST_CODECS)) {
             listCodecs();
             try {
@@ -468,10 +479,10 @@ public class MainActivity extends AppCompatActivity {
             });
 
             final Encoder transcoder;
-
             if (vc.getInputfile().toLowerCase(Locale.US).contains(".raw") ||
                     vc.getInputfile().toLowerCase(Locale.US).contains(".yuv") ||
-                    vc.getInputfile().toLowerCase(Locale.US).contains(".rgba")) {
+                    vc.getInputfile().toLowerCase(Locale.US).contains(".rgba")||
+                    vc.getInputfile().toLowerCase(Locale.US).equals("camera")) {
                 if (vc.doSurfaceEncoding()) {
                     transcoder = new SurfaceEncoder(this);
                 } else {

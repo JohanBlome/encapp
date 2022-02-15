@@ -404,9 +404,13 @@ public class TestParams {
     }
 
     public void setInputfile(String inputfile) {
-        // Assume that the file is in the root of /sdcard/
-        String[] splits = inputfile.split("/");
-        mInputfile = "/sdcard/" + splits[splits.length-1];
+        if (inputfile.toLowerCase().equals("camera")) {
+            mInputfile = inputfile;
+        } else {
+            // Assume that the file is in the root of /sdcard/
+            String[] splits = inputfile.split("/");
+            mInputfile = "/sdcard/" + splits[splits.length - 1];
+        }
     }
 
     public String getInputfile() {

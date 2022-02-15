@@ -248,7 +248,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
     if test_def is None:
         raise Exception('No test files')
 
-    path, filename = os.path.split(json_path)
+    path, json_filename = os.path.split(json_path)
     # remove old encapp files on device (!)
     run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
     # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
@@ -280,25 +280,30 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
             if input_files is not None:
                 for file in input_files:
                     if file[0] != "/":
-                        path = f'{json_folder}/{file}'
+                        media_path = f'{json_folder}/{file}'
                     else:
-                        path = f'{file}'
-                    inputfile = f'/sdcard/{os.path.basename(path)}'
-                    ret, stdout, stderr = run_cmd_silent(
-                        f'adb -s {serial} shell ls {inputfile}')
-                    if len(stderr) > 0:
-                        all_input_files.append(path)
-                        if exists(path):
-                            run_cmd(f'adb -s {serial} push {path} /sdcard/')
-                        else:
-                            print(f'Media file is missing: {path}')
-                            exit(0)
+                        media_path = f'{file}'
+                    mediafile = os.path.basename(media_path)
+                    print(f'file: {mediafile}')
+                    if mediafile == 'camera':
+                        media_path = mediafile
+                    else:
+                        inputfile = f'/sdcard/{mediafile}'
+                        ret, stdout, stderr = run_cmd_silent(
+                            f'adb -s {serial} shell ls {inputfile}')
+                        if len(stderr) > 0:
+                            all_input_files.append(path)
+                            if exists(path):
+                                run_cmd(f'adb -s {serial} push {media_path} /sdcard/')
+                            else:
+                                print(f'Media file is missing: {media_path}')
+                                exit(0)
 
     # run test(s)
     if not options.no_split:
         print(f'No split: {tests}')
         for test in tests:
-            json_name = f'{filename}_{counter}.json'
+            json_name = f'{json_filename}_{counter}.json'
             counter += 1
             with open(json_name, "w") as outfile:
                 json.dump(test, outfile)
@@ -306,7 +311,7 @@ def run_encode_tests(test_def, json_path, model, serial, test_desc,
                      result_json, serial, options)
             os.remove(json_name)
     else:
-        run_test(workdir, json_folder, filename,
+        run_test(workdir, json_folder, json_filename,
                  result_json, serial, options)
 
     if len(all_input_files) > 0:
