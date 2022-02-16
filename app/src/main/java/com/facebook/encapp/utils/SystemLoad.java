@@ -87,7 +87,6 @@ public class SystemLoad {
                 value.append('\n');
             }
         } catch (Exception e) {
-            e.printStackTrace();
             Log.e(TAG, "Failed to read: " + path);
             mCannotRead = true;
         } finally {

@@ -109,7 +109,7 @@ public class SurfaceTranscoder extends BufferEncoder {
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 
 
-            mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight());
+            mOutputSurface = new OutputSurface(vc.getVideoSize().getWidth(), vc.getVideoSize().getHeight(), true);
             if (!noEncoding) {
                 mInputSurfaceReference = new AtomicReference<>();
                 setConfigureParams(vc, vc.getEncoderConfigure(), format);

@@ -1,7 +1,5 @@
-package android.media.cts;
-
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +13,18 @@ package android.media.cts;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
-import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
+package android.media.cts;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
-import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.util.Log;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 /**
  * Code for rendering a texture onto a surface using OpenGL ES 2.0.
  */
@@ -38,10 +36,10 @@ class TextureRender {
     private static final int TRIANGLE_VERTICES_DATA_UV_OFFSET = 3;
     private final float[] mTriangleVerticesData = {
             // X, Y, Z, U, V
-            -1.0f, -1.0f, 0, 0.f, 0.f,
-            1.0f, -1.0f, 0, 1.f, 0.f,
-            -1.0f,  1.0f, 0, 0.f, 1.f,
-            1.0f,  1.0f, 0, 1.f, 1.f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
     };
     private FloatBuffer mTriangleVertices;
     private static final String VERTEX_SHADER =
@@ -65,7 +63,7 @@ class TextureRender {
     private float[] mMVPMatrix = new float[16];
     private float[] mSTMatrix = new float[16];
     private int mProgram;
-    private int mTextureID = -12345;
+    private int mTextureID;
     private int muMVPMatrixHandle;
     private int muSTMatrixHandle;
     private int maPositionHandle;
@@ -142,7 +140,7 @@ class TextureRender {
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, mTextureID);
         checkGlError("glBindTexture mTextureID");
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER,
-                GLES20.GL_LINEAR);
+                GLES20.GL_NEAREST);
         GLES20.glTexParameterf(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER,
                 GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S,
@@ -177,31 +175,34 @@ class TextureRender {
         return shader;
     }
     private int createProgram(String vertexSource, String fragmentSource) {
+        Log.d(TAG, "Compile vertext shader");
         int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexSource);
         if (vertexShader == 0) {
             return 0;
         }
+        Log.d(TAG, "Compile fragment shader");
         int pixelShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource);
         if (pixelShader == 0) {
             return 0;
         }
         int program = GLES20.glCreateProgram();
         checkGlError("glCreateProgram");
-        if (program == 0) {
+        if (program != 0) {
+            GLES20.glAttachShader(program, vertexShader);
+            checkGlError("glAttachShader");
+            GLES20.glAttachShader(program, pixelShader);
+            checkGlError("glAttachShader");
+            GLES20.glLinkProgram(program);
+            int[] linkStatus = new int[1];
+            GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0);
+            if (linkStatus[0] != GLES20.GL_TRUE) {
+                Log.e(TAG, "Could not link program: ");
+                Log.e(TAG, GLES20.glGetProgramInfoLog(program));
+                GLES20.glDeleteProgram(program);
+                program = 0;
+            }
+        } else {
             Log.e(TAG, "Could not create program");
-        }
-        GLES20.glAttachShader(program, vertexShader);
-        checkGlError("glAttachShader");
-        GLES20.glAttachShader(program, pixelShader);
-        checkGlError("glAttachShader");
-        GLES20.glLinkProgram(program);
-        int[] linkStatus = new int[1];
-        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0);
-        if (linkStatus[0] != GLES20.GL_TRUE) {
-            Log.e(TAG, "Could not link program: ");
-            Log.e(TAG, GLES20.glGetProgramInfoLog(program));
-            GLES20.glDeleteProgram(program);
-            program = 0;
         }
         return program;
     }
@@ -211,5 +212,55 @@ class TextureRender {
             Log.e(TAG, op + ": glError " + error);
             throw new RuntimeException(op + ": glError " + error);
         }
+    }
+    /**
+     * Saves the current frame to disk as a PNG image.  Frame starts from (0,0).
+     * <p>
+     * Useful for debugging.
+     */
+    public static void saveFrame(String filename, int width, int height) {
+        // glReadPixels gives us a ByteBuffer filled with what is essentially big-endian RGBA
+        // data (i.e. a byte of red, followed by a byte of green...).  We need an int[] filled
+        // with native-order ARGB data to feed to Bitmap.
+        //
+        // If we implement this as a series of buf.get() calls, we can spend 2.5 seconds just
+        // copying data around for a 720p frame.  It's better to do a bulk get() and then
+        // rearrange the data in memory.  (For comparison, the PNG compress takes about 500ms
+        // for a trivial frame.)
+        //
+        // So... we set the ByteBuffer to little-endian, which should turn the bulk IntBuffer
+        // get() into a straight memcpy on most Android devices.  Our ints will hold ABGR data.
+        // Swapping B and R gives us ARGB.  We need about 30ms for the bulk get(), and another
+        // 270ms for the color swap.
+        //
+        // Making this even more interesting is the upside-down nature of GL, which means we
+        // flip the image vertically here.
+        ByteBuffer buf = ByteBuffer.allocateDirect(width * height * 4);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf);
+        buf.rewind();
+        int pixelCount = width * height;
+        int[] colors = new int[pixelCount];
+        buf.asIntBuffer().get(colors);
+        for (int i = 0; i < pixelCount; i++) {
+            int c = colors[i];
+            colors[i] = (c & 0xff00ff00) | ((c & 0x00ff0000) >> 16) | ((c & 0x000000ff) << 16);
+        }
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(filename);
+            Bitmap bmp = Bitmap.createBitmap(colors, width, height, Bitmap.Config.ARGB_8888);
+            bmp.compress(Bitmap.CompressFormat.PNG, 90, fos);
+            bmp.recycle();
+        } catch (IOException ioe) {
+            throw new RuntimeException("Failed to write file " + filename, ioe);
+        } finally {
+            try {
+                if (fos != null) fos.close();
+            } catch (IOException ioe2) {
+                throw new RuntimeException("Failed to close file " + filename, ioe2);
+            }
+        }
+        Log.d(TAG, "Saved " + width + "x" + height + " frame as '" + filename + "'");
     }
 }
