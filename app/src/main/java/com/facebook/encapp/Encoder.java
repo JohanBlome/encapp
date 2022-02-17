@@ -31,7 +31,7 @@ public abstract class Encoder {
     protected static final String TAG = "encapp";
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000000;
 
-    protected int mFrameRate = 30;
+    protected float mFrameRate = 30;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
     protected MediaMuxer mMuxer;
@@ -41,6 +41,7 @@ public abstract class Encoder {
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
 
     protected long mFrameTime = 0;
+    protected long mRefFrameTime = 0;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
@@ -52,8 +53,10 @@ public abstract class Encoder {
     protected int mVideoTrack = -1;
     int mPts = 132;
     long mLastTime = -1;
+    long mFirstTime = -1;
     boolean mRealtime = false;
-
+    double mCurrentTime;
+    float mReferenceFrameRate = 30;
 
     public abstract String encode(
             TestParams vc,
@@ -65,7 +68,7 @@ public abstract class Encoder {
             mLastTime = System.nanoTime();
         } else {
             long diff = (now - mLastTime) / 1000000;
-            long sleepTime = (mFrameTime / 1000 - diff);
+            long sleepTime = (mRefFrameTime / 1000 - diff);
             if (sleepTime > 0) {
                 try {
                     Thread.sleep(sleepTime);
@@ -77,16 +80,39 @@ public abstract class Encoder {
         mLastTime = now;
     }
 
+    protected void sleepUntilNextFrame(long nextFrame) {
+        long now = System.nanoTime() - mFirstTime;
+        long nextTime = nextFrame * mFrameTime * 1000;
+        long sleepTime = mRefFrameTime / 1000;
+        if (mFirstTime == -1) {
+            mFirstTime = System.nanoTime();
+        } else {
+            sleepTime = (nextTime - now) / 1000000;
+            if (sleepTime < 0) {
+                // We have been delayed. Run forward.
+                now += -sleepTime * 1000000;
+                sleepTime = 0;
+            }
+        }
+        if (sleepTime > 0) {
+            try {
+                Thread.sleep(sleepTime);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTime(int frameIndex) {
-        return mPts + frameIndex * mFrameTime;
+    protected long computePresentationTime(int frameIndex, long frameTime) {
+        return mPts + (long)(frameIndex * frameTime);
     }
 
-    protected void calculateFrameTiming() {
-        mFrameTime = 1000000L / mFrameRate;
+    protected long calculateFrameTiming(float frameRate) {
+        return mFrameTime = (long)(1000000L / frameRate);
     }
 
 

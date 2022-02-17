@@ -88,7 +88,7 @@ class BufferEncoder extends Encoder {
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = vc.getmReferenceFPS();
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        calculateFrameTiming();
+        mRefFrameTime  = calculateFrameTiming(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
@@ -231,7 +231,7 @@ class BufferEncoder extends Encoder {
             read = -2;
         } else if (read == size) {
             mFramesAdded++;
-            long ptsUsec = computePresentationTime(frameCount);
+            long ptsUsec = computePresentationTime(frameCount, mRefFrameTime);
             if (mRealtime) {
                 sleepUntilNextFrame();
             }

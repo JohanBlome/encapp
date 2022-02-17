@@ -17,6 +17,7 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.facebook.encapp.utils.Assert;
+import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.JSONTestCaseBuilder;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.ParseData;
@@ -291,68 +292,88 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(TAG, "No test cases created");
                     return;
                 }
-                int pursuit = vcCombinations.firstElement().getPursuit();
-                while (!mPursuitOver) {
-                    if (vcCombinations.size() == 0) {
-                        Log.w(TAG, "warning: no test to run");
-                        break;
-                    }
+
+                int cameraCount = 0;
+
+                if (vcCombinations.size() == 0) {
+                    Log.w(TAG, "warning: no test to run");
+                } else {
                     Log.d(TAG,"** Starting tests, " + vcCombinations.size() + " number of combinations **");
                     for (TestParams vc : vcCombinations) {
-                        if (pursuit > 0) pursuit -= 1;
                         int vcConc = vc.getConcurrentCodings();
                         int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
+                        int pursuit = vc.getPursuit();
+                        mPursuitOver = false;
+                        Log.d(TAG, "Concurrent = " + concurrent);
+                        Log.d(TAG, "Pursuit = " + pursuit);
+                        while (!mPursuitOver) {
+                            if (pursuit > 0) pursuit -= 1;
 
-                        if (pursuit == 0) {
-                            mPursuitOver = true;
+                            if (vc.getInputfile().toLowerCase().equals("camera")) {
+                                cameraCount += 1;
+                            }
+                            if (pursuit == 0) {
+                                mPursuitOver = true;
+                            }
+                            if (concurrent > 1 || pursuit != 0) {
+                                increaseTestsInflight();
+                                Log.d(TAG, "Start another threaded test " + mInstancesRunning);
+                                (new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Log.d(TAG, "Start threaded test");
+                                        RunTestCase(vc, logText, writeOutput);
+                                        Log.d(TAG, "Done threaded test");
+                                    }
+
+                                })).start();
+
+                                Log.d(TAG, "pursuit = " + pursuit);
+
+
+                                if (pursuit != 0) {
+                                    Log.d(TAG, "pursuit sleep 1 sec, instances: " + mInstancesRunning);
+                                    try {
+                                        Thread.sleep(100);
+                                    } catch (InterruptedException e) {
+                                        e.printStackTrace();
+                                    }
+
+                                }
+                            } else {
+                                increaseTestsInflight();
+                                Log.d(TAG, "start test, no sep thread");
+                                RunTestCase(vc, logText, writeOutput);
+                                Log.d(TAG, "Done test");
+                            }
                         }
-                        if (concurrent > 1 || pursuit != 0) {
-                            increaseTestsInflight();
-                            Log.d(TAG, "Start another threaded test " + mInstancesRunning);
-                            (new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Log.d(TAG, "Start threaded test");
-                                    RunTestCase(vc, logText, writeOutput);
-                                    Log.d(TAG, "Done threaded test");
-                                }
-
-                            })).start();
-
-                            Log.d(TAG, "Concurrent or pursuit");
-                            while (mInstancesRunning >= concurrent && pursuit == 0) {
-                                try {
-                                    Log.d(TAG, "Sleep 200ms");
-                                    Thread.sleep(200);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
+                        Log.d(TAG, "Test queued up, check pursuit over: " + mPursuitOver);
+                        while (mInstancesRunning >= concurrent && pursuit == 0) {
+                            try {
+                                Thread.sleep(200);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
-
-                            if (pursuit != 0) {
-                                Log.d(TAG, "pursuit sleep 1 sec, instances: " + mInstancesRunning);
-                                try {
-                                    Thread.sleep(1000);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-
-                            }
-                        } else {
-                            increaseTestsInflight();
-                            Log.d(TAG, "start test, no sep thread");
-                            RunTestCase(vc, logText, writeOutput);
-                            Log.d(TAG, "Done test");
                         }
                     }
-
-                    Log.d(TAG, "All tests queued up, check pursuit over: " + mPursuitOver);
                 }
                 Log.d(TAG, "All tests queued up, wait for finish");
-                // Wait for all transcoding to be finished
+
+                if (cameraCount > 0) {
+                    do {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }  while (CameraSource.getClientCount() != cameraCount);
+                    Log.d(TAG, "Start cameras");
+                    CameraSource.start();
+                }
+
                 do {
                     try {
-                        Thread.sleep(1000);
+                        Thread.sleep(2000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -471,9 +492,10 @@ public class MainActivity extends AppCompatActivity {
                 public void run() {
                     if (vc.noEncoding()) {
                         logText.append("\n\nStart Test of decoder: " + vc.getDescription() +
-                                       "(" + mInstancesRunning +")");
+                                       "(" + mInstancesRunning +" tests running)");
                     } else {
-                        logText.append("\n\nStart Test: " + settings);
+                        logText.append("\n\nStart Test of encoder: " + vc.getDescription() +
+                                "(" + mInstancesRunning +" tests running)");
                     }
                 }
             });

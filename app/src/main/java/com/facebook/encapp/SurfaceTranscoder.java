@@ -40,6 +40,8 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         mWriteFile = writeFile;
         mStats = new Statistics("surface encoder", vc);
+        mRealtime = vc.isRealtime();
+
         int loop = vc.getLoopCount();
 
         mExtractor = new MediaExtractor();
@@ -69,11 +71,16 @@ public class SurfaceTranscoder extends BufferEncoder {
             e.printStackTrace();
             return "Failed to create decoder";
         }
+        float mReferenceFrameRate = vc.getmReferenceFPS();
+        if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+            mReferenceFrameRate = (float)(inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
+        }
+        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
         boolean isVP = false;
         boolean isQCom = false;
         int keyFrameInterval = vc.getKeyframeRate();
 
-        MediaFormat format;
+        MediaFormat format; 
         try {
             if (!noEncoding) {
                 String codecName = getCodecName(vc);
@@ -151,7 +158,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float referenceFrameRate = vc.getmReferenceFPS();
         mKeepInterval = referenceFrameRate / (float) mFrameRate;
-        calculateFrameTiming();
+        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
 
         if (!noEncoding) {
             Log.d(TAG, "Create muxer");
@@ -162,7 +169,6 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         int inFramesCount = 0;
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        double currentTime = 0;
         long pts_offset = 0;
         long last_pts = 0;
         int current_loop = 1;
@@ -172,11 +178,11 @@ public class SurfaceTranscoder extends BufferEncoder {
             int index;
             if ((mFramesAdded % 100 == 0 && !noEncoding ) || (inFramesCount % 100 == 0 && noEncoding )) {
                 Log.d(TAG, "SurfaceTranscoder, Frames: " + mFramesAdded + " - inframes: " + inFramesCount +
-                        ", current loop: " + current_loop + " / "+loop + ", current time: " + currentTime + " sec");
+                        ", current loop: " + current_loop + " / "+loop + ", current time: " + mCurrentTime + " sec");
             }
             try {
                 int flags = 0;
-                if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                if (doneReading(vc, current_loop, mCurrentTime, inFramesCount)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -207,10 +213,13 @@ public class SurfaceTranscoder extends BufferEncoder {
                         long pts = mExtractor.getSampleTime()  + pts_offset;
                         last_pts = pts;
 
-                        mStats.startDecodingFrame(pts, mExtractor.getSampleSize(), flags);
                         inFramesCount++;
-                        mDecoder.queueInputBuffer(index, 0, size, pts, flags);
+                        if (mRealtime) {
+                            sleepUntilNextFrame(inFramesCount);
+                        }
 
+                        mStats.startDecodingFrame(pts, mExtractor.getSampleSize(), flags);
+                        mDecoder.queueInputBuffer(index, 0, size, pts, flags);
                         boolean eof = !mExtractor.advance();
                         if (eof) {
                             mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
@@ -218,9 +227,10 @@ public class SurfaceTranscoder extends BufferEncoder {
                             pts_offset = last_pts + mFrameTime;
                             Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
                         }
-                        if (doneReading(vc, current_loop, currentTime, inFramesCount)) {
+                        if (doneReading(vc, current_loop, mCurrentTime, inFramesCount)) {
                             done = true;
                         }
+                        mCurrentTime = mExtractor.getSampleTime()/1000000;
                     }
                 }
             } catch (Exception ex) {
@@ -250,12 +260,8 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mOutputSurface.drawImage();
 
                         //egl have time in ns
-                        currentTime = pts/1000000.0;
                         mInputSurface.setPresentationTime(pts * 1000);
                         mInputSurface.swapBuffers();
-                        if (mRealtime) {
-                            sleepUntilNextFrame();
-                        }
                         mStats.startEncodingFrame(pts, inFramesCount);
                     }
 

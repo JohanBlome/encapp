@@ -52,7 +52,7 @@ class SurfaceEncoder extends Encoder {
     OutputSurface mOutputSurface;
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
-    double mCurrentTime = 0;
+    boolean mUseCameraTimestamp = true;
 
     public SurfaceEncoder(Context context) {
         mContext = context;
@@ -61,6 +61,14 @@ class SurfaceEncoder extends Encoder {
     public String encode(
             TestParams vc,
             boolean writeFile) {
+        return encode(vc, writeFile, null);
+    }
+
+    public String encode(
+            TestParams vc,
+            boolean writeFile,
+            Object synchStart) {
+
         Log.d(TAG, "** Raw input encoding - " + vc.getDescription() + " **");
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
@@ -72,6 +80,9 @@ class SurfaceEncoder extends Encoder {
         mRefFramesizeInBytes = (int) (width * height* 1.5);
         mRealtime = vc.isRealtime();
         mWriteFile = writeFile;
+        mFrameRate = vc.getFPS();
+        mReferenceFrameRate = vc.getmReferenceFPS();
+        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
         mStats = new Statistics("raw encoder", vc);
 
         if (vc.getInputfile().endsWith("rgba")) {
@@ -79,8 +90,9 @@ class SurfaceEncoder extends Encoder {
             mRefFramesizeInBytes = (int) (width * height * 4);
         } else if (vc.getInputfile().equals("camera")) {
             mIsCameraSource = true;
-            mCameraSource = new CameraSource(mContext);
-            mCameraSource.openCamera();
+            mCameraSource = CameraSource.getCamera(mContext);
+            mReferenceFrameRate = 30; //We strive for this at least
+            mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
         }
 
         if (!mIsRgbaSource) {
@@ -152,14 +164,10 @@ class SurfaceEncoder extends Encoder {
             mInputSurface.makeCurrent();
             Log.d(TAG,"create output surface");
             mOutputSurface = new OutputSurface(width, height, false);
-            mCameraSource.start(mOutputSurface.getSurface(), width, height);
+            mCameraSource.registerSurface(mOutputSurface.getSurface(), width, height);
         }
 
-
-        mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
-        float mReferenceFrameRate = vc.getmReferenceFPS();
-        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        calculateFrameTiming();
+        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         boolean isQCom = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".qcom");
 
@@ -174,10 +182,11 @@ class SurfaceEncoder extends Encoder {
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
+        long firstTimestamp = -1;
         mStats.start();
         while (!done) {
             int index;
-            if (mFramesAdded % 100 == 0) {
+            if (mInFramesCount % 100 == 0) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
                         ", current loop: " + current_loop + " / "+loop + ", current time: " + mCurrentTime + " sec");
             }
@@ -200,15 +209,33 @@ class SurfaceEncoder extends Encoder {
                 int size = -1;
 
                 if (mIsCameraSource) {
-                    mOutputSurface.awaitNewImage();
+                    long timestamp = mOutputSurface.awaitNewImage();
+                    if (firstTimestamp <= 0) {
+                        firstTimestamp = timestamp;
+                    }
                     mOutputSurface.drawImage();
-                    long ptsUsec = computePresentationTime(mInFramesCount);
-                    mInputSurface.setPresentationTime(ptsUsec * 1000);
-                    mInputSurface.swapBuffers();
-                    mStats.startEncodingFrame(ptsUsec, mInFramesCount);
-                    //TODO: dynamic settings?
-                    mFramesAdded++;
+                    int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
+                    int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+
+                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                        mSkipped++;
+                        mDropNext = false;
+                    } else {
+                        long ptsNsec = 0;
+                        if (mUseCameraTimestamp) {
+                            // Use the camera provided timestamp
+                            ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
+                        } else {
+                            ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
+                        }
+                        mInputSurface.setPresentationTime(ptsNsec);
+                        mInputSurface.swapBuffers();
+                        mStats.startEncodingFrame(ptsNsec/1000, mInFramesCount);
+                        //TODO: dynamic settings?
+                        mFramesAdded++;
+                    }
                     mInFramesCount++;
+
                 } else {
                     while (size < 0 && !done) {
                         try {
@@ -298,7 +325,7 @@ class SurfaceEncoder extends Encoder {
             mDropNext = false;
             read = -2;
         } else if (read == size) {
-            long ptsUsec = computePresentationTime(mFramesAdded);
+            long ptsUsec = computePresentationTime(mInFramesCount, mRefFrameTime);
             mFramesAdded++;
             if (mRealtime) {
                 sleepUntilNextFrame();
