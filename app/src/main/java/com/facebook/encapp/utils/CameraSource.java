@@ -24,9 +24,9 @@ import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Vector;
 import java.util.concurrent.Executor;
 
 import androidx.annotation.NonNull;
@@ -41,22 +41,42 @@ public class CameraSource {
     CameraDevice mCameraDevice;
     Handler mHandler;
     Surface mSurface;
-    List<OutputConfiguration> mOutputConfigs;
+    Vector<OutputConfiguration> mOutputConfigs;
     InputConfiguration mInputConfig;
-    private CameraCaptureSession mSession;
+
     private CaptureRequest.Builder mPreviewRequestBuilder;
 
+    private static CameraSource me = null;
+    private static int mClients = 0;
+    static Object lock = new Object();
+    Vector<SurfaceData> mSurfaces = new Vector<>();
+
     int mHwLevel = -1;
-    public CameraSource(Context context) {
+    public static CameraSource getCamera(Context theContext) {
+        synchronized (lock) {
+            if (me == null) {
+                me = new CameraSource(theContext);
+            }
+            mClients += 1;
+        }
+        return me;
+    }
+
+    private CameraSource(Context context) {
         mContext = context;
     }
 
     public void closeCamera() {
-        mCameraDevice.close();
+        synchronized (me) {
+            mClients -= 1;
+            if (mClients == 0) {
+                mCameraDevice.close();
+            }
+        }
     }
 
 
-    public boolean openCamera() {
+    private boolean openCamera() {
         mCameraManager = (CameraManager) mContext.getSystemService(CAMERA_SERVICE);
         if (mCameraManager == null) {
             Log.e(TAG, "No camera");
@@ -129,6 +149,9 @@ public class CameraSource {
                     new StateHolder(),
                     mHandler);
 
+            int orientation = characs.get(CameraCharacteristics.SENSOR_ORIENTATION);
+            Log.d(TAG,"Sensor orientation: " + orientation);
+
             mHwLevel = characs.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
             Log.d(TAG, "Hw level: " + hwLevelToText(mHwLevel));
         } catch (CameraAccessException cameraAccessException) {
@@ -137,31 +160,43 @@ public class CameraSource {
         return true;
     }
 
-    public  boolean start(Surface output, int width,  int height) {
+
+    public void registerSurface(Surface output, int width,  int height) {
+        mSurfaces.add(new SurfaceData(output, width, height));
+    }
+
+    public static void start() {
+        me.openCamera();
+    }
+
+    private boolean startCapture() {
         try {
-            mSurface = output;
-            android.hardware.camera2.CameraCharacteristics characs = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
-            OutputConfiguration outputConfig = new OutputConfiguration(new Size(width, height), SurfaceTexture.class );
-        //    OutputConfiguration outputConfig = new OutputConfiguration(SurfaceTexture.class );
-            mOutputConfigs = Arrays.asList(outputConfig);
+            mOutputConfigs = new Vector<>();
+
+
+            for (SurfaceData data: mSurfaces) {
+                Log.d(TAG, "Add config surface: " + data.mSurface + ", " + data.mHeight);
+                OutputConfiguration outconfig = new OutputConfiguration(data.mSurface);
+                mOutputConfigs.add(outconfig);
+            }
             SessionConfiguration config = new SessionConfiguration(SessionConfiguration.SESSION_REGULAR,
                     mOutputConfigs,
                     new CamExec(),
                     new CamState());
-            outputConfig.addSurface(output);
+
             mCameraDevice.createCaptureSession(config);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
         return true;
     }
-
     class StateHolder extends CameraDevice.StateCallback {
 
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             Log.d(TAG, "Camera opened: "+camera.getId());
             mCameraDevice = camera;
+            startCapture();
         }
 
         @Override
@@ -195,12 +230,8 @@ public class CameraSource {
         @Override
         public void onConfigured(@NonNull CameraCaptureSession session) {
             Log.d(TAG, "CameraCapture configured: " + session.toString());
-            mSession = session;
-            try {
-                mSession.finalizeOutputConfigurations(mOutputConfigs);
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            }
+
+
             Log.d(TAG, "onReady");
             try {
                 Log.d(TAG, "Create request");
@@ -210,7 +241,10 @@ public class CameraSource {
 
                 mPreviewRequestBuilder
                         = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
-                mPreviewRequestBuilder.addTarget(mSurface);
+                for (SurfaceData data: mSurfaces) {
+                    Log.d(TAG, "Add target surface: " + data.mSurface + ", " + data.mHeight);
+                    mPreviewRequestBuilder.addTarget(data.mSurface);
+                }
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
                 mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, CameraMetadata.CONTROL_AE_MODE_OFF);
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fpsRanges[fpsRanges.length - 1]);
@@ -220,10 +254,12 @@ public class CameraSource {
                 //Set 30ms
                 mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long)(30 * 1000000000));
                 mPreviewRequestBuilder.set(CaptureRequest.SENSOR_FRAME_DURATION, (long)(15 * 1000000000));
-
+                //TOO: from api 31
+                //mPreviewRequestBuilder.set(CameraMetadata.SCALER_ROTATE_AND_CROP_270);
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT, CameraMetadata.CONTROL_CAPTURE_INTENT_VIDEO_RECORD);
                 Log.d(TAG, "Capture!");
-                int capture = mSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, mHandler);
+                int capture = session.setRepeatingRequest(mPreviewRequestBuilder.build(), null, mHandler);
+
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -319,4 +355,17 @@ public class CameraSource {
         return false; // Should never reach here
     }
 
+    class SurfaceData {
+        Surface mSurface;
+        int mWidth, mHeight;
+        public SurfaceData(Surface surface, int width, int height) {
+            mSurface = surface;
+            mWidth = width;
+            mHeight = height;
+        }
+    }
+
+    public static int getClientCount() {
+        return mClients;
+    }
 }
