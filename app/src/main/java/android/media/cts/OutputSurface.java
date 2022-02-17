@@ -47,6 +47,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private SurfaceTexture mSurfaceTexture;
     private Surface mSurface;
     private Object mFrameSyncObject = new Object();     // guards mFrameAvailable
+    private long timeStamp = -1;
     private boolean mFrameAvailable;
     private TextureRender mTextureRender;
     /**
@@ -219,8 +220,9 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * Latches the next buffer into the texture.  Must be called from the thread that created
      * the OutputSurface object, after the onFrameAvailable callback has signaled that new
      * data is available.
+     * Return the timestamp
      */
-    public void awaitNewImage() {
+    public long awaitNewImage() {
         final int TIMEOUT_MS = 2000;
         synchronized (mFrameSyncObject) {
             while (!mFrameAvailable) {
@@ -242,6 +244,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         // Latch the data.
         mTextureRender.checkGlError("before updateTexImage");
         mSurfaceTexture.updateTexImage();
+        return timeStamp;
     }
     /**
      * Wait for new image to become available or until timeout, whichever comes first.
@@ -288,6 +291,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
                 throw new RuntimeException("mFrameAvailable already set, frame could be dropped");
             }
             mFrameAvailable = true;
+            timeStamp = st.getTimestamp();
             mFrameSyncObject.notifyAll();
         }
     }

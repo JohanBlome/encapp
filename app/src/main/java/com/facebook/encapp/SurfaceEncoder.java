@@ -61,6 +61,14 @@ class SurfaceEncoder extends Encoder {
     public String encode(
             TestParams vc,
             boolean writeFile) {
+        return encode(vc, writeFile, null);
+    }
+
+    public String encode(
+            TestParams vc,
+            boolean writeFile,
+            Object synchStart) {
+
         Log.d(TAG, "** Raw input encoding - " + vc.getDescription() + " **");
         mRuntimeParams = vc.getRuntimeParameters();
         mSkipped = 0;
@@ -79,8 +87,7 @@ class SurfaceEncoder extends Encoder {
             mRefFramesizeInBytes = (int) (width * height * 4);
         } else if (vc.getInputfile().equals("camera")) {
             mIsCameraSource = true;
-            mCameraSource = new CameraSource(mContext);
-            mCameraSource.openCamera();
+            mCameraSource = CameraSource.getCamera(mContext);
         }
 
         if (!mIsRgbaSource) {
@@ -152,7 +159,7 @@ class SurfaceEncoder extends Encoder {
             mInputSurface.makeCurrent();
             Log.d(TAG,"create output surface");
             mOutputSurface = new OutputSurface(width, height, false);
-            mCameraSource.start(mOutputSurface.getSurface(), width, height);
+            mCameraSource.registerSurface(mOutputSurface.getSurface(), width, height);
         }
 
 
@@ -174,10 +181,11 @@ class SurfaceEncoder extends Encoder {
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
+        long firstTimestamp = -1;
         mStats.start();
         while (!done) {
             int index;
-            if (mFramesAdded % 100 == 0) {
+            if (mInFramesCount % 100 == 0) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
                         ", current loop: " + current_loop + " / "+loop + ", current time: " + mCurrentTime + " sec");
             }
@@ -200,15 +208,28 @@ class SurfaceEncoder extends Encoder {
                 int size = -1;
 
                 if (mIsCameraSource) {
-                    mOutputSurface.awaitNewImage();
+                    long timestamp = mOutputSurface.awaitNewImage();
+                    if (firstTimestamp <= 0) {
+                        firstTimestamp = timestamp;
+                    }
                     mOutputSurface.drawImage();
-                    long ptsUsec = computePresentationTime(mInFramesCount);
-                    mInputSurface.setPresentationTime(ptsUsec * 1000);
-                    mInputSurface.swapBuffers();
-                    mStats.startEncodingFrame(ptsUsec, mInFramesCount);
-                    //TODO: dynamic settings?
-                    mFramesAdded++;
+                    int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
+                    int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+
+                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                        mSkipped++;
+                        mDropNext = false;
+                    } else {
+                        // Use the camera provided timestamp
+                        long ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
+                        mInputSurface.setPresentationTime(ptsNsec);
+                        mInputSurface.swapBuffers();
+                        mStats.startEncodingFrame(ptsNsec/1000, mInFramesCount);
+                        //TODO: dynamic settings?
+                        mFramesAdded++;
+                    }
                     mInFramesCount++;
+
                 } else {
                     while (size < 0 && !done) {
                         try {
