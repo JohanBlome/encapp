@@ -11,8 +11,8 @@ import re
 INDEX_FILE_NAME = 'encapp_index.csv'
 
 
-def getProperties(json):
-    data = get_data(True)
+def getProperties(options, json):
+    data = getData(options, True)
     _, filename = os.path.split(json)
     row = data.loc[data['file'].str.contains(filename)]
     return row
@@ -32,9 +32,8 @@ def getFilesInDir(directory, recursive):
     return files
 
 
-def indexCurrentDir(recursive):
-    current_dir = os.getcwd()
-    files = getFilesInDir(current_dir, recursive)
+def indexDirectory(options, recursive):
+    files = getFilesInDir(f'{options.path}', recursive)
     settings = []
 
     for df in files:
@@ -57,25 +56,25 @@ def indexCurrentDir(recursive):
               'bitrate', 'real_bitrate']
     pdata = pd.DataFrame.from_records(settings, columns=labels,
                                       coerce_float=True)
-    pdata.to_csv(INDEX_FILE_NAME, index=False)
+    pdata.to_csv(f'{options.path}/{INDEX_FILE_NAME}', index=False)
 
 
-def get_data(recursive):
+def getData(options, recursive):
     try:
-        data = pd.read_csv(INDEX_FILE_NAME)
+        data = pd.read_csv(f'{options.path}/{INDEX_FILE_NAME}')
     except Exception:
         sys.stderr.write('Error when reading index, reindex\n')
-        indexCurrentDir(recursive)
+        indexDirectory(options, recursive)
         try:
-            data = pd.read_csv(INDEX_FILE_NAME)
+            data = pd.read_csv(f'{options.path}/{INDEX_FILE_NAME}')
         except Exception:
-            sys.stderr.write('Failed to read index file')
+            sys.stderr.write('Failed to read index file: {options.path}/{INDEX_FILE_NAME}')
             exit(-1)
     return data
 
 
 def search(options):
-    data = get_data(not options.no_rec)
+    data = getData(options, not options.no_rec)
 
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
@@ -117,6 +116,9 @@ def search(options):
 
 def main():
     parser = argparse.ArgumentParser(description='')
+    parser.add_argument('path',
+                        nargs='?',
+                        help='Search path, default current')
     parser.add_argument('-s', '--size', default=None)  # WxH
     parser.add_argument('-c', '--codec', default=None)
     parser.add_argument('-b', '--bitrate', default=None)
@@ -129,8 +131,11 @@ def main():
 
     options = parser.parse_args()
 
+    if options.path is None:
+        options.path = os.getcwd()
+
     if options.index:
-        indexCurrentDir(options)
+        indexDirectory(options)
 
     data = search(options)
 
@@ -155,7 +160,7 @@ def main():
                 video = data.loc[data['file'] == fl]
                 name = directory + '/' + video['media'].values[0]
             else:
-                name = directory + '/' + fl
+                name = fl
             print(name)
 
 
