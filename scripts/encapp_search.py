@@ -135,7 +135,7 @@ def main():
         options.path = os.getcwd()
 
     if options.index:
-        indexDirectory(options)
+        indexDirectory(options, False)
 
     data = search(options)
 
