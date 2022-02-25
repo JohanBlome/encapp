@@ -302,9 +302,6 @@ public class CameraSource {
         public void onSurfacePrepared(@NonNull CameraCaptureSession session, @NonNull Surface surface) {
             super.onSurfacePrepared(session, surface);
             Log.d(TAG, "onSurfacePrepared");
-
-
-
         }
 
     }

@@ -184,6 +184,7 @@ class SurfaceEncoder extends Encoder {
         boolean done = false;
         long firstTimestamp = -1;
         mStats.start();
+        int errorCounter = 0;
         while (!done) {
             int index;
             if (mInFramesCount % 100 == 0) {
@@ -209,32 +210,42 @@ class SurfaceEncoder extends Encoder {
                 int size = -1;
 
                 if (mIsCameraSource) {
-                    long timestamp = mOutputSurface.awaitNewImage();
-                    if (firstTimestamp <= 0) {
-                        firstTimestamp = timestamp;
-                    }
-                    mOutputSurface.drawImage();
-                    int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
-                    int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
-
-                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
-                        mSkipped++;
-                        mDropNext = false;
-                    } else {
-                        long ptsNsec = 0;
-                        if (mUseCameraTimestamp) {
-                            // Use the camera provided timestamp
-                            ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
-                        } else {
-                            ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
+                    try {
+                        long timestamp = mOutputSurface.awaitNewImage();
+                        if (firstTimestamp <= 0) {
+                            firstTimestamp = timestamp;
                         }
-                        mInputSurface.setPresentationTime(ptsNsec);
-                        mInputSurface.swapBuffers();
-                        mStats.startEncodingFrame(ptsNsec/1000, mInFramesCount);
-                        //TODO: dynamic settings?
-                        mFramesAdded++;
+                        mOutputSurface.drawImage();
+                        int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
+                        int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+
+                        if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                            mSkipped++;
+                            mDropNext = false;
+                        } else {
+                            long ptsNsec = 0;
+                            if (mUseCameraTimestamp) {
+                                // Use the camera provided timestamp
+                                ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
+                            } else {
+                                ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
+                            }
+                            mInputSurface.setPresentationTime(ptsNsec);
+                            mInputSurface.swapBuffers();
+                            mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
+                            //TODO: dynamic settings?
+                            mFramesAdded++;
+                        }
+                        mInFramesCount++;
+                    } catch (Exception ex) {
+                        //TODO: make a real fix for when a camera encoder quits before another
+                        // nd the surface is removed. The camera request needs to be updated.
+                        errorCounter += 1;
+                        if (errorCounter > 10) {
+                            Log.e(TAG, "Failed to get next frame: " + ex.getMessage() + " errorCounter = " + errorCounter);
+                            break;
+                        }
                     }
-                    mInFramesCount++;
 
                 } else {
                     while (size < 0 && !done) {

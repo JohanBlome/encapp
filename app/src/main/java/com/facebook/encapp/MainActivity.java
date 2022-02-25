@@ -486,7 +486,7 @@ public class MainActivity extends AppCompatActivity {
     private void RunTestCase(TestParams vc, TextView logText, boolean fwriteOutput) {
         Log.d(TAG, "Run test case, source : " + vc.getInputfile());
         try {
-            final String settings = vc.getSettings();
+            final String description = vc.getDescription();
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -534,7 +534,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        logText.append("\nTest failed: " + settings);
+                        logText.append("\nTest failed: " + description);
                         logText.append("\n" + status);
                         if (vc.getPursuit() == 0) {
                             Log.d(TAG, "Pursuit over");
@@ -555,7 +555,7 @@ public class MainActivity extends AppCompatActivity {
                         } catch (ArithmeticException aex) {
                             Log.e(TAG, aex.getMessage());
                         }
-                        logText.append("\nDone test: " + settings);
+                        logText.append("\nDone test: " + description);
                     }
                 });
             }
