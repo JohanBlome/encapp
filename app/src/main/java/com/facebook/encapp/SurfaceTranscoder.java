@@ -16,7 +16,6 @@ import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.proto.TestDefinition;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -28,8 +27,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
-import androidx.annotation.NonNull;
-
 public class SurfaceTranscoder extends BufferEncoder {
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
@@ -37,8 +34,7 @@ public class SurfaceTranscoder extends BufferEncoder {
     InputSurface mInputSurface;
     OutputSurface mOutputSurface;
 
-    public String encode(Test test,
-                         boolean writeFile) {
+    public String start(Test test) {
         boolean noEncoding = !test.getConfigure().getEncode();
         if (noEncoding) {
             Log.d(TAG, "**** Surface Decode, no encode ***");
@@ -51,7 +47,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
-        mWriteFile = writeFile;
+        mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mStats = new Statistics("surface encoder", test);
 
         mYuvReader = new FileReader();
@@ -143,7 +139,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         null /* surface */,
                         null /* crypto */,
                         MediaCodec.CONFIGURE_FLAG_ENCODE);
-                checkConfigureParams(test, mCodec.getInputFormat());
+                checkMediaFormat(mCodec.getInputFormat());
                 mInputSurfaceReference.set(mCodec.createInputSurface());
                 mInputSurface = new InputSurface(mInputSurfaceReference.get());
                 mInputSurface.makeCurrent();

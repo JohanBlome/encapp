@@ -55,15 +55,12 @@ class SurfaceEncoder extends Encoder {
         mContext = context;
     }
 
-    public String encode(
-            Test test,
-            boolean writeFile) {
-        return encode(test, writeFile, null);
+    public String start(Test test) {
+        return encode(test, null);
     }
 
     public String encode(
             Test test,
-            boolean writeFile,
             Object synchStart) {
 
         Log.d(TAG, "** Raw input encoding - " + test.getCommon().getDescription() + " **");
@@ -73,7 +70,7 @@ class SurfaceEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
-        mWriteFile = writeFile;
+        mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mStats = new Statistics("raw encoder", test);
 
         Size res = SizeUtils.parseXString(test.getInput().getResolution());
@@ -303,6 +300,7 @@ class SurfaceEncoder extends Encoder {
 
         Log.d(TAG, "Close muxer and streams");
         if (mCodec != null) {
+            mCodec.flush();
             mCodec.stop();
             mCodec.release();
         }
@@ -321,6 +319,20 @@ class SurfaceEncoder extends Encoder {
         if (mIsCameraSource) {
             mCameraSource.closeCamera();
         }
+
+        if (mSurfaceTexture != null) {
+            mInputSurfaceReference.get().release();
+            mInputSurfaceReference.set(null);
+            mSurfaceTexture.detachFromGLContext();
+            mSurfaceTexture.releaseTexImage();
+            mSurfaceTexture.release();
+        }
+
+        if (mOutputSurface != null) {
+            mOutputSurface.getSurface().release();
+            mOutputSurface.release();
+        }
+
         return "";
     }
 

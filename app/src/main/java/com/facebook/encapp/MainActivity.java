@@ -21,7 +21,6 @@ import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.ParseData;
-import com.facebook.encapp.utils.SessionParam;
 import com.facebook.encapp.utils.Statistics;
 
 import java.io.File;
@@ -33,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Stack;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -207,6 +207,35 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    int mCameraCount = 0;
+    public Thread startTest(Test test, TextView logText, Stack<Thread> threads) {
+        Log.d(TAG, "Start test: " + test.getCommon().getDescription());
+        if (test.hasParallel()) {
+            for (Test parallell: test.getParallel().getTestList()) {
+                threads.push(startTest(parallell, logText, threads));
+            }
+        }
+
+        if (test.getInput().getFilepath().toLowerCase().equals("camera")) {
+            mCameraCount += 1;
+        }
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                increaseTestsInflight();
+                Log.d(TAG, "Start threaded test");
+                RunTestCase(test, logText);
+                Log.d(TAG, "Done threaded test");
+            }
+
+        });
+        Log.d(TAG, "start the test thread");
+        t.start();
+
+
+        return t;
+    }
+
     /**
      * Start automated test run.
      */
@@ -239,93 +268,61 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        int overrideConcurrent = 1;
-        if (mExtraData.containsKey(ParseData.MULTIPLE_CONC_SESSIONS)) {
-            overrideConcurrent = mExtraData.getInt(ParseData.MULTIPLE_CONC_SESSIONS, 0);
-        }
 
-        boolean tmp = true; // By default always write encoded file
-        if (mExtraData.containsKey(ParseData.WRITE_FILE)) {
-            tmp = mExtraData.getBoolean(ParseData.WRITE_FILE);
-        }
-
-        SessionParam sp = new SessionParam();
-        final boolean writeOutput = tmp;
-        // Override the filename in the json configure by adding cli "-e -file FILENAME"
-        if (mExtraData.containsKey(ParseData.FILE)) {
-            sp.setInputFile(mExtraData.getString(ParseData.FILE));
-        }
-
-        // A new input size is probably needed in that case
-        if (mExtraData.containsKey(ParseData.REF_RESOLUTION)) {
-            sp.setInputResolution(mExtraData.getString(ParseData.REF_RESOLUTION));
-        }
-
-        if (mExtraData.containsKey(ParseData.REF_FPS)) {
-            sp.setInputFps(mExtraData.getString(ParseData.REF_FPS));
-        }
-
-        if (mExtraData.containsKey(ParseData.FPS)) {
-            sp.setOutputFps(mExtraData.getString(ParseData.FPS));
-        }
-
-        if (mExtraData.containsKey(ParseData.RESOLUTION)) {
-            sp.setOutputResolution(mExtraData.getString(ParseData.RESOLUTION));
-        }
-        if (mExtraData.containsKey(ParseData.ENCODER)) {
-            sp.setOutputCodec(mExtraData.getString(ParseData.ENCODER));
-        }
-
-        /// Use json builder
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                Tests vcCombinations = null;
+                Tests testcases = null;
                 if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
                     Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
                     FileInputStream fis = new FileInputStream(path.toFile());
                     Log.d(TAG, "Test path = " + path.getFileName());
-                    vcCombinations = Tests.parseFrom(fis);
+                    testcases = Tests.parseFrom(fis);
                     Log.d(TAG, "Data: "+Files.readAllBytes(path));
                     // ERROR
+                    if (testcases.getTestList().size() <= 0) {
+                        Log.e(TAG, "Failed to read test");
+                        return;
+                    }
+
                 }
 
                 int pursuit =  -1;// TODO: pursuit
-                int cameraCount = 0;
+
                 while (!mPursuitOver) {
-                    Log.d(TAG,"** Starting tests, " + vcCombinations.getTestCount() + " number of combinations **");
-                    for (Test test : vcCombinations.getTestList()) {
+                    Log.d(TAG,"** Starting tests, " + testcases.getTestCount() + " number of combinations **");
+                    for (Test test : testcases.getTestList()) {
+                        mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;
-                        int vcConc = 1; // TODO: vc.getConcurrentCodings();
-                        int concurrent = (vcConc > overrideConcurrent) ? vcConc : overrideConcurrent;
                         pursuit = test.getInput().getPursuit();
                         mPursuitOver = false;
-                        Log.d(TAG, "Concurrent = " + concurrent);
                         Log.d(TAG, "Pursuit = " + pursuit);
                         while (!mPursuitOver) {
                             if (pursuit > 0) pursuit -= 1;
 
-                            if (test.getInput().getFilepath().toLowerCase().equals("camera")) {
-                                cameraCount += 1;
-                            }
                             if (pursuit == 0) {
                                 mPursuitOver = true;
                             }
 
-                            increaseTestsInflight();
-                            Log.d(TAG, "Start another threaded test " + mInstancesRunning);
-                            (new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Log.d(TAG, "Start threaded test");
-                                    RunTestCase(test, logText, writeOutput);
-                                    Log.d(TAG, "Done threaded test");
-                                }
+                            Stack<Thread> threads = new Stack<>();
 
-                            })).start();
+                            Thread t = startTest(test, logText, threads);
+
+
+                            // Now all parallell tests are done.
+                            Log.d(TAG, "Started the test, check camera: "+mCameraCount);
+                            if (mCameraCount > 0) {
+                                do {
+                                    try {
+                                        Thread.sleep(1000);
+                                    } catch (InterruptedException e) {
+                                        e.printStackTrace();
+                                    }
+                                }  while (CameraSource.getClientCount() != mCameraCount);
+                                Log.d(TAG, "Start cameras");
+                                CameraSource.start();
+                            }
 
                             Log.d(TAG, "pursuit = " + pursuit);
-
-
                             if (pursuit != 0) {
                                 Log.d(TAG, "pursuit sleep 1 sec, instances: " + mInstancesRunning);
                                 try {
@@ -334,6 +331,22 @@ public class MainActivity extends AppCompatActivity {
                                     e.printStackTrace();
                                 }
 
+                            } else {
+                                try {
+                                    //Run serially
+                                    t.join();
+
+                                    while(!threads.empty()) {
+                                        Thread p = threads.pop();
+                                        try {
+                                            p.join();
+                                        } catch (InterruptedException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
 
                         }
@@ -341,17 +354,6 @@ public class MainActivity extends AppCompatActivity {
                 }
                 Log.d(TAG, "All tests queued up, wait for finish");
 
-                if (cameraCount > 0) {
-                    do {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }  while (CameraSource.getClientCount() != cameraCount);
-                    Log.d(TAG, "Start cameras");
-                    CameraSource.start();
-                }
 
                 do {
                     try {
@@ -380,7 +382,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void RunTestCase(Test test, TextView logText, boolean fwriteOutput) {
+    private void RunTestCase(Test test, TextView logText) {
         String filePath = test.getInput().getFilepath().toString();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());
@@ -417,8 +419,7 @@ public class MainActivity extends AppCompatActivity {
                 transcoder = new SurfaceTranscoder();
             }
 
-            final String status = transcoder.encode(test,
-                    fwriteOutput);
+            final String status = transcoder.start(test);
             Log.d(TAG, "Get stats");
             final Statistics stats = transcoder.getStatistics();
             try {

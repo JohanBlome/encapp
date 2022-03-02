@@ -28,8 +28,6 @@ import java.util.Vector;
 import androidx.annotation.NonNull;
 
 public abstract class Encoder {
-
-
     protected static final String TAG = "encapp";
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000000;
 
@@ -65,9 +63,7 @@ public abstract class Encoder {
     int mCurrentLoop = 0;
     Test mTest;
 
-    public abstract String encode(
-            Test td,
-            boolean writeFile);
+    public abstract String start(Test td);
 
 
     public String checkFilePath(String path) {
@@ -258,28 +254,6 @@ public abstract class Encoder {
         }
     }
 
-    public static void checkConfigureParams(Test vc, MediaFormat format) {
-        //TODO:
-        /*
-        ArrayList<ConfigureParam> params = vc.getEncoderConfigure();
-        Log.d(TAG, "checkConfigureParams: " + params.toString() + ", l = " + params.size());
-        for (ConfigureParam param : params) {
-            try {
-                if (param.value instanceof Integer) {
-                    int value = format.getInteger(param.name);
-                    Log.d(TAG, "MediaFormat: " + param.name + " - integer: " + value);
-                } else if (param.value instanceof String) {
-                    String value = format.getString(param.name);
-                    Log.d(TAG, "MediaFormat: " + param.name + " - string: " + value);
-                } else if (param.value instanceof Float) {
-                    float value = format.getFloat(param.name);
-                    Log.d(TAG, "MediaFormat: " + param.name + " - float: " + value);
-                }
-            } catch (Exception ex) {
-                Log.e(TAG, param.name + ", Bad behaving Mediaformat query: " + ex.getMessage());
-            }
-        }*/
-    }
 
     public static void checkMediaFormat(MediaFormat format) {
 

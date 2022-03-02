@@ -21,9 +21,8 @@ import java.nio.ByteBuffer;
  */
 
 class BufferEncoder extends Encoder {
-    public String encode(
-            Test test,
-            boolean writeFile) {
+    public String start(
+            Test test) {
         Log.d(TAG, "** Raw buffer encoding - " + test.getCommon().getDescription() + " **");
 
         if (test.hasRuntime())
@@ -31,6 +30,7 @@ class BufferEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
+        mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mSkipped = 0;
         mFramesAdded = 0;
 
@@ -38,8 +38,7 @@ class BufferEncoder extends Encoder {
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);
 
-        mRealtime = false;//td.getConfigure().isRealtime(); TODO: realtim
-        mWriteFile = writeFile;
+        mRealtime = test.getInput().getRealtime();
         mStats = new Statistics("raw encoder", test);
         mYuvReader = new FileReader();
 
@@ -60,7 +59,7 @@ class BufferEncoder extends Encoder {
             mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
 
             format = TestDefinitionHelper.buildMediaFormat(test);
-            checkConfigureParams(test, format);
+            checkMediaFormat(format);
             setConfigureParams(test, format);
             // Needed for the buffer input. this can be either nv12, nv21 or yuv420p
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
@@ -73,7 +72,7 @@ class BufferEncoder extends Encoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
 
-            checkConfigureParams(test, mCodec.getInputFormat());
+            checkMediaFormat(mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
