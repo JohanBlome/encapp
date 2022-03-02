@@ -192,7 +192,7 @@ public class SurfaceTranscoder extends BufferEncoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount)) {
+                if (doneReading(test, mInFramesCount, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -231,7 +231,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                             pts_offset = last_pts + mFrameTime;
                             Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
                         }
-                        if (doneReading(test, mInFramesCount)) {
+                        if (doneReading(test, mInFramesCount, true)) {
                             done = true;
                         }
                         mCurrentTime = mExtractor.getSampleTime()/1000000;
@@ -254,9 +254,9 @@ public class SurfaceTranscoder extends BufferEncoder {
                     ByteBuffer data = mDecoder.getOutputBuffer(index);
                     int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
                     int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
-                    setRuntimeParameters(nextFrameNbr);
-                    mDropNext = dropFrame(nextFrameNbr);
-                    updateDynamicFramerate(nextFrameNbr);
+                    setRuntimeParameters(mInFramesCount);
+                    mDropNext = dropFrame(mInFramesCount);
+                    updateDynamicFramerate(mInFramesCount);
 
                     if (currentFrameNbr == nextFrameNbr || mDropNext || noEncoding) {
                         mDecoder.releaseOutputBuffer(index, false); //Skip this and read again

@@ -284,6 +284,14 @@ def collect_result(workdir, test_name, serial, options):
     print(f'results collect: {result_json}')
     return result_json
 
+def add_files(test, files_to_push):
+    if test.input.filepath != 'camera':
+        files_to_push.append(test.input.filepath)
+        test.input.filepath =  f'/sdcard/{os.path.basename(test.input.filepath)}'
+    for para in test.parallel.test:
+        files_to_push = add_files(files_to_push)
+    return files_to_push
+    
 def run_codec_tests(test_def, test_path, model, serial, test_desc,
                     workdir, options):
     print(f'run test: {test_def}')
@@ -345,6 +353,8 @@ def run_codec_tests(test_def, test_path, model, serial, test_desc,
                     ntest.configure.bitrate = str(bitrate)
                     fresh.test.extend([ntest])            
         else:
+            # check for possible parallel files
+            files_to_push = add_files(test, files_to_push)
             fresh.test.extend([test])
 
     test_file = os.path.basename(test_def)
@@ -353,6 +363,7 @@ def run_codec_tests(test_def, test_path, model, serial, test_desc,
         binfile.write(fresh.SerializeToString())
         files_to_push.append(output)
 
+    print(f'files_to_push = {files_to_push}')
     for filepath in files_to_push:        
         print(f'Push {filepath}')
         run_cmd(f'adb -s {serial} push {filepath} /sdcard/', options.debug)

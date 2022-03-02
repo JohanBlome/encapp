@@ -339,8 +339,11 @@ public abstract class Encoder {
 
         }
     }
-    boolean doneReading(Test test, int frame) {
+    boolean doneReading(Test test, int frame, boolean loop) {
         boolean done = false;
+        if (!test.getInput().hasPlayoutFrames() && loop) {
+            return true;
+        }
         if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {
             if ( frame >= test.getInput().getPlayoutFrames()  ) {
                 done = true;
@@ -432,6 +435,9 @@ public abstract class Encoder {
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
         int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
+        setRuntimeParameters(mInFramesCount);
+        mDropNext = dropFrame(mInFramesCount);
+        updateDynamicFramerate(mInFramesCount);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
             mSkipped++;
             mDropNext = false;

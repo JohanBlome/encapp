@@ -24,7 +24,7 @@ class BufferEncoder extends Encoder {
     public String start(
             Test test) {
         Log.d(TAG, "** Raw buffer encoding - " + test.getCommon().getDescription() + " **");
-
+        test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
         if (test.hasRuntime())
             mRuntimeParams = test.getRuntime();
         if (test.getInput().hasRealtime())
@@ -90,7 +90,6 @@ class BufferEncoder extends Encoder {
             return "Start encoding failed";
         }
 
-        mFrameRate = format.getInteger(MediaFormat.KEY_FRAME_RATE);
         float mReferenceFrameRate = test.getInput().getFramerate();
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
         mRefFrameTime  = calculateFrameTiming(mReferenceFrameRate);
@@ -113,7 +112,7 @@ class BufferEncoder extends Encoder {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
 
-                if (doneReading(test, mInFramesCount)) {
+                if (doneReading(test, mInFramesCount, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -140,7 +139,7 @@ class BufferEncoder extends Encoder {
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mInFramesCount)) {
+                            if (doneReading(test, mInFramesCount, true)) {
                                 done = true;
                             }
 

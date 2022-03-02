@@ -203,7 +203,7 @@ class SurfaceEncoder extends Encoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount)) {
+                if (doneReading(test, mInFramesCount, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -219,9 +219,9 @@ class SurfaceEncoder extends Encoder {
                         mOutputSurface.drawImage();
                         int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
                         int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
-                        setRuntimeParameters(nextFrameNbr);
-                        mDropNext = dropFrame(nextFrameNbr);
-                        updateDynamicFramerate(nextFrameNbr);
+                        setRuntimeParameters(mInFramesCount);
+                        mDropNext = dropFrame(mInFramesCount);
+                        updateDynamicFramerate(mInFramesCount);
 
                         if (currentFrameNbr == nextFrameNbr || mDropNext) {
                             mSkipped++;
@@ -275,7 +275,7 @@ class SurfaceEncoder extends Encoder {
                                 mYuvReader.closeFile();
                             }
                             current_loop++;
-                            if (doneReading(test, mInFramesCount)) {
+                            if (doneReading(test, mInFramesCount, true)) {
                                 done = true;
                             }
 
@@ -350,9 +350,9 @@ class SurfaceEncoder extends Encoder {
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
         int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
-        setRuntimeParameters(nextFrameNbr);
-        mDropNext = dropFrame(nextFrameNbr);
-        updateDynamicFramerate(nextFrameNbr);
+        setRuntimeParameters(mInFramesCount);
+        mDropNext = dropFrame(mInFramesCount);
+        updateDynamicFramerate(mInFramesCount);
         if (currentFrameNbr == nextFrameNbr || mDropNext) {
             mSkipped++;
             mDropNext = false;
