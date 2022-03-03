@@ -301,14 +301,15 @@ def update_file_paths(test, new_name):
         if path!= 'camera':
             test.input.filepath =  f'/sdcard/{os.path.basename(path)}'
         for para in test.parallel.test:            
-            update_file_names(para, new_name)
+            update_file_paths(para, new_name)
 
 
 def add_files(test, files_to_push):
     if test.input.filepath != 'camera':
         files_to_push.append(test.input.filepath)
     for para in test.parallel.test:
-        files_to_push = add_files(files_to_push)
+        if test.input.filepath != 'camera':
+            files_to_push = add_files(files_to_push)
     return files_to_push
 
 
@@ -514,7 +515,7 @@ def get_options(argv):
     parser.add_argument(
             '-r','--bitrate', type=str, dest='bitrate',
             default=default_values['bps'],
-            metavar='input-video-file',
+            metavar='input-video-bitrate',
             help='input video bitrate, either as a single number, \"100 kbps\" or a lst 100kbps,200kbps or a range 100kps-1Mbps-100kbps (start-stop-step)',)
     parser.add_argument(
             'configfile', type=str, nargs='?',

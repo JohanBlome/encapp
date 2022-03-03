@@ -19,15 +19,13 @@ from encapp import convert_to_bps
 from google.protobuf import text_format
 import proto.tests_pb2 as proto
 
-DEFAULT_TESTS = ['simple.qcif.json',                 
-                 'bitrates.json',
-                 'bitrates_surface.json',
-                 'dynamic_bitrate.json',
-                 'dynamic_framerate.json',
-                 'idr.json',
-                 'lt2.json',
-                 'ltr.json',
-                 'ltr-2ref.json']
+DEFAULT_TESTS = ['bitrate_buffer.pbtxt',
+                 'bitrate_surface.pbtxt',
+                 'dynamic_bitrate.pbtxt',
+                 'dynamic_framerate.pbtxt',
+                 'dynamic_idr.pbtxt',
+                 'lt2.pbtxt',
+                 'ltr-2ref.pbtxt']
 
 
 def parse_schema(schema):
@@ -46,7 +44,7 @@ def get_nal_data(videopath, codec):
     elif codec.find('hevc') or codec.find('h265') or codec.find('265'):
         ending = '265'
     if len(ending) > 0:
-        filename = os.path.splitext(videopath)[0]    
+        filename = os.path.splitext(videopath)[0]
         if not os.path.exists(f'{filename}.{ending}.nal'):
             if ending == '264':
                 cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb '
@@ -114,11 +112,11 @@ def check_long_term_ref(resultpath):
             mark_frame = None
             use_frame = None
 
-            test_def = result.get('testdefinition')                        
+            test_def = result.get('testdefinition')
             test = text_format.Parse(test_def, proto.Test());
 
             dynamics = parse_dynamic_settings(test.runtime)['params']
-           
+
             if dynamics is not None and len(dynamics) > 0:
                 mark_frame = dynamics['vendor.qti-ext-enc-ltr.mark-frame']
                 use_frame = dynamics['vendor.qti-ext-enc-ltr.use-frame']
@@ -201,6 +199,16 @@ def check_long_term_ref(resultpath):
                                               .format(item[0], item[2],
                                                       item[1]))
 
+                # What was found
+                result_string += f'\n\nMarked in media:'
+                for val in lt_mark:
+                    result_string += ('\nframe {:4d} - id: {:d}'
+                                          .format(val, int(lt_mark[val])))
+                result_string += f'\nUsed in media:'
+                for val in lt_use:
+                    result_string += ('\nframe {:4d} - id: {:d}'
+                                          .format(val, int(lt_use[val])))
+
     return result_string
 
 #TODO: fix
@@ -254,7 +262,7 @@ def check_idr_placement(resultpath):
             encoder_settings = result.get('settings')
             testname = result.get('test')
             frames = result.get('frames')
-            
+
             iframes = list(filter(lambda x: (x['iframe'] == 1), frames))
             idr_ids = []
             # gop, either static gop or distance from last?
@@ -271,7 +279,7 @@ def check_idr_placement(resultpath):
                 idr_ids.append(frame['frame'])
 
 
-            test_def = result.get('testdefinition')                        
+            test_def = result.get('testdefinition')
             test = text_format.Parse(test_def, proto.Test());
 
             dynamic_sync = parse_dynamic_settings(test.runtime)['syncs']
@@ -283,10 +291,10 @@ def check_idr_placement(resultpath):
 
                     status.append([testname, "Runtime sync request", passed,
                                    item, resultfilename])
-         
+
             frame_gop = gop * fps
             print(f'fps = {fps} gop = {gop} frame gop = {frame_gop}')
-            
+
             passed = True
             if frame_gop < len(frames):
                 for frame in idr_ids:
@@ -319,9 +327,9 @@ def parse_dynamic_settings(settings):
 
     for param in settings.parameter:
         # TODO: fix this
-        #print(f'{param}')        
+        #print(f'{param}')
         if param.key in params:
-            serie = params[param.key]            
+            serie = params[param.key]
         else:
             serie = {}
             params[param.key] = serie
@@ -335,7 +343,7 @@ def parse_dynamic_settings(settings):
         else:
             serie[param.framenum] = param.value
     for param in settings.video_bitrate:
-        bitrates[param.framenum] = convert_to_bps(param.bitrate)    
+        bitrates[param.framenum] = convert_to_bps(param.bitrate)
     for param in settings.dynamic_framerate:
         framerates[param.framenum] = param.framerate
     for param in settings.request_sync:
@@ -348,7 +356,7 @@ def parse_dynamic_settings(settings):
         'syncs': syncs,
     }
     return runtime_data
-    
+
 def check_mean_bitrate_deviation(resultpath):
     result_string = ''
     bitrate_error = []
@@ -362,7 +370,7 @@ def check_mean_bitrate_deviation(resultpath):
             bitrate = convert_to_bps(encoder_settings.get('bitrate'))
             fps = encoder_settings.get('fps')
 
-            test_def = result.get('testdefinition')                        
+            test_def = result.get('testdefinition')
             test = text_format.Parse(test_def, proto.Test());
             parse_dynamic_settings(test.runtime)
             dynamic_video_bitrate = parse_dynamic_settings(test.runtime)['bitrates']
@@ -531,7 +539,7 @@ def main(argv):
                 settings['videofile'] = options.videofile
                 settings['encoder'] = options.codec
                 settings['output'] = workdir
-                
+
                 result = ep.codec_test(settings, model, serial)
                 bitrate_string += check_mean_bitrate_deviation(result)
                 idr_string += check_idr_placement(result)
