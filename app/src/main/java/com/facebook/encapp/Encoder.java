@@ -246,9 +246,11 @@ public abstract class Encoder {
             switch (param.getType().getNumber()) {
                 case DataValueType.intType_VALUE:
                     format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
+                    Log.d(TAG, "Set int config key: "+param.getKey() + ", " + param.getType() + ", " + param.getValue());
                     break;
                 case DataValueType.stringType_VALUE:
                     format.setString(param.getKey(), param.getValue());
+                    Log.d(TAG, "Set string config key: "+param.getKey() + ", " + param.getType() + ", " + param.getValue());
                     break;
             }
         }
@@ -374,6 +376,7 @@ public abstract class Encoder {
 
         for (Runtime.Parameter param: mRuntimeParams.getParameterList()) {
             if (param.getFramenum() == frame) {
+                Log.d(TAG, "Set runtime parameter @ " + frame +" key: "+param.getKey() + ", " + param.getType() + ", " + param.getValue());
                 switch (param.getType().getNumber()) {
                     case DataValueType.floatType_VALUE:
                         float fval = Float.parseFloat(param.getValue());

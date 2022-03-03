@@ -76,7 +76,7 @@ message Configure {
   }
   optional ColorTransfer color_transfer = 13;
   optional string color_transfer_request = 14;
-  optional int32 frame_rate = 15;
+  optional float framerate = 15;
   optional int32 i_frame_interval = 16;
   optional int32 intra_refresh_period = 17;
   optional int32 latency = 18;

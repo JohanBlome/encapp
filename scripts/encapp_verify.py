@@ -15,7 +15,9 @@ import numpy as np
 import encapp as ep
 import encapp_search as es
 from encapp import run_cmd
-
+from encapp import convert_to_bps
+from google.protobuf import text_format
+import proto.tests_pb2 as proto
 
 DEFAULT_TESTS = ['simple.qcif.json',                 
                  'bitrates.json',
@@ -35,16 +37,6 @@ def parse_schema(schema):
     return -1
 
 
-def parse_bitrate(bitrate):
-    if isinstance(bitrate, str):
-        bitrate_num = -1
-        if bitrate.find('k') > -1:
-            bitrate_num = int(str(bitrate).replace('k', '000'))
-        elif bitrate.find('M') > -1:
-            bitrate_num = int(str(bitrate).replace('M', '000000'))
-        return bitrate_num
-    else:
-        return bitrate
 
 
 def get_nal_data(videopath, codec):
@@ -54,18 +46,17 @@ def get_nal_data(videopath, codec):
     elif codec.find('hevc') or codec.find('h265') or codec.find('265'):
         ending = '265'
     if len(ending) > 0:
-        filename = os.path.splitext(videopath)[0]
-        print(f'filename = {filename}')
-        print(f'videopath = {videopath}')
-
+        filename = os.path.splitext(videopath)[0]    
         if not os.path.exists(f'{filename}.{ending}.nal'):
-            cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb '
-                   f'{filename}.{ending}')
-            run_cmd(cmd)
-
             if ending == '264':
+                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb '
+                       f'{filename}.{ending}')
+                run_cmd(cmd, True)
                 cmd = f'h264nal {filename}.{ending} > {filename}.{ending}.nal'
             else:
+                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v hevc_mp4toannexb '
+                       f'{filename}.{ending}')
+                run_cmd(cmd, True)
                 cmd = f'h265nal {filename}.{ending} > {filename}.{ending}.nal'
 
             print(f'cmd = {cmd}')
@@ -93,7 +84,7 @@ def check_pair_values(ref, data, ok_range):
             not_found.append(key)
     return not_found, wrong_value
 
-
+# TODO: fix ltr
 def check_long_term_ref(resultpath):
     result_string = ''
 
@@ -117,17 +108,20 @@ def check_long_term_ref(resultpath):
             directory, __ = os.path.split(file)
             encoder_settings = result.get('settings')
             testname = result.get('test')
-            # bitrate = parse_bitrate(encoder_settings.get('bitrate'))
+            # bitrate = convert_to_bps(encoder_settings.get('bitrate'))
             runtime_settings = result.get('runtime_settings')
 
             mark_frame = None
             use_frame = None
-            if runtime_settings is not None and len(runtime_settings) > 0:
-                mark_frame = runtime_settings.get(
-                    'vendor.qti-ext-enc-ltr.mark-frame')
-                use_frame = runtime_settings.get(
-                    'vendor.qti-ext-enc-ltr.use-frame')
 
+            test_def = result.get('testdefinition')                        
+            test = text_format.Parse(test_def, proto.Test());
+
+            dynamics = parse_dynamic_settings(test.runtime)['params']
+           
+            if dynamics is not None and len(dynamics) > 0:
+                mark_frame = dynamics['vendor.qti-ext-enc-ltr.mark-frame']
+                use_frame = dynamics['vendor.qti-ext-enc-ltr.use-frame']
             reg_long_term_id = "long_term_frame_idx { ([0-9]*) }"
             reg_long_pic_id = "long_term_pic_num { ([0-9]*) }"
             lt_mark = {}
@@ -142,8 +136,8 @@ def check_long_term_ref(resultpath):
                     while len(line) > 0:
                         line = nal.readline()
                         if line.find('frame_num:') != -1:
-                            if frame < 4:
-                                print(f'frame: {frame} - {line}')
+                            #if frame < 4:
+                            #    print(f'frame: {frame} - {line}')
                             frame += 1
                             match = re.search(reg_long_term_id, line)
                             if match:
@@ -156,6 +150,10 @@ def check_long_term_ref(resultpath):
                                 lt_use[frame] = pid
                                 continue
 
+                print(f'Found ltr mark cases')
+                print(f'{lt_mark}')
+                print(f'Found ltr use cases')
+                print(f'{lt_use}')
                 result_string += f'\n\n----- {testname} -----'
                 result_string += f'\n\nSource: {file}'
                 # each mark frame will cause a use frame so merge the mark
@@ -205,7 +203,7 @@ def check_long_term_ref(resultpath):
 
     return result_string
 
-
+#TODO: fix
 def check_temporal_layer(resultpath):
     result_string = ''
     # "ts-schema": "android.generic.2"
@@ -256,27 +254,39 @@ def check_idr_placement(resultpath):
             encoder_settings = result.get('settings')
             testname = result.get('test')
             frames = result.get('frames')
+            
             iframes = list(filter(lambda x: (x['iframe'] == 1), frames))
             idr_ids = []
             # gop, either static gop or distance from last?
             gop = encoder_settings.get('gop')
+            print(f'Encoder settings: {encoder_settings}')
+            if gop <= 0:
+                print(f'gop is missing')
+                gop = 1
             fps = encoder_settings.get('fps')
+            if fps <= 0:
+                print(f'fps is missing')
+                fps = 30
             for frame in iframes:
                 idr_ids.append(frame['frame'])
 
-            runtime_settings = result.get('runtime_settings')
-            if runtime_settings is not None and len(runtime_settings) > 0:
-                dynamic_sync = runtime_settings.get('request-sync')
-                if dynamic_sync is not None:
-                    passed = True
-                    for item in dynamic_sync:
-                        if int(item) not in idr_ids:
-                            passed = False
+
+            test_def = result.get('testdefinition')                        
+            test = text_format.Parse(test_def, proto.Test());
+
+            dynamic_sync = parse_dynamic_settings(test.runtime)['syncs']
+            if dynamic_sync is not None:
+                passed = True
+                for item in dynamic_sync:
+                    if int(item) not in idr_ids:
+                        passed = False
 
                     status.append([testname, "Runtime sync request", passed,
-                                   gop, resultfilename])
-
+                                   item, resultfilename])
+         
             frame_gop = gop * fps
+            print(f'fps = {fps} gop = {gop} frame gop = {frame_gop}')
+            
             passed = True
             if frame_gop < len(frames):
                 for frame in idr_ids:
@@ -293,7 +303,7 @@ def check_idr_placement(resultpath):
         result_string += f'\n\n----- {name} -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            result_string += ('\n{:s} \"{:s}\", gop {:2d} sec, {:s}'
+            result_string += ('\n{:s} \"{:s}\" at {:2d} frames, {:s}'
                               .format({True: 'passed', False: 'failed'}
                                       [row.passed], row.subtest, row.gop,
                                       row.file))
@@ -301,6 +311,44 @@ def check_idr_placement(resultpath):
     return result_string
 
 
+def parse_dynamic_settings(settings):
+    params = {}
+    bitrates = {}
+    framerates = {}
+    syncs = []
+
+    for param in settings.parameter:
+        # TODO: fix this
+        #print(f'{param}')        
+        if param.key in params:
+            serie = params[param.key]            
+        else:
+            serie = {}
+            params[param.key] = serie
+
+        if param.type == proto.DataValueType.Value('intType'):
+            serie[param.framenum] = int(param.value)
+        if param.type == proto.DataValueType.Value('floatType'):
+            serie[param.framenum] = float(param.value)
+        if param.type == proto.DataValueType.Value('longType'):
+            serie[param.framenum] = param.value
+        else:
+            serie[param.framenum] = param.value
+    for param in settings.video_bitrate:
+        bitrates[param.framenum] = convert_to_bps(param.bitrate)    
+    for param in settings.dynamic_framerate:
+        framerates[param.framenum] = param.framerate
+    for param in settings.request_sync:
+        syncs.append(param)
+
+    runtime_data = {
+        'params': params,
+        'bitrates': bitrates,
+        'framerates': framerates,
+        'syncs': syncs,
+    }
+    return runtime_data
+    
 def check_mean_bitrate_deviation(resultpath):
     result_string = ''
     bitrate_error = []
@@ -311,14 +359,15 @@ def check_mean_bitrate_deviation(resultpath):
             _, resultfilename = os.path.split(file)
             encoder_settings = result.get('settings')
             testname = result.get('test')
-            bitrate = parse_bitrate(encoder_settings.get('bitrate'))
+            bitrate = convert_to_bps(encoder_settings.get('bitrate'))
             fps = encoder_settings.get('fps')
-            runtime_settings = result.get('runtime_settings')
-            dynamic_video_bitrate = None
-            if runtime_settings is not None and len(runtime_settings) > 0:
-                dynamic_video_bitrate = runtime_settings.get('video-bitrate')
 
-            if dynamic_video_bitrate is not None:
+            test_def = result.get('testdefinition')                        
+            test = text_format.Parse(test_def, proto.Test());
+            parse_dynamic_settings(test.runtime)
+            dynamic_video_bitrate = parse_dynamic_settings(test.runtime)['bitrates']
+
+            if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
                 frames = result.get('frames')
                 previous_limit = 0
                 dyn_data = []
@@ -346,7 +395,7 @@ def check_mean_bitrate_deviation(resultpath):
                                      int(target_bitrate), int(round(mean, 0)),
                                      int(round(bitrate_error_perc, 0))])
                     if limit in dynamic_video_bitrate:
-                        target_bitrate = parse_bitrate(
+                        target_bitrate = convert_to_bps(
                             dynamic_video_bitrate[limit])
                     previous_limit = limit
                 result_string += (f'\n\n----- {testname}, runtime bitrate '
@@ -399,17 +448,17 @@ def main(argv):
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument('-d', '--dir', default='encapp_verify')
     parser.add_argument(
-        '-i', '--input',
-        help='Replace all test defined sources with input', default='')
+        '-i', '--videofile',
+        help='Replace all test defined sources with input', default=None)
     parser.add_argument(
-        '-is', '--input_res', help='Override input file', default='')
+        '-is', '--input_res', help='Override input file', default=None)
     parser.add_argument(
-        '-if', '--input_fps', help='Override input fps', default='')
+        '-if', '--input_fps', help='Override input fps', default=None)
     parser.add_argument(
-        '-os', '--output_res', help='Override input file', default='')
+        '-os', '--output_res', help='Override input file', default=None)
     parser.add_argument(
-        '-of', '--output_fps', help='Override input fps', default='')
-    parser.add_argument('-c', '--codec', help='Override encoder', default='')
+        '-of', '--output_fps', help='Override input fps', default=None)
+    parser.add_argument('-c', '--codec', help='Override encoder', default=None)
     parser.add_argument('-t', '--test', nargs="+",)
     parser.add_argument('-r', '--result', nargs="+",)
 
@@ -437,6 +486,11 @@ def main(argv):
 
         os.mkdir(workdir)
         model, serial = ep.get_device_info(options.serial)
+        if type(model) is dict:
+            if 'model' in model:
+                model = model.get('model')
+            else:
+                model = list(model.values())[0]
 
         if options.test is not None:
             # check if list
@@ -452,16 +506,15 @@ def main(argv):
                 test_path = test
 
             with open(test_path, 'r') as test_file:
-                tests_json = json.load(test_file)
                 if os.path.exists(es.INDEX_FILE_NAME):
                     os.remove(es.INDEX_FILE_NAME)
-
+                '''
                 args = []
                 args.append(__file__)
                 args.append('--codec')
                 args.append(options.codec)
                 args.append('--input')
-                args.append(options.input)
+                args.append(options.videofile)
                 args.append('--input_res')
                 args.append(options.input_res)
                 args.append('--input_fps')
@@ -470,18 +523,16 @@ def main(argv):
                 args.append(options.output_res)
                 args.append('--output_fps')
                 args.append(options.output_fps)
-
-                print(f'test: {test}, path = {test_path}')
-                encapp_options = ep.get_options(args)
-                print(f'run test: {tests_json}')
-                result = ep.run_encode_tests(tests_json,
-                                             test_path,
-                                             model,
-                                             serial,
-                                             "encapp_verify",
-                                             workdir,
-                                             encapp_options)
-
+                args.append('--configfile')
+                args.append(configfile)
+                '''
+                settings = ep.extra_settings
+                settings['configfile'] = test_path
+                settings['videofile'] = options.videofile
+                settings['encoder'] = options.codec
+                settings['output'] = workdir
+                
+                result = ep.codec_test(settings, model, serial)
                 bitrate_string += check_mean_bitrate_deviation(result)
                 idr_string += check_idr_placement(result)
                 temporal_string += check_temporal_layer(result)

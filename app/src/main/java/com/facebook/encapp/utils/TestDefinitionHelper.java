@@ -2,7 +2,6 @@ package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.util.Log;
 import android.util.Size;
 
 import com.facebook.encapp.proto.Configure;
@@ -12,6 +11,7 @@ import com.facebook.encapp.proto.Test;
 
 
 public class TestDefinitionHelper {
+    private static String TAG = "encapp";
     public static MediaFormat buildMediaFormat(Test test) {
         Configure config = test.getConfigure();
         Input input = test.getInput();
@@ -40,7 +40,7 @@ public class TestDefinitionHelper {
 
         int bitrateMode = (config.hasBitrateMode())? config.getBitrateMode().getNumber():
                                                     MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR;
-
+        format.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
         int qpVal = 30;
         if (bitrateMode == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ) {
             // Now we need a qp value
@@ -79,7 +79,6 @@ public class TestDefinitionHelper {
 
 
     public static int magnitudeToInt(String text) {
-        Log.d("encapp", "magnitudeToInt: " + text);
         int index = text.indexOf("bps");
 
         if (index > 0) {
@@ -88,7 +87,6 @@ public class TestDefinitionHelper {
             text = text.trim();
         }
 
-        Log.d("encapp", "cleaned magnitudeToInt: " + text);
         int val = 0;
         if (text.endsWith("k")) {
             val = Integer.parseInt(text.substring(0, text.lastIndexOf('k')).trim()) * 1000;
@@ -133,6 +131,7 @@ public class TestDefinitionHelper {
         if (!input.hasResolution()) {
             input.setResolution("1280x720");
         }
+
         if (!input.hasFramerate()) {
             input.setFramerate(30.0f);
         }
@@ -141,6 +140,11 @@ public class TestDefinitionHelper {
         if (!config.hasBitrate()) {
             config.setBitrate("1 Mbps");
         }
+
+        if (!config.hasFramerate()) {
+            config.setFramerate(input.getFramerate());
+        }
+
         if (!config.hasIFrameInterval()) {
             config.setIFrameInterval(10);
         }

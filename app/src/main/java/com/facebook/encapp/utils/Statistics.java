@@ -30,6 +30,7 @@ public class Statistics {
     private String mCodec;
     private long mStartTime;
     private long mStopTime;
+    private MediaFormat mEncoderConfigFormat;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
@@ -162,6 +163,10 @@ public class Statistics {
         mEncoderMediaFormat = format;
     }
 
+    public void setEncoderConfigMediaFormat(MediaFormat format) {
+        mEncoderConfigFormat = format;
+    }
+
     public void setDecoderMediaFormat(MediaFormat format) {
         mDecoderMediaFormat = format;
     }
@@ -178,11 +183,7 @@ public class Statistics {
         if (format == null) {
             return mediaformat;
         }
-        try {
-            mediaformat.put("decoder", mDecoderName);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
             for (String feature: features) {
@@ -232,7 +233,7 @@ public class Statistics {
         JSONObject settings = new JSONObject();
         settings.put("codec", mCodec);
         settings.put("gop", config.getIFrameInterval());
-        settings.put("fps", config.getFrameRate());
+        settings.put("fps", config.getFramerate());
         settings.put("bitrate",config.getBitrate());
         settings.put("meanbitrate", getAverageBitrate());
         if (config.hasResolution()) {
