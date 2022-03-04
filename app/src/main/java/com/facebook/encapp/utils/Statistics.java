@@ -38,16 +38,16 @@ public class Statistics {
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
     int mEncodingProcessingFrames = 0;
-    Test mVc;
+    Test mTest;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
     public static String NA = "na";
 
-    public Statistics(String desc, Test vc) {
+    public Statistics(String desc, Test test) {
         mDesc = desc;
         mEncodingFrames = new HashMap<>();
         mDecodingFrames = new HashMap<>();
-        mVc = vc;
+        mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();
     }
@@ -222,6 +222,12 @@ public class Statistics {
             }
         } else {
            // TODO: Go through the settings
+            try {
+                mediaformat.put(MediaFormat.KEY_FRAME_RATE, format.getFloat(MediaFormat.KEY_FRAME_RATE));
+                mediaformat.put(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         }
         return mediaformat;
     }
@@ -237,11 +243,11 @@ public class Statistics {
         settings.put("bitrate",config.getBitrate());
         settings.put("meanbitrate", getAverageBitrate());
         if (config.hasResolution()) {
-            Size s = Size.parseSize(mVc.getConfigure().getResolution());
+            Size s = Size.parseSize(mTest.getConfigure().getResolution());
             settings.put("width", s.getWidth());
             settings.put("height", s.getHeight());
         }
-        settings.put("encmode",mVc.getConfigure().getBitrateMode());
+        settings.put("encmode", mTest.getConfigure().getBitrateMode());
         if (config.hasColorRange())
             settings.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
         if (config.hasColorStandard())
@@ -261,16 +267,16 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
-            json.put("test", mVc.getCommon().getDescription());
-            json.put("testdefinition", mVc.toString());
+            json.put("test", mTest.getCommon().getDescription());
+            json.put("testdefinition", mTest.toString());
             json.put("date", mStartDate.toString());
             json.put("proctime", getProcessingTime());
             json.put("framecount", getEncodedFrameCount());
             json.put("encodedfile", mEncodedfile);
-            String[] tmp = mVc.getInput().getFilepath().split("/");
+            String[] tmp = mTest.getInput().getFilepath().split("/");
             json.put("sourcefile", tmp[tmp.length - 1]);
 
-            json.put("settings", getConfigSettings(mVc.getConfigure()));
+            json.put("settings", getConfigSettings(mTest.getConfigure()));
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
@@ -368,7 +374,6 @@ public class Statistics {
             e.printStackTrace();
         }
     }
-
 
     //TODO: write camera settings
 

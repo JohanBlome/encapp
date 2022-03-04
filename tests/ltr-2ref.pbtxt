@@ -39,30 +39,24 @@ test {
             type: intType,
             value: "0"
         }
-            parameter {
+        parameter {
             framenum: 500
             key: "vendor.qti-ext-enc-ltr.use-frame"
             type: intType,
             value: "1"
         }
-            parameter {
-            framenum: 600
-            key: "vendor.qti-ext-enc-ltr.use-frame"
-            type: intType,
-            value: "0"
-        }
+        request_sync: 600
         parameter {
             framenum: 700
             key: "vendor.qti-ext-enc-ltr.use-frame"
             type: intType,
             value: "1"
-        }
+        }        
         parameter {
             framenum: 800
             key: "vendor.qti-ext-enc-ltr.use-frame"
             type: intType,
             value: "0"
         }
-       
     }
 }

@@ -238,19 +238,14 @@ public abstract class Encoder {
     }
 
     protected void setConfigureParams(Test test, MediaFormat format) {
-        Configure config = test.getConfigure();
-
-
         List<Configure.Parameter> params = test.getConfigure().getParameterList();
         for (Configure.Parameter param : params) {
             switch (param.getType().getNumber()) {
                 case DataValueType.intType_VALUE:
                     format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
-                    Log.d(TAG, "Set int config key: "+param.getKey() + ", " + param.getType() + ", " + param.getValue());
                     break;
                 case DataValueType.stringType_VALUE:
                     format.setString(param.getKey(), param.getValue());
-                    Log.d(TAG, "Set string config key: "+param.getKey() + ", " + param.getType() + ", " + param.getValue());
                     break;
             }
         }
@@ -360,7 +355,6 @@ public abstract class Encoder {
         Bundle bundle = new Bundle();
         for (Runtime.VideoBitrateParameter bitrate: mRuntimeParams.getVideoBitrateList()) {
             if (bitrate.getFramenum() == frame) {
-                Log.d(TAG, "Set new bitrate at frame: " + frame+" ( "+ TestDefinitionHelper.magnitudeToInt(bitrate.getBitrate()) +"  bps)");
                 bundle.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE,
                             TestDefinitionHelper.magnitudeToInt(bitrate.getBitrate()));
                 break;
@@ -471,7 +465,7 @@ public abstract class Encoder {
         public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
             if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                 MediaFormat oformat = mCodec.getOutputFormat();
-
+                mStats.setEncoderMediaFormat(mCodec.getInputFormat());
                 if (mWriteFile) {
                     mVideoTrack = mMuxer.addTrack(oformat);
                     mMuxer.start();

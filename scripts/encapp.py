@@ -17,8 +17,6 @@ import proto.tests_pb2 as tests_definitions
 
 
 from datetime import datetime
-from os.path import exists
-
 
 __version__ = '0.1'
 
@@ -287,7 +285,6 @@ def collect_result(workdir, test_name, serial):
             path, tmpname = os.path.split(file)
             result_json.append(f'{output_dir}/{tmpname}')
 
-
     adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
     run_cmd(adb_cmd)
     print(f'results collect: {result_json}')
@@ -295,13 +292,13 @@ def collect_result(workdir, test_name, serial):
 
 
 def update_file_paths(test, new_name):
-        path = test.input.filepath
-        if new_name is not None:
-            path = new_name
-        if path!= 'camera':
-            test.input.filepath =  f'/sdcard/{os.path.basename(path)}'
-        for para in test.parallel.test:
-            update_file_paths(para, new_name)
+    path = test.input.filepath
+    if new_name is not None:
+        path = new_name
+    if path != 'camera':
+        test.input.filepath = f'/sdcard/{os.path.basename(path)}'
+    for para in test.parallel.test:
+        update_file_paths(para, new_name)
 
 
 def add_files(test, files_to_push):
@@ -320,7 +317,7 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
         tests.ParseFromString(fd.read())
 
     print(tests)
-    fresh = tests_definitions.Tests();
+    fresh = tests_definitions.Tests()
     files_to_push = []
     for test in tests.test:
 
@@ -328,6 +325,7 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
             test.configure.codec = settings['encoder']
 
         videofile = settings['videofile']
+        print(f'Videofile exchanged? {videofile}')
         if videofile is not None and len(videofile) > 0:
             files_to_push.append(videofile)
         else:
@@ -335,15 +333,15 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
             files_to_push = add_files(test, files_to_push)
         update_file_paths(test, videofile)
 
-
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
-            #defult is serial calls
+            # defult is serial calls
             split = settings['bitrate'].split(' ')
             if len(split) != 3:
                 split = settings['bitrate'].split(',')
                 if len(split) != 3:
-                    #Single bitrate
-                    test.configure.bitrate = str(convert_to_bps(settings['bitrate']))
+                    # Single bitrate
+                    test.configure.bitrate = str(
+                        convert_to_bps(settings['bitrate']))
                     fresh.test.extend([test])
                 else:
                     for bitrate in split:
@@ -407,10 +405,10 @@ def is_int(s):
         return True
     return (s[1:].isdigit() if s[0] in ('-', '+') else s.isdigit())
 
+
 def convert_to_bps(value):
     if isinstance(value, str):
         mul = 1
-        tmp = value.replace('bps', '')
         index = value.rfind('k')
         if index == -1:
             index = value.rfind('M')
@@ -438,10 +436,10 @@ def convert_to_frames(value, fps=30):
 
 
 def convert_test(path):
-    index = path.rindex('.')
     output = f"{path[0:path.rindex('.')]}.bin"
     root = f"{SCRIPT_DIR[0:SCRIPT_DIR.rindex('/')]}"
-    cmd = f'protoc -I / --encode="Tests" {root}/proto/tests.proto < {path} > {output}'
+    cmd = (f'protoc -I / --encode="Tests" {root}/proto/tests.proto '
+           f'< {path} > {output}')
     print(f'cmd: {cmd}')
     run_cmd(cmd)
     return output
@@ -465,70 +463,70 @@ def codec_test(settings, model, serial):
 
     # run the codec test
     return run_codec_tests(test_config,
-                    model,
-                    serial,
-                    workdir,
-                    settings)
+                           model,
+                           serial,
+                           workdir,
+                           settings)
 
 
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-            '-v', '--version', action='store_true',
-            dest='version', default=False,
-            help='Print version',)
+        '-v', '--version', action='store_true',
+        dest='version', default=False,
+        help='Print version',)
     parser.add_argument(
-            '-d', '--debug', action='count',
-            dest='debug', default=default_values['debug'],
-            help='Increase verbosity (use multiple times for more)',)
+        '-d', '--debug', action='count',
+        dest='debug', default=default_values['debug'],
+        help='Increase verbosity (use multiple times for more)',)
     parser.add_argument(
-            '--quiet', action='store_const',
-            dest='debug', const=-1,
-            help='Zero verbosity',)
+        '--quiet', action='store_const',
+        dest='debug', const=-1,
+        help='Zero verbosity',)
     parser.add_argument('--serial', help='Android device serial number')
     parser.add_argument(
-            '--install', action='store_const',
-            dest='install', const=True,
-            default=default_values['install'],
-            help='Do install apk',)
+        '--install', action='store_const',
+        dest='install', const=True,
+        default=default_values['install'],
+        help='Do install apk',)
     parser.add_argument(
-            '--no-install', action='store_const',
-            dest='install', const=False,
-            help='Do not install apk',)
+        '--no-install', action='store_const',
+        dest='install', const=False,
+        help='Do not install apk',)
     parser.add_argument(
-            'func', type=str, nargs='?',
-            default=default_values['func'],
-            choices=FUNC_CHOICES.keys(),
-            metavar='%s' % (' | '.join("{}: {}".format(k, v) for k, v in
-                                       FUNC_CHOICES.items())),
-            help='function arg',)
+        'func', type=str, nargs='?',
+        default=default_values['func'],
+        choices=FUNC_CHOICES.keys(),
+        metavar='%s' % (' | '.join("{}: {}".format(k, v) for k, v in
+                                   FUNC_CHOICES.items())),
+        help='function arg',)
     parser.add_argument(
-            '-i', type=str, dest='videofile',
-            default=default_values['videofile'],
-            metavar='input-video-file',
-            help='input video file',)
+        '-i', type=str, dest='videofile',
+        default=default_values['videofile'],
+        metavar='input-video-file',
+        help='input video file',)
     parser.add_argument(
-            '-c', '--codec', type=str, dest='codec',
-            default=default_values['encoder'],
-            metavar='encoder',
-            help='override encoder in config',)
+        '-c', '--codec', type=str, dest='codec',
+        default=default_values['encoder'],
+        metavar='encoder',
+        help='override encoder in config',)
     parser.add_argument(
-            '-r','--bitrate', type=str, dest='bitrate',
-            default=default_values['bps'],
-            metavar='input-video-bitrate',
-            help='input video bitrate, either as a single number, '
-                 '\"100 kbps\" or a lst 100kbps,200kbps or a range '
-                 '100kps-1Mbps-100kbps (start-stop-step)',)
+        '-r', '--bitrate', type=str, dest='bitrate',
+        default=default_values['bps'],
+        metavar='input-video-bitrate',
+        help='input video bitrate, either as a single number, '
+        '\"100 kbps\" or a lst 100kbps,200kbps or a range '
+        '100kps-1Mbps-100kbps (start-stop-step)',)
     parser.add_argument(
-            'configfile', type=str, nargs='?',
-            default=default_values['configfile'],
-            metavar='input-config-file',
-            help='input configuration file',)
+        'configfile', type=str, nargs='?',
+        default=default_values['configfile'],
+        metavar='input-config-file',
+        help='input configuration file',)
     parser.add_argument(
-            'output', type=str, nargs='?',
-            default=default_values['output'],
-            metavar='output',
-            help='output dir or file',)
+        'output', type=str, nargs='?',
+        default=default_values['output'],
+        metavar='output',
+        help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
@@ -593,6 +591,7 @@ def get_video_info(videofile, debug=0):
     videofile_config['filepath'] = videofile
     return videofile_config
 
+
 def main(argv):
     options = get_options(argv)
     if options.version:
@@ -640,9 +639,7 @@ def main(argv):
         settings['bitrate'] = options.bitrate
         settings['desc'] = options.desc
 
-        result = codec_test(settings, model, serial)
-        for json in result:
-            print(f'{json}')
+        codec_test(settings, model, serial)
 
 
 if __name__ == '__main__':

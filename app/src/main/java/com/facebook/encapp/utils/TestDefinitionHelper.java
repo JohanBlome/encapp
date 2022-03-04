@@ -2,6 +2,7 @@ package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.util.Log;
 import android.util.Size;
 
 import com.facebook.encapp.proto.Configure;
@@ -110,8 +111,16 @@ public class TestDefinitionHelper {
     public static Test updateInputSettings(Test test, MediaFormat format) {
         Test.Builder builder = test.toBuilder();
         Input.Builder input = builder.getInput().toBuilder();
-        input.setResolution(String.valueOf(format.getInteger(MediaFormat.KEY_BIT_RATE)));
-        input.setFramerate(format.getFloat(MediaFormat.KEY_FRAME_RATE));
+        input.setResolution(format.getInteger(MediaFormat.KEY_WIDTH) + "x"  + format.getInteger(MediaFormat.KEY_HEIGHT));
+        float framerate = 30.0f;
+        try {
+            framerate = format.getFloat(MediaFormat.KEY_FRAME_RATE);
+        } catch (Exception ex) {
+            Log.e(TAG, "Failed to grab framerate as float.");
+            framerate = (float)format.getInteger(MediaFormat.KEY_FRAME_RATE);
+            Log.e(TAG, "framerate as int: " + framerate);
+        }
+        input.setFramerate(framerate);
 
         return builder.build();
     }

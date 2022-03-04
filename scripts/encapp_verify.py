@@ -25,7 +25,8 @@ DEFAULT_TESTS = ['bitrate_buffer.pbtxt',
                  'dynamic_framerate.pbtxt',
                  'dynamic_idr.pbtxt',
                  'lt2.pbtxt',
-                 'ltr-2ref.pbtxt']
+                 'ltr-2ref.pbtxt',
+                 ]
 
 
 def parse_schema(schema):
@@ -33,8 +34,6 @@ def parse_schema(schema):
     if match:
         return int(match.group(1))
     return -1
-
-
 
 
 def get_nal_data(videopath, codec):
@@ -47,13 +46,13 @@ def get_nal_data(videopath, codec):
         filename = os.path.splitext(videopath)[0]
         if not os.path.exists(f'{filename}.{ending}.nal'):
             if ending == '264':
-                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb '
-                       f'{filename}.{ending}')
+                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb'
+                       f' {filename}.{ending}')
                 run_cmd(cmd, True)
                 cmd = f'h264nal {filename}.{ending} > {filename}.{ending}.nal'
             else:
-                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v hevc_mp4toannexb '
-                       f'{filename}.{ending}')
+                cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v hevc_mp4toannexb'
+                       f' {filename}.{ending}')
                 run_cmd(cmd, True)
                 cmd = f'h265nal {filename}.{ending} > {filename}.{ending}.nal'
 
@@ -64,25 +63,18 @@ def get_nal_data(videopath, codec):
     return ""
 
 
-def check_pair_values(ref, data, ok_range):
-    not_found = []
-    wrong_value = []
-    for key in ref.keys():
-        found = False
-        for ext in range(0, ok_range):
-            if int(key) + ext in data:
-                # verify value
-                if ref[key] != data[int(key) + ext]:
-                    wrong_value.append([int(key), int(ref[key]),
-                                        int(data[int(key) + ext])])
-                found = True
-                break
-
-        if not found:
-            not_found.append(key)
-    return not_found, wrong_value
+def find_frame(frame, rfid, frame_list, count):
+    ''' Check mark or use, verifying the id used as welll
+    '''
+    for index in range(0, count, 1):
+        if frame + index in frame_list:
+            if rfid == frame_list[frame + index]:
+                return frame + index
+    return -1
 
 # TODO: fix ltr
+
+
 def check_long_term_ref(resultpath):
     result_string = ''
 
@@ -106,115 +98,153 @@ def check_long_term_ref(resultpath):
             directory, __ = os.path.split(file)
             encoder_settings = result.get('settings')
             testname = result.get('test')
-            # bitrate = convert_to_bps(encoder_settings.get('bitrate'))
-            runtime_settings = result.get('runtime_settings')
 
             mark_frame = None
             use_frame = None
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test());
+            test = text_format.Parse(test_def, proto.Test())
 
             dynamics = parse_dynamic_settings(test.runtime)['params']
 
             if dynamics is not None and len(dynamics) > 0:
                 mark_frame = dynamics['vendor.qti-ext-enc-ltr.mark-frame']
                 use_frame = dynamics['vendor.qti-ext-enc-ltr.use-frame']
+
             reg_long_term_id = "long_term_frame_idx { ([0-9]*) }"
             reg_long_pic_id = "long_term_pic_num { ([0-9]*) }"
+            reg_max_num_ref_frames = "max_num_ref_frames: ([0-9]*)"
             lt_mark = {}
             lt_use = {}
             if mark_frame is not None and use_frame is not None:
                 nal_file = get_nal_data(f'{directory}/'
                                         f"{result.get('encodedfile')}",
                                         encoder_settings.get('codec'))
+                ltr_count = -1
                 frame = 0
                 with open(nal_file) as nal:
                     line = "-1"
                     while len(line) > 0:
                         line = nal.readline()
                         if line.find('frame_num:') != -1:
-                            #if frame < 4:
+                            # if frame < 4:
                             #    print(f'frame: {frame} - {line}')
                             frame += 1
                             match = re.search(reg_long_term_id, line)
                             if match:
-                                pid = match.group(1)
-                                lt_mark[frame] = pid
+                                num = match.group(1)
+                                lt_mark[frame] = num
                                 continue
                             match = re.search(reg_long_pic_id, line)
                             if match:
-                                pid = match.group(1)
-                                lt_use[frame] = pid
+                                num = match.group(1)
+                                lt_use[frame] = num
                                 continue
-
-                print(f'Found ltr mark cases')
-                print(f'{lt_mark}')
-                print(f'Found ltr use cases')
-                print(f'{lt_use}')
-                result_string += f'\n\n----- {testname} -----'
-                result_string += f'\n\nSource: {file}'
+                        match = re.search(reg_max_num_ref_frames, line)
+                        if match:
+                            num = int(match.group(1)) - 1
+                            if ltr_count != -1:
+                                print(
+                                    'ERROR: ltr count appears multiple times, '
+                                    f'{ltr_count} -> {num}')
+                            ltr_count = num
+                            continue
+                # ltr refs are flushed after an I frame
+                frames = result.get('frames')
+                iframes = list(filter(lambda x: (x['iframe'] == 1), frames))
+                result_string += f'\n\n----- test case: [{testname}] -----'
                 # each mark frame will cause a use frame so merge the mark
                 # with the use
-                for item in lt_mark:
-                    use_frame[item] = lt_mark[item]
+
+                for frame in iframes:
+                    lt_mark[frame['frame']] = 0  # implicit marking of 0th
+                    for ltr in range(0, ltr_count - 1, 1):
+                        mark_frame[frame['frame'] + ltr] = ltr
+                        use_frame[frame['frame'] + ltr_count + 1] = ltr
 
                 ok_range = 2
-                not_found, wrong_values = check_pair_values(
-                    mark_frame, lt_mark, ok_range)
+                matching = {}
+
+                result_string += f'\nLtr frame count: {ltr_count}'
                 result_string += '\n(1) Verify long term reference mark'
-                if len(not_found) == 0 and len(wrong_values) == 0:
+
+                # Check 'mark' frames
+                for frame in sorted(mark_frame.keys()):
+                    frame_match = find_frame(
+                        frame, mark_frame[frame], lt_mark, ok_range)
+                    if frame_match != -1:
+                        matching[frame] = frame_match
+
+                not_found = {}
+                for frame in sorted(mark_frame.keys()):
+                    if not (frame in matching.keys()):
+                        not_found[frame] = mark_frame[frame]
+
+                if len(matching) > 0:
                     result_string += ('\nMarked ltr frames correct (within '
                                       f'{ok_range} frames)')
-                else:
-                    if len(not_found) > 0:
-                        result_string += ('\nFollowing ltr frames not found '
-                                          f'(within {ok_range}: {not_found})')
-                    if len(wrong_values) > 0:
-                        result_string += ('\nFollowing ltr frames have wrong '
-                                          f'value (within {ok_range}: '
-                                          f'{wrong_values})')
-                        for item in wrong_values:
-                            result_string += (f'frame: {item} = '
-                                              f'{wrong_values[item]}')
+                    for frame in matching.keys():
+                        result_string += (
+                            f'\nframe: {frame} as {matching[frame]} id: '
+                            f'{mark_frame[frame]}')
+                if len(not_found) > 0:
+                    result_string += ('\nFollowing mark ltr frames not found '
+                                      f'(within {ok_range})')
+                    for frame in sorted(not_found.keys()):
+                        result_string += f'\n{frame} id:{not_found[frame]}'
 
-                not_found, wrong_values = check_pair_values(
-                    use_frame, lt_use, 3)
+                # Check 'use' frames
+                matching = {}
+                for frame in sorted(use_frame.keys()):
+                    frame_match = find_frame(
+                        frame, use_frame[frame], lt_use, ok_range)
+                    if frame_match != -1:
+                        matching[frame] = frame_match
+                # How many missed?
+                not_found = {}
+                for frame in sorted(use_frame.keys()):
+                    if not (frame in matching.keys()):
+                        not_found[frame] = use_frame[frame]
                 result_string += '\n(2) Verify long term reference use setting'
-                if len(not_found) == 0 and len(wrong_values) == 0:
-                    print(f'{not_found} - {{not_found}}')
-                    result_string += ('Used ltr frames correct (within '
+                if len(matching) > 0:
+                    result_string += ('\nUsed ltr frames correct (within '
                                       f'{ok_range})')
-                else:
-                    if len(not_found) > 0:
-                        result_string += ('\nFollowing ltr use frames not '
-                                          f'found (within {ok_range} frames):'
-                                          f'\n{not_found})')
-                    if len(wrong_values) > 0:
-                        result_string += ('\nFollowing ltr use frames have '
-                                          f'wrong value (within {ok_range}):')
-                        for item in wrong_values:
-                            result_string += ('\nframe {:4d} - ref: {:2d}, '
-                                              'should have been {:2d}'
-                                              .format(item[0], item[2],
-                                                      item[1]))
+                    for frame in matching:
+                        result_string += (
+                            f'\nframe: {frame} as {matching[frame]} id: '
+                            f'{use_frame[frame]}')
+
+                if len(not_found) > 0:
+                    result_string += ('\nFollowing ltr use frames not '
+                                      f'found (within {ok_range} frames):')
+                    for frame in sorted(not_found.keys()):
+                        result_string += f'\n{frame} id:{not_found[frame]}'
 
                 # What was found
-                result_string += f'\n\nMarked in media:'
+                result_string += '\n\nMarked in media:'
                 for val in lt_mark:
                     result_string += ('\nframe {:4d} - id: {:d}'
-                                          .format(val, int(lt_mark[val])))
-                result_string += f'\nUsed in media:'
+                                      .format(val, int(lt_mark[val])))
+                result_string += '\nUsed in media:'
                 for val in lt_use:
                     result_string += ('\nframe {:4d} - id: {:d}'
-                                          .format(val, int(lt_use[val])))
+                                      .format(val, int(lt_use[val])))
 
+                if len(iframes) > 0:
+                    result_string += '\nKey frames:\n'
+                    for frame in iframes:
+                        result_string += f"{frame['frame']}\n"
     return result_string
 
-#TODO: fix
+
+def get_config_param(config, param_name):
+    for param in config.parameter:
+        if param.key == param_name:
+            return param.value
+
+
 def check_temporal_layer(resultpath):
     result_string = ''
-    # "ts-schema": "android.generic.2"
 
     for file in resultpath:
         with open(file) as resultfile:
@@ -223,6 +253,10 @@ def check_temporal_layer(resultpath):
             testname = result.get('test')
             encoder_settings = result.get('settings')
             schema = encoder_settings.get('ts-schema')
+
+            test_def = result.get('testdefinition')
+            test = text_format.Parse(test_def, proto.Test())
+            schema = get_config_param(test.configure, 'ts-schema')
             if not isinstance(schema, type(None)) and len(schema) > 0:
                 frames = result.get('frames')
                 layer_count = parse_schema(schema)
@@ -239,7 +273,7 @@ def check_temporal_layer(resultpath):
                 for size in layer_size:
                     total_size += size[1]
 
-                result_string += f'\n\n----- {testname} -----'
+                result_string += f'\n\n----- test case: [{testname}] -----'
                 for size in layer_size:
                     if total_size > 0:
                         ratio = size[1] / total_size
@@ -267,20 +301,18 @@ def check_idr_placement(resultpath):
             idr_ids = []
             # gop, either static gop or distance from last?
             gop = encoder_settings.get('gop')
-            print(f'Encoder settings: {encoder_settings}')
             if gop <= 0:
-                print(f'gop is missing')
+                print('gop is missing')
                 gop = 1
             fps = encoder_settings.get('fps')
             if fps <= 0:
-                print(f'fps is missing')
+                print('fps is missing')
                 fps = 30
             for frame in iframes:
                 idr_ids.append(frame['frame'])
 
-
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test());
+            test = text_format.Parse(test_def, proto.Test())
 
             dynamic_sync = parse_dynamic_settings(test.runtime)['syncs']
             if dynamic_sync is not None:
@@ -291,10 +323,7 @@ def check_idr_placement(resultpath):
 
                     status.append([testname, "Runtime sync request", passed,
                                    item, resultfilename])
-
             frame_gop = gop * fps
-            print(f'fps = {fps} gop = {gop} frame gop = {frame_gop}')
-
             passed = True
             if frame_gop < len(frames):
                 for frame in idr_ids:
@@ -308,7 +337,7 @@ def check_idr_placement(resultpath):
     data = data.sort_values(by=['gop'])
     test_names = np.unique(data['test'])
     for name in test_names:
-        result_string += f'\n\n----- {name} -----'
+        result_string += f'\n\n----- test case: [{testname}] -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
             result_string += ('\n{:s} \"{:s}\" at {:2d} frames, {:s}'
@@ -327,7 +356,7 @@ def parse_dynamic_settings(settings):
 
     for param in settings.parameter:
         # TODO: fix this
-        #print(f'{param}')
+        # print(f'{param}')
         if param.key in params:
             serie = params[param.key]
         else:
@@ -360,6 +389,7 @@ def parse_dynamic_settings(settings):
 
 ERROR_LIMIT = 5
 
+
 def check_mean_bitrate_deviation(resultpath):
     result_string = ''
     bitrate_error = []
@@ -375,11 +405,13 @@ def check_mean_bitrate_deviation(resultpath):
             fps = encoder_settings.get('fps')
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test());
+            test = text_format.Parse(test_def, proto.Test())
             parse_dynamic_settings(test.runtime)
-            dynamic_video_bitrate = parse_dynamic_settings(test.runtime)['bitrates']
+            dynamic_video_bitrate = parse_dynamic_settings(test.runtime)[
+                'bitrates']
 
-            if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
+            if (dynamic_video_bitrate is not None
+               and len(dynamic_video_bitrate) > 0):
                 frames = result.get('frames')
                 previous_limit = 0
                 dyn_data = []
@@ -387,7 +419,10 @@ def check_mean_bitrate_deviation(resultpath):
                 limits = list(dynamic_video_bitrate.keys())
                 limits.append(frames[-1]['frame'])
                 status = "passed"
+                limit_too_high = False
                 for limit in limits:
+                    if limit > len(frames):
+                        limit_too_high = True
                     filtered = list(filter(lambda x: (x['frame'] >=
                                                       int(previous_limit) and
                                                       x['frame'] < int(limit)),
@@ -412,20 +447,25 @@ def check_mean_bitrate_deviation(resultpath):
                         target_bitrate = convert_to_bps(
                             dynamic_video_bitrate[limit])
                     previous_limit = limit
-                result_string += (f'\n\n----- {testname}, runtime bitrate '
-                                  'changes -----')
+                result_string += f'\n\n----- test case: [{testname}] -----'
 
                 result_string += (f"\n{status} \"Dynamic bitrate\", ")
                 result_string += (f" codec: {encoder_settings.get('codec')}"
                                   f", {encoder_settings.get('height')}"
-                                  f"p@{fps}fps"
+                                  f"p @ {fps}fps"
                                   f", {resultfilename}")
+
+                if limit_too_high:
+                    result_string += (
+                        f'\nERROR: limit higher than available frames '
+                        f'({len(frames)}), adjust test case')
                 for item in dyn_data:
                     result_string += ('\n      {:3d}% error in {:4d}:{:4d} '
                                       '({:4d}kbps) for {:4d}kbps'
                                       .format(item[4], item[0], item[1],
                                               int(item[3]/1000),
                                               int(item[2]/1000)))
+                result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
             else:
                 mean_bitrate = encoder_settings.get('meanbitrate')
                 ratio = mean_bitrate / bitrate
@@ -440,18 +480,20 @@ def check_mean_bitrate_deviation(resultpath):
     data = data.sort_values(by=['bitrate'])
     test_names = np.unique(data['test'])
     for name in test_names:
-        result_string += f'\n\n----- {name} -----'
+        result_string += f'\n\n----- test case: [{testname}] -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
             status = "passed"
             if abs(row.error) > ERROR_LIMIT:
                 status = "failed"
-            result_string += ('\n{:s} "Bitrate accuracy" {:3d} % error for {:4d}kbps ({:4d}kbps), codec: {:s}, {:s}'
+            result_string += ('\n{:s} "Bitrate accuracy" {:3d} % error for '
+                              '{:4d}kbps ({:4d}kbps), codec: {:s}, {:s}'
                               .format(status,
                                       row.error, int(row.bitrate/1000),
                                       int(row.real_bitrate/1000),
                                       row.codec,
                                       row.file))
+        result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
 
     return result_string
 
@@ -483,12 +525,16 @@ def main(argv):
     parser.add_argument('-c', '--codec', help='Override encoder', default=None)
     parser.add_argument('-t', '--test', nargs="+",)
     parser.add_argument('-r', '--result', nargs="+",)
+    parser.add_argument('--bitrate_limit', nargs="?",
+                        help='Set acceptance lmit on bitrate in percentage', default=5)
 
     options = parser.parse_args(argv[1:])
     result_string = ""
     model = None
     serial = None
 
+    global ERROR_LIMIT
+    ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ""
     idr_string = ""
     temporal_string = ""
@@ -527,44 +573,43 @@ def main(argv):
             else:
                 test_path = test
 
-            with open(test_path, 'r') as test_file:
-                if os.path.exists(es.INDEX_FILE_NAME):
-                    os.remove(es.INDEX_FILE_NAME)
-                '''
-                args = []
-                args.append(__file__)
-                args.append('--codec')
-                args.append(options.codec)
-                args.append('--input')
-                args.append(options.videofile)
-                args.append('--input_res')
-                args.append(options.input_res)
-                args.append('--input_fps')
-                args.append(options.input_fps)
-                args.append('--output_res')
-                args.append(options.output_res)
-                args.append('--output_fps')
-                args.append(options.output_fps)
-                args.append('--configfile')
-                args.append(configfile)
-                '''
-                settings = ep.extra_settings
-                settings['configfile'] = test_path
-                settings['videofile'] = options.videofile
-                settings['encoder'] = options.codec
-                settings['output'] = workdir
+            if os.path.exists(es.INDEX_FILE_NAME):
+                os.remove(es.INDEX_FILE_NAME)
+            '''
+            args = []
+            args.append(__file__)
+            args.append('--codec')
+            args.append(options.codec)
+            args.append('--input')
+            args.append(options.videofile)
+            args.append('--input_res')
+            args.append(options.input_res)
+            args.append('--input_fps')
+            args.append(options.input_fps)
+            args.append('--output_res')
+            args.append(options.output_res)
+            args.append('--output_fps')
+            args.append(options.output_fps)
+            args.append('--configfile')
+            args.append(configfile)
+            '''
+            settings = ep.extra_settings
+            settings['configfile'] = test_path
+            settings['videofile'] = options.videofile
+            settings['encoder'] = options.codec
+            settings['output'] = workdir
 
-                result = ep.codec_test(settings, model, serial)
-                bitrate_string += check_mean_bitrate_deviation(result)
-                idr_string += check_idr_placement(result)
-                temporal_string += check_temporal_layer(result)
-                ltr_string += check_long_term_ref(result)
+            result = ep.codec_test(settings, model, serial)
+            bitrate_string += check_mean_bitrate_deviation(result)
+            idr_string += check_idr_placement(result)
+            temporal_string += check_temporal_layer(result)
+            ltr_string += check_long_term_ref(result)
 
     result_string += print_partial_result(
         'Verify bitrate accuracy', bitrate_string)
     result_string += print_partial_result('Verify idr accuracy', idr_string)
     result_string += print_partial_result(
-        'Verify check temporal layer accuracy', temporal_string)
+        'Verify temporal layers', temporal_string)
     result_string += print_partial_result(
         'Verify long term reference settings', ltr_string)
 
