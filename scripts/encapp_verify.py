@@ -357,6 +357,9 @@ def parse_dynamic_settings(settings):
     }
     return runtime_data
 
+
+ERROR_LIMIT = 5
+
 def check_mean_bitrate_deviation(resultpath):
     result_string = ''
     bitrate_error = []
@@ -366,6 +369,7 @@ def check_mean_bitrate_deviation(resultpath):
             result = json.load(resultfile)
             _, resultfilename = os.path.split(file)
             encoder_settings = result.get('settings')
+            codec = encoder_settings.get('codec')
             testname = result.get('test')
             bitrate = convert_to_bps(encoder_settings.get('bitrate'))
             fps = encoder_settings.get('fps')
@@ -382,7 +386,7 @@ def check_mean_bitrate_deviation(resultpath):
                 target_bitrate = bitrate
                 limits = list(dynamic_video_bitrate.keys())
                 limits.append(frames[-1]['frame'])
-
+                status = "passed"
                 for limit in limits:
                     filtered = list(filter(lambda x: (x['frame'] >=
                                                       int(previous_limit) and
@@ -399,6 +403,8 @@ def check_mean_bitrate_deviation(resultpath):
                         mean = 0
                     ratio = mean / target_bitrate
                     bitrate_error_perc = int((ratio - 1) * 100)
+                    if abs(bitrate_error_perc) > ERROR_LIMIT:
+                        status = "failed"
                     dyn_data.append([int(previous_limit), int(limit),
                                      int(target_bitrate), int(round(mean, 0)),
                                      int(round(bitrate_error_perc, 0))])
@@ -408,25 +414,27 @@ def check_mean_bitrate_deviation(resultpath):
                     previous_limit = limit
                 result_string += (f'\n\n----- {testname}, runtime bitrate '
                                   'changes -----')
-                result_string += (f"\n Codec: {encoder_settings.get('codec')}"
+
+                result_string += (f"\n{status} \"Dynamic bitrate\", ")
+                result_string += (f" codec: {encoder_settings.get('codec')}"
                                   f", {encoder_settings.get('height')}"
-                                  f'p@{fps}fps')
+                                  f"p@{fps}fps"
+                                  f", {resultfilename}")
                 for item in dyn_data:
-                    result_string += ('\n{:3d}% error in {:4d}:{:4d} '
-                                      '({:4d}kbps) for {:4d}kbps, {:s}'
+                    result_string += ('\n      {:3d}% error in {:4d}:{:4d} '
+                                      '({:4d}kbps) for {:4d}kbps'
                                       .format(item[4], item[0], item[1],
                                               int(item[3]/1000),
-                                              int(item[2]/1000),
-                                              resultfilename))
+                                              int(item[2]/1000)))
             else:
                 mean_bitrate = encoder_settings.get('meanbitrate')
                 ratio = mean_bitrate / bitrate
                 bitrate_error_perc = int((ratio - 1) * 100)
                 bitrate_error.append([testname, bitrate_error_perc,
                                       int(bitrate), mean_bitrate,
-                                      resultfilename])
+                                      codec, resultfilename])
 
-    labels = ['test', 'error', 'bitrate', 'real_bitrate', 'file']
+    labels = ['test', 'error', 'bitrate', 'real_bitrate', 'codec', 'file']
     data = pd.DataFrame.from_records(bitrate_error, columns=labels,
                                      coerce_float=True)
     data = data.sort_values(by=['bitrate'])
@@ -435,9 +443,15 @@ def check_mean_bitrate_deviation(resultpath):
         result_string += f'\n\n----- {name} -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            result_string += ('\n{:3d} % error for {:4d}kbps ({:4d}kbps), {:s}'
-                              .format(row.error, int(row.bitrate/1000),
-                                      int(row.real_bitrate/1000), row.file))
+            status = "passed"
+            if abs(row.error) > ERROR_LIMIT:
+                status = "failed"
+            result_string += ('\n{:s} "Bitrate accuracy" {:3d} % error for {:4d}kbps ({:4d}kbps), codec: {:s}, {:s}'
+                              .format(status,
+                                      row.error, int(row.bitrate/1000),
+                                      int(row.real_bitrate/1000),
+                                      row.codec,
+                                      row.file))
 
     return result_string
 
