@@ -14,6 +14,7 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 
 /**
@@ -97,7 +98,14 @@ class BufferEncoder extends Encoder {
 
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-        int keyFrameInterval = test.getConfigure().getIFrameInterval();
+
+        // This is needed.
+        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
+        if (isVP) {
+            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mMuxer.start();
+        }
+
         double currentTime = 0;
         int current_loop = 1;
         boolean done = false;

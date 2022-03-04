@@ -257,7 +257,7 @@ def installed_apps(serial, debug=0):
 
 
 def collect_result(workdir, test_name, serial):
-    
+
     run_cmd(f'adb -s {serial} shell am start -W -e test '
             f'/sdcard/{test_name} {ACTIVITY}')
     wait_for_exit(serial)
@@ -286,7 +286,7 @@ def collect_result(workdir, test_name, serial):
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(f'{output_dir}/{tmpname}')
-           
+
 
     adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
     run_cmd(adb_cmd)
@@ -294,13 +294,13 @@ def collect_result(workdir, test_name, serial):
     return result_json
 
 
-def update_file_paths(test, new_name):    
+def update_file_paths(test, new_name):
         path = test.input.filepath
         if new_name is not None:
             path = new_name
         if path!= 'camera':
             test.input.filepath =  f'/sdcard/{os.path.basename(path)}'
-        for para in test.parallel.test:            
+        for para in test.parallel.test:
             update_file_paths(para, new_name)
 
 
@@ -323,21 +323,21 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
     fresh = tests_definitions.Tests();
     files_to_push = []
     for test in tests.test:
-    
+
         if settings['encoder'] is not None and len(settings['encoder']) > 0:
             test.configure.codec = settings['encoder']
 
         videofile = settings['videofile']
         if videofile is not None and len(videofile) > 0:
             files_to_push.append(videofile)
-        else:            
+        else:
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
         update_file_paths(test, videofile)
 
 
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
-            #defult is serial calls            
+            #defult is serial calls
             split = settings['bitrate'].split(' ')
             if len(split) != 3:
                 split = settings['bitrate'].split(',')
@@ -350,8 +350,8 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
                         ntest = tests_definitions.Test()
                         ntest.CopyFrom(test)
                         ntest.configure.bitrate = str(convert_to_bps(bitrate))
-                        fresh.test.extend([ntest])         
-            else:           
+                        fresh.test.extend([ntest])
+            else:
                 fval = convert_to_bps(split[0])
                 tval = convert_to_bps(split[1])
                 sval = convert_to_bps(split[2])
@@ -359,7 +359,7 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
                     ntest = tests_definitions.Test()
                     ntest.CopyFrom(test)
                     ntest.configure.bitrate = str(bitrate)
-                    fresh.test.extend([ntest])            
+                    fresh.test.extend([ntest])
         else:
             fresh.test.extend([test])
 
@@ -370,7 +370,7 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
         files_to_push.append(output)
 
     print(f'files_to_push = {files_to_push}')
-    for filepath in files_to_push:        
+    for filepath in files_to_push:
         print(f'Push {filepath}')
         run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
     return collect_result(workdir, output, serial)
@@ -510,13 +510,15 @@ def get_options(argv):
     parser.add_argument(
             '-c', '--codec', type=str, dest='codec',
             default=default_values['encoder'],
-            metavar='input-video-file',
-            help='input video file',)
+            metavar='encoder',
+            help='override encoder in config',)
     parser.add_argument(
             '-r','--bitrate', type=str, dest='bitrate',
             default=default_values['bps'],
             metavar='input-video-bitrate',
-            help='input video bitrate, either as a single number, \"100 kbps\" or a lst 100kbps,200kbps or a range 100kps-1Mbps-100kbps (start-stop-step)',)
+            help='input video bitrate, either as a single number, '
+                 '\"100 kbps\" or a lst 100kbps,200kbps or a range '
+                 '100kps-1Mbps-100kbps (start-stop-step)',)
     parser.add_argument(
             'configfile', type=str, nargs='?',
             default=default_values['configfile'],
@@ -527,7 +529,7 @@ def get_options(argv):
             default=default_values['output'],
             metavar='output',
             help='output dir or file',)
-    
+
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
     if options.version:
@@ -628,9 +630,8 @@ def main(argv):
         # ensure there is an input configuration
         assert options.configfile is not None, (
             'error: need a valid input configuration file')
-    
+
         settings = extra_settings
-        print(f'settings: {settings}')
         settings['configfile'] = options.configfile
         settings['videofile'] = options.videofile
         settings['encoder'] = options.codec

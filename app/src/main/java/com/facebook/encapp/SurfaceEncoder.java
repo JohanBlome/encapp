@@ -27,6 +27,7 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -180,12 +181,12 @@ class SurfaceEncoder extends Encoder {
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
 
-//TODO: needed?
-        /*boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
+        // This is needed.
+        boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
             mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
             mMuxer.start();
-        }*/
+        }
 
 
         int current_loop = 1;

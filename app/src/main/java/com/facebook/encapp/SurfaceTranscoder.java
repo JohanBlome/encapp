@@ -174,6 +174,13 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (!noEncoding) {
             Log.d(TAG, "Create muxer");
             mMuxer = createMuxer(mCodec, format, true);
+
+            // This is needed.
+            boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
+            if (isVP) {
+                mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+                mMuxer.start();
+            }
         }
 
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();

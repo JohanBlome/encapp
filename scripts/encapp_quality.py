@@ -12,12 +12,25 @@ import argparse
 import re
 
 from os.path import exists
-from encapp_tests import run_cmd
+from encapp import run_cmd
+from encapp import convert_to_bps
 
 VMAF_RE = '(?<=aggregateVMAF=\")[0-9.]*'
 PSNR_RE = 'average:([0-9.]*)'
 SSIM_RE = 'SSIM Y:([0-9.]*)'
 FFMPEG_SILENT = 'ffmpeg  -hide_banner -loglevel error -y '
+
+extra_settings = {
+    'media_path': None,
+    'override_reference': None,
+    'pix_fmt': None,
+    'reference_resolution': None,
+    'fr_fr': False,
+    'fr_lr': False,
+    'lr_lr': False,
+    'lr_fr': False,
+    'recalc': False,
+}
 
 
 def parse_quality(vmaf_file, ssim_file, psnr_file):
@@ -30,7 +43,7 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
         line = " "
         while len(line) > 0:
             line = input_file.readline()
-            match = re.search(VMAF_RE, line)
+match = re.search(VMAF_RE, line)
             if match:
                 vmaf = int(round(float(match.group(0))))
                 break
@@ -57,16 +70,16 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
     return vmaf, ssim, psnr
 
 
-def run_quality(test_file, options):
+def run_quality(test_file, optionals):
     """Compare the output found in test_file with the source/reference
        found in options.media directory or overriden
     """
     with open(test_file, 'r') as input_file:
         test = json.load(input_file)
 
-    source = options.media + "/" + test.get('sourcefile')
-    if len(options.override_reference) > 0:
-        source = options.override_reference
+    source = optionals['media_path'] + "/" + test.get('sourcefile')
+    if len(optionals['override_reference']) > 0:
+        source = optionals['override_reference']
 
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format"
@@ -82,13 +95,13 @@ def run_quality(test_file, options):
     settings = test.get('settings')
     fps = settings.get('fps')
     if (exists(vmaf_file) and exists(ssim_file) and exists(psnr_file) and
-            not options.recalc):
+            not optionals['recalc']):
         print('All quality indicators already calculated for media, '
               f'{vmaf_file}')
     else:
         input_media_format = test.get('decoder_media_format')
         raw = True
-        pix_fmt = options.pix_fmt
+        pix_fmt = optionals['pix_fmt']
 
         if isinstance(input_media_format, str):
             # surface mode
@@ -101,8 +114,8 @@ def run_quality(test_file, options):
             if source.find('nv12') > -1:
                 pix_fmt = 'nv12'
 
-        if len(options.override_reference) > 0:
-            input_res = options.reference_resolution
+        if len(optionals['override_reference']) > 0:
+            input_res = optionals['reference_resolution']
         else:
             input_width = input_media_format.get('width')
             input_height = input_media_format.get('height')
@@ -118,13 +131,13 @@ def run_quality(test_file, options):
         adb_cmd = ''
 
         force_scale = ''
-        if options.fr_fr:
+        if optionals['fr_fr']:
             force_scale = 'scale=in_range=full:out_range=full[o];[o]'
-        if options.fr_lr:
+        if optionals['fr_lr']:
             force_scale = 'scale=in_range=full:out_range=limited[o];[o]'
-        if options.lr_lr:
+        if optionals['lr_lr']:
             force_scale = 'scale=in_range=limited:out_range=limited[o];[o]'
-        if options.lr_fr:
+        if optionals['lr_fr']:
             force_scale = 'scale=in_range=limited:out_range=full[o];[o]'
 
         if input_res != output_res:
@@ -148,7 +161,7 @@ def run_quality(test_file, options):
             dist_part = f'-r {fps} -i {distorted} '
 
         # Do calculations
-        if options.recalc or not exists(vmaf_file):
+        if optionals['recalc'] or not exists(vmaf_file):
             adb_cmd = (f'{FFMPEG_SILENT} {ref_part} {dist_part} '
                        '-filter_complex '
                        f'"{force_scale}libvmaf=log_path={vmaf_file}" '
@@ -157,7 +170,7 @@ def run_quality(test_file, options):
         else:
             print(f'vmaf already calculated for media, {vmaf_file}')
 
-        if options.recalc or not exists(ssim_file):
+        if optionals['recalc'] or not exists(ssim_file):
             adb_cmd = (f'ffmpeg {dist_part} {ref_part} '
                        '-filter_complex '
                        f'"{force_scale}ssim=stats_file={ssim_file}.all" '
@@ -166,7 +179,7 @@ def run_quality(test_file, options):
         else:
             print(f'ssim already calculated for media, {ssim_file}')
 
-        if options.recalc or not exists(psnr_file):
+        if optionals['recalc'] or not exists(psnr_file):
             adb_cmd = (f'ffmpeg {dist_part} {ref_part} '
                        '-filter_complex '
                        f'"{force_scale}psnr=stats_file={psnr_file}.all" '
@@ -188,7 +201,8 @@ def run_quality(test_file, options):
                 f"{settings.get('gop')}, "
                 f"{settings.get('fps')}, {settings.get('width')}, "
                 f"{settings.get('height')}, "
-                f"{settings.get('bitrate')}, {settings.get('meanbitrate')}, "
+                f"{convert_to_bps(settings.get('bitrate'))}, "
+                f"{settings.get('meanbitrate')}, "
                 f"{file_size}, {vmaf}, {ssim}, {psnr}, {test_file}\n")
         return data
     return None
@@ -258,8 +272,19 @@ def main(argv):
             output.write('media,codec,gop,fps,width,height,'
                          'bitrate,real_bitrate,size,vmaf,ssim,'
                          'psnr,file\n')
+        settings = extra_settings
+        settings['media_path'] = options.media
+        settings['override_reference'] = options.override_reference
+        settings['pix_fmt'] = options.pix_fmt
+        settings['reference_resolution'] = options.reference_resolution
+        settings['fr_fr'] = options.fr_fr
+        settings['fr_lr'] = options.fr_lr
+        settings['lr_lr'] = options.lr_lr
+        settings['lr_fr'] = options.lr_fr
+        settings['recalc'] = options.recalc
+
         for test in options.test:
-            data = run_quality(test, options)
+            data = run_quality(test, settings)
             output.write(data)
 
 
