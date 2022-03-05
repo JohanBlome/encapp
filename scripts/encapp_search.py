@@ -68,7 +68,8 @@ def getData(options, recursive):
         try:
             data = pd.read_csv(f'{options.path}/{INDEX_FILE_NAME}')
         except Exception:
-            sys.stderr.write('Failed to read index file: {options.path}/{INDEX_FILE_NAME}')
+            sys.stderr.write('Failed to read index file: '
+                             f'{options.path}/{INDEX_FILE_NAME}')
             exit(-1)
     return data
 
@@ -125,17 +126,16 @@ def main():
     parser.add_argument('-g', '--gop', type=int, default=None)
     parser.add_argument('-f', '--fps', type=float, default=None)
     parser.add_argument('--no_rec', action='store_true')
-    parser.add_argument('--index', action='store_true')
+    parser.add_argument('-i', '--index', action='store_true')
     parser.add_argument('-v', '--video', action='store_true')
     parser.add_argument('-p', '--print_data', action='store_true')
 
     options = parser.parse_args()
-
     if options.path is None:
         options.path = os.getcwd()
 
     if options.index:
-        indexDirectory(options, False)
+        indexDirectory(options, not options.no_rec)
 
     data = search(options)
 

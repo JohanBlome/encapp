@@ -1,0 +1,27 @@
+test {
+    common {
+        id: "Bitrate"
+        description: "Verify encoding bitrate"
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.yuv"
+        resolution: "352x288"
+        framerate: 30
+        playout_frames: 900
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "100 kbps"
+        parameter {
+            key: "ts-schema"
+            type: stringType
+            value: "android.generic.2"
+        }
+    }
+    runtime {
+        video_bitrate {
+            framenum: 400
+            bitrate: "200k"
+        }
+    }
+}

@@ -1,0 +1,29 @@
+test {
+    common {
+        id: "Bitrate"
+        description: "Verify encoding bitrate"
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.yuv"
+        resolution: "176x144"
+        framerate: 30        
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "400 kbps"
+    }
+    runtime {
+        dynamic_framerate {
+            framenum: 60
+            framerate: 5
+        }
+        dynamic_framerate {
+            framenum: 120
+            framerate: 10
+        }
+        dynamic_framerate {
+            framenum: 180
+            framerate: 15
+        }
+    }
+}

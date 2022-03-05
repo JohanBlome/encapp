@@ -1,14 +1,13 @@
 test {
     common {
-        id: "simple"
-        description: "Simple QCIF Test"
-    },
+        id: "Bitrate"
+        description: "Verify encoding bitrate - buffer"
+    }
     input {
-        filepath: "foo.yuv"
+        filepath: "/tmp/akiyo_qcif.yuv"
         resolution: "176x144"
-        pix_fmt: nv12
         framerate: 30
-    },
+    }
     configure {
         codec: "OMX.google.h264.encoder"
         bitrate: "100 kbps"
