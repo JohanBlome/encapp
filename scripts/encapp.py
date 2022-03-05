@@ -61,6 +61,10 @@ extra_settings = {
     'output': None,
     'bitrate': None,
     'desc': 'encapp',
+    'inp_resolution': None,
+    'out_resolution': None,
+    'inp_framerate': None,
+    'out_framerate': None,
 }
 
 RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.raw')
@@ -316,13 +320,22 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
     with open(test_def, "rb") as fd:
         tests.ParseFromString(fd.read())
 
-    print(tests)
     fresh = tests_definitions.Tests()
     files_to_push = []
     for test in tests.test:
 
         if settings['encoder'] is not None and len(settings['encoder']) > 0:
             test.configure.codec = settings['encoder']
+        if (settings['inp_resolution'] is not None and
+            len(settings['inp_resolution']) > 0):
+                test.input.resolution = settings['inp_resolution']
+        if (settings['out_resolution'] is not None and
+            len(settings['out_resolution']) > 0):
+                test.configure.resolution = settings['out_resolution']
+        if settings['inp_framerate'] is not None:
+                test.input.framerate = settings['inp_framerate']
+        if settings['out_framerate'] is not None:
+                test.configure.framerate = settings['out_framerate']
 
         videofile = settings['videofile']
         print(f'Videofile exchanged? {videofile}')
@@ -361,6 +374,9 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
         else:
             fresh.test.extend([test])
 
+
+
+    print(fresh)
     test_file = os.path.basename(test_def)
     output = f"{test_file[0:test_file.rindex('.')]}.run.bin"
     with open(output, 'wb') as binfile:

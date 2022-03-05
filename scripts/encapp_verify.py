@@ -472,9 +472,11 @@ def check_mean_bitrate_deviation(resultpath):
                 bitrate_error_perc = int((ratio - 1) * 100)
                 bitrate_error.append([testname, bitrate_error_perc,
                                       int(bitrate), mean_bitrate,
-                                      codec, resultfilename])
+                                      codec, encoder_settings.get('height'),
+                                      fps, resultfilename])
 
-    labels = ['test', 'error', 'bitrate', 'real_bitrate', 'codec', 'file']
+    labels = ['test', 'error', 'bitrate', 'real_bitrate',
+              'codec', 'height', 'fps','file']
     data = pd.DataFrame.from_records(bitrate_error, columns=labels,
                                      coerce_float=True)
     data = data.sort_values(by=['bitrate'])
@@ -487,11 +489,13 @@ def check_mean_bitrate_deviation(resultpath):
             if abs(row.error) > ERROR_LIMIT:
                 status = "failed"
             result_string += ('\n{:s} "Bitrate accuracy" {:3d} % error for '
-                              '{:4d}kbps ({:4d}kbps), codec: {:s}, {:s}'
+                              '{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
                               .format(status,
                                       row.error, int(row.bitrate/1000),
                                       int(row.real_bitrate/1000),
                                       row.codec,
+                                      row.height,
+                                      row.fps,
                                       row.file))
         result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
 
@@ -517,11 +521,11 @@ def main(argv):
     parser.add_argument(
         '-is', '--input_res', help='Override input file', default=None)
     parser.add_argument(
-        '-if', '--input_fps', help='Override input fps', default=None)
+        '-if', '--input_fps', type=float, help='Override input fps', default=None)
     parser.add_argument(
         '-os', '--output_res', help='Override input file', default=None)
     parser.add_argument(
-        '-of', '--output_fps', help='Override input fps', default=None)
+        '-of', '--output_fps', type=float, help='Override input fps', default=None)
     parser.add_argument('-c', '--codec', help='Override encoder', default=None)
     parser.add_argument('-t', '--test', nargs="+",)
     parser.add_argument('-r', '--result', nargs="+",)
@@ -597,6 +601,10 @@ def main(argv):
             settings['configfile'] = test_path
             settings['videofile'] = options.videofile
             settings['encoder'] = options.codec
+            settings['inp_resolution'] = options.input_res
+            settings['out_resolution'] = options.output_res
+            settings['inp_framerate'] = options.input_fps
+            settings['out_framerate'] = options.output_fps
             settings['output'] = workdir
 
             result = ep.codec_test(settings, model, serial)
