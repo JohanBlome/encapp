@@ -237,14 +237,14 @@ class SurfaceEncoder extends Encoder {
                             }
                             mInputSurface.setPresentationTime(ptsNsec);
                             mInputSurface.swapBuffers();
+
                             mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
-                            //TODO: dynamic settings?
                             mFramesAdded++;
                         }
                         mInFramesCount++;
                     } catch (Exception ex) {
                         //TODO: make a real fix for when a camera encoder quits before another
-                        // nd the surface is removed. The camera request needs to be updated.
+                        // and the surface is removed. The camera request needs to be updated.
                         errorCounter += 1;
                         if (errorCounter > 10) {
                             Log.e(TAG, "Failed to get next frame: " + ex.getMessage() + " errorCounter = " + errorCounter);

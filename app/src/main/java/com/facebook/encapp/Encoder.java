@@ -47,7 +47,6 @@ public abstract class Encoder {
     protected String mFilename;
     protected boolean mDropNext;
     protected Runtime mRuntimeParams;
-  //  protected HashMap<Integer, ArrayList<RuntimeParam>> mDecoderRuntimeParams; TODO: transcoder decoder settings?
 
     boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     protected FileReader mYuvReader;
@@ -427,7 +426,6 @@ public abstract class Encoder {
      */
     protected int queueInputBufferEncoder(
             MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
-        //TODO: setRuntimeParameters(frameCount, mCodec, mRuntimeParams);
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
