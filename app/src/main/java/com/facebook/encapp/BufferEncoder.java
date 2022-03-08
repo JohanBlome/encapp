@@ -31,10 +31,10 @@ class BufferEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
+        mFrameRate = test.getConfigure().getFramerate();
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mSkipped = 0;
         mFramesAdded = 0;
-
         Size sourceResolution = SizeUtils.parseXString(test.getInput().getResolution());
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);

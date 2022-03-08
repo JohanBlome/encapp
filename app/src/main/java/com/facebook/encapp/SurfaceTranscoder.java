@@ -53,7 +53,7 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
-
+        mFrameRate = test.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime);
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
 
@@ -81,16 +81,17 @@ public class SurfaceTranscoder extends BufferEncoder {
             Log.d(TAG, "Extractor input format");
             checkMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
-            if (noEncoding) {
+         /*   if (noEncoding) {
                 //TODO: throw error on failed lookup
+                //TODO: fix decoder lookup
                 test = setCodecNameAndIdentifier(test);
                 Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
-                mDecoder = MediaCodec.createByCodecName(test.getConfigure().getCodec());
+                mDecoder = MediaCodec.createByCodecName(test.getDecoderConfigure().getCodec());
 
-            } else {
+            } else {*/
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
-            }
+            //}
         } catch (IOException e) {
             mExtractor.release();
             e.printStackTrace();

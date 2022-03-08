@@ -71,6 +71,7 @@ class SurfaceEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
+        mFrameRate = test.getConfigure().getFramerate();
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mStats = new Statistics("raw encoder", test);
 
@@ -223,7 +224,6 @@ class SurfaceEncoder extends Encoder {
                         setRuntimeParameters(mInFramesCount);
                         mDropNext = dropFrame(mInFramesCount);
                         updateDynamicFramerate(mInFramesCount);
-
                         if (currentFrameNbr == nextFrameNbr || mDropNext) {
                             mSkipped++;
                             mDropNext = false;
