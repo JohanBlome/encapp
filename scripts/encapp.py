@@ -217,7 +217,11 @@ def wait_for_exit(serial, debug=0):
         ret, stdout, stderr = run_cmd(adb_cmd, debug)
         current = -2
         if len(stdout) > 0:
-            current = int(stdout)
+            try:
+                current = int(stdout)
+            except Exception:
+                print(f'wait for exit caught exception: {stdout}')
+                continue
         else:
             current = -1
     print(f'Exit from {pid}')
