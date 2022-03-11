@@ -109,6 +109,15 @@ class BufferEncoder extends Encoder {
         double currentTime = 0;
         int current_loop = 1;
         boolean done = false;
+        synchronized (this) {
+            Log.d(TAG, "Wait for synchronized start");
+            try {
+                mInitDone = true;
+                wait(WAIT_TIME_MS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         mStats.start();
         while (!done) {
             int index;

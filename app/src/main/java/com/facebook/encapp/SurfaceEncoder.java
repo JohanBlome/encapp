@@ -194,6 +194,15 @@ class SurfaceEncoder extends Encoder {
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
         long firstTimestamp = -1;
+        synchronized (this) {
+            Log.d(TAG, "Wait for synchronized start");
+            try {
+                mInitDone = true;
+                wait(WAIT_TIME_MS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         mStats.start();
         int errorCounter = 0;
         while (!done) {

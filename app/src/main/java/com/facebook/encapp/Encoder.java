@@ -60,11 +60,10 @@ public abstract class Encoder {
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
     int mCurrentLoop = 0;
-    Test mTest;
-
+    boolean mInitDone = false;
     public abstract String start(Test td);
 
-
+    final static int WAIT_TIME_MS = 5000;  // 5 secs
     public String checkFilePath(String path) {
         if (path.startsWith("/sdcard/")) {
             return path;
@@ -129,6 +128,11 @@ public abstract class Encoder {
 
     protected long calculateFrameTiming(float frameRate) {
         return mFrameTime = (long)(1000000L / frameRate);
+    }
+
+
+    public boolean initDone() {
+        return mInitDone;
     }
 
 

@@ -20,6 +20,7 @@ import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
+import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.Statistics;
 
@@ -38,13 +39,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 public class MainActivity extends AppCompatActivity {
-    private final static String TAG = "encapp";
+    private final static String TAG = "encapp.main";
     private Bundle mExtraData;
     TextureView mTextureView;
     private int mInstancesRunning = 0;
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
+    MemoryLoad mMemLoad;
+    Stack<Encoder> mEncoderList = new Stack<>();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
             (new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    performInstrumentedTest();
+                    performAllTests();
                     exit();
                 }
             })).start();
@@ -149,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void exit() {
         Log.d(TAG, "Finish and remove");
+        mMemLoad.stop();
         finishAndRemoveTask();
         Process.killProcess(Process.myPid());
         Log.d(TAG, "EXIT");
@@ -210,8 +215,19 @@ public class MainActivity extends AppCompatActivity {
     int mCameraCount = 0;
     public Thread startTest(Test test, TextView logText, Stack<Thread> threads) {
         Log.d(TAG, "Start test: " + test.getCommon().getDescription());
+
+        increaseTestsInflight();
+        Thread t = RunTestCase(test, logText);
+
         if (test.hasParallel()) {
             for (Test parallell: test.getParallel().getTestList()) {
+                Log.d(TAG, "Sleep before other parallel");
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                Log.d(TAG, "Start parallel");
                 threads.push(startTest(parallell, logText, threads));
             }
         }
@@ -219,29 +235,13 @@ public class MainActivity extends AppCompatActivity {
         if (test.getInput().getFilepath().toLowerCase().equals("camera")) {
             mCameraCount += 1;
         }
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                increaseTestsInflight();
-                Log.d(TAG, "Start threaded test");
-                RunTestCase(test, logText);
-                Log.d(TAG, "Done threaded test");
-            }
-
-        });
-        Log.d(TAG, "start the test thread");
-        t.start();
-
-
         return t;
     }
 
-    /**
-     * Start automated test run.
-     */
-    private void performInstrumentedTest() {
-        Log.d(TAG, "ENTER: performInstrumentedTest");
-        Log.d(TAG, "Instrumentation test - let us start!");
+
+    private void performAllTests() {
+        mMemLoad = new MemoryLoad(this);
+        mMemLoad.start();
         final TextView logText = findViewById(R.id.logText);
         if (mExtraData.containsKey(ParseData.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(ParseData.TEST_UI_HOLD_TIME_SEC, "0"));
@@ -270,26 +270,25 @@ public class MainActivity extends AppCompatActivity {
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Tests testcases = null;
             try {
-                Tests testcases = null;
                 if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
                     Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
                     FileInputStream fis = new FileInputStream(path.toFile());
                     Log.d(TAG, "Test path = " + path.getFileName());
                     testcases = Tests.parseFrom(fis);
-                    Log.d(TAG, "Data: "+Files.readAllBytes(path));
+                    Log.d(TAG, "Data: " + Files.readAllBytes(path));
                     // ERROR
                     if (testcases.getTestList().size() <= 0) {
                         Log.e(TAG, "Failed to read test");
                         return;
                     }
-
                 }
 
-                int pursuit =  -1;// TODO: pursuit
-
+                int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
-                    Log.d(TAG,"** Starting tests, " + testcases.getTestCount() + " number of combinations **");
+                    Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
+                                     " number of combinations (parallels not counted) **");
                     for (Test test : testcases.getTestList()) {
                         mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;
@@ -304,27 +303,32 @@ public class MainActivity extends AppCompatActivity {
                             }
 
                             Stack<Thread> threads = new Stack<>();
-
                             Thread t = startTest(test, logText, threads);
 
-
-                            // Now all parallell tests are done.
-                            Log.d(TAG, "Started the test, check camera: "+mCameraCount);
+                            Log.d(TAG, "Started the test, check camera: " + mCameraCount);
                             if (mCameraCount > 0) {
-                                do {
+                                while (CameraSource.getClientCount() != mCameraCount) {
                                     try {
-                                        Thread.sleep(1000);
+                                        Thread.sleep(50);
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                     }
-                                }  while (CameraSource.getClientCount() != mCameraCount);
+                                }
                                 Log.d(TAG, "Start cameras");
                                 CameraSource.start();
                             }
 
+                            // Start them all
+                            for (Encoder enc : mEncoderList) {
+                                synchronized (enc) {
+                                    Log.d(TAG, "Start encoder: " + enc);
+                                    enc.notifyAll();
+                                }
+                            }
+
                             Log.d(TAG, "pursuit = " + pursuit);
                             if (pursuit != 0) {
-                                Log.d(TAG, "pursuit sleep 1 sec, instances: " + mInstancesRunning);
+                                Log.d(TAG, "pursuit sleep, instances: " + mInstancesRunning);
                                 try {
                                     Thread.sleep(100);
                                 } catch (InterruptedException e) {
@@ -333,12 +337,15 @@ public class MainActivity extends AppCompatActivity {
 
                             } else {
                                 try {
-                                    //Run serially
+                                    // Run next test serially so wait for this test
+                                    // and all parallels to be finished first
+                                    Log.d(TAG, "Join " + t.getName() + ", state = " + t.getState());
                                     t.join();
 
-                                    while(!threads.empty()) {
+                                    while (!threads.empty()) {
                                         Thread p = threads.pop();
                                         try {
+                                            Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState());
                                             p.join();
                                         } catch (InterruptedException e) {
                                             e.printStackTrace();
@@ -353,8 +360,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 Log.d(TAG, "All tests queued up, wait for finish");
-
-
                 do {
                     try {
                         Thread.sleep(2000);
@@ -364,7 +369,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "number of instances running:" + mInstancesRunning);
 
                 } while (mInstancesRunning > 0);
-                Log.d(TAG, "Done with tests, instances: "+ mInstancesRunning);
+                Log.d(TAG, "Done with tests, instances: " + mInstancesRunning);
                 try {
                     if (mUIHoldtimeSec > 0) {
                         Thread.sleep(mUIHoldtimeSec);
@@ -372,39 +377,35 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-            } catch(IOException e){
-                Log.e(TAG, "@Exception when running tests: "+e.getMessage());
-                e.printStackTrace();
+            } catch (IOException iox) {
+                Log.e(TAG, "Test failed: " + iox.getMessage());
             }
         }
-
-        Log.d(TAG, "EXIT: performInstrumentedTest");
     }
 
 
-    private void RunTestCase(Test test, TextView logText) {
+    private Thread RunTestCase(Test test, TextView logText) {
         String filePath = test.getInput().getFilepath().toString();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());
+        Thread t;
 
-        try {
-
-            final String description = test.getCommon().getDescription().toString();
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (test.getConfigure().getEncode()) {
-                        logText.append("\n\nStart Test: " + description);
-                    } else {
-                        logText.append("\n\nStart Test of decoder: " + description +
-                                "(" + mInstancesRunning +")");
-                    }
+        final String description = test.getCommon().getDescription().toString();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (test.getConfigure().getEncode()) {
+                    logText.append("\n\nStart Test: " + description);
+                } else {
+                    logText.append("\n\nStart Test of decoder: " + description +
+                            "(" + mInstancesRunning + ")");
                 }
-            });
+            }
+        });
 
-            final Encoder transcoder;
-
-            Log.d(TAG, "Source file  = "+filePath.toLowerCase(Locale.US));
+        final Encoder transcoder;
+        synchronized (mEncoderList) {
+            Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
             if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                     filePath.toLowerCase(Locale.US).contains(".yuv") ||
                     filePath.toLowerCase(Locale.US).contains(".rgba") ||
@@ -419,52 +420,86 @@ public class MainActivity extends AppCompatActivity {
                 transcoder = new SurfaceTranscoder();
             }
 
-            final String status = transcoder.start(test);
-            Log.d(TAG, "Get stats");
-            final Statistics stats = transcoder.getStatistics();
+
+            Log.d(TAG, "Add encoder to list");
+            mEncoderList.add(transcoder);
+        }
+
+
+        t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+
+                    Log.d(TAG, "Start transcoder");
+                    final String status = transcoder.start(test);
+                    Log.d(TAG, "Transcoder done!");
+                    Log.d(TAG, "Get stats");
+                    final Statistics stats = transcoder.getStatistics();
+                    try {
+                        Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
+                        FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
+                        stats.writeJSON(fw);
+                        fw.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    Log.d(TAG, "On test done, instances running: " + mInstancesRunning);
+                    mPursuitOver = true;
+                    if (status.length() > 0) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                logText.append("\nTest failed: " + description);
+                                logText.append("\n" + status);
+                                //    if (test.getPursuit() == 0) { TODO: pursuit
+                                Log.d(TAG, "Pursuit over");
+                                mPursuitOver = true;
+                                //  } else {
+                                //      Assert.assertTrue(status, false);
+                                //   }
+                            }
+                        });
+                    } else {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Log.d(TAG, "Total time: " + stats.getProcessingTime());
+                                    Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
+                                    Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
+                                } catch (ArithmeticException aex) {
+                                    Log.e(TAG, aex.getMessage());
+                                }
+                                logText.append("\nDone test: " + description);
+                            }
+                        });
+                    }
+                } finally {
+                    decreaseTestsInflight();
+                }
+            }
+        });
+        t.start();
+
+        int waitime = 2000; //ms
+        while(!transcoder.initDone()) {
             try {
-                Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
-                FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
-                stats.writeJSON(fw);
-                fw.close();
-            } catch (IOException e) {
+                // If we do not wait for the init to de done before starting next
+                // transcoder there may be issue in the surface handling on lower levels
+                // on certain hw (not thread safe)
+                Log.d(TAG, "Sleep while waiting for init to be done");
+                Thread.sleep(200);
+                waitime -= 200;
+                if (waitime < 0) {
+                    Log.e(TAG, "Init not ready within " + waitime + " ms, probably failure");
+                }
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
-            Log.d(TAG, "On test done, instances running: " + mInstancesRunning);
-            mPursuitOver = true;
-            if (status.length() > 0) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        logText.append("\nTest failed: " + description);
-                        logText.append("\n" + status);
-                    //    if (test.getPursuit() == 0) { TODO: pursuit
-                            Log.d(TAG, "Pursuit over");
-                            mPursuitOver = true;
-                      //  } else {
-                      //      Assert.assertTrue(status, false);
-                     //   }
-                    }
-                });
-            } else {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                            Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
-                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
-                        } catch (ArithmeticException aex) {
-                            Log.e(TAG, aex.getMessage());
-                        }
-                        logText.append("\nDone test: " + description);
-                    }
-                });
-            }
-        } finally {
-            decreaseTestsInflight();
         }
+        return t;
     }
 
 
