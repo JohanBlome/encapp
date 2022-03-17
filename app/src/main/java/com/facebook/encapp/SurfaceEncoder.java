@@ -71,6 +71,7 @@ class SurfaceEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
+        mFrameRate = test.getConfigure().getFramerate();
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mStats = new Statistics("raw encoder", test);
 
@@ -91,7 +92,7 @@ class SurfaceEncoder extends Encoder {
             mReferenceFrameRate = 30; //We strive for this at least
             mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
 
-            if (!test.getInput().hasPlayoutFrames()) {
+            if (!test.getInput().hasPlayoutFrames() && !test.getInput().hasStoptimeSec()) {
                 // In case we do not have a limit, limit to 60 secs
                 test = TestDefinitionHelper.updatePlayoutFrames(test, 1800);
                 Log.d(TAG, "Set playout limit for camera to 1800 frames");
@@ -193,6 +194,15 @@ class SurfaceEncoder extends Encoder {
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
         long firstTimestamp = -1;
+        synchronized (this) {
+            Log.d(TAG, "Wait for synchronized start");
+            try {
+                mInitDone = true;
+                wait(WAIT_TIME_MS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         mStats.start();
         int errorCounter = 0;
         while (!done) {
@@ -204,7 +214,7 @@ class SurfaceEncoder extends Encoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -223,7 +233,6 @@ class SurfaceEncoder extends Encoder {
                         setRuntimeParameters(mInFramesCount);
                         mDropNext = dropFrame(mInFramesCount);
                         updateDynamicFramerate(mInFramesCount);
-
                         if (currentFrameNbr == nextFrameNbr || mDropNext) {
                             mSkipped++;
                             mDropNext = false;
@@ -237,14 +246,14 @@ class SurfaceEncoder extends Encoder {
                             }
                             mInputSurface.setPresentationTime(ptsNsec);
                             mInputSurface.swapBuffers();
+
                             mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
-                            //TODO: dynamic settings?
                             mFramesAdded++;
                         }
                         mInFramesCount++;
                     } catch (Exception ex) {
                         //TODO: make a real fix for when a camera encoder quits before another
-                        // nd the surface is removed. The camera request needs to be updated.
+                        // and the surface is removed. The camera request needs to be updated.
                         errorCounter += 1;
                         if (errorCounter > 10) {
                             Log.e(TAG, "Failed to get next frame: " + ex.getMessage() + " errorCounter = " + errorCounter);
@@ -276,7 +285,7 @@ class SurfaceEncoder extends Encoder {
                                 mYuvReader.closeFile();
                             }
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime, true)) {
                                 done = true;
                             }
 

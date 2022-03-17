@@ -121,7 +121,7 @@ public class TestDefinitionHelper {
             Log.e(TAG, "framerate as int: " + framerate);
         }
         input.setFramerate(framerate);
-
+        builder.setInput(input);
         return builder.build();
     }
 

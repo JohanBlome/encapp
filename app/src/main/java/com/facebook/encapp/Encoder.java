@@ -40,14 +40,13 @@ public abstract class Encoder {
     protected int mFramesAdded = 0;
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
 
-    protected long mFrameTime = 0;
-    protected long mRefFrameTime = 0;
+    protected double mFrameTime = 0;
+    protected double mRefFrameTime = 0;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
     protected boolean mDropNext;
     protected Runtime mRuntimeParams;
-  //  protected HashMap<Integer, ArrayList<RuntimeParam>> mDecoderRuntimeParams; TODO: transcoder decoder settings?
 
     boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     protected FileReader mYuvReader;
@@ -61,11 +60,10 @@ public abstract class Encoder {
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
     int mCurrentLoop = 0;
-    Test mTest;
-
+    boolean mInitDone = false;
     public abstract String start(Test td);
 
-
+    final static int WAIT_TIME_MS = 30000;  // 30 secs
     public String checkFilePath(String path) {
         if (path.startsWith("/sdcard/")) {
             return path;
@@ -85,7 +83,7 @@ public abstract class Encoder {
             mLastTime = System.nanoTime();
         } else {
             long diff = (now - mLastTime) / 1000000;
-            long sleepTime = (mRefFrameTime / 1000 - diff);
+            long sleepTime = (long)(mRefFrameTime / 1000.0 - diff);
             if (sleepTime > 0) {
                 try {
                     Thread.sleep(sleepTime);
@@ -99,8 +97,8 @@ public abstract class Encoder {
 
     protected void sleepUntilNextFrame(long nextFrame) {
         long now = System.nanoTime() - mFirstTime;
-        long nextTime = nextFrame * mFrameTime * 1000;
-        long sleepTime = mRefFrameTime / 1000;
+        long nextTime = (long)(nextFrame * mFrameTime * 1000.0);
+        long sleepTime = (long)(mRefFrameTime / 1000.0);
         if (mFirstTime == -1) {
             mFirstTime = System.nanoTime();
         } else {
@@ -124,12 +122,17 @@ public abstract class Encoder {
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTime(int frameIndex, long frameTime) {
+    protected long computePresentationTime(int frameIndex, double frameTime) {
         return mPts + (long)(frameIndex * frameTime);
     }
 
-    protected long calculateFrameTiming(float frameRate) {
-        return mFrameTime = (long)(1000000L / frameRate);
+    protected double calculateFrameTiming(float frameRate) {
+        return mFrameTime = 1000000.0 / frameRate;
+    }
+
+
+    public boolean initDone() {
+        return mInitDone;
     }
 
 
@@ -336,9 +339,9 @@ public abstract class Encoder {
 
         }
     }
-    boolean doneReading(Test test, int frame, boolean loop) {
+    boolean doneReading(Test test, int frame, double time, boolean loop) {
         boolean done = false;
-        if (!test.getInput().hasPlayoutFrames() && loop) {
+        if (!test.getInput().hasStoptimeSec() && !test.getInput().hasPlayoutFrames() && loop) {
             return true;
         }
         if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {
@@ -346,6 +349,12 @@ public abstract class Encoder {
                 done = true;
             }
         }
+        if (test.getInput().hasStoptimeSec() && test.getInput().getStoptimeSec() > 0) {
+            if ( time >= test.getInput().getStoptimeSec()  ) {
+                done = true;
+            }
+        }
+
         return done;
     }
 
@@ -427,7 +436,6 @@ public abstract class Encoder {
      */
     protected int queueInputBufferEncoder(
             MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
-        //TODO: setRuntimeParameters(frameCount, mCodec, mRuntimeParams);
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
         int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);

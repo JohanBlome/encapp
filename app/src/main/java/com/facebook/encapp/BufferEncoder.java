@@ -31,10 +31,10 @@ class BufferEncoder extends Encoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
 
+        mFrameRate = test.getConfigure().getFramerate();
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
         mSkipped = 0;
         mFramesAdded = 0;
-
         Size sourceResolution = SizeUtils.parseXString(test.getInput().getResolution());
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);
@@ -109,6 +109,15 @@ class BufferEncoder extends Encoder {
         double currentTime = 0;
         int current_loop = 1;
         boolean done = false;
+        synchronized (this) {
+            Log.d(TAG, "Wait for synchronized start");
+            try {
+                mInitDone = true;
+                wait(WAIT_TIME_MS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         mStats.start();
         while (!done) {
             int index;
@@ -120,7 +129,7 @@ class BufferEncoder extends Encoder {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
 
-                if (doneReading(test, mInFramesCount, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -147,7 +156,7 @@ class BufferEncoder extends Encoder {
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime,true)) {
                                 done = true;
                             }
 

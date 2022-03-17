@@ -217,7 +217,11 @@ def wait_for_exit(serial, debug=0):
         ret, stdout, stderr = run_cmd(adb_cmd, debug)
         current = -2
         if len(stdout) > 0:
-            current = int(stdout)
+            try:
+                current = int(stdout)
+            except Exception:
+                print(f'wait for exit caught exception: {stdout}')
+                continue
         else:
             current = -1
     print(f'Exit from {pid}')
@@ -259,12 +263,12 @@ def installed_apps(serial, debug=0):
 
 
 def collect_result(workdir, test_name, serial):
-
+    print(f'Collect_result: {test_name}')
     run_cmd(f'adb -s {serial} shell am start -W -e test '
             f'/sdcard/{test_name} {ACTIVITY}')
     wait_for_exit(serial)
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, True)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
     base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
@@ -307,19 +311,25 @@ def update_file_paths(test, new_name):
 
 def add_files(test, files_to_push):
     if test.input.filepath != 'camera':
-        files_to_push.append(test.input.filepath)
+        if not (test.input.filepath in files_to_push):
+            files_to_push.append(test.input.filepath)
     for para in test.parallel.test:
-        if test.input.filepath != 'camera':
-            files_to_push = add_files(files_to_push)
+        if para.input.filepath != 'camera':
+            files_to_push = add_files(para, files_to_push)
     return files_to_push
 
 
-def run_codec_tests(test_def, model, serial, workdir, settings):
+def run_codec_tests_file(test_def, model, serial, workdir, settings):
     print(f'run test: {test_def}')
     tests = tests_definitions.Tests()
     with open(test_def, "rb") as fd:
         tests.ParseFromString(fd.read())
+    return run_codec_tests(tests, model, serial, workdir, settings)
 
+
+def run_codec_tests(tests, model, serial, workdir, settings):
+    test_def = settings['configfile'] #todo: check
+    print(f'Run test: {test_def}')
     fresh = tests_definitions.Tests()
     files_to_push = []
     for test in tests.test:
@@ -338,14 +348,14 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
                 test.configure.framerate = settings['out_framerate']
 
         videofile = settings['videofile']
-        print(f'Videofile exchanged? {videofile}')
         if videofile is not None and len(videofile) > 0:
             files_to_push.append(videofile)
         else:
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
-        update_file_paths(test, videofile)
 
+        update_file_paths(test, videofile)
+        print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
             # defult is serial calls
             split = settings['bitrate'].split(' ')
@@ -374,9 +384,9 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
         else:
             fresh.test.extend([test])
 
-
-
     print(fresh)
+    if test_def is None:
+        print('ERROR: no test file name')
     test_file = os.path.basename(test_def)
     output = f"{test_file[0:test_file.rindex('.')]}.run.bin"
     with open(output, 'wb') as binfile:
@@ -387,6 +397,7 @@ def run_codec_tests(test_def, model, serial, workdir, settings):
     for filepath in files_to_push:
         print(f'Push {filepath}')
         run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
+
     return collect_result(workdir, output, serial)
 
 
@@ -478,11 +489,11 @@ def codec_test(settings, model, serial):
     os.system('mkdir -p ' + workdir)
 
     # run the codec test
-    return run_codec_tests(test_config,
-                           model,
-                           serial,
-                           workdir,
-                           settings)
+    return run_codec_tests_file(test_config,
+                               model,
+                               serial,
+                               workdir,
+                               settings)
 
 
 def get_options(argv):
@@ -615,7 +626,8 @@ def main(argv):
         sys.exit(0)
 
     videofile_config = {}
-    if options.videofile is not None:
+    if (options.videofile is not None and
+        options.videofile != 'camera'):
         videofile_config = get_video_info(options.videofile)
 
     # get model and serial number
