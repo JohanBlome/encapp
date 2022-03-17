@@ -92,7 +92,7 @@ class SurfaceEncoder extends Encoder {
             mReferenceFrameRate = 30; //We strive for this at least
             mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
 
-            if (!test.getInput().hasPlayoutFrames()) {
+            if (!test.getInput().hasPlayoutFrames() && !test.getInput().hasStoptimeSec()) {
                 // In case we do not have a limit, limit to 60 secs
                 test = TestDefinitionHelper.updatePlayoutFrames(test, 1800);
                 Log.d(TAG, "Set playout limit for camera to 1800 frames");
@@ -214,7 +214,7 @@ class SurfaceEncoder extends Encoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -285,7 +285,7 @@ class SurfaceEncoder extends Encoder {
                                 mYuvReader.closeFile();
                             }
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime, true)) {
                                 done = true;
                             }
 

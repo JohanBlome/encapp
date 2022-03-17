@@ -74,8 +74,10 @@ public class CameraSource {
                     mSession.abortCaptures();
                 }
                 mSession = null;
-                mOutputConfigs.clear();
-                mSurfaces.clear();
+                if (mOutputConfigs != null)
+                    mOutputConfigs.clear();
+                if (mSurfaces != null)
+                    mSurfaces.clear();
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }

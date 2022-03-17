@@ -54,7 +54,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (test.getInput().hasRealtime())
             mRealtime = test.getInput().getRealtime();
         mFrameRate = test.getConfigure().getFramerate();
-        Log.d(TAG, "Realtime = " + mRealtime);
+        Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
         mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
 
         mYuvReader = new FileReader();
@@ -97,7 +97,6 @@ public class SurfaceTranscoder extends BufferEncoder {
             e.printStackTrace();
             return "Failed to create decoder";
         }
-
         test = TestDefinitionHelper.updateInputSettings(test, inputFormat);
         test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
         mStats = new Statistics("surface encoder", test);
@@ -109,7 +108,6 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         mReferenceFrameRate = test.getInput().getFramerate();
         mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
-
 
         if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
             mReferenceFrameRate = (float)(inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
@@ -205,6 +203,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         long last_pts = 0;
         int current_loop = 1;
         boolean done = false;
+        double mLoopTime = 0;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -223,7 +222,7 @@ public class SurfaceTranscoder extends BufferEncoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTime,false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -260,14 +259,14 @@ public class SurfaceTranscoder extends BufferEncoder {
                         if (eof) {
                             mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                             current_loop++;
-                            pts_offset = last_pts + mFrameTime;
+                            pts_offset = (long)(last_pts + mFrameTime);
+                            mLoopTime = mCurrentTime;
                             Log.d(TAG, "*** Loop ended starting " + current_loop + " ***");
-
-                            if (doneReading(test, mInFramesCount, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime,true)) {
                                 done = true;
                             }
                         }
-                        mCurrentTime = mExtractor.getSampleTime()/1000000;
+                        mCurrentTime = mLoopTime + mExtractor.getSampleTime()/1000000;
                     }
                 }
             } catch (Exception ex) {

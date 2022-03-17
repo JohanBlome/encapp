@@ -129,7 +129,7 @@ class BufferEncoder extends Encoder {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
 
-                if (doneReading(test, mInFramesCount, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -156,7 +156,7 @@ class BufferEncoder extends Encoder {
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime,true)) {
                                 done = true;
                             }
 
