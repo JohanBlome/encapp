@@ -238,7 +238,9 @@ public class Statistics {
     private JSONObject getConfigSettings(Configure config) throws JSONException {
         JSONObject settings = new JSONObject();
         settings.put("codec", mCodec);
-        settings.put("gop", config.getIFrameInterval());
+        if (config.hasIFrameInterval()) {
+            settings.put("gop", config.getIFrameInterval());
+        }
         settings.put("fps", config.getFramerate());
         settings.put("bitrate",config.getBitrate());
         settings.put("meanbitrate", getAverageBitrate());
@@ -247,7 +249,9 @@ public class Statistics {
             settings.put("width", s.getWidth());
             settings.put("height", s.getHeight());
         }
-        settings.put("encmode", mTest.getConfigure().getBitrateMode());
+        if ( mTest.getConfigure().hasBitrateMode()) {
+            settings.put("encmode", mTest.getConfigure().getBitrateMode());
+        }
         if (config.hasColorRange())
             settings.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
         if (config.hasColorStandard())
