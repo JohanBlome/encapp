@@ -283,6 +283,7 @@ public class Statistics {
             json.put("settings", getConfigSettings(mTest.getConfigure()));
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
             if (mDecodingFrames.size() > 0) {
+                json.put("decoder", mDecoderName);
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
             }
 

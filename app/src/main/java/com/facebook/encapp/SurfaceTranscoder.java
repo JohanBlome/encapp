@@ -6,6 +6,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
@@ -163,8 +164,14 @@ public class SurfaceTranscoder extends BufferEncoder {
             checkMediaFormat(inputFormat);
             setDecoderConfigureParams(test, inputFormat);
             mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
+            Log.d(TAG, "Start decoder");
             mDecoder.start();
-            mStats.setDecoderName(mDecoder.getName());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mStats.setDecoderName(mDecoder.getCodecInfo().getCanonicalName());
+            } else {
+                mStats.setDecoderName(mDecoder.getCodecInfo().getName());
+            }
+
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
             if (!noEncoding) {
                 mStats.setEncoderMediaFormat(mCodec.getInputFormat());
@@ -250,7 +257,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                         if (mRealtime) {
                             sleepUntilNextFrame(mInFramesCount);
                         }
-
                         mStats.startDecodingFrame(pts, size, flags);
                         if (size > 0) {
                             mDecoder.queueInputBuffer(index, 0, size, pts, flags);
