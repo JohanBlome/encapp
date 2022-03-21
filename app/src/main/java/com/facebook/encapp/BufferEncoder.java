@@ -3,6 +3,7 @@ package com.facebook.encapp;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.util.Log;
 import android.util.Size;
 
@@ -55,7 +56,6 @@ class BufferEncoder extends Encoder {
                 //TODO: throw error on failed lookup
                 test = setCodecNameAndIdentifier(test);
             }
-            mStats.setCodec(test.getConfigure().getCodec());
             Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
             mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
 
@@ -75,6 +75,11 @@ class BufferEncoder extends Encoder {
 
             checkMediaFormat(mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mStats.setCodec(mCodec.getCanonicalName());
+            } else {
+                mStats.setCodec(mCodec.getName());
+            }
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
             return "Failed to create codec";

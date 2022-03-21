@@ -6,6 +6,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
@@ -122,7 +123,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                     //TODO: throw error on failed lookup
                     test = setCodecNameAndIdentifier(test);
                 }
-                mStats.setCodec(test.getConfigure().getCodec());
                 Log.d(TAG, "Create encoder by name: " + test.getConfigure().getCodec());
                 mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
             } else {
@@ -163,11 +163,22 @@ public class SurfaceTranscoder extends BufferEncoder {
             checkMediaFormat(inputFormat);
             setDecoderConfigureParams(test, inputFormat);
             mDecoder.configure(inputFormat, mOutputSurface.getSurface(), null, 0);
+            Log.d(TAG, "Start decoder");
             mDecoder.start();
-            mStats.setDecoderName(mDecoder.getName());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mStats.setDecoderName(mDecoder.getCodecInfo().getCanonicalName());
+            } else {
+                mStats.setDecoderName(mDecoder.getCodecInfo().getName());
+            }
+
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
             if (!noEncoding) {
                 mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    mStats.setCodec(mCodec.getCanonicalName());
+                } else {
+                    mStats.setCodec(mCodec.getName());
+                }
             }
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
@@ -250,7 +261,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                         if (mRealtime) {
                             sleepUntilNextFrame(mInFramesCount);
                         }
-
                         mStats.startDecodingFrame(pts, size, flags);
                         if (size > 0) {
                             mDecoder.queueInputBuffer(index, 0, size, pts, flags);

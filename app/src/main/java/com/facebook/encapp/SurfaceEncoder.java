@@ -9,6 +9,7 @@ import android.media.MediaFormat;
 import android.media.cts.BitmapRender;
 import android.media.cts.InputSurface;
 import android.media.cts.OutputSurface;
+import android.os.Build;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -130,8 +131,6 @@ class SurfaceEncoder extends Encoder {
                 //TODO: throw error on failed lookup
                 test = setCodecNameAndIdentifier(test);
             }
-
-            mStats.setCodec(test.getConfigure().getCodec());
             Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
             mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
 
@@ -155,6 +154,11 @@ class SurfaceEncoder extends Encoder {
             mInputSurfaceReference.set(mCodec.createInputSurface());
             mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                mStats.setCodec(mCodec.getCanonicalName());
+            } else {
+                mStats.setCodec(mCodec.getName());
+            }
 
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
