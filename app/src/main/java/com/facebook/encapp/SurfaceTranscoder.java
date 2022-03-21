@@ -123,7 +123,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                     //TODO: throw error on failed lookup
                     test = setCodecNameAndIdentifier(test);
                 }
-                mStats.setCodec(test.getConfigure().getCodec());
                 Log.d(TAG, "Create encoder by name: " + test.getConfigure().getCodec());
                 mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
             } else {
@@ -175,6 +174,11 @@ public class SurfaceTranscoder extends BufferEncoder {
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
             if (!noEncoding) {
                 mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    mStats.setCodec(mCodec.getCanonicalName());
+                } else {
+                    mStats.setCodec(mCodec.getName());
+                }
             }
         } catch (IOException iox) {
             Log.e(TAG, "Failed to create codec: " + iox.getMessage());
