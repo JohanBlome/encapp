@@ -188,10 +188,63 @@ public class MediaCodecInfoHelper {
         //Odds are that if there is no default profile - nothing else will have defaults anyway...
         if (format.getString(MediaFormat.KEY_PROFILE) != null) {
             str.append("\nDefault settings:");
-            str.append(TestParams.getFormatInfo(format));
+            str.append(getFormatInfo(format));
         }
         return str.toString();
     }
+
+
+    public static String getFormatInfo(MediaFormat format) {
+
+        StringBuilder str = new StringBuilder();
+        String[] keys = {
+                MediaFormat.KEY_BIT_RATE,
+                MediaFormat.KEY_BITRATE_MODE,
+                MediaFormat.KEY_MIME,
+                MediaFormat.KEY_FRAME_RATE,
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaFormat.KEY_COLOR_RANGE,
+                MediaFormat.KEY_COLOR_STANDARD,
+                MediaFormat.KEY_COLOR_TRANSFER,
+                MediaFormat.KEY_I_FRAME_INTERVAL,
+                MediaFormat.KEY_LATENCY,
+                MediaFormat.KEY_LEVEL,
+                MediaFormat.KEY_PROFILE,
+                MediaFormat.KEY_SLICE_HEIGHT,
+                MediaFormat.KEY_SLICE_HEIGHT,
+                MediaFormat.KEY_TEMPORAL_LAYERING,
+        };
+
+        for (String key : keys) {
+            if (format.containsKey(key)) {
+                String val="";
+                try {
+                    val = format.getString(key);
+                } catch (ClassCastException ex1) {
+                    try {
+                        val = Integer.toString(format.getInteger(key));
+                    } catch (ClassCastException ex2) {
+                        try {
+                            val = Float.toString(format.getFloat(key));
+                        } catch (ClassCastException ex3) {
+                            try {
+                                val = Long.toString(format.getLong(key));
+                            } catch (ClassCastException ex4) {
+                                continue;
+                            }
+                        }
+
+                    }
+                }
+                if (val != null && val.length() > 0) {
+                    str.append("\n" + key + ": " + val);
+                }
+            }
+        }
+
+        return str.toString();
+    }
+
 
     public static String toText(MediaCodecInfo media_codec_info, int tab_length) {
         String tab = String.format("%" + (tab_length * 4) + "s", "");

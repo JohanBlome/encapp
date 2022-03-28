@@ -11,7 +11,6 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.params.InputConfiguration;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.RecommendedStreamConfigurationMap;
 import android.hardware.camera2.params.SessionConfiguration;
@@ -40,9 +39,8 @@ public class CameraSource {
     CameraManager mCameraManager;
     CameraDevice mCameraDevice;
     Handler mHandler;
-    Surface mSurface;
     Vector<OutputConfiguration> mOutputConfigs;
-    InputConfiguration mInputConfig;
+    CameraCaptureSession mSession;
 
     private CaptureRequest.Builder mPreviewRequestBuilder;
 
@@ -69,6 +67,21 @@ public class CameraSource {
     public void closeCamera() {
         synchronized (me) {
             mClients -= 1;
+            Log.d(TAG, "Clients is: " + mClients);
+
+            try {
+                if (mSession != null) {
+                    mSession.abortCaptures();
+                }
+                mSession = null;
+                if (mOutputConfigs != null)
+                    mOutputConfigs.clear();
+                if (mSurfaces != null)
+                    mSurfaces.clear();
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
+
             if (mClients == 0) {
                 mCameraDevice.close();
             }
@@ -231,8 +244,6 @@ public class CameraSource {
         public void onConfigured(@NonNull CameraCaptureSession session) {
             Log.d(TAG, "CameraCapture configured: " + session.toString());
 
-
-            Log.d(TAG, "onReady");
             try {
                 Log.d(TAG, "Create request");
                 CameraCharacteristics characs =mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
@@ -259,7 +270,7 @@ public class CameraSource {
                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT, CameraMetadata.CONTROL_CAPTURE_INTENT_VIDEO_RECORD);
                 Log.d(TAG, "Capture!");
                 int capture = session.setRepeatingRequest(mPreviewRequestBuilder.build(), null, mHandler);
-
+                mSession = session;
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -282,7 +293,7 @@ public class CameraSource {
         @Override
         public void onActive(@NonNull CameraCaptureSession session) {
             super.onActive(session);
-            Log.d(TAG, "onActive");
+            Log.d(TAG, "onActive" + session);
         }
 
         @Override

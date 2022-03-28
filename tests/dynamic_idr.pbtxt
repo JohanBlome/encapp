@@ -1,0 +1,23 @@
+test {
+    common {
+        id: "Dynamic Sync Frame"
+        description: "Verify encoding bitrate"
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.yuv"
+        resolution: "176x144"
+        framerate: 30
+        playout_frames: 180
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "400 kbps"
+        i_frame_interval: 2000
+    }
+    runtime {
+        request_sync: 30
+        request_sync: 60
+        request_sync: 90
+        request_sync: 120
+    }
+}

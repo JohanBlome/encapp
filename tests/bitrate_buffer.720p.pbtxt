@@ -1,0 +1,15 @@
+test {
+    common {
+        id: "Bitrate"
+        description: "Verify encoding bitrate - buffer"
+    }
+    input {
+        filepath: "/tmp/KristenAndSara_1280x720_60.yuv"
+        resolution: "1280x720"
+        framerate: 60
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "1000 kbps"
+    }
+}

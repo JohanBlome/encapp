@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'com.google.protobuf'
 
 android {
     compileSdkVersion 30
@@ -17,6 +18,15 @@ android {
         }
     }
 
+    sourceSets {
+        main {
+            proto {
+                main.java.srcDirs += "${protobuf.generatedFilesBaseDir}/debug/javalite"
+                srcDir '../proto/'
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -28,4 +38,27 @@ android {
 dependencies {
     api fileTree(include: ['*.jar'], dir: 'libs')
     api 'androidx.appcompat:appcompat:1.0.0'
+    implementation 'com.google.protobuf:protobuf-lite:3.0.0'
+}
+
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.0.0'
+    }
+    plugins {
+        javalite {
+            artifact = 'com.google.protobuf:protoc-gen-javalite:3.0.0'
+        }
+    }
+    generateProtoTasks {
+        all().each { task ->
+            task.builtins {
+                remove java
+            }
+            task.plugins {
+                javalite {}
+            }
+        }
+    }
 }

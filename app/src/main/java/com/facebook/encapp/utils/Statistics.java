@@ -5,6 +5,9 @@ import android.os.Build;
 import android.util.Log;
 import android.util.Size;
 
+import com.facebook.encapp.proto.Configure;
+import com.facebook.encapp.proto.Test;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,6 +30,7 @@ public class Statistics {
     private String mCodec;
     private long mStartTime;
     private long mStopTime;
+    private MediaFormat mEncoderConfigFormat;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
@@ -34,16 +38,16 @@ public class Statistics {
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
     int mEncodingProcessingFrames = 0;
-    TestParams mVc;
+    Test mTest;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
     public static String NA = "na";
 
-    public Statistics(String desc, TestParams vc) {
+    public Statistics(String desc, Test test) {
         mDesc = desc;
         mEncodingFrames = new HashMap<>();
         mDecodingFrames = new HashMap<>();
-        mVc = vc;
+        mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();
     }
@@ -159,20 +163,27 @@ public class Statistics {
         mEncoderMediaFormat = format;
     }
 
+    public void setEncoderConfigMediaFormat(MediaFormat format) {
+        mEncoderConfigFormat = format;
+    }
+
     public void setDecoderMediaFormat(MediaFormat format) {
         mDecoderMediaFormat = format;
     }
+
+    public void setDecoderName(String decoderName) {
+        mDecoderName = decoderName;
+    }
+
+
+
 
     private JSONObject getSettingsFromMediaFormat(MediaFormat format) {
         JSONObject mediaformat = new JSONObject();
         if (format == null) {
             return mediaformat;
         }
-        try {
-            mediaformat.put("decoder", mDecoderName);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+
         if ( Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
             for (String feature: features) {
@@ -210,23 +221,49 @@ public class Statistics {
                 }
             }
         } else {
-            ArrayList<ConfigureParam> params = mVc.getEncoderConfigure();
-            for (ConfigureParam param : params) {
-                try {
-                    if (param.value instanceof Integer) {
-                        mediaformat.put(param.name, format.getInteger(param.name));
-                    } else if (param.value instanceof String) {
-                        mediaformat.put(param.name, format.getString(param.name));
-                    } else if (param.value instanceof Float) {
-                        mediaformat.put(param.name, format.getFloat(param.name));
-                    }
-                } catch (Exception ex) {
-                    Log.e(TAG, param.name + ", Bad behaving Mediaformat query: " + ex.getMessage());
-                }
+           // TODO: Go through the settings
+            try {
+                mediaformat.put(MediaFormat.KEY_FRAME_RATE, format.getFloat(MediaFormat.KEY_FRAME_RATE));
+                mediaformat.put(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
         }
         return mediaformat;
     }
+
+
+
+
+    private JSONObject getConfigSettings(Configure config) throws JSONException {
+        JSONObject settings = new JSONObject();
+        settings.put("codec", mCodec);
+        if (config.hasIFrameInterval()) {
+            settings.put("gop", config.getIFrameInterval());
+        }
+        settings.put("fps", config.getFramerate());
+        settings.put("bitrate",config.getBitrate());
+        settings.put("meanbitrate", getAverageBitrate());
+        if (config.hasResolution()) {
+            Size s = Size.parseSize(mTest.getConfigure().getResolution());
+            settings.put("width", s.getWidth());
+            settings.put("height", s.getHeight());
+        }
+        if ( mTest.getConfigure().hasBitrateMode()) {
+            settings.put("encmode", mTest.getConfigure().getBitrateMode());
+        }
+        if (config.hasColorRange())
+            settings.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
+        if (config.hasColorStandard())
+            settings.put(MediaFormat.KEY_COLOR_STANDARD, config.getColorStandard());
+        if (config.hasColorTransfer())
+            settings.put(MediaFormat.KEY_COLOR_TRANSFER, config.getColorTransfer());
+
+        //TODO: more settings
+
+        return settings;
+    }
+
     public void writeJSON(Writer writer) throws IOException {
         Log.d(TAG, "Write stats for " + mId);
         try {
@@ -234,55 +271,22 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
-            json.put("test", mVc.getDescription());
+            json.put("test", mTest.getCommon().getDescription());
+            json.put("testdefinition", mTest.toString());
             json.put("date", mStartDate.toString());
             json.put("proctime", getProcessingTime());
             json.put("framecount", getEncodedFrameCount());
             json.put("encodedfile", mEncodedfile);
-            String[] tmp = mVc.getInputfile().split("/");
+            String[] tmp = mTest.getInput().getFilepath().split("/");
             json.put("sourcefile", tmp[tmp.length - 1]);
-            JSONObject settings = new JSONObject();
-            settings.put("codec", mCodec);
-            settings.put("gop", mVc.getKeyframeRate());
-            settings.put("fps", mVc.getFPS());
-            settings.put("bitrate", mVc.getBitRate());
-            settings.put("meanbitrate", getAverageBitrate());
-            Size s = mVc.getVideoSize();
-            settings.put("width", s.getWidth());
-            settings.put("height", s.getHeight());
-            settings.put("encmode",mVc.bitrateModeName());
-            settings.put("keyrate",mVc.getKeyframeRate());
 
-            ArrayList<ConfigureParam> configure = mVc.getEncoderConfigure();
-            for (ConfigureParam param: configure) {
-                settings.put(param.name, param.value.toString());
-            }
-            json.put("settings", settings);
+            json.put("settings", getConfigSettings(mTest.getConfigure()));
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
             if (mDecodingFrames.size() > 0) {
+                json.put("decoder", mDecoderName);
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
             }
 
-            JSONObject runtime = new JSONObject();
-            ArrayList<Object> runtimeList = mVc.getRuntimeParametersList();
-            if (runtimeList != null) {
-                for (Object param : runtimeList) {
-                    if (param instanceof RuntimeParam) {
-                        RuntimeParam rt = (RuntimeParam) param;
-                        JSONObject subtype = null;
-                        if (runtime.has(rt.name)) {
-                            subtype = runtime.getJSONObject(rt.name);
-                        } else {
-                            subtype = new JSONObject();
-                            runtime.put(rt.name, subtype);
-                        }
-                        subtype.put(String.valueOf(rt.frame), rt.value.toString());
-                    } else {
-                        Log.e(TAG, "Object is " + param);
-                    }
-                }
-            }
-            json.put("runtime_settings", runtime);
             ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
             Collections.sort(allFrames, compareByPts);
@@ -305,24 +309,6 @@ public class Statistics {
             json.put("frames", jsonArray);
 
             if (mDecodingFrames.size() > 0) {
-                runtime = new JSONObject();
-                runtimeList = mVc.getDecoderRuntimeParametersList();
-                for (Object param: runtimeList) {
-                    if (param instanceof RuntimeParam) {
-                        RuntimeParam rt = (RuntimeParam) param;
-                        JSONObject subtype = null;
-                        if (runtime.has(rt.name)) {
-                            subtype = runtime.getJSONObject(rt.name);
-                        } else {
-                            subtype = new JSONObject();
-                            runtime.put(rt.name, subtype);
-                        }
-                        subtype.put(String.valueOf(rt.frame), rt.value.toString());
-                    } else {
-                        Log.e(TAG, "Object is " + param);
-                    }
-                }
-                json.put("decoder_runtime_settings", runtime);
 
                 allFrames = new ArrayList<>(mDecodingFrames.values());
                 Collections.sort(allFrames, compareByPts);
@@ -394,7 +380,6 @@ public class Statistics {
         }
     }
 
-    public void setDecoderName(String decoderName) {
-        mDecoderName = decoderName;
-    }
+    //TODO: write camera settings
+
 }

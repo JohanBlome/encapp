@@ -7,75 +7,129 @@ and save encoded video and rate distortion results in the directory
 
 import os
 import subprocess
+import humanfriendly
 import json
 import sys
 import argparse
 import re
 import time
+import proto.tests_pb2 as tests_definitions
+
 
 from datetime import datetime
-from os.path import exists
 
-KEY_NAME_DESCRIPTION = 'description'
-KEY_NAME_INPUT_FILES = 'input_files'
-KEY_NAME_CODECS = 'codecs'
-KEY_NAME_ENCODE_RESOLUTIONS = 'encode_resolutions'
-KEY_NAME_RC_MODES = 'rc_modes'
-KEY_NAME_BITRATES = 'bitrates'
-KEY_NAME_I_INTERVALS = 'i_intervals'
-KEY_NAME_DURATION = 'duration'
-KEY_NAME_INPUT_FORMAT = 'input_format'
-KEY_NAME_INPUT_RESOLUTION = 'input_resolution'
-KEY_NAME_TEMPORAL_LAYER_COUNTS = 'temporal_layer_counts'
-KEY_NAME_ENC_LOOP = 'enc_loop'
-KEY_NAME_CONFIGURE = 'configure'
-KEY_NAME_RUNTIME_PARAMETER = 'runtime_parameter'
-
-sample_config_json_data = \
-    {
-        'tests':
-            [{
-              KEY_NAME_DESCRIPTION: 'sample',
-              KEY_NAME_INPUT_FILES: [''],
-              KEY_NAME_INPUT_FORMAT: 'mp4',
-              KEY_NAME_INPUT_RESOLUTION: '1280x720',
-              KEY_NAME_CODECS: ['h264.encoder'],
-              KEY_NAME_ENCODE_RESOLUTIONS: ['1280x720'],
-              KEY_NAME_RC_MODES: ['cbr'],
-              KEY_NAME_BITRATES: ['500k', '1000k', '1500k', '2M', '2500k'],
-              KEY_NAME_I_INTERVALS: [2],
-              # DEFAULT, MEDIUM, HUGE, UNLIMITED
-              # KEY_NAME_CONFIGURE: [''],
-              # KEY_NAME_RUNTIME_PARAMETER: ['']
-              KEY_NAME_DURATION: 10,
-              KEY_NAME_ENC_LOOP: 0
-            }]
-    }
+__version__ = '0.1'
 
 
-ACTIVITY = 'com.facebook.encapp/.MainActivity'
+APPNAME_MAIN = 'com.facebook.encapp'
+APPNAME_TEST = 'com.facebook.encapp.test'
+ACTIVITY = f'{APPNAME_MAIN}/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
+SCRIPT_PATH = os.path.realpath(__file__)
+SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
+APK_DIR = os.path.join(SCRIPT_DIR, '../app/build/outputs/apk')
+APK_NAME_MAIN = f'{APPNAME_MAIN}-v1.0-debug.apk'
+APK_MAIN = os.path.join(APK_DIR, 'debug', APK_NAME_MAIN)
+APK_NAME_TEST = f'{APPNAME_MAIN}-v1.0-debug-androidTest.apk'
+APK_TEST = os.path.join(APK_DIR, 'androidTest/debug', APK_NAME_TEST)
 
-def run_cmd_silent(cmd):
+FUNC_CHOICES = {
+    'help': 'show help options',
+    'install': 'install apks',
+    'uninstall': 'uninstall apks',
+    'list': 'list codecs and devices supported',
+    'run': 'run codec test case',
+}
+
+default_values = {
+    'debug': 0,
+    'func': 'help',
+    'install': False,
+    'videofile': None,
+    'configfile': None,
+    'encoder': None,
+    'output': None,
+    'bps': None,
+}
+
+extra_settings = {
+    'videofile': None,
+    'configfile': None,
+    'encoder': None,
+    'output': None,
+    'bitrate': None,
+    'desc': 'encapp',
+    'inp_resolution': None,
+    'out_resolution': None,
+    'inp_framerate': None,
+    'out_framerate': None,
+}
+
+RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.raw')
+OPERATION_TYPES = ('batch', 'realtime')
+PIX_FMT_TYPES = ('yuv420p', 'nv12')
+KNOWN_CONFIGURE_TYPES = {
+    'codec': str,
+    'encode': bool,
+    'surface': bool,
+    'mime': str,
+    'bitrate': int,
+    'bitrate-mode': int,
+    'durationUs': int,
+    'resolution': str,
+    'width': int,
+    'height': int,
+    'color-format': int,
+    'color-standard': int,
+    'color-range': int,
+    'color-transfer': int,
+    'color-transfer-request': int,
+    'frame-rate': int,
+    'i-frame-interval': int,
+    'intra-refresh-period': int,
+    'latency': int,
+    'repeat-previous-frame-after': int,
+    'ts-schema': str,
+}
+KNOWN_RUNTIME_TYPES = {
+    'video-bitrate': int,
+    'request-sync': None,
+    'drop': None,
+    'dynamic-framerate': int,
+}
+TYPE_LIST = (
+    'int', 'float', 'str', 'bool', 'null',
+)
+BITRATE_MODE_VALUES = {
+    'cq': 0,
+    'vbr': 1,
+    'cbr': 2,
+    'cbr_fd': 3,
+}
+FFPROBE_FIELDS = {
+    'codec_name': 'codec-name',
+    'width': 'width',
+    'height': 'height',
+    'pix_fmt': 'pix-fmt',
+    'color_range': 'color-range',
+    'color_space': 'color-space',
+    'color_transfer': 'color-transfer',
+    'color_primaries': 'color-primaries',
+    'r_frame_rate': 'framerate',
+    'duration': 'duration',
+}
+R_FRAME_RATE_MAP = {
+    '30/1': 30,
+}
+
+
+def run_cmd(cmd, debug=0):
     ret = True
     try:
-        process = subprocess.Popen(cmd, shell=True,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-    except Exception:
-        ret = False
-        print('Failed to run command: ' + cmd)
-
-    return ret, stdout.decode(), stderr.decode()
-
-
-def run_cmd(cmd):
-    ret = True
-    try:
-        print(cmd, sep=' ')
+        if debug > 0:
+            print(cmd, sep=' ')
         process = subprocess.Popen(cmd, shell=True,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -92,7 +146,7 @@ def run_cmd(cmd):
 def get_device_info(serial_inp, debug=0):
     # list all available devices
     adb_cmd = 'adb devices -l'
-    ret, stdout, stderr = run_cmd(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
     assert ret, 'error: failed to get adb devices'
 
     # parse list
@@ -137,84 +191,91 @@ def get_device_info(serial_inp, debug=0):
 
     # remove any files that are generated in previous runs
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
     for file in output_files:
         if file == '':
             continue
         # remove the output
         adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
-        run_cmd(adb_cmd)
+        run_cmd(adb_cmd, debug)
 
     return model, serial
 
 
-def wait_for_exit(serial):
-    adb_cmd = f'adb -s {serial} shell pidof com.facebook.encapp'
+def wait_for_exit(serial, debug=0):
+    adb_cmd = f'adb -s {serial} shell pidof {APPNAME_MAIN}'
     pid = -1
     current = 1
     while (current != -1):
         if pid == -1:
-            ret, stdout, stderr = run_cmd_silent(adb_cmd)
+            ret, stdout, stderr = run_cmd(adb_cmd, debug)
             pid = -1
             if len(stdout) > 0:
                 pid = int(stdout)
         time.sleep(1)
-        ret, stdout, stderr = run_cmd_silent(adb_cmd)
+        ret, stdout, stderr = run_cmd(adb_cmd, debug)
         current = -2
         if len(stdout) > 0:
-            current = int(stdout)
+            try:
+                current = int(stdout)
+            except Exception:
+                print(f'wait for exit caught exception: {stdout}')
+                continue
         else:
             current = -1
     print(f'Exit from {pid}')
 
 
-def install_app(serial):
-    script_path = os.path.realpath(__file__)
-    path, __ = os.path.split(script_path)
-
-    run_cmd_silent(f'adb -s {serial} install -g '
-                   f'{path}/../app/build/outputs/apk/debug/'
-                   'com.facebook.encapp-v1.0-debug.apk')
+def install_app(serial, debug=0):
+    run_cmd(f'adb -s {serial} install -g {APK_MAIN}', debug)
+    run_cmd(f'adb -s {serial} install -g {APK_TEST}', debug)
 
 
-def run_test(workdir, json_path, json_name,
-             result_json, serial, options):
-    print(f'Run test: s{json_path}, {json_name}')
-    run_cmd(f'adb -s {serial} push {json_path}/{json_name} /sdcard/')
+def uninstall_app(serial, debug=0):
+    package_list = installed_apps(serial, debug)
+    if APPNAME_MAIN in package_list:
+        run_cmd(f'adb -s {serial} uninstall {APPNAME_MAIN}', debug)
+    else:
+        print(f'warning: {APPNAME_MAIN} not installed')
+    if APPNAME_TEST in package_list:
+        run_cmd(f'adb -s {serial} uninstall {APPNAME_TEST}', debug)
+    else:
+        print(f'warning: {APPNAME_TEST} not installed')
 
-    additional = ''
-    if options.codec is not None and len(options.codec) > 0:
-        additional = f'{additional} -e enc {options.codec}'
 
-    if options.input is not None and len(options.input) > 0:
-        additional = f'{additional} -e file {options.input}'
+def parse_pm_list_packages(stdout):
+    package_list = []
+    for line in stdout.split('\n'):
+        # ignore blank lines
+        if not line:
+            continue
+        if line.startswith('package:'):
+            package_list.append(line[len('package:'):])
+    return package_list
 
-    if options is not None and len(options.input_res) > 0:
-        additional = f'{additional} -e ref_res {options.input_res}'
 
-    if options is not None and len(options.input_fps) > 0:
-        additional = f'{additional} -e ref_fps {options.input_fps}'
+def installed_apps(serial, debug=0):
+    ret, stdout, stderr = run_cmd(f'adb -s {serial} shell pm list packages',
+                                  debug)
+    assert ret, 'error: failed to get installed app list'
+    return parse_pm_list_packages(stdout)
 
-    if options is not None and len(options.output_fps) > 0:
-        additional = f'{additional} -e fps {options.output_fps}'
 
-    if options is not None and len(options.output_res) > 0:
-        additional = f'{additional} -e res {options.output_res}'
-
-    run_cmd(f'adb -s {serial} shell am start -W {additional} -e test '
-            f'/sdcard/{json_name} {ACTIVITY}')
+def collect_result(workdir, test_name, serial):
+    print(f'Collect_result: {test_name}')
+    run_cmd(f'adb -s {serial} shell am start -W -e test '
+            f'/sdcard/{test_name} {ACTIVITY}')
     wait_for_exit(serial)
     adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd_silent(adb_cmd)
+    ret, stdout, stderr = run_cmd(adb_cmd, True)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
-
-    base_file_name = os.path.basename(json_path).rsplit('.', 1)[0]
+    base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
     sub_dir = '_'.join([base_file_name, 'files'])
     output_dir = f'{workdir}/{sub_dir}/'
     run_cmd(f'mkdir {output_dir}')
-
+    result_json = []
     for file in output_files:
         if file == '':
             print('No file found')
@@ -223,117 +284,133 @@ def run_test(workdir, json_path, json_name,
         print(f'pull {file} to {output_dir}')
 
         adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
-        run_cmd_silent(adb_cmd)
+        run_cmd(adb_cmd)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
-        run_cmd_silent(adb_cmd)
+        run_cmd(adb_cmd)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(f'{output_dir}/{tmpname}')
 
-    adb_cmd = f'adb -s {serial} shell rm /sdcard/{json_name}'
+    adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
     run_cmd(adb_cmd)
+    print(f'results collect: {result_json}')
     return result_json
 
 
-def run_encode_tests(test_def, json_path, model, serial, test_desc,
-                     workdir, options):
-    result_json = []
-    if options.no_install is not None and options.no_install:
-        print('Skip install of apk!')
-    else:
-        install_app(serial)
+def update_file_paths(test, new_name):
+    path = test.input.filepath
+    if new_name is not None:
+        path = new_name
+    if path != 'camera':
+        test.input.filepath = f'/sdcard/{os.path.basename(path)}'
+    for para in test.parallel.test:
+        update_file_paths(para, new_name)
 
-    if test_def is None:
-        raise Exception('No test files')
 
-    path, json_filename = os.path.split(json_path)
-    # remove old encapp files on device (!)
-    run_cmd(f'adb -s {serial} rm /sdcard/encapp_*')
-    # run_cmd(f'adb -s {serial} push {json_path} /sdcard/')
+def add_files(test, files_to_push):
+    if test.input.filepath != 'camera':
+        if not (test.input.filepath in files_to_push):
+            files_to_push.append(test.input.filepath)
+    for para in test.parallel.test:
+        if para.input.filepath != 'camera':
+            files_to_push = add_files(para, files_to_push)
+    return files_to_push
 
-    json_folder = os.path.dirname(json_path)
-    if len(json_folder) == 0:
-        json_folder = '.'
 
-    inputfile = ''
-    tests = test_def.get('tests')
-    print(f'tests {tests}')
-    if isinstance(tests, type(None)):
-        tests = [test_def]
-    counter = 1
-    all_input_files = []
-    # push media files to the device
-    for test in tests:
-        print(f'push data for test = {test}')
-        if options is not None and len(options.input) > 0:            
-            inputfile = f'/sdcard/{os.path.basename(options.input)}'
-            all_input_files.append(inputfile)
-            ret, stdout, stderr = run_cmd_silent(
-                f'adb -s {serial} shell ls {inputfile}')
-            if len(stderr) > 0:
-                run_cmd_silent(f'adb -s {serial} push {options.input} '
-                               '/sdcard/')
+def run_codec_tests_file(test_def, model, serial, workdir, settings):
+    print(f'run test: {test_def}')
+    tests = tests_definitions.Tests()
+    with open(test_def, "rb") as fd:
+        tests.ParseFromString(fd.read())
+    return run_codec_tests(tests, model, serial, workdir, settings)
+
+
+def run_codec_tests(tests, model, serial, workdir, settings):
+    test_def = settings['configfile'] #todo: check
+    print(f'Run test: {test_def}')
+    fresh = tests_definitions.Tests()
+    files_to_push = []
+    for test in tests.test:
+
+        if settings['encoder'] is not None and len(settings['encoder']) > 0:
+            test.configure.codec = settings['encoder']
+        if (settings['inp_resolution'] is not None and
+            len(settings['inp_resolution']) > 0):
+                test.input.resolution = settings['inp_resolution']
+        if (settings['out_resolution'] is not None and
+            len(settings['out_resolution']) > 0):
+                test.configure.resolution = settings['out_resolution']
+        if settings['inp_framerate'] is not None:
+                test.input.framerate = settings['inp_framerate']
+        if settings['out_framerate'] is not None:
+                test.configure.framerate = settings['out_framerate']
+
+        videofile = settings['videofile']
+        if videofile is not None and len(videofile) > 0:
+            files_to_push.append(videofile)
         else:
-            input_files = test.get(KEY_NAME_INPUT_FILES)
-            if input_files is not None:
-                for file in input_files:
-                    if file[0] != "/":
-                        media_path = f'{json_folder}/{file}'
-                    else:
-                        media_path = f'{file}'
-                    mediafile = os.path.basename(media_path)
-                    print(f'file: {mediafile}')
-                    if mediafile == 'camera':
-                        media_path = mediafile
-                    else:
-                        inputfile = f'/sdcard/{mediafile}'
-                        ret, stdout, stderr = run_cmd_silent(
-                            f'adb -s {serial} shell ls {inputfile}')
-                        if len(stderr) > 0:
-                            all_input_files.append(path)
-                            if exists(path):
-                                run_cmd(f'adb -s {serial} push {media_path} /sdcard/')
-                            else:
-                                print(f'Media file is missing: {media_path}')
-                                exit(0)
+            # check for possible parallel files
+            files_to_push = add_files(test, files_to_push)
 
-    # run test(s)
-    if not options.no_split:
-        print(f'No split: {tests}')
-        for test in tests:
-            json_name = f'{json_filename}_{counter}.json'
-            counter += 1
-            with open(json_name, "w") as outfile:
-                json.dump(test, outfile)
-            run_test(workdir, './', json_name,
-                     result_json, serial, options)
-            os.remove(json_name)
-    else:
-        run_test(workdir, json_folder, json_filename,
-                 result_json, serial, options)
+        update_file_paths(test, videofile)
+        print(f'files to push: {files_to_push}')
+        if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
+            # defult is serial calls
+            split = settings['bitrate'].split(' ')
+            if len(split) != 3:
+                split = settings['bitrate'].split(',')
+                if len(split) != 3:
+                    # Single bitrate
+                    test.configure.bitrate = str(
+                        convert_to_bps(settings['bitrate']))
+                    fresh.test.extend([test])
+                else:
+                    for bitrate in split:
+                        ntest = tests_definitions.Test()
+                        ntest.CopyFrom(test)
+                        ntest.configure.bitrate = str(convert_to_bps(bitrate))
+                        fresh.test.extend([ntest])
+            else:
+                fval = convert_to_bps(split[0])
+                tval = convert_to_bps(split[1])
+                sval = convert_to_bps(split[2])
+                for bitrate in range(fval, tval, sval):
+                    ntest = tests_definitions.Test()
+                    ntest.CopyFrom(test)
+                    ntest.configure.bitrate = str(bitrate)
+                    fresh.test.extend([ntest])
+        else:
+            fresh.test.extend([test])
 
-    if len(all_input_files) > 0:
-        for file in all_input_files:
-            run_cmd(f'adb -s {serial} shell rm {file}')
+    print(fresh)
+    if test_def is None:
+        print('ERROR: no test file name')
+    test_file = os.path.basename(test_def)
+    output = f"{test_file[0:test_file.rindex('.')]}.run.bin"
+    with open(output, 'wb') as binfile:
+        binfile.write(fresh.SerializeToString())
+        files_to_push.append(output)
 
-    return result_json
+    print(f'files_to_push = {files_to_push}')
+    for filepath in files_to_push:
+        print(f'Push {filepath}')
+        run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
+
+    return collect_result(workdir, output, serial)
 
 
-def list_codecs(serial, model, install):
-    if install:
-        install_app(serial)
-
+def list_codecs(serial, model, debug=0):
     adb_cmd = f'adb -s {serial} shell am start '\
               f'-e ui_hold_sec 3 '\
               f'-e list_codecs a {ACTIVITY}'
 
-    run_cmd_silent(adb_cmd)
-    wait_for_exit(serial)
+    run_cmd(adb_cmd, debug)
+    wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
-    run_cmd(adb_cmd)
+    run_cmd(adb_cmd, debug)
     with open(filename, 'r') as codec_file:
         lines = codec_file.readlines()
         for line in lines:
@@ -341,30 +418,152 @@ def list_codecs(serial, model, install):
         print(f'File is available in current dir as {filename}')
 
 
+def read_json_file(configfile, debug):
+    # read input file
+    with open(configfile, 'r') as fp:
+        if debug > 0:
+            print(f'configfile: {configfile}')
+        input_config = json.load(fp)
+    return input_config
+
+
+def is_int(s):
+    if isinstance(s, int):
+        return True
+    return (s[1:].isdigit() if s[0] in ('-', '+') else s.isdigit())
+
+
+def convert_to_bps(value):
+    if isinstance(value, str):
+        mul = 1
+        index = value.rfind('k')
+        if index == -1:
+            index = value.rfind('M')
+            if index > 0:
+                mul = 1000000
+        elif index > 0:
+            mul = 1000
+        return int(value[0:index]) * mul
+    else:
+        return int(value)
+
+
+# convert a value (in either time or frame units) into frame units
+def convert_to_frames(value, fps=30):
+    if is_int(value):
+        # value is already fps
+        return int(value)
+    # check if it can be parsed as a duration (time)
+    try:
+        sec = humanfriendly.parse_timespan(value)
+    except humanfriendly.InvalidTimespan:
+        print('error: invalid frame value "%s"' % value)
+        sys.exit(-1)
+    return int(sec * fps)
+
+
+def convert_test(path):
+    output = f"{path[0:path.rindex('.')]}.bin"
+    root = f"{SCRIPT_DIR[0:SCRIPT_DIR.rindex('/')]}"
+    cmd = (f'protoc -I / --encode="Tests" {root}/proto/tests.proto '
+           f'< {path} > {output}')
+    print(f'cmd: {cmd}')
+    run_cmd(cmd)
+    return output
+
+
+def codec_test(settings, model, serial):
+    print(f'codec test: {settings}')
+    # convert the human-friendly input into a valid apk input
+    test_config = convert_test(settings['configfile'])
+
+    # get date and time and format it
+    now = datetime.now()
+    dt_string = now.strftime('%Y-%m-%d_%H_%M')
+
+    # get working directory at the host
+    if settings['output'] is not None:
+        workdir = settings['output']
+    else:
+        workdir = f"{settings['desc'].replace(' ', '_')}_{model}_{dt_string}"
+    os.system('mkdir -p ' + workdir)
+
+    # run the codec test
+    return run_codec_tests_file(test_config,
+                               model,
+                               serial,
+                               workdir,
+                               settings)
+
+
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
-
-    parser.add_argument('test', nargs='*', help='Test cases in JSON format.')
+    parser.add_argument(
+        '-v', '--version', action='store_true',
+        dest='version', default=False,
+        help='Print version',)
+    parser.add_argument(
+        '-d', '--debug', action='count',
+        dest='debug', default=default_values['debug'],
+        help='Increase verbosity (use multiple times for more)',)
+    parser.add_argument(
+        '--quiet', action='store_const',
+        dest='debug', const=-1,
+        help='Zero verbosity',)
     parser.add_argument('--serial', help='Android device serial number')
-    parser.add_argument('--config', help='Generate a sample config \
-                         file in json format')
-    parser.add_argument('-l', '--list_codecs', action='store_true',
-                        help='List codecs the devices support')
-    parser.add_argument('--desc', default='encapp', help='Test description')
-    parser.add_argument('-o', '--output', help='Name output directory')
-    parser.add_argument('--no_install', action='store_true',
-                        help='Do not install apk')
-
-    parser.add_argument('--codec', help='Override used codec', default='')
-    parser.add_argument('--input', help='Override input file', default='')
-    parser.add_argument('--input_res', help='Override input file', default='')
-    parser.add_argument('--input_fps', help='Override input fps', default='')
-    parser.add_argument('--output_fps', help='Override output fps', default='')
-    parser.add_argument('--output_res', help='Override output resolution',
-                        default='')
-    parser.add_argument('--no_split', action='store_true')
+    parser.add_argument(
+        '--install', action='store_const',
+        dest='install', const=True,
+        default=default_values['install'],
+        help='Do install apk',)
+    parser.add_argument(
+        '--no-install', action='store_const',
+        dest='install', const=False,
+        help='Do not install apk',)
+    parser.add_argument(
+        'func', type=str, nargs='?',
+        default=default_values['func'],
+        choices=FUNC_CHOICES.keys(),
+        metavar='%s' % (' | '.join("{}: {}".format(k, v) for k, v in
+                                   FUNC_CHOICES.items())),
+        help='function arg',)
+    parser.add_argument(
+        '-i', type=str, dest='videofile',
+        default=default_values['videofile'],
+        metavar='input-video-file',
+        help='input video file',)
+    parser.add_argument(
+        '-c', '--codec', type=str, dest='codec',
+        default=default_values['encoder'],
+        metavar='encoder',
+        help='override encoder in config',)
+    parser.add_argument(
+        '-r', '--bitrate', type=str, dest='bitrate',
+        default=default_values['bps'],
+        metavar='input-video-bitrate',
+        help='input video bitrate, either as a single number, '
+        '\"100 kbps\" or a lst 100kbps,200kbps or a range '
+        '100kps-1Mbps-100kbps (start-stop-step)',)
+    parser.add_argument(
+        'configfile', type=str, nargs='?',
+        default=default_values['configfile'],
+        metavar='input-config-file',
+        help='input configuration file',)
+    parser.add_argument(
+        'output', type=str, nargs='?',
+        default=default_values['output'],
+        metavar='output',
+        help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
+    options.desc = "testing"
+    if options.version:
+        return options
+
+    # implement help
+    if options.func == 'help':
+        parser.print_help()
+        sys.exit(0)
 
     if options.serial is None and 'ANDROID_SERIAL' in os.environ:
         # read serial number from ANDROID_SERIAL env variable
@@ -373,43 +572,102 @@ def get_options(argv):
     return options
 
 
+def video_is_raw(videofile):
+    extension = os.path.splitext(videofile)[1]
+    return extension in RAW_EXTENSION_LIST
+
+
+def parse_ffprobe_output(stdout):
+    videofile_config = {}
+    for line in stdout.split('\n'):
+        if not line:
+            # ignore empty lines
+            continue
+        if line in ('[STREAM]', '[/STREAM]'):
+            # ignore start/end of stream
+            continue
+        key, value = line.split('=')
+        # store interesting fields
+        if key in FFPROBE_FIELDS.keys():
+            # process some values
+            if key == 'r_frame_rate':
+                value = R_FRAME_RATE_MAP[value]
+            elif key == 'width' or key == 'height':
+                value = int(value)
+            elif key == 'duration':
+                value = float(value)
+            key = FFPROBE_FIELDS[key]
+            videofile_config[key] = value
+    return videofile_config
+
+
+def get_video_info(videofile, debug=0):
+    assert os.path.exists(videofile), (
+        'input video file (%s) does not exist' % videofile)
+    assert os.path.isfile(videofile), (
+        'input video file (%s) is not a file' % videofile)
+    assert os.access(videofile, os.R_OK), (
+        'input video file (%s) is not readable' % videofile)
+    if video_is_raw(videofile):
+        return {}
+    # check using ffprobe
+    cmd = f'ffprobe -v quiet -select_streams v -show_streams {videofile}'
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    assert ret, f'error: failed to analyze file {videofile}'
+    videofile_config = parse_ffprobe_output(stdout)
+    videofile_config['filepath'] = videofile
+    return videofile_config
+
+
 def main(argv):
     options = get_options(argv)
-    if options.config is not None:
-        if options.config.endswith('.json') is False:
-            print('Error: the config file should have .json extension')
-        with open(options.config, 'w') as fp:
-            json.dump(sample_config_json_data, fp, indent=4)
-    else:
-        model, serial = get_device_info(options.serial)
-        if type(model) is dict:
-            if 'model' in model:
-                model = model.get('model')
-            else:
-                model = list(model.values())[0]
-        print(f'model = {model}')
-        if options.list_codecs is True:
-            list_codecs(serial, model, not options.no_install)
+    if options.version:
+        print('version: %s' % __version__)
+        sys.exit(0)
+
+    videofile_config = {}
+    if (options.videofile is not None and
+        options.videofile != 'camera'):
+        videofile_config = get_video_info(options.videofile)
+
+    # get model and serial number
+    model, serial = get_device_info(options.serial, options.debug)
+    # TODO(chema): fix this
+    if type(model) is dict:
+        if 'model' in model:
+            model = model.get('model')
         else:
-            # get date and time and format it
-            now = datetime.now()
-            dt_string = now.strftime('%Y-%m-%d_%H_%M')
-            workdir = (
-                f"{options.desc.replace(' ', '_')}_{model}_{dt_string}")
-            if options.output is not None:
-                workdir = options.output
-            os.system('mkdir -p ' + workdir)
-            for test in options.test:
-                with open(test, 'r') as fp:
-                    tests_json = json.load(fp)
-                    run_encode_tests(tests_json,
-                                     test,
-                                     model,
-                                     serial,
-                                     options.desc if options.desc is
-                                     not None else '',
-                                     workdir,
-                                     options)
+            model = list(model.values())[0]
+    if options.debug > 0:
+        print(f'model = {model}')
+
+    # install app
+    if options.func == 'install' or options.install:
+        install_app(serial, options.debug)
+
+    # uninstall app
+    if options.func == 'uninstall':
+        uninstall_app(serial, options.debug)
+
+    # run function
+    if options.func == 'list':
+        list_codecs(serial, model, options.debug)
+
+    elif options.func == 'run':
+        # ensure there is an input configuration
+        assert options.configfile is not None, (
+            'error: need a valid input configuration file')
+
+        settings = extra_settings
+        settings['configfile'] = options.configfile
+        settings['videofile'] = options.videofile
+        settings['encoder'] = options.codec
+        settings['encoder'] = options.codec
+        settings['output'] = options.output
+        settings['bitrate'] = options.bitrate
+        settings['desc'] = options.desc
+
+        codec_test(settings, model, serial)
 
 
 if __name__ == '__main__':

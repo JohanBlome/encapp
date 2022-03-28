@@ -1,0 +1,62 @@
+test {
+    common {
+        id: "qcom_ltr2"
+        description: "Dynamic LTR - 2 Frame Refs Test"
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.yuv"
+        resolution: "176x144"
+        pix_fmt: nv12
+        framerate: 30
+        playout_frames: 900
+    }
+    configure {
+        codec: "encoder.avc"
+        bitrate: "100 kbps"
+        bitrate_mode: cbr
+        i_frame_interval: 2000
+        parameter {
+            key: "vendor.qti-ext-enc-ltr-count.num-ltr-frames"
+            type: intType
+            value: "2"
+        }
+        parameter {
+            key: "vendor.qti-ext-enc-caps-ltr.max-frames"
+            type: intType
+            value: "2"
+        }
+    }
+    runtime {
+        parameter {
+            framenum: 60
+            key: "vendor.qti-ext-enc-ltr.mark-frame"
+            type: intType,
+            value: "1"
+        }        
+        parameter {
+            framenum: 400
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: intType,
+            value: "0"
+        }
+        parameter {
+            framenum: 500
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: intType,
+            value: "1"
+        }
+        request_sync: 600
+        parameter {
+            framenum: 700
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: intType,
+            value: "1"
+        }        
+        parameter {
+            framenum: 800
+            key: "vendor.qti-ext-enc-ltr.use-frame"
+            type: intType,
+            value: "0"
+        }
+    }
+}
