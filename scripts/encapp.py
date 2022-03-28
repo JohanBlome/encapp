@@ -17,9 +17,8 @@ import datetime
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
-import sys
 sys.path.append(SCRIPT_ROOT_DIR)
-import proto.tests_pb2 as tests_definitions
+import proto.tests_pb2 as tests_definitions  # noqa: E402
 
 
 __version__ = '1.0'
@@ -134,7 +133,7 @@ def run_cmd(cmd, debug=0):
     try:
         if debug > 0:
             print(cmd, sep=' ')
-        process = subprocess.Popen(cmd, shell=True,
+        process = subprocess.Popen(cmd, shell=True,  # noqa: P204
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
@@ -332,24 +331,23 @@ def run_codec_tests_file(test_def, model, serial, workdir, settings):
 
 
 def run_codec_tests(tests, model, serial, workdir, settings):
-    test_def = settings['configfile'] #todo: check
+    test_def = settings['configfile']  # todo: check
     print(f'Run test: {test_def}')
     fresh = tests_definitions.Tests()
     files_to_push = []
     for test in tests.test:
-
         if settings['encoder'] is not None and len(settings['encoder']) > 0:
             test.configure.codec = settings['encoder']
         if (settings['inp_resolution'] is not None and
-            len(settings['inp_resolution']) > 0):
-                test.input.resolution = settings['inp_resolution']
+                len(settings['inp_resolution']) > 0):
+            test.input.resolution = settings['inp_resolution']
         if (settings['out_resolution'] is not None and
-            len(settings['out_resolution']) > 0):
-                test.configure.resolution = settings['out_resolution']
+                len(settings['out_resolution']) > 0):
+            test.configure.resolution = settings['out_resolution']
         if settings['inp_framerate'] is not None:
-                test.input.framerate = settings['inp_framerate']
+            test.input.framerate = settings['inp_framerate']
         if settings['out_framerate'] is not None:
-                test.configure.framerate = settings['out_framerate']
+            test.configure.framerate = settings['out_framerate']
 
         videofile = settings['videofile']
         if videofile is not None and len(videofile) > 0:
@@ -494,10 +492,10 @@ def codec_test(settings, model, serial):
 
     # run the codec test
     return run_codec_tests_file(test_config,
-                               model,
-                               serial,
-                               workdir,
-                               settings)
+                                model,
+                                serial,
+                                workdir,
+                                settings)
 
 
 def get_options(argv):
@@ -631,7 +629,7 @@ def main(argv):
 
     videofile_config = {}
     if (options.videofile is not None and
-        options.videofile != 'camera'):
+            options.videofile != 'camera'):
         videofile_config = get_video_info(options.videofile)
 
     # get model and serial number
