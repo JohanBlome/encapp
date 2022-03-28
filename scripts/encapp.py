@@ -22,7 +22,7 @@ sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions
 
 
-__version__ = '0.1'
+__version__ = '1.0'
 
 
 APPNAME_MAIN = 'com.facebook.encapp'
