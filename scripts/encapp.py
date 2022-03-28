@@ -13,10 +13,14 @@ import sys
 import argparse
 import re
 import time
+import datetime
+
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+import sys
+sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions
 
-
-from datetime import datetime
 
 __version__ = '0.1'
 
@@ -478,7 +482,7 @@ def codec_test(settings, model, serial):
     test_config = convert_test(settings['configfile'])
 
     # get date and time and format it
-    now = datetime.now()
+    now = datetime.datetime.now()
     dt_string = now.strftime('%Y-%m-%d_%H_%M')
 
     # get working directory at the host
