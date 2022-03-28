@@ -23,7 +23,15 @@ This document describes how to use the tool.
 For running encapp:
 * adb connection to the device being tested.
 * ffmpeg with decoding support for the codecs to be tested
+* install some python packages
 * protobuf (https://developers.google.com/protocol-buffers/docs/downloads)
+
+List of required python packages:
+* humanfriendly
+* numpy
+* pandas
+* seaborn
+
 
 
 # 2. Operation: Get a List of Available Codecs
