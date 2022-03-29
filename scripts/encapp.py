@@ -21,7 +21,7 @@ sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
 
-__version__ = '1.0'
+__version__ = '1.1'
 
 
 APPNAME_MAIN = 'com.facebook.encapp'
