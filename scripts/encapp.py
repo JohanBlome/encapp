@@ -25,7 +25,6 @@ __version__ = '1.0'
 
 
 APPNAME_MAIN = 'com.facebook.encapp'
-APPNAME_TEST = 'com.facebook.encapp.test'
 ACTIVITY = f'{APPNAME_MAIN}/.MainActivity'
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
@@ -35,8 +34,6 @@ SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
 APK_DIR = os.path.join(SCRIPT_DIR, '../app/build/outputs/apk')
 APK_NAME_MAIN = f'{APPNAME_MAIN}-v1.0-debug.apk'
 APK_MAIN = os.path.join(APK_DIR, 'debug', APK_NAME_MAIN)
-APK_NAME_TEST = f'{APPNAME_MAIN}-v1.0-debug-androidTest.apk'
-APK_TEST = os.path.join(APK_DIR, 'androidTest/debug', APK_NAME_TEST)
 
 FUNC_CHOICES = {
     'help': 'show help options',
@@ -232,14 +229,11 @@ def wait_for_exit(serial, debug=0):
 
 def install_app(serial, debug=0):
     run_cmd(f'adb -s {serial} install -g {APK_MAIN}', debug)
-    run_cmd(f'adb -s {serial} install -g {APK_TEST}', debug)
 
 
 def install_ok(serial, debug=0):
     package_list = installed_apps(serial, debug)
     if APPNAME_MAIN not in package_list:
-        return False
-    if APPNAME_TEST in package_list:
         return False
     return True
 
@@ -250,10 +244,6 @@ def uninstall_app(serial, debug=0):
         run_cmd(f'adb -s {serial} uninstall {APPNAME_MAIN}', debug)
     else:
         print(f'warning: {APPNAME_MAIN} not installed')
-    if APPNAME_TEST in package_list:
-        run_cmd(f'adb -s {serial} uninstall {APPNAME_TEST}', debug)
-    else:
-        print(f'warning: {APPNAME_TEST} not installed')
 
 
 def parse_pm_list_packages(stdout):
