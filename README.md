@@ -31,6 +31,7 @@ List of required python packages:
 * numpy
 * pandas
 * seaborn
+* protobuf (google protocol buffers)
 
 
 
@@ -98,7 +99,7 @@ $ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt nv12 /tmp/akiyo_qcif.yuv
 
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
-$ encapp.py run tests/bitrate_buffer.pbtxt 
+$ encapp.py run tests/bitrate_buffer.pbtxt
 codec test: {'videofile': None, 'configfile': '/media/johan/data/code/encapp/tests/bitrate.pbtxt', 'encoder': None, 'output': None, 'bitrate': None, 'desc': 'testing', 'inp_resolution': None, 'out_resolution': None, 'inp_framerate': None, 'out_framerate': None}
 cmd: protoc -I / --encode="Tests" /media/johan/data/code/encapp/proto/tests.proto < /media/johan/data/code/encapp/tests/bitrate.pbtxt > /media/johan/data/code/encapp/tests/bitrate.bin
 run test: /media/johan/data/code/encapp/tests/bitrate.bin
@@ -291,3 +292,35 @@ $ encapp_quality.py --header --media MEDIA_FOLDER $(encapp_search.py)
 
 Since the json file only contains the name of the source for an encoding the source folder needs to be provided.
 The output will be a csv file (default name is 'quality.csv') containing vmaf, ssim, psnr and other relevant properties.
+
+
+# 7. Requirements
+
+## 7.1. Linux
+
+Just install the pip packages.
+
+```
+$ sudo pip install humanfriendly numpy pandas seaborn protobuf
+```
+
+
+## 7.2. OSX
+
+Make sure your pip3 and your default python3 shell are coherent.
+
+```
+bash-3.2$ sudo chown -R $(whoami) /usr/local/bin /usr/local/lib /usr/local/sbin
+
+bash-3.2$ brew install python@3.9
+...
+
+bash-3.2$ brew link --overwrite python@3.9
+Linking /usr/local/Cellar/python@3.9/3.9.12... 24 symlinks created.
+
+bash-3.2$ pip3 install protobuf
+...
+Collecting protobuf
+  Downloading protobuf-3.19.4-cp39-cp39-macosx_10_9_x86_64.whl (961 kB)
+...
+```
