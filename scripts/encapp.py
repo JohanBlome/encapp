@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 
 """Python script to run ENCAPP tests on Android and collect results.
 The script will create a directory based on device model and date,
