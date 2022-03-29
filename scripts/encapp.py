@@ -235,6 +235,15 @@ def install_app(serial, debug=0):
     run_cmd(f'adb -s {serial} install -g {APK_TEST}', debug)
 
 
+def install_ok(serial, debug=0):
+    package_list = installed_apps(serial, debug)
+    if APPNAME_MAIN not in package_list:
+        return False
+    if APPNAME_TEST in package_list:
+        return False
+    return True
+
+
 def uninstall_app(serial, debug=0):
     package_list = installed_apps(serial, debug)
     if APPNAME_MAIN in package_list:
@@ -650,6 +659,11 @@ def main(argv):
     # uninstall app
     if options.func == 'uninstall':
         uninstall_app(serial, options.debug)
+        sys.exit(0)
+
+    # ensure the app is correctly installed
+    assert install_ok(serial, options.debug), (
+        'Apps not installed in %s' % serial)
 
     # run function
     if options.func == 'list':
