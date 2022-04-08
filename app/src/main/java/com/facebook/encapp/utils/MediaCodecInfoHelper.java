@@ -3,6 +3,9 @@ package com.facebook.encapp.utils;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 
+import java.util.List;
+import java.util.Arrays;
+
 
 public class MediaCodecInfoHelper {
     final static int mIndentWidth = 2;
@@ -15,19 +18,61 @@ public class MediaCodecInfoHelper {
         return tab;
     }
 
-    public static String codecCapabilitiesToText(String type, MediaCodecInfo.CodecCapabilities cap, int indent) {
+    final static List<String> mFeatureList = Arrays.asList(new String[]{
+        MediaCodecInfo.CodecCapabilities.FEATURE_AdaptivePlayback,
+        MediaCodecInfo.CodecCapabilities.FEATURE_DynamicTimestamp,
+        //MediaCodecInfo.CodecCapabilities.FEATURE_EncodingStatistics,
+        MediaCodecInfo.CodecCapabilities.FEATURE_FrameParsing,
+        //MediaCodecInfo.CodecCapabilities.FEATURE_HdrEditing,
+        MediaCodecInfo.CodecCapabilities.FEATURE_IntraRefresh,
+        MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency,
+        MediaCodecInfo.CodecCapabilities.FEATURE_MultipleFrames,
+        MediaCodecInfo.CodecCapabilities.FEATURE_PartialFrame,
+        //MediaCodecInfo.CodecCapabilities.FEATURE_QpBounds,
+        MediaCodecInfo.CodecCapabilities.FEATURE_SecurePlayback,
+        MediaCodecInfo.CodecCapabilities.FEATURE_TunneledPlayback,
+    });
+
+    public static String featuresToString(MediaCodecInfo.CodecCapabilities codec_capabilities, boolean required, int indent) {
         String tab = getIndentation(indent);
-
         StringBuilder str = new StringBuilder();
-        str.append(tab + "mime_type: " + type + "\n");
-        str.append(tab + "max_supported_instances: " + cap.getMaxSupportedInstances() + "\n");
 
-        for (int col : cap.colorFormats) {
+        if (required) {
+            str.append(tab + "feature_required {\n");
+        } else {
+            str.append(tab + "feature_provided {\n");
+        }
+
+        indent += 1;
+        tab = getIndentation(indent);
+
+        for (String feature : mFeatureList) {
+            if (required) {
+                str.append(tab + feature + ": " + codec_capabilities.isFeatureRequired(feature) + "\n");
+            } else {
+                str.append(tab + feature + ": " + codec_capabilities.isFeatureSupported(feature) + "\n");
+            }
+        }
+
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
+        return str.toString();
+    }
+
+    public static String colorFormatsToString(int[] color_formats, int indent) {
+        String tab = getIndentation(indent);
+        StringBuilder str = new StringBuilder();
+
+        str.append(tab + "color_formats {\n");
+        indent += 1;
+        tab = getIndentation(indent);
+        for (int color_format : color_formats) {
             str.append(tab + "color {\n");
             indent += 1;
             tab = getIndentation(indent);
-            str.append(tab + "format: " + col + "\n");
-            switch (col) {
+            str.append(tab + "format: " + color_format + "\n");
+            switch (color_format) {
                 case MediaCodecInfo.CodecCapabilities.COLOR_Format12bitRGB444:
                     str.append(tab + "name: COLOR_Format12bitRGB444\n");
                     break;
@@ -189,24 +234,53 @@ public class MediaCodecInfoHelper {
             tab = getIndentation(indent);
             str.append(tab + "}\n");
         }
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
+        return str.toString();
+    }
 
-        for (MediaCodecInfo.CodecProfileLevel prof : cap.profileLevels) {
+    public static String codecCapabilitiesToText(MediaCodecInfo media_codec_info, String media_type, int indent) {
+        String tab = getIndentation(indent);
+        StringBuilder str = new StringBuilder();
+
+        MediaCodecInfo.CodecCapabilities codec_capabilities = media_codec_info.getCapabilitiesForType(media_type);
+
+        str.append(tab + "media_type {\n");
+        indent += 1;
+        tab = getIndentation(indent);
+
+        str.append(tab + "media_type: " + media_type + "\n");
+        str.append(tab + "mime_type: " + codec_capabilities.getMimeType() + "\n");
+        str.append(tab + "max_supported_instances: " + codec_capabilities.getMaxSupportedInstances() + "\n");
+
+        str.append(colorFormatsToString(codec_capabilities.colorFormats, indent));
+
+        for (MediaCodecInfo.CodecProfileLevel profile_level : codec_capabilities.profileLevels) {
             str.append(tab + "profile {\n");
             indent += 1;
             tab = getIndentation(indent);
-            str.append(tab + "profile: " + prof.profile + "\n");
-            str.append(tab + "level: " + prof.level + "\n");
+            str.append(tab + "profile: " + profile_level.profile + "\n");
+            str.append(tab + "level: " + profile_level.level + "\n");
             indent -= 1;
             tab = getIndentation(indent);
             str.append(tab + "}\n");
         }
 
-        MediaFormat format = cap.getDefaultFormat();
+        MediaFormat format = codec_capabilities.getDefaultFormat();
         //Odds are that if there is no default profile - nothing else will have defaults anyway...
         if (format.getString(MediaFormat.KEY_PROFILE) != null) {
             str.append("\nDefault settings:");
             str.append(getFormatInfo(format));
         }
+
+        // print features required and supported
+        str.append(featuresToString(codec_capabilities, true, indent));
+        str.append(featuresToString(codec_capabilities, false, indent));
+
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
         return str.toString();
     }
 
@@ -273,11 +347,15 @@ public class MediaCodecInfoHelper {
         indent += 1;
         tab = getIndentation(indent);
         str.append(tab + "name: " + media_codec_info.getName() + "\n");
+        str.append(tab + "canonical_name: " + media_codec_info.getCanonicalName() + "\n");
+        str.append(tab + "is_alias: " + media_codec_info.isAlias() + "\n");
+        str.append(tab + "is_encoder: " + media_codec_info.isEncoder() + "\n");
+        str.append(tab + "is_hardware_accelerated: " + media_codec_info.isHardwareAccelerated() + "\n");
+        str.append(tab + "is_software_only: " + media_codec_info.isSoftwareOnly() + "\n");
+        str.append(tab + "is_vendor: " + media_codec_info.isVendor() + "\n");
         String[] media_types = media_codec_info.getSupportedTypes();
         for (String media_type : media_types) {
-            str.append(tab + "type {\n");
-            str.append(codecCapabilitiesToText(media_type, media_codec_info.getCapabilitiesForType(media_type), indent + 1));
-            str.append(tab + "}\n");
+            str.append(codecCapabilitiesToText(media_codec_info, media_type, indent));
         }
         indent -= 1;
         tab = getIndentation(indent);
