@@ -255,10 +255,10 @@ public class MediaCodecInfoHelper {
         StringBuilder str = new StringBuilder();
         str.append(tab + "MediaCodec {\n");
         str.append(tab2 + "name: " + media_codec_info.getName() + "\n");
-        String[] types = media_codec_info.getSupportedTypes();
-        for (String tp : types) {
+        String[] media_types = media_codec_info.getSupportedTypes();
+        for (String media_type : media_types) {
             str.append(tab2 + "type {\n");
-            str.append(codecCapabilitiesToText(tp, media_codec_info.getCapabilitiesForType(tp), tab_length + 2));
+            str.append(codecCapabilitiesToText(media_type, media_codec_info.getCapabilitiesForType(media_type), tab_length + 2));
             str.append(tab2 + "}\n");
         }
         str.append(tab + "}\n");
