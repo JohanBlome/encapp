@@ -2,6 +2,7 @@ package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.util.Range;
 
 import java.util.List;
 import java.util.Arrays;
@@ -18,6 +19,28 @@ public class MediaCodecInfoHelper {
         return tab;
     }
 
+    final static List<Integer> mBitrateModeList = Arrays.asList(
+        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR,
+        //MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR_FD,
+        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ,
+        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+    );
+
+    public static String bitrateModeToString(int bitrate_mode) {
+        switch(bitrate_mode) {
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR:
+                return "MODE_CBR";
+            //case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR_FD:
+                //return "MODE_CBR_FD";
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ:
+                return "MODE_CQ";
+            case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR:
+                return "MODE_VBR";
+            default:
+                return bitrate_mode  + " is no bitrate mode";
+        }
+    }
+
     final static List<String> mFeatureList = Arrays.asList(new String[]{
         MediaCodecInfo.CodecCapabilities.FEATURE_AdaptivePlayback,
         MediaCodecInfo.CodecCapabilities.FEATURE_DynamicTimestamp,
@@ -32,6 +55,31 @@ public class MediaCodecInfoHelper {
         MediaCodecInfo.CodecCapabilities.FEATURE_SecurePlayback,
         MediaCodecInfo.CodecCapabilities.FEATURE_TunneledPlayback,
     });
+
+    public static String encoderCapabilitiesToString(MediaCodecInfo.EncoderCapabilities encoder_capabilities, int indent) {
+        if (encoder_capabilities == null) {
+            return "";
+        }
+
+        String tab = getIndentation(indent);
+        StringBuilder str = new StringBuilder();
+
+        str.append(tab + "encoder_capabilities {\n");
+
+        indent += 1;
+        tab = getIndentation(indent);
+
+        str.append(tab + "complexity_range: " + encoder_capabilities.getComplexityRange().toString() + "\n");
+        str.append(tab + "quality_range: " + encoder_capabilities.getQualityRange().toString() + "\n");
+        for (int bitrate_mode : mBitrateModeList) {
+            str.append(tab + bitrateModeToString(bitrate_mode) + ": " + encoder_capabilities.isBitrateModeSupported(bitrate_mode) + "\n");
+        }
+
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
+        return str.toString();
+    }
 
     public static String featuresToString(MediaCodecInfo.CodecCapabilities codec_capabilities, boolean required, int indent) {
         String tab = getIndentation(indent);
@@ -278,8 +326,8 @@ public class MediaCodecInfoHelper {
         str.append(tab + "mime_type: " + codec_capabilities.getMimeType() + "\n");
         str.append(tab + "max_supported_instances: " + codec_capabilities.getMaxSupportedInstances() + "\n");
 
+        // print fields
         str.append(colorFormatsToString(codec_capabilities.colorFormats, indent));
-
         str.append(profileLevelsToString(codec_capabilities.profileLevels, indent));
 
         MediaFormat format = codec_capabilities.getDefaultFormat();
@@ -288,6 +336,9 @@ public class MediaCodecInfoHelper {
             str.append("\nDefault settings:");
             str.append(getFormatInfo(format));
         }
+
+        // print encoder capabilities
+        str.append(encoderCapabilitiesToString(codec_capabilities.getEncoderCapabilities(), indent));
 
         // print features required and supported
         str.append(featuresToString(codec_capabilities, true, indent));
