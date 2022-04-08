@@ -134,6 +134,7 @@ def run_cmd(cmd, debug=0):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
+        ret = True if process.returncode == 0 else False
     except Exception:
         ret = False
         print('Failed to run command: ' + cmd)
