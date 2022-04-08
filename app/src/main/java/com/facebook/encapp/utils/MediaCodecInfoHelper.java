@@ -81,6 +81,32 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+    public static String videoCapabilitiesToString(MediaCodecInfo.VideoCapabilities video_capabilities, int indent) {
+        if (video_capabilities == null) {
+            return "";
+        }
+
+        String tab = getIndentation(indent);
+        StringBuilder str = new StringBuilder();
+
+        str.append(tab + "video_capabilities {\n");
+
+        indent += 1;
+        tab = getIndentation(indent);
+
+        str.append(tab + "bitrate_range: " + video_capabilities.getBitrateRange().toString() + "\n");
+        str.append(tab + "height_alignment: " + video_capabilities.getHeightAlignment() + "\n");
+        str.append(tab + "width_alignment: " + video_capabilities.getWidthAlignment() + "\n");
+        str.append(tab + "supported_frame_rates: " + video_capabilities.getSupportedFrameRates().toString() + "\n");
+        str.append(tab + "supported_heights: " + video_capabilities.getSupportedHeights().toString() + "\n");
+        str.append(tab + "supported_widths: " + video_capabilities.getSupportedWidths().toString() + "\n");
+
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
+        return str.toString();
+    }
+
     public static String featuresToString(MediaCodecInfo.CodecCapabilities codec_capabilities, boolean required, int indent) {
         String tab = getIndentation(indent);
         StringBuilder str = new StringBuilder();
@@ -339,6 +365,8 @@ public class MediaCodecInfoHelper {
 
         // print encoder capabilities
         str.append(encoderCapabilitiesToString(codec_capabilities.getEncoderCapabilities(), indent));
+        // print encoder capabilities
+        str.append(videoCapabilitiesToString(codec_capabilities.getVideoCapabilities(), indent));
 
         // print features required and supported
         str.append(featuresToString(codec_capabilities, true, indent));
