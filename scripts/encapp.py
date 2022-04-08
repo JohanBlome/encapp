@@ -412,7 +412,9 @@ def list_codecs(serial, model, debug=0):
     wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
-    run_cmd(adb_cmd, debug)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
+    assert ret, 'error getting codec list: "%s"' % stdout
+
     with open(filename, 'r') as codec_file:
         lines = codec_file.readlines()
         for line in lines:
