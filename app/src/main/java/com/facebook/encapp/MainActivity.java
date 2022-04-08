@@ -109,22 +109,24 @@ public class MainActivity extends AppCompatActivity {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
 
-        StringBuffer encoders = new StringBuffer("--- List of supported encoders  ---\n\n");
-        StringBuffer decoders = new StringBuffer("--- List of supported decoders  ---\n\n");
+        StringBuffer encoders = new StringBuffer("encoders {\n");
+        StringBuffer decoders = new StringBuffer("decoders {\n");
 
         for (MediaCodecInfo info : codecInfos) {
-            String str = MediaCodecInfoHelper.toText(info, 2);
+            String str = MediaCodecInfoHelper.toText(info, 1);
             if (str.toLowerCase(Locale.US).contains("video")) {
                 if (info.isEncoder()) {
-                    encoders.append(str + "\n");
+                    encoders.append(str);
                 }  else {
-                    decoders.append(str + "\n");
+                    decoders.append(str);
                 }
 
             }
 
 
         }
+        encoders.append("}\n");
+        decoders.append("}\n");
         final TextView logText = findViewById(R.id.logText);
         runOnUiThread(new Runnable() {
                           @Override
@@ -142,7 +144,6 @@ public class MainActivity extends AppCompatActivity {
             writer = new FileWriter(new File("/sdcard/codecs.txt"));
             Log.d(TAG, "Write to file");
             writer.write(encoders.toString());
-            writer.write("\n*******\n");
             writer.write(decoders.toString());
             writer.flush();
             writer.close();
