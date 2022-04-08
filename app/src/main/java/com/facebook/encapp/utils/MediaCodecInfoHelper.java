@@ -240,6 +240,30 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+    public static String profileLevelsToString(MediaCodecInfo.CodecProfileLevel[] color_profile_level, int indent) {
+        String tab = getIndentation(indent);
+        StringBuilder str = new StringBuilder();
+
+        str.append(tab + "profile_levels {\n");
+        indent += 1;
+        tab = getIndentation(indent);
+
+        for (MediaCodecInfo.CodecProfileLevel profile_level : color_profile_level) {
+            str.append(tab + "profile_level {\n");
+            indent += 1;
+            tab = getIndentation(indent);
+            str.append(tab + "profile: " + profile_level.profile + "\n");
+            str.append(tab + "level: " + profile_level.level + "\n");
+            indent -= 1;
+            tab = getIndentation(indent);
+            str.append(tab + "}\n");
+        }
+        indent -= 1;
+        tab = getIndentation(indent);
+        str.append(tab + "}\n");
+        return str.toString();
+    }
+
     public static String codecCapabilitiesToText(MediaCodecInfo media_codec_info, String media_type, int indent) {
         String tab = getIndentation(indent);
         StringBuilder str = new StringBuilder();
@@ -256,16 +280,7 @@ public class MediaCodecInfoHelper {
 
         str.append(colorFormatsToString(codec_capabilities.colorFormats, indent));
 
-        for (MediaCodecInfo.CodecProfileLevel profile_level : codec_capabilities.profileLevels) {
-            str.append(tab + "profile {\n");
-            indent += 1;
-            tab = getIndentation(indent);
-            str.append(tab + "profile: " + profile_level.profile + "\n");
-            str.append(tab + "level: " + profile_level.level + "\n");
-            indent -= 1;
-            tab = getIndentation(indent);
-            str.append(tab + "}\n");
-        }
+        str.append(profileLevelsToString(codec_capabilities.profileLevels, indent));
 
         MediaFormat format = codec_capabilities.getDefaultFormat();
         //Odds are that if there is no default profile - nothing else will have defaults anyway...
