@@ -30,9 +30,9 @@ RD_RESULT_FILE_NAME = 'rd_results.json'
 
 SCRIPT_PATH = os.path.realpath(__file__)
 SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
-APK_DIR = os.path.join(SCRIPT_DIR, '../app/build/outputs/apk')
-APK_NAME_MAIN = f'{APPNAME_MAIN}-v1.0-debug.apk'
-APK_MAIN = os.path.join(APK_DIR, 'debug', APK_NAME_MAIN)
+APK_DIR = os.path.join(SCRIPT_DIR, '../app/releases')
+APK_NAME_MAIN = f'{APPNAME_MAIN}-v{__version__}-debug.apk'
+APK_MAIN = os.path.join(APK_DIR, APK_NAME_MAIN)
 
 FUNC_CHOICES = {
     'help': 'show help options',
