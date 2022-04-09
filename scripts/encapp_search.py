@@ -1,14 +1,30 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
+
+"""Python script to for index and search in Encapp result json files.
+It will search all directories below the specified one (unless --no_rec
+option enabled).
+
+Searchable properties are
+* size (WxH)
+* codec (partial name is fine)
+* bitrate where bitrate can be
+    - sctrict size, e.g. 200k
+    - a range 200000-1M
+* group of pictures (gop)
+* frame rate
+
+The output can either be the video source files or the json result.
+"""
 
 import argparse
+from argparse import RawTextHelpFormatter
 import sys
 import json
 import os
 import pandas as pd
 import re
 
-
-INDEX_FILE_NAME = 'encapp_index.csv'
+INDEX_FILE_NAME = '.encapp_index'
 
 
 def getProperties(options, json):
@@ -116,7 +132,8 @@ def search(options):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='')
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=RawTextHelpFormatter)
     parser.add_argument('path',
                         nargs='?',
                         help='Search path, default current')
