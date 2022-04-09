@@ -119,7 +119,8 @@ def plot_bitrate(data, variant, description, options):
 
 
 def plot_processingtime(data, variant, description, options):
-    print('Plot per frame latency and a straight line is average processing time')
+    print('Plot per frame latency and a straight line is average processing '
+          'time')
 
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     p = sb.lineplot(x=data['pts']/1000000,
@@ -132,16 +133,17 @@ def plot_processingtime(data, variant, description, options):
                     ci='sd', data=data,
                     hue=variant,
                     ax=axs,
-                    legend = False)
+                    legend=False)
     p = sb.lineplot(x=data['pts']/1000000,
                     y=33,
                     ci='sd',
                     color='red', linewidth=5,
                     ax=axs,
-                    legend = False)
+                    legend=False)
     plt.suptitle(f'{options.label} - {description}')
 
-    axs.set_title('Frame latency in ms\nStraight line is average proc in ms - Red is 33 ms')
+    axs.set_title('Frame latency in ms\n'
+                  'Straight line is average proc in ms - Red is 33 ms')
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
     p.set_ylim(0, 300)
     p.set_xlabel('Presentation time in sec')
@@ -151,7 +153,6 @@ def plot_processingtime(data, variant, description, options):
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     name = options.label + '_proc-time_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format='png')
-
 
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=200)
     axs.set_title('Frame latency in ms')
@@ -165,7 +166,6 @@ def plot_processingtime(data, variant, description, options):
 
     name = options.label + '_proc-time_hist_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format='png')
-
 
 
 def plot_processing_framerate(data, variant, description, options):
@@ -184,16 +184,15 @@ def plot_processing_framerate(data, variant, description, options):
         length = max_pts_sec - min_pts_sec
         for sec in range(min_pts_sec, length):
             frames = filtered.loc[(filtered['pts'] >= sec * 1000000) &
-                              (filtered['pts'] < (sec + 1) * 1000000)]
-            average_time = (np.sum(frames['proctime'])/len(frames))/1000000000.0
+                                  (filtered['pts'] < (sec + 1) * 1000000)]
+            average_time = (np.sum(frames['proctime']) /
+                            len(frames)) / 1000000000.0
             fps = round(1.0/average_time, 2)
-            rates.append(( var, sec, fps ))
-
-
+            rates.append((var, sec, fps))
 
     labels = ['var', 'time', 'fps']
     framerate = pd.DataFrame.from_records(rates, columns=labels,
-                                           coerce_float=True)
+                                          coerce_float=True)
     p = sb.lineplot(x=framerate['time'],
                     y=framerate['fps'],
                     ci='sd', data=framerate,
@@ -204,11 +203,11 @@ def plot_processing_framerate(data, variant, description, options):
                     ci='sd',
                     color='red', linewidth=5,
                     ax=axs,
-                    legend = False)
+                    legend=False)
     plt.suptitle(f'{options.label} - {description}')
     axs.set_title('Alt Framerate in fps\n - Red is 30 fps')
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
-   # p.set_ylim(0, 120)
+    # p.set_ylim(0, 120)
     p.set_xlabel('Presentation time in sec')
     p.set_ylabel('fps')
     plt.suptitle(f'{options.label} - {description}')
@@ -223,8 +222,8 @@ def plot_processing_framerate(data, variant, description, options):
                     data=framerate,
                     hue='var',
                     ax=axs)
-   # p.set_ylabel('fps')
-    #p.set_xlim(0, 120)
+    # p.set_ylabel('fps')
+    # p.set_xlim(0, 120)
     axs.set_title('Alt Framerate histogram')
     plt.suptitle(f'{options.label} - {description}')
     name = options.label + '_fps_alt_hist_' + description + '.png'
@@ -244,11 +243,13 @@ def plot_framerate(data, variant, description, options):
         print(f'checking {var}')
         filtered = data.loc[data[variant] == var]
         print(f'{filtered}')
-        filtered.loc[filtered[variant] == var,'fps'] = 1000000000.0/(filtered['stoptime'].shift(
-                -1, axis='index', fill_value=0) - filtered['stoptime'])
+        filtered.loc[filtered[variant] == var, 'fps'] = (
+            1000000000.0 /
+            (filtered['stoptime'].shift(-1, axis='index', fill_value=0) -
+             filtered['stoptime']))
 
         filtered['av_fps'] = filtered['fps'].rolling(
-            fps,  min_periods=fps, win_type=None).sum()/fps
+            fps, min_periods=fps, win_type=None).sum()/fps
 
         if isinstance(calculated, type(None)):
             calculated = filtered
@@ -265,11 +266,11 @@ def plot_framerate(data, variant, description, options):
                     ci='sd',
                     color='red', linewidth=5,
                     ax=axs,
-                    legend = False)
+                    legend=False)
     plt.suptitle(f'{options.label} - {description}')
     axs.set_title('Framerate in fps\n- Red is 30 fps')
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
-    #p.set_ylim(0, 0)
+    # p.set_ylim(0, 0)
     p.set_xlabel('Presentation time in sec')
     p.set_ylabel('fps')
     plt.suptitle(f'{options.label} - {description}')
@@ -287,11 +288,12 @@ def plot_framerate(data, variant, description, options):
                     data=calculated,
                     hue=variant,
                     ax=axs)
-   # p.set_ylabel('fps')
-   # p.set_xlim(0, 120)
+    # p.set_ylabel('fps')
+    # p.set_xlim(0, 120)
     plt.suptitle(f'{options.label} - {description}')
     name = options.label + '_fps_hist_' + description + '.png'
     plt.savefig(name.replace(' ', '_'), format='png')
+
 
 def plot_times(data, variant, description, options):
     print('Plot times')
@@ -436,10 +438,12 @@ def parse_decoding_data(json, inputfile):
                 decoded_data['height'] = 'unknown height'
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
-            #oh no we may have b frames...
-            decoded_data['duration_ms'] = round((decoded_data['pts'].shift(-1, axis='index',
-                                     fill_value=0) - decoded_data['pts']) / 1000, 2)
-            decoded_data['fps'] = round(1000.0/(decoded_data['duration_ms']), 2)
+            # oh no we may have b frames...
+            decoded_data['duration_ms'] = round(
+                (decoded_data['pts'].shift(-1, axis='index', fill_value=0) -
+                 decoded_data['pts']) / 1000, 2)
+            decoded_data['fps'] = round(
+                1000.0/(decoded_data['duration_ms']), 2)
             decoded_data.fillna(0)
     except Exception as ex:
         print(f'Failed to parse decode data for {inputfile}: {ex}')
@@ -513,6 +517,7 @@ def clean_name(name):
     ret = name.translate(str.maketrans({',': '_', ' ': '_'}))
     print(f'{name} -> {ret}')
     return ret
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -593,16 +598,17 @@ def main():
                 last_frame_end = np.max(decoded_data['stoptime'])
                 video_length = (last_frame - first_frame)/pts_mult
 
-
             print(f'{type(decoded_data)}')
             gpu_data = parse_gpu_data(alldata, inputfile)
             framecount = alldata['framecount']
             total_time_sec = round((last_frame_end-first_frame_start) /
-                                 1000000000.0, 2)
-            if  not isinstance(encoding_data, type(None)):
-                proctime_sec = np.sum(encoding_data.loc[encoding_data['proctime'] > 0].proctime)/(1000000000)
+                                   1000000000.0, 2)
+            if not isinstance(encoding_data, type(None)):
+                proctime_sec = (
+                    np.sum(encoding_data.loc[encoding_data['proctime'] > 0]
+                           .proctime)/(1000000000))
             else:
-                proctime_sec = -1;
+                proctime_sec = -1
 
             print('__')
             print('Media = {:s}'.format(alldata['encodedfile']))
@@ -619,8 +625,7 @@ def main():
 
             if not isinstance(encoding_data, type(None)):
                 mean_proc = 1000 * total_time_sec/len(encoding_data)
-                print('Mean processing time = {:.2f} ms'.
-                  format(mean_proc))
+                print('Mean processing time = {:.2f} ms'.format(mean_proc))
 
                 # Latency is the time it takes for the
                 # frame to pass the encoder
@@ -633,8 +638,7 @@ def main():
                 encoding_data['mean_proc_ms'] = mean_proc
             if not isinstance(decoded_data, type(None)):
                 mean_proc = 1000 * total_time_sec/len(decoded_data)
-                print('Mean processing time = {:.2f} ms'.
-                  format(mean_proc))
+                print('Mean processing time = {:.2f} ms'.format(mean_proc))
                 # Latency is the time it takes for the
                 # frame to pass the encoder
                 mean_latency = np.mean(decoded_data.
@@ -661,7 +665,7 @@ def main():
         elif not isinstance(gpu_data, type(None)):
             accum_gpu_data = accum_gpu_data.append(gpu_data)
 
-    print(f'All files checked')
+    print('All files checked')
     concurrency = None
     frames = None
     if not isinstance(accum_data, type(None)):
@@ -681,7 +685,7 @@ def main():
         plot_concurrency(concurrency, 'conc', options)
 
     if frames is not None:
-        #plot_processing_framerate(frames, 'test', 'encoder', options)
+        # plot_processing_framerate(frames, 'test', 'encoder', options)
         if options.framesize:
             plot_framesize(frames, 'test', 'encoder', options)
 
