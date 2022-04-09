@@ -37,6 +37,14 @@ List of required python packages:
 
 # 2. Operation: Get a List of Available Codecs
 
+(1) install the app and give it permission to access the external storage:
+```
+$ ./scripts/encapp.py install
+$ adb shell appops set --uid com.facebook.encapp MANAGE_EXTERNAL_STORAGE allow
+```
+
+
+(2) run the list command:
 ```
 $ ./scripts/encapp.py list
 adb devices -l
