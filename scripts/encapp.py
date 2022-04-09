@@ -35,6 +35,8 @@ APK_DIR = os.path.join(SCRIPT_DIR, '../app/build/outputs/apk')
 APK_NAME_MAIN = f'{APPNAME_MAIN}-v1.0-debug.apk'
 APK_MAIN = os.path.join(APK_DIR, 'debug', APK_NAME_MAIN)
 
+DEBUG = False
+
 FUNC_CHOICES = {
     'help': 'show help options',
     'install': 'install apks',
@@ -573,6 +575,8 @@ def get_options(argv):
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ['ANDROID_SERIAL']
 
+    global DEBUG
+    DEBUG = options.debug > 0
     return options
 
 
@@ -680,4 +684,9 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except AssertionError as ae:
+        print(ae)
+        if DEBUG:
+            raise
