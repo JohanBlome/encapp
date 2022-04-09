@@ -37,7 +37,7 @@ def parse_schema(schema):
 
 
 def get_nal_data(videopath, codec):
-    ending = ""
+    ending = ''
     if codec.find('avc') or codec.find('h264') or codec.find('264'):
         ending = '264'
     elif codec.find('hevc') or codec.find('h265') or codec.find('265'):
@@ -60,7 +60,7 @@ def get_nal_data(videopath, codec):
             run_cmd(cmd)
         return f'{filename}.{ending}.nal'
 
-    return ""
+    return ''
 
 
 def find_frame(frame, rfid, frame_list, count):
@@ -111,9 +111,9 @@ def check_long_term_ref(resultpath):
                 mark_frame = dynamics['vendor.qti-ext-enc-ltr.mark-frame']
                 use_frame = dynamics['vendor.qti-ext-enc-ltr.use-frame']
 
-            reg_long_term_id = "long_term_frame_idx { ([0-9]*) }"
-            reg_long_pic_id = "long_term_pic_num { ([0-9]*) }"
-            reg_max_num_ref_frames = "max_num_ref_frames: ([0-9]*)"
+            reg_long_term_id = 'long_term_frame_idx { ([0-9]*) }'
+            reg_long_pic_id = 'long_term_pic_num { ([0-9]*) }'
+            reg_max_num_ref_frames = 'max_num_ref_frames: ([0-9]*)'
             lt_mark = {}
             lt_use = {}
             if mark_frame is not None and use_frame is not None:
@@ -123,7 +123,7 @@ def check_long_term_ref(resultpath):
                 ltr_count = -1
                 frame = 0
                 with open(nal_file) as nal:
-                    line = "-1"
+                    line = '-1'
                     while len(line) > 0:
                         line = nal.readline()
                         if line.find('frame_num:') != -1:
@@ -321,7 +321,7 @@ def check_idr_placement(resultpath):
                     if int(item) not in idr_ids:
                         passed = False
 
-                    status.append([testname, "Runtime sync request", passed,
+                    status.append([testname, 'Runtime sync request', passed,
                                    item, resultfilename])
             frame_gop = gop * fps
             passed = True
@@ -330,7 +330,7 @@ def check_idr_placement(resultpath):
                     if frame % frame_gop != 0:
                         passed = False
             # TODO: check for missing key frames
-            status.append([testname, "Even gop", passed, gop, resultfilename])
+            status.append([testname, 'Even gop', passed, gop, resultfilename])
 
     labels = ['test', 'subtest', 'passed', 'gop', 'file']
     data = pd.DataFrame.from_records(status, columns=labels, coerce_float=True)
@@ -340,7 +340,7 @@ def check_idr_placement(resultpath):
         result_string += f'\n\n----- test case: [{testname}] -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            result_string += ('\n{:s} \"{:s}\" at {:2d} frames, {:s}'
+            result_string += ('\n{:s} "{:s}" at {:2d} frames, {:s}'
                               .format({True: 'passed', False: 'failed'}
                                       [row.passed], row.subtest, row.gop,
                                       row.file))
@@ -418,7 +418,7 @@ def check_mean_bitrate_deviation(resultpath):
                 target_bitrate = bitrate
                 limits = list(dynamic_video_bitrate.keys())
                 limits.append(frames[-1]['frame'])
-                status = "passed"
+                status = 'passed'
                 limit_too_high = False
                 for limit in limits:
                     if limit > len(frames):
@@ -439,7 +439,7 @@ def check_mean_bitrate_deviation(resultpath):
                     ratio = mean / target_bitrate
                     bitrate_error_perc = int((ratio - 1) * 100)
                     if abs(bitrate_error_perc) > ERROR_LIMIT:
-                        status = "failed"
+                        status = 'failed'
                     dyn_data.append([int(previous_limit), int(limit),
                                      int(target_bitrate), int(round(mean, 0)),
                                      int(round(bitrate_error_perc, 0))])
@@ -449,11 +449,11 @@ def check_mean_bitrate_deviation(resultpath):
                     previous_limit = limit
                 result_string += f'\n\n----- test case: [{testname}] -----'
 
-                result_string += (f"\n{status} \"Dynamic bitrate\", ")
+                result_string += (f'\n{status} "Dynamic bitrate", ')
                 result_string += (f" codec: {encoder_settings.get('codec')}"
                                   f", {encoder_settings.get('height')}"
-                                  f"p @ {fps}fps"
-                                  f", {resultfilename}")
+                                  f'p @ {fps}fps'
+                                  f', {resultfilename}')
 
                 if limit_too_high:
                     result_string += (
@@ -465,7 +465,7 @@ def check_mean_bitrate_deviation(resultpath):
                                       .format(item[4], item[0], item[1],
                                               int(item[3]/1000),
                                               int(item[2]/1000)))
-                result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
+                result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
             else:
                 mean_bitrate = encoder_settings.get('meanbitrate')
                 ratio = mean_bitrate / bitrate
@@ -476,7 +476,7 @@ def check_mean_bitrate_deviation(resultpath):
                                       fps, resultfilename])
 
     labels = ['test', 'error', 'bitrate', 'real_bitrate',
-              'codec', 'height', 'fps','file']
+              'codec', 'height', 'fps', 'file']
     data = pd.DataFrame.from_records(bitrate_error, columns=labels,
                                      coerce_float=True)
     data = data.sort_values(by=['bitrate'])
@@ -485,19 +485,20 @@ def check_mean_bitrate_deviation(resultpath):
         result_string += f'\n\n----- test case: [{testname}] -----'
         files = data.loc[data['test'] == name]
         for row in files.itertuples():
-            status = "passed"
+            status = 'passed'
             if abs(row.error) > ERROR_LIMIT:
-                status = "failed"
-            result_string += ('\n{:s} "Bitrate accuracy" {:3d} % error for '
-                              '{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
-                              .format(status,
-                                      row.error, int(row.bitrate/1000),
-                                      int(row.real_bitrate/1000),
-                                      row.codec,
-                                      row.height,
-                                      row.fps,
-                                      row.file))
-        result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
+                status = 'failed'
+            result_string += (
+                '\n{:s} "Bitrate accuracy" {:3d} % error for '
+                '{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
+                .format(status,
+                        row.error, int(row.bitrate/1000),
+                        int(row.real_bitrate/1000),
+                        row.codec,
+                        row.height,
+                        row.fps,
+                        row.file))
+        result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
 
     return result_string
 
@@ -508,7 +509,7 @@ def print_partial_result(header, partial_result):
         result_string += '\n' + partial_result
         result_string += '\n-----\n'
         return result_string
-    return ""
+    return ''
 
 
 def main(argv):
@@ -521,28 +522,32 @@ def main(argv):
     parser.add_argument(
         '-is', '--input_res', help='Override input file', default=None)
     parser.add_argument(
-        '-if', '--input_fps', type=float, help='Override input fps', default=None)
+        '-if', '--input_fps', type=float, help='Override input fps',
+        default=None)
     parser.add_argument(
         '-os', '--output_res', help='Override input file', default=None)
     parser.add_argument(
-        '-of', '--output_fps', type=float, help='Override input fps', default=None)
-    parser.add_argument('-c', '--codec', help='Override encoder', default=None)
-    parser.add_argument('-t', '--test', nargs="+",)
-    parser.add_argument('-r', '--result', nargs="+",)
-    parser.add_argument('--bitrate_limit', nargs="?",
-                        help='Set acceptance lmit on bitrate in percentage', default=5)
+        '-of', '--output_fps', type=float, help='Override input fps',
+        default=None)
+    parser.add_argument('-c', '--codec', help='Override encoder',
+                        default=None)
+    parser.add_argument('-t', '--test', nargs='+',)
+    parser.add_argument('-r', '--result', nargs='+',)
+    parser.add_argument('--bitrate_limit', nargs='?',
+                        help='Set acceptance lmit on bitrate in percentage',
+                        default=5)
 
     options = parser.parse_args(argv[1:])
-    result_string = ""
+    result_string = ''
     model = None
     serial = None
 
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
-    bitrate_string = ""
-    idr_string = ""
-    temporal_string = ""
-    ltr_string = ""
+    bitrate_string = ''
+    idr_string = ''
+    temporal_string = ''
+    ltr_string = ''
     workdir = options.dir
     if options.result is not None:
         results = []
@@ -573,7 +578,7 @@ def main(argv):
         for test in tests:
             directory, _ = os.path.split(__file__)
             if options.test is None:
-                test_path = directory + "/../tests/" + test
+                test_path = directory + '/../tests/' + test
             else:
                 test_path = test
 
@@ -622,17 +627,17 @@ def main(argv):
         'Verify long term reference settings', ltr_string)
 
     print(f'\nRESULTS\n{result_string}')
-    with open(f'{workdir}/RESULT.txt', "w") as output:
+    with open(f'{workdir}/RESULT.txt', 'w') as output:
         output.write(result_string)
         output.write('\n---------')
-        extra = ""
+        extra = ''
         if model is not None and serial is not None:
             with open(f'{workdir}/dut.txt', 'w') as dut:
                 now = datetime.now()
                 dt_string = now.strftime('%Y-%m-%d_%H_%M')
-                dut.write(f"\nTest performed: {dt_string}")
+                dut.write(f'\nTest performed: {dt_string}')
                 if isinstance(model, str):
-                    dut.write(f"\nDUT: {model}, serial: {serial}")
+                    dut.write(f'\nDUT: {model}, serial: {serial}')
                 else:
                     dut.write(f"\nDUT: {model['product']}, serial: {serial}")
 
