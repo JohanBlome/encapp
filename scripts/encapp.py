@@ -636,7 +636,7 @@ def main(argv):
     videofile_config = {}
     if (options.videofile is not None and
             options.videofile != 'camera'):
-        videofile_config = get_video_info(options.videofile)
+        videofile_config = get_video_info(options.videofile)  # noqa: F841
 
     # get model and serial number
     model, serial = get_device_info(options.serial, options.debug)
