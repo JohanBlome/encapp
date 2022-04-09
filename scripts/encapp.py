@@ -392,7 +392,9 @@ def run_codec_tests(tests, model, serial, workdir, settings):
     if test_def is None:
         print('ERROR: no test file name')
     test_file = os.path.basename(test_def)
-    output = f"{test_file[0:test_file.rindex('.')]}.run.bin"
+    testname = f"{test_file[0:test_file.rindex('.')]}.run.bin"
+    output = f'{workdir}/{testname}'
+    os.system('mkdir -p ' + workdir)
     with open(output, 'wb') as binfile:
         binfile.write(fresh.SerializeToString())
         files_to_push.append(output)
@@ -402,7 +404,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         print(f'Push {filepath}')
         run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
 
-    return collect_result(workdir, output, serial)
+    return collect_result(workdir, testname, serial)
 
 
 def list_codecs(serial, model, debug=0):
@@ -492,7 +494,6 @@ def codec_test(settings, model, serial):
         workdir = settings['output']
     else:
         workdir = f"{settings['desc'].replace(' ', '_')}_{model}_{dt_string}"
-    os.system('mkdir -p ' + workdir)
 
     # run the codec test
     return run_codec_tests_file(test_config,
