@@ -43,7 +43,7 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
         line = " "
         while len(line) > 0:
             line = input_file.readline()
-match = re.search(VMAF_RE, line)
+            match = re.search(VMAF_RE, line)
             if match:
                 vmaf = int(round(float(match.group(0))))
                 break
