@@ -44,10 +44,10 @@ import numpy as np
 
 def parse_encoding_data(json, inputfile):
     print(f'Parse encoding data: {inputfile}')
-    
+
     try:
         data = pd.DataFrame(json['frames'])
-       
+
         data['source'] = inputfile
         data['codec'] = json['settings']['codec']
         data['description'] = json['description']
@@ -58,21 +58,23 @@ def parse_encoding_data(json, inputfile):
         data['fps'] = fps
         data['duration_ms'] = round((data['pts'].shift(-1, axis='index',
                                      fill_value=0) - data['pts']) / 1000, 2)
-        data['stop-stop_ms'] = round((data['stoptime'].shift(-1, axis='index',
-                                     fill_value=0) - data['stoptime']) / 1000000, 2)
-        
+        data['stop-stop_ms'] = round(
+            (data['stoptime'].shift(-1, axis='index', fill_value=0) -
+             data['stoptime']) / 1000000, 2)
+
         data.loc[data['proctime'] < 0] = 0
         data.loc[data['duration_ms'] < 0] = 0
         data['fps'] = round(1000.0/(data['duration_ms']), 2)
         data['proc_fps'] = round(1000.0/(data['stop-stop_ms']), 2)
-        #delete the last item
+        # delete the last item
         data = data.loc[data['starttime'] > 0]
         start_ts = data.iloc[0]['starttime']
-        data['rel_start_ms'] = round((data['starttime'] - start_ts)/1000000,2)
+        data['rel_start_ms'] = round((data['starttime'] - start_ts)/1000000, 2)
         stop_ts = data.iloc[0]['stoptime']
-        data['rel_stop_ms'] = round((data['stoptime'] - stop_ts)/1000000,2)
+        data['rel_stop_ms'] = round((data['stoptime'] - stop_ts)/1000000, 2)
 
-        data['start_pts_diff_ms'] = round(data['rel_start_ms'] - data['pts']/1000,2)
+        data['start_pts_diff_ms'] = round(
+            data['rel_start_ms'] - data['pts']/1000, 2)
         data['av_fps'] = data['fps'].rolling(
             fps,  min_periods=fps, win_type=None).sum()/fps
         data['av_proc_fps'] = data['proc_fps'].rolling(
@@ -108,10 +110,12 @@ def parse_decoding_data(json, inputfile):
                 decoded_data['height'] = 'unknown height'
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
-            #oh no we may have b frames...
-            decoded_data['duration_ms'] = round((decoded_data['pts'].shift(-1, axis='index',
-                                     fill_value=0) - decoded_data['pts']) / 1000, 2)
-            decoded_data['fps'] = round(1000.0/(decoded_data['duration_ms']), 2)
+            # oh no we may have b frames...
+            decoded_data['duration_ms'] = round(
+                (decoded_data['pts'].shift(-1, axis='index', fill_value=0) -
+                 decoded_data['pts']) / 1000, 2)
+            decoded_data['fps'] = round(
+                1000.0 / (decoded_data['duration_ms']), 2)
             decoded_data.fillna(0)
     except Exception as ex:
         print(f'Failed to parse decode data for {inputfile}: {ex}')
@@ -190,6 +194,7 @@ def clean_name(name):
     print(f'{name} -> {ret}')
     return ret
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('file', nargs='?', help='file to analyze')
@@ -228,17 +233,9 @@ def main():
     """
     options = parse_args()
 
-    accum_data = None
-    accum_dec_data = None
-    accum_gpu_data = None
-    pts_mult = 1000000
-
-
-
     with open(options.file) as json_file:
         alldata = json.load(json_file)
 
-        
         encoding_data = parse_encoding_data(alldata, options.file)
         decoded_data = parse_decoding_data(alldata, options.file)
         gpu_data = parse_gpu_data(alldata, options.file)
@@ -248,40 +245,43 @@ def main():
             encoding_data.to_csv(f'{options.file}_encoding_data.csv')
             mean_fps = round(np.mean(encoding_data['fps']), 2)
             mean_proc_fps = round(np.mean(encoding_data['proc_fps']), 2)
-           
+
             print(f'mean fps:{mean_fps}')
             print(f'mean proc fps:{mean_proc_fps}')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
-            p = sb.lineplot(x=encoding_data['pts']/1000000,
+            p = sb.lineplot(
+                x=encoding_data['pts']/1000000,
                 y=encoding_data['start_pts_diff_ms'],
                 ci='sd', data=encoding_data,
-                ax = axs,
+                ax=axs,
                 label='start pts diff in ms')
-            p = sb.lineplot(x=encoding_data['pts']/1000000,
+            p = sb.lineplot(
+                x=encoding_data['pts']/1000000,
                 y=encoding_data['duration_ms'],
                 ci='sd', data=encoding_data,
-                ax = axs,
+                ax=axs,
                 label='frame duration in ms')
             axs.set_title('pts vs start time and frame duration')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}_time_diff.png'
             plt.savefig(name.replace(' ', '_'), format='png')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
-            p = sb.lineplot(x=encoding_data['pts']/1000000,
+            p = sb.lineplot(
+                x=encoding_data['pts']/1000000,
                 y=encoding_data['av_proc_fps'],
                 ci='sd', data=encoding_data,
-                ax = axs,
+                ax=axs,
                 label=f'processing fps, average = {mean_proc_fps} ms')
-                
-            #p.set_ylim(0, 90)
-            p = sb.lineplot(x=encoding_data['pts']/1000000,
+
+            # p.set_ylim(0, 90)
+            p = sb.lineplot(  # noqa: F841
+                x=encoding_data['pts']/1000000,
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
-                ax = axs,
+                ax=axs,
                 label=f'pts based fps, average = {mean_fps} ms')
-            #p.set_ylim(0, 90)
-          
-            
+            # p.set_ylim(0, 90)
+
             axs.set_title('Fps and proc fps')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}_fps.png'
@@ -291,7 +291,6 @@ def main():
             print(f'decoding data len = {len(decoded_data)}')
         if not isinstance(gpu_data, type(None)):
             print(f'gpu data len = {len(gpu_data)}')
-
 
 
 if __name__ == '__main__':
