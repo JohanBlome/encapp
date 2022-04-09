@@ -9,6 +9,7 @@ import os
 import json
 import sys
 import argparse
+from argparse import RawTextHelpFormatter
 import re
 
 from os.path import exists
@@ -210,7 +211,8 @@ def run_quality(test_file, optionals):
 
 def get_options(argv):
     """ Parse cli args """
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=RawTextHelpFormatter)
 
     parser.add_argument('test', nargs='*',
                         help='Test result in JSON format.')
