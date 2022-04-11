@@ -35,6 +35,12 @@ public class Statistics {
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
 
+    public void setAppVersion(String mAppVersion) {
+        this.mAppVersion = mAppVersion;
+    }
+
+    private String mAppVersion = "";
+
     private final HashMap<Long,FrameInfo> mEncodingFrames;
     private final HashMap<Long,FrameInfo> mDecodingFrames;
     int mEncodingProcessingFrames = 0;
@@ -223,18 +229,26 @@ public class Statistics {
         } else {
            // TODO: Go through the settings
             try {
-                mediaformat.put(MediaFormat.KEY_FRAME_RATE, format.getFloat(MediaFormat.KEY_FRAME_RATE));
-                mediaformat.put(MediaFormat.KEY_BITRATE_MODE, format.getInteger(MediaFormat.KEY_BITRATE_MODE));
+                mediaformat.put(MediaFormat.KEY_FRAME_RATE, getVal(format, MediaFormat.KEY_FRAME_RATE, "unknown"));
+                mediaformat.put(MediaFormat.KEY_BITRATE_MODE, getVal(format, MediaFormat.KEY_BITRATE_MODE, "unknown"));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
         return mediaformat;
     }
+    
+    private String getVal(MediaFormat format, String key, String val) {
+        if (format == null) {
+            return val;
+        }
+        if (format.containsKey(key)) {
+           return format.getString(key);
+        }
+        return val;
+    }
 
-
-
-
+    
     private JSONObject getConfigSettings(Configure config) throws JSONException {
         JSONObject settings = new JSONObject();
         settings.put("codec", mCodec);
@@ -258,12 +272,12 @@ public class Statistics {
             settings.put(MediaFormat.KEY_COLOR_STANDARD, config.getColorStandard());
         if (config.hasColorTransfer())
             settings.put(MediaFormat.KEY_COLOR_TRANSFER, config.getColorTransfer());
-
         //TODO: more settings
 
         return settings;
     }
 
+    
     public void writeJSON(Writer writer) throws IOException {
         Log.d(TAG, "Write stats for " + mId);
         try {
@@ -274,6 +288,8 @@ public class Statistics {
             json.put("test", mTest.getCommon().getDescription());
             json.put("testdefinition", mTest.toString());
             json.put("date", mStartDate.toString());
+            Log.d(TAG, "log app version: " + mAppVersion);
+            json.put("encapp_version", mAppVersion);
             json.put("proctime", getProcessingTime());
             json.put("framecount", getEncodedFrameCount());
             json.put("encodedfile", mEncodedfile);
