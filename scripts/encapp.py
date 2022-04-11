@@ -732,7 +732,7 @@ if __name__ == '__main__':
     try:
         main(sys.argv)
     except AssertionError as ae:
-        print(ae)
+        print(ae, file=sys.stderr)
         if DEBUG:
             raise
         sys.exit(1)
