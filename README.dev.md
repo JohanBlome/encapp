@@ -150,28 +150,28 @@ $ adb shell cat /sdcard/codecs.txt
 
 ## 3. Regression test
 
-encapp.verify.py will run through the tests defined in 'tests/' folder and try to verify:
-    * bitrate
-    * key frames
-    * temporal layers
-    * long temporal references (Qalcomm ltr)
+encapp_verify.py will run through the tests defined in 'tests/' folder and try to verify:
+* bitrate
+* key frames
+* temporal layers
+* long temporal references (Qualcomm ltr)
 
-Just like encapp.py overrides for input and encoder is vailable.
+Just like encapp.py overrides for input and encoder are available.
 Run the test just like they are defined:
 
-'''
+```
 $ encapp_verify.py
-'''
-1
+```
+
 Override the input, encoding resolution and codec:
-'''
+```
 $ encapp_verify.py -i /media/johan/data/media_encapp/<encoded>.mp4  -os 1920x1080 -c encoder.avc
-'''
+```
 This only works (for now) for encoded files and not raw files.
 
-Overrride input and run specific test:
-'''
+Override input and run specific test:
+```
 $ encapp_verify.py -i /tmp/KristenAndSara_1280x720_60.yuv -is 1280x720 -if 30 -os 1280x720 -of 30 -t <PATH>/encapp/tests/simple.qcif.json
-'''
+```
 
 For a raw input both input and output resolution and fps needs to be specified even if raw buffer will not allow scaling (which surface encoding does).
