@@ -408,7 +408,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             print(f'File: \"{filepath}\" does not exist, check path')
 
     if not ok:
-        print(f'Check file paths and try again')
+        print('Check file paths and try again')
         shutil.rmtree(workdir)
         exit(0)
 
@@ -701,6 +701,7 @@ def main(argv):
 
         result = codec_test(settings, model, serial)
         verify_app_version(result)
+
 
 if __name__ == '__main__':
     try:
