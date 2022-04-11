@@ -20,6 +20,7 @@ from _version import __version__
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+print(f'script dir: {SCRIPT_DIR} - root dir {SCRIPT_ROOT_DIR}')
 sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
@@ -304,6 +305,22 @@ def collect_result(workdir, test_name, serial):
     return result_json
 
 
+def verify_video_size(videofile, resolution):
+    if not os.path.exists(videofile):
+        return False
+
+    if video_is_raw(videofile):
+        file_size = os.path.getsize(videofile)
+        if (resolution != None):
+            framesize = int(resolution.split('x')[0]) * int(resolution.split('x')[1]) * 1.5
+            if file_size % framesize == 0:
+                return True
+        return False
+    else:
+        # in this case the actual encoded size is used.
+        return True
+
+
 def update_file_paths(test, new_name):
     path = test.input.filepath
     if new_name is not None:
@@ -331,6 +348,11 @@ def run_codec_tests_file(test_def, model, serial, workdir, settings):
         tests.ParseFromString(fd.read())
     return run_codec_tests(tests, model, serial, workdir, settings)
 
+def abort_test(workdir, message):
+    print('\n*** Test failed ***')
+    print(message)
+    shutil.rmtree(workdir)
+    exit(0)
 
 def run_codec_tests(tests, model, serial, workdir, settings):
     test_def = settings['configfile']  # todo: check
@@ -354,11 +376,16 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         videofile = settings['videofile']
         if videofile is not None and len(videofile) > 0:
             files_to_push.append(videofile)
+            # verify video and resolution
+            if not verify_video_size(videofile, test.input.resolution):
+                abort_test(workdir, 'Video size is not matching the raw file size')
         else:
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
 
         update_file_paths(test, videofile)
+
+
         print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
             # defult is serial calls
@@ -390,7 +417,8 @@ def run_codec_tests(tests, model, serial, workdir, settings):
 
     print(fresh)
     if test_def is None:
-        print('ERROR: no test file name')
+        abort_test(workdir, 'ERROR: no test file name')
+
     test_file = os.path.basename(test_def)
     testname = f"{test_file[0:test_file.rindex('.')]}.run.bin"
     output = f'{workdir}/{testname}'
@@ -408,9 +436,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             print(f'File: \"{filepath}\" does not exist, check path')
 
     if not ok:
-        print(f'Check file paths and try again')
-        shutil.rmtree(workdir)
-        exit(0)
+        abort_test(workdir, 'Check file paths and try again')
 
     return collect_result(workdir, testname, serial)
 
