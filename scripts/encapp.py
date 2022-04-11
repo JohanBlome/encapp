@@ -727,6 +727,7 @@ def main(argv):
         result = codec_test(settings, model, serial)
         verify_app_version(result)
 
+
 if __name__ == '__main__':
     try:
         main(sys.argv)
