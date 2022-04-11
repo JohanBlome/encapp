@@ -578,7 +578,10 @@ def main(argv):
         for test in tests:
             directory, _ = os.path.split(__file__)
             if options.test is None:
-                test_path = directory + '/../tests/' + test
+                test_path = '../tests/' + test
+                if len(directory) > 0:
+                    test_path = f'{directory}/{test_path}'
+
             else:
                 test_path = test
 
