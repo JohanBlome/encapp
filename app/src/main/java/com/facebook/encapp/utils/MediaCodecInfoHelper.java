@@ -2,6 +2,7 @@ package com.facebook.encapp.utils;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.util.Range;
 
 import java.util.List;
@@ -441,12 +442,16 @@ public class MediaCodecInfoHelper {
         indent += 1;
         tab = getIndentation(indent);
         str.append(tab + "name: " + media_codec_info.getName() + "\n");
-        str.append(tab + "canonical_name: " + media_codec_info.getCanonicalName() + "\n");
-        str.append(tab + "is_alias: " + media_codec_info.isAlias() + "\n");
+        if (Build.VERSION.SDK_INT >= 29) {
+            str.append(tab + "canonical_name: " + media_codec_info.getCanonicalName() + "\n");
+            str.append(tab + "is_alias: " + media_codec_info.isAlias() + "\n");
+        }
         str.append(tab + "is_encoder: " + media_codec_info.isEncoder() + "\n");
-        str.append(tab + "is_hardware_accelerated: " + media_codec_info.isHardwareAccelerated() + "\n");
-        str.append(tab + "is_software_only: " + media_codec_info.isSoftwareOnly() + "\n");
-        str.append(tab + "is_vendor: " + media_codec_info.isVendor() + "\n");
+        if (Build.VERSION.SDK_INT >= 29) {
+            str.append(tab + "is_hardware_accelerated: " + media_codec_info.isHardwareAccelerated() + "\n");
+            str.append(tab + "is_software_only: " + media_codec_info.isSoftwareOnly() + "\n");
+            str.append(tab + "is_vendor: " + media_codec_info.isVendor() + "\n");
+        }
         String[] media_types = media_codec_info.getSupportedTypes();
         for (String media_type : media_types) {
             str.append(codecCapabilitiesToText(media_codec_info, media_type, indent));

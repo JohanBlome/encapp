@@ -65,8 +65,8 @@ public class MainActivity extends AppCompatActivity {
 
         return currentVersion;
     }
-    
-    
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
