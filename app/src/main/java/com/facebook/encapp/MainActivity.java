@@ -2,6 +2,7 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -50,6 +51,22 @@ public class MainActivity extends AppCompatActivity {
     Stack<Encoder> mEncoderList = new Stack<>();
 
 
+    private String getCurrentAppVersion() {
+        PackageManager pm = this.getPackageManager();
+        PackageInfo pInfo = null;
+
+        try {
+            pInfo = pm.getPackageInfo(this.getPackageName(), 0);
+
+        } catch (PackageManager.NameNotFoundException e1) {
+            e1.printStackTrace();
+        }
+        String currentVersion = pInfo.versionName;
+
+        return currentVersion;
+    }
+    
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -437,6 +454,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Transcoder done!");
                     Log.d(TAG, "Get stats");
                     final Statistics stats = transcoder.getStatistics();
+                    stats.setAppVersion(getCurrentAppVersion());
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
                         FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);

@@ -14,6 +14,7 @@ import argparse
 import re
 import time
 import datetime
+import shutil
 
 from _version import __version__
 
@@ -398,10 +399,18 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         binfile.write(fresh.SerializeToString())
         files_to_push.append(output)
 
-    print(f'files_to_push = {files_to_push}')
+    ok = True
     for filepath in files_to_push:
-        print(f'Push {filepath}')
-        run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
+        if os.path.exists(filepath):
+            run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
+        else:
+            ok = False
+            print(f'File: \"{filepath}\" does not exist, check path')
+
+    if not ok:
+        print(f'Check file paths and try again')
+        shutil.rmtree(workdir)
+        exit(0)
 
     return collect_result(workdir, testname, serial)
 
@@ -627,6 +636,16 @@ def get_video_info(videofile, debug=0):
     return videofile_config
 
 
+def verify_app_version(json_files):
+    for fl in json_files:
+        with open(fl) as f:
+            data = json.load(f)
+            version = data['encapp_version']
+            if __version__ != version:
+                print(f'Warning, version missmatch between script '
+                      f'({__version__}) and application ({version})')
+
+
 def main(argv):
     options = get_options(argv)
     if options.version:
@@ -680,8 +699,8 @@ def main(argv):
         settings['bitrate'] = options.bitrate
         settings['desc'] = options.desc
 
-        codec_test(settings, model, serial)
-
+        result = codec_test(settings, model, serial)
+        verify_app_version(result)
 
 if __name__ == '__main__':
     try:
