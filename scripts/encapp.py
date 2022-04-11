@@ -410,7 +410,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
     if not ok:
         print('Check file paths and try again')
         shutil.rmtree(workdir)
-        exit(0)
+        sys.exit(1)
 
     return collect_result(workdir, testname, serial)
 
@@ -707,7 +707,7 @@ if __name__ == '__main__':
     try:
         main(sys.argv)
     except AssertionError as ae:
-        print(ae)
+        print(ae, file=sys.stderr)
         if DEBUG:
             raise
         sys.exit(1)
