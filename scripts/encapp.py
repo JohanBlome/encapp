@@ -20,6 +20,7 @@ from _version import __version__
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+print(f'script dir: {SCRIPT_DIR} - root dir {SCRIPT_ROOT_DIR}')
 sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
