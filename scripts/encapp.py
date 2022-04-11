@@ -14,6 +14,7 @@ import argparse
 import re
 import time
 import datetime
+import shutil
 
 from _version import __version__
 
@@ -408,6 +409,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
 
     if not ok:
         print(f'Check file paths and try again')
+        shutil.rmtree(workdir)
         exit(0)
 
     return collect_result(workdir, testname, serial)
