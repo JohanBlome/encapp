@@ -709,3 +709,4 @@ if __name__ == '__main__':
         print(ae)
         if DEBUG:
             raise
+        sys.exit(1)
