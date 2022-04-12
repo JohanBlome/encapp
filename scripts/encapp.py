@@ -389,7 +389,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
             # defult is serial calls
-            split = settings['bitrate'].split(' ')
+            split = settings['bitrate'].split('-')
             if len(split) != 3:
                 split = settings['bitrate'].split(',')
                 if len(split) != 3:
@@ -584,7 +584,7 @@ def get_options(argv):
         metavar='input-video-bitrate',
         help='input video bitrate, either as a single number, '
         '\"100 kbps\" or a lst 100kbps,200kbps or a range '
-        '100kps-1Mbps-100kbps (start-stop-step)',)
+        '100k-1M-100k (start-stop-step)',)
     parser.add_argument(
         'configfile', type=str, nargs='?',
         default=default_values['configfile'],
