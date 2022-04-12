@@ -23,6 +23,7 @@ import json
 import os
 import pandas as pd
 import re
+from encapp import convert_to_bps
 
 INDEX_FILE_NAME = '.encapp_index'
 
@@ -92,23 +93,15 @@ def getData(options, recursive):
 
 def search(options):
     data = getData(options, not options.no_rec)
-
+    data['bitrate']  = data['bitrate'].apply(lambda x: convert_to_bps(x))
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
     if options.bitrate:
         ranges = options.bitrate.split('-')
         vals = []
         for val in ranges:
-            bitrate = 0
-            kb = val.split('k')
-            if len(kb) == 2:
-                bitrate = int(kb[0]) * 1000
-            Mb = val.split('M')
-            if len(Mb) == 2:
-                bitrate = int(Mb[0]) * 1000000
-            if bitrate == 0:
-                bitrate = int(val)
-            vals.append(bitrate)
+            bitrate = convert_to_bps(val)
+            vals.append(int(bitrate))
 
         if len(vals) == 2:
             data = data.loc[(data['bitrate'] >= vals[0]) &
