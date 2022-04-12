@@ -47,12 +47,7 @@ $ adb shell appops set --uid com.facebook.encapp MANAGE_EXTERNAL_STORAGE allow
 (2) run the list command:
 ```
 $ ./scripts/encapp.py list
-adb devices -l
-adb -s <serial> shell ls /sdcard/
-model = <model_name>
-adb -s <serial> install -g proj/encapp/scripts/../app/build/outputs/apk/debug/com.facebook.encapp-v1.0-debug.apk
-adb -s <serial> shell am start -W -e ui_hold_sec 3 -e list_codecs a com.facebook.encapp/.MainActivity
-adb -s <serial> pull /sdcard/codecs.txt codecs_<model_name>.txt
+...
 --- List of supported encoders  ---
 
         MediaCodec {
@@ -100,42 +95,18 @@ Note: The `scripts/encapp.py` scripts will install a prebuild apk before running
 First, select one of the codecs from step 4. In this case, we will use `OMX.google.h264.encoder`.
 
 Push the (raw) video file to be encoded into the device. Note that we are using a QCIF video (176x144).
+In this case the raw format is yuv420p (which is stated in the codec list from (2.2), COLOR_FormatYUV420Planar).0
+For sw codecs in most case it is yuv420p. For hw codecs e.g. Qcom: COLOR_QCOM_FormatYUV420SemiPlanar this is nv12.
+In the case of surface encoder from raw the source should be nv21 regardless of codec.
 ```
 $ wget https://media.xiph.org/video/derf/y4m/akiyo_qcif.y4m -O /tmp/akiyo_qcif.y4m
-$ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt nv12 /tmp/akiyo_qcif.yuv
-```
+$ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt yuv420p /tmp/akiyo_qcif.yuv
 
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
 $ encapp.py run tests/bitrate_buffer.pbtxt
-codec test: {'videofile': None, 'configfile': '/media/johan/data/code/encapp/tests/bitrate.pbtxt', 'encoder': None, 'output': None, 'bitrate': None, 'desc': 'testing', 'inp_resolution': None, 'out_resolution': None, 'inp_framerate': None, 'out_framerate': None}
-cmd: protoc -I / --encode="Tests" /media/johan/data/code/encapp/proto/tests.proto < /media/johan/data/code/encapp/tests/bitrate.pbtxt > /media/johan/data/code/encapp/tests/bitrate.bin
-run test: /media/johan/data/code/encapp/tests/bitrate.bin
-Videofile exchanged? None
-test {
-  common {
-    id: "Bitrate"
-    description: "Verify encoding bitrate"
-  }
-  input {
-    filepath: "/sdcard/akiyo_qcif.yuv"
-    resolution: "176x144"
-    framerate: 30.0
-  }
-  configure {
-    codec: "OMX.google.h264.encoder"
-    surface: true
-    bitrate: "100 kbps"
-  }
-}
-
-files_to_push = ['/tmp/akiyo_qcif.yuv', 'bitrate.run.bin']
-Push /tmp/akiyo_qcif.yuv
-Push bitrate.run.bin
-Exit from 14903
-pull encapp_a6896c13-1c2a-48b0-9e6c-a2e1e25a632a.json to testing_Portal_2022-03-04_16_17/bitrate_files/
-pull encapp_a6896c13-1c2a-48b0-9e6c-a2e1e25a632a.mp4 to testing_Portal_2022-03-04_16_17/bitrate_files/
-results collect: ['testing_Portal_2022-03-04_16_17/bitrate_files//encapp_a6896c13-1c2a-48b0-9e6c-a2e1e25a632a.json']
+...
+results collect: ['PATH/bitrate_files/encapp_XXX.json']
 
 ```
 
@@ -155,33 +126,8 @@ $ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tm
 
 ```
 $ encapp.py run tests/bitrate_buffer.720p.pbtxt
-codec test: {'videofile': None, 'configfile': '/media/johan/data/code/encapp/tests/bitrate_buffer.720p.pbtxt', 'encoder': None, 'output': None, 'bitrate': None, 'desc': 'testing', 'inp_resolution': None, 'out_resolution': None, 'inp_framerate': None, 'out_framerate': None}
-cmd: protoc -I / --encode="Tests" /media/johan/data/code/encapp/proto/tests.proto < /media/johan/data/code/encapp/tests/bitrate_buffer.720p.pbtxt > /media/johan/data/code/encapp/tests/bitrate_buffer.720p.bin
-run test: /media/johan/data/code/encapp/tests/bitrate_buffer.720p.bin
-Videofile exchanged? None
-test {
-  common {
-    id: "Bitrate"
-    description: "Verify encoding bitrate - buffer"
-  }
-  input {
-    filepath: "/sdcard/KristenAndSara_1280x720_60.yuv"
-    resolution: "1280x720"
-    framerate: 60.0
-  }
-  configure {
-    codec: "OMX.google.h264.encoder"
-    bitrate: "1000 kbps"
-  }
-}
-
-files_to_push = ['/tmp/KristenAndSara_1280x720_60.yuv', 'bitrate_buffer.720p.run.bin']
-Push /tmp/KristenAndSara_1280x720_60.yuv
-Push bitrate_buffer.720p.run.bin
-Exit from 17015
-pull encapp_72a1ff62-a7b2-4ab2-9600-61896d24c8dd.json to testing_Portal_2022-03-04_16_23/bitrate_buffer.720p_files/
-pull encapp_72a1ff62-a7b2-4ab2-9600-61896d24c8dd.mp4 to testing_Portal_2022-03-04_16_23/bitrate_buffer.720p_files/
-results collect: ['testing_Portal_2022-03-04_16_23/bitrate_buffer.720p_files//encapp_72a1ff62-a7b2-4ab2-9600-61896d24c8dd.json'
+...
+results collect: ['PATH/bitrate_buffer.720p_files/encapp_XXX.json'
 
 ```
 
@@ -284,9 +230,9 @@ $ encapp_search.py
 
 Running it without any arguments will index all parsable json files in the current folder and below.
 
-To find all 1080p files run:
+To find all 720p files run:
 ```
-$ encapp_search.py -s 1920x1080
+$ encapp_search.py -s 1280x720
 ```
 
 
