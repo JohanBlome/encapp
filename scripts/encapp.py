@@ -408,7 +408,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             print(f'File: \"{filepath}\" does not exist, check path')
 
     if not ok:
-        print('Check file paths and try again')
+        print('Check file paths and try again', file=sys.stderr)
         shutil.rmtree(workdir)
         sys.exit(1)
 
