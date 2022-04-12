@@ -73,6 +73,7 @@ class RDPlot:
            
             for height in heights:
                 filtHeight = data.loc[data['height'] == height]
+                filtHeight = filtHeight.apply(pd.to_numeric, errors='ignore')
                 if len(filtHeight) <= 1:
                     continue
                 self.vmaf_figure(f'VMAF for {height}p')

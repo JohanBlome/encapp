@@ -140,17 +140,14 @@ def run_quality(test_file, optionals):
         if len(optionals["reference_resolution"]) > 0:
             input_res = optionals["reference_resolution"]
         else:
-
-            input_width = input_media_format.get("width")
-            input_height = input_media_format.get("height")
-            # If we did not get aything here use the encoded size
-            if (
-                input_width is None
-                or input_height is None
-                or (not input_width.isnumeric() and not input_height.isnumeric())
-            ):
+            try:
+                input_width = int(input_media_format.get("width"))
+                input_height = int(input_media_format.get("height"))
+                # If we did not get aything here use the encoded size
+            except:
                 print("Warning. Input size if wrong.")
-                print(f"Json {input_width}x{input_height}")
+                print(f"Json {input_media_format.get('width')}x"
+                      f"{input_media_format.get('height')}")
                 input_res = output_res
             else:
                 input_res = f"{input_width}x{input_height}"
