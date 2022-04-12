@@ -11,7 +11,6 @@ test {
     configure {
         codec: "OMX.google.h264.encoder"
         bitrate: "1Mbps"
-        surface: true
     }
     runtime {
         video_bitrate {

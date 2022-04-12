@@ -1,7 +1,7 @@
 test {
     common {
         id: "Bitrate"
-        description: "Verify encoding bitrate"
+        description: "Verify encoding frame rate"
     }
     input {
         filepath: "/tmp/akiyo_qcif.yuv"
