@@ -101,7 +101,7 @@ In the case of surface encoder from raw the source should be nv21 regardless of 
 ```
 $ wget https://media.xiph.org/video/derf/y4m/akiyo_qcif.y4m -O /tmp/akiyo_qcif.y4m
 $ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt yuv420p /tmp/akiyo_qcif.yuv
-
+```
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
 $ encapp.py run tests/bitrate_buffer.pbtxt
@@ -122,6 +122,7 @@ Now, let's run the h264 encoder in an HD file. We will just select the codec ("h
 ```
 $ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m -O /tmp/KristenAndSara_1280x720_60.y4m
 $ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tmp/KristenAndSara_1280x720_60.yuv
+
 ```
 
 ```
@@ -153,6 +154,7 @@ test {
         bitrate: "XXX kbps"
     }
 }
+```
 
 # 5. Test Definition Settings
 
