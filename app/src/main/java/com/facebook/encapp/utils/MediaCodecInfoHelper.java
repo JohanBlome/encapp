@@ -3,10 +3,9 @@ package com.facebook.encapp.utils;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
-import android.util.Range;
 
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
 
 
 public class MediaCodecInfoHelper {
