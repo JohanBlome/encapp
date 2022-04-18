@@ -9,6 +9,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.Runtime;
@@ -24,8 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.Vector;
-
-import androidx.annotation.NonNull;
 
 public abstract class Encoder {
     protected static final String TAG = "encapp";

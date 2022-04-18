@@ -1,5 +1,7 @@
 package com.facebook.encapp.utils;
 
+import static android.content.Context.CAMERA_SERVICE;
+
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -23,15 +25,13 @@ import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.Executor;
-
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-
-import static android.content.Context.CAMERA_SERVICE;
 
 public class CameraSource {
     private static final String TAG = "encapp.camera";

@@ -17,6 +17,9 @@ import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
@@ -35,9 +38,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Stack;
-
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
