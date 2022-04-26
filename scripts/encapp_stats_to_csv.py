@@ -244,25 +244,32 @@ def main():
             print(f'encoding_data data len = {len(encoding_data)}')
             # print(f'{encoding_data}')
             encoding_data.to_csv(f'{options.file}_encoding_data.csv')
-            mean_fps = round(np.mean(encoding_data['fps']), 2)
-            mean_proc_fps = round(np.mean(encoding_data['proc_fps']), 2)
-
-            print(f'mean fps:{mean_fps}')
-            print(f'mean proc fps:{mean_proc_fps}')
+            # `fps` column contains the framerate calculated from the
+            # camera-reported timings (the camera framerate)
+            mean_cam_fps = round(np.mean(encoding_data['fps']), 2)
+            # `proc_fps` column contains the framerate calculated from the
+            # system-reported timings (the gettimeofday framerate)
+            mean_sys_fps = round(np.mean(encoding_data['proc_fps']), 2)
+            print(f'mean camera fps: {mean_cam_fps}')
+            print(f'mean system fps: {mean_sys_fps}')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
                 y=encoding_data['start_pts_diff_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label='start pts diff in ms')
+                label='system frame duration')
+            p.set_xlabel('time (sec)')
+            p.set_ylabel('frame duration (ms)')
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
                 y=encoding_data['duration_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label='frame duration in ms')
-            axs.set_title('pts vs start time and frame duration')
+                label='camera frame duration')
+            p.set_xlabel('time (sec)')
+            p.set_ylabel('frame duration (ms)')
+            axs.set_title('Camera vs. System Frame Duration')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}_time_diff.png'
             plt.savefig(name.replace(' ', '_'), format='png')
@@ -272,18 +279,17 @@ def main():
                 y=encoding_data['av_proc_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f'processing fps, average = {mean_proc_fps} ms')
-
+                label=f'system fps, average = {mean_sys_fps} ms')
             # p.set_ylim(0, 90)
             p = sb.lineplot(  # noqa: F841
                 x=encoding_data['pts']/1000000,
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f'pts based fps, average = {mean_fps} ms')
+                label=f'camera fps, average = {mean_cam_fps} ms')
             # p.set_ylim(0, 90)
 
-            axs.set_title('Fps and proc fps')
+            axs.set_title('Camera Framerate vs. System Framerate')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}_fps.png'
             plt.savefig(name.replace(' ', '_'), format='png')
