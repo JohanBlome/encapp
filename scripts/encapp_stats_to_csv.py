@@ -43,8 +43,9 @@ import numpy as np
 #   },
 
 
-def parse_encoding_data(json, inputfile):
-    print(f'Parse encoding data: {inputfile}')
+def parse_encoding_data(json, inputfile, debug=0):
+    if debug > 0:
+        print(f'Parse encoding data: {inputfile}')
 
     try:
         data = pd.DataFrame(json['frames'])
@@ -87,12 +88,14 @@ def parse_encoding_data(json, inputfile):
     except Exception as ex:
         print(f'parsing failed: {ex}')
         return None
-    print(f'{data}')
+    if debug > 2:
+        print(f'{data}')
     return data
 
 
-def parse_decoding_data(json, inputfile):
-    print('Parse decoding data')
+def parse_decoding_data(json, inputfile, debug=0):
+    if debug > 0:
+        print('Parse decoding data')
     decoded_data = None
     try:
         decoded_data = pd.DataFrame(json['decoded_frames'])
@@ -125,8 +128,9 @@ def parse_decoding_data(json, inputfile):
     return decoded_data
 
 
-def parse_gpu_data(json, inputfile):
-    print('Parse gpu data')
+def parse_gpu_data(json, inputfile, debug=0):
+    if debug > 0:
+        print('Parse gpu data')
     gpu_data = None
     try:
         gpu_data = pd.DataFrame(json['gpu_data']['gpu_load_percentage'])
@@ -190,7 +194,7 @@ def calc_infligh(frames, time_ref):
     return frames, concurrent
 
 
-def clean_name(name):
+def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({',': '_', ' ': '_'}))
     print(f'{name} -> {ret}')
     return ret
@@ -198,6 +202,12 @@ def clean_name(name):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--debug', action='count',
+                        dest='debug', default=0,
+                        help='Increase verbosity (use many times for more)',)
+    parser.add_argument('--quiet', action='store_const',
+                        dest='debug', const=-1,
+                        help='Zero verbosity',)
     parser.add_argument('file', nargs='?', help='file to analyze')
     parser.add_argument('--label', default='')
     parser.add_argument('-c', '--concurrency', action='store_true',
@@ -237,11 +247,13 @@ def main():
     with open(options.file) as json_file:
         alldata = json.load(json_file)
 
-        encoding_data = parse_encoding_data(alldata, options.file)
-        decoded_data = parse_decoding_data(alldata, options.file)
-        gpu_data = parse_gpu_data(alldata, options.file)
+        encoding_data = parse_encoding_data(alldata, options.file,
+                                            options.debug)
+        decoded_data = parse_decoding_data(alldata, options.file,
+                                           options.debug)
+        gpu_data = parse_gpu_data(alldata, options.file, options.debug)
         if not isinstance(encoding_data, type(None)):
-            print(f'encoding_data data len = {len(encoding_data)}')
+            print(f'encoding_data_len: {len(encoding_data)}')
             # print(f'{encoding_data}')
             encoding_data.to_csv(f'{options.file}_encoding_data.csv')
             # `fps` column contains the framerate calculated from the
@@ -250,8 +262,8 @@ def main():
             # `proc_fps` column contains the framerate calculated from the
             # system-reported timings (the gettimeofday framerate)
             mean_sys_fps = round(np.mean(encoding_data['proc_fps']), 2)
-            print(f'mean camera fps: {mean_cam_fps}')
-            print(f'mean system fps: {mean_sys_fps}')
+            print(f'mean_camera_fps: {mean_cam_fps}')
+            print(f'mean_system_fps: {mean_sys_fps}')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
@@ -271,8 +283,9 @@ def main():
             p.set_ylabel('frame duration (ms)')
             axs.set_title('Camera vs. System Frame Duration')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
-            name = f'{options.file}_time_diff.png'
+            name = f'{options.file}_frame_duration.png'
             plt.savefig(name.replace(' ', '_'), format='png')
+            print(f'output1: {name}')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
@@ -291,13 +304,14 @@ def main():
 
             axs.set_title('Camera Framerate vs. System Framerate')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
-            name = f'{options.file}_fps.png'
+            name = f'{options.file}_framerate.png'
+            print(f'output2: {name}')
             plt.savefig(name.replace(' ', '_'), format='png')
-            plt.show()
+            # plt.show()
         if not isinstance(decoded_data, type(None)):
-            print(f'decoding data len = {len(decoded_data)}')
+            print(f'decoding_data_len: {len(decoded_data)}')
         if not isinstance(gpu_data, type(None)):
-            print(f'gpu data len = {len(gpu_data)}')
+            print(f'gpu_data_len: {len(gpu_data)}')
 
 
 if __name__ == '__main__':
