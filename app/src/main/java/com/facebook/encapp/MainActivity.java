@@ -4,6 +4,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Matrix;
+import android.graphics.RectF;
+import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.net.Uri;
@@ -13,8 +16,13 @@ import android.os.Environment;
 import android.os.Process;
 import android.provider.Settings;
 import android.util.Log;
+import android.util.Size;
+import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.view.WindowInsetsController;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 
 import com.facebook.encapp.proto.Test;
@@ -22,6 +30,7 @@ import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
+import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.Statistics;
 
@@ -35,21 +44,25 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Stack;
+import java.util.Vector;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
     private Bundle mExtraData;
-    TextureView mTextureView;
     private int mInstancesRunning = 0;
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
     MemoryLoad mMemLoad;
     Stack<Encoder> mEncoderList = new Stack<>();
+    CameraSource mCameraSource = null;
+    OutputMultiplier mCameraSourceMultiplier;
 
+    TableLayout mTable;
 
     private String getCurrentAppVersion() {
         PackageManager pm = this.getPackageManager();
@@ -70,7 +83,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        //setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_visualize);
 
         String[] permissions = retrieveNotGrantedPermissions(this);
 
@@ -101,12 +115,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        mTable = findViewById(R.id.viewTable);
+
         Log.d(TAG, "Passed all permission checks");
         if (getTestSettings()) {
-            TextView mTvTestRun = findViewById(R.id.tv_testrun);
-
-            mTvTestRun.setVisibility(View.VISIBLE);
-
             (new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -144,17 +156,10 @@ public class MainActivity extends AppCompatActivity {
         }
         encoders.append("}\n");
         decoders.append("}\n");
-        final TextView logText = findViewById(R.id.logText);
-        runOnUiThread(new Runnable() {
-                          @Override
-                          public void run() {
 
-                              logText.append(encoders);
-                              logText.append("\n" + decoders);
-                              Log.d(TAG, encoders + "\n" + decoders);
-
-                          }
-                      });
+        log(encoders.toString());
+        log("\n" + decoders);
+        Log.d(TAG, encoders + "\n" + decoders);
 
         FileWriter writer = null;
         try {
@@ -231,11 +236,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     int mCameraCount = 0;
-    public Thread startTest(Test test, TextView logText, Stack<Thread> threads) {
+    public Thread startTest(Test test, Stack<Thread> threads) {
         Log.d(TAG, "Start test: " + test.getCommon().getDescription());
 
         increaseTestsInflight();
-        Thread t = RunTestCase(test, logText);
+        Thread t = RunTestCase(test);
 
         if (test.hasParallel()) {
             for (Test parallell: test.getParallel().getTestList()) {
@@ -246,7 +251,7 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                 Log.d(TAG, "Start parallel");
-                threads.push(startTest(parallell, logText, threads));
+                threads.push(startTest(parallell, threads));
             }
         }
 
@@ -257,10 +262,75 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    public int countPotentialViews(Test test) {
+        int nbr = 0;
+        if (test.hasParallel()) {
+            for (Test par_test:test.getParallel().getTestList()){
+                nbr += countPotentialViews(par_test);
+            }
+        }
+
+        String filePath = test.getInput().getFilepath();
+        if (filePath.toLowerCase(Locale.US).contains(".raw") ||
+                filePath.toLowerCase(Locale.US).contains(".yuv") ||
+                filePath.toLowerCase(Locale.US).contains(".rgba") ||
+                filePath.toLowerCase(Locale.US).equals("camera")) {
+            if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                //Count the camera in 100s
+                nbr += 100;
+            } else {
+                //Ignore
+                Log.d(TAG, filePath + " is will not give a visualization view");
+            }
+        } else {
+            nbr++;
+        }
+        return nbr;
+    }
+
+    public void prepareViews(int count) {
+        Log.d(TAG, "Prepare views, count = " + count);
+        for (int i = 0; i < count; i++) {
+
+            TextureView view = new TextureView(this);
+            OutputAndTexture item = new OutputAndTexture(new OutputMultiplier(), view, null);
+            mViewsToDraw.add(item);
+            view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+                @Override
+                public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
+                    Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view+", surface = " + surface + ", w, h = " + width + ", " + height);
+                    item.mMult.addSurfaceTexture(surface);
+
+                    synchronized (mViewsToDraw) {
+                        mViewsToDraw.notifyAll();
+                    }
+                }
+
+                @Override
+                public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+
+                }
+
+                @Override
+                public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+                    return false;
+                }
+
+                @Override
+                public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+
+                }
+            });
+        }
+
+        createTable();
+
+    }
+
+
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
         mMemLoad.start();
-        final TextView logText = findViewById(R.id.logText);
         if (mExtraData.containsKey(ParseData.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(ParseData.TEST_UI_HOLD_TIME_SEC, "0"));
         }
@@ -276,18 +346,13 @@ public class MainActivity extends AppCompatActivity {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    TextView mTvTestRun = findViewById(R.id.tv_testrun);
-                    mTvTestRun.setVisibility(View.GONE);
-                }
-            });
             return;
         }
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+
             Tests testcases = null;
             try {
                 if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
@@ -303,6 +368,35 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
+                int nbrViews = 0;
+                // Prepare views for visualization
+                for (Test test : testcases.getTestList()) {
+                    nbrViews += countPotentialViews(test);
+                }
+                // Only one view for camera
+                if (nbrViews > 100) {
+                    nbrViews = nbrViews%100 + 1;
+                }
+                final int tmp = nbrViews;
+                if (nbrViews > 0) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Log.d(TAG, "Prepare views");
+                            prepareViews(tmp);
+                        }
+                    });
+                }
+
+                while(mViewsToDraw.size() < nbrViews) {
+                    synchronized (mViewsToDraw) {
+                        try {
+                            mViewsToDraw.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
                 int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
                     Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
@@ -321,18 +415,26 @@ public class MainActivity extends AppCompatActivity {
                             }
 
                             Stack<Thread> threads = new Stack<>();
-                            Thread t = startTest(test, logText, threads);
+                            Thread t = startTest(test, threads);
 
                             Log.d(TAG, "Started the test, check camera: " + mCameraCount);
                             if (mCameraCount > 0) {
-                                while (CameraSource.getClientCount() != mCameraCount) {
+                                Log.d(TAG, "Start cameras");
+
+                                Surface outputSurface = null;
+                                while(outputSurface == null) {
+                                    outputSurface = mCameraSourceMultiplier.getInputSurface();
                                     try {
                                         Thread.sleep(50);
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                     }
                                 }
-                                Log.d(TAG, "Start cameras");
+
+                                mCameraSource = CameraSource.getCamera(this);
+                                //Use max size, get from camera or test
+                                mCameraSource.registerSurface(outputSurface, 1280, 720);
+
                                 CameraSource.start();
                             }
 
@@ -401,41 +503,115 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    Vector<OutputAndTexture> mViewsToDraw = new Vector<>();
+    public void createTable() {
+        //hideSystemUI();
 
-    private Thread RunTestCase(Test test, TextView logText) {
+        int count = mViewsToDraw.size();
+        int cols = 1;
+        int rows = 1;
+
+        rows = (int)(Math.sqrt(count));
+        cols = (int)((float)count / (float)rows + 0.5f);
+        int extra = count - rows * cols;
+        if (extra > 0){
+            cols += extra;
+        }
+        int counter = 0;
+
+        for (int row = 0; row < rows; row++) {
+            TableRow tr = new TableRow(this);
+            for (int col = 0; col < cols; col++) {
+                try {
+                    if (counter >= count)
+                        break;
+                    OutputAndTexture item = mViewsToDraw.elementAt(counter++);
+                   // item.mView.setMinimumHeight(100);
+                   // item.mView.setMinimumWidth(100);
+                    item.mView.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.FILL_PARENT,
+                            TableRow.LayoutParams.WRAP_CONTENT));
+                    tr.addView(item.mView);
+                    Log.d(TAG, "Add to: " + tr + ", count = " + tr.getChildCount());
+                } catch (IndexOutOfBoundsException iox) {
+                    iox.printStackTrace();
+                }
+            }
+            Log.d(TAG, "Table row, " + tr + ", children: " + tr.getChildCount());
+            tr.setLayoutParams(new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, 0, 0.25f));
+            mTable.addView(tr);
+        }
+        mTable.setShrinkAllColumns(true);
+        mTable.setStretchAllColumns(true);
+        Log.d(TAG, "Request layout: "+mTable.getChildCount());
+        mTable.requestLayout();
+    }
+
+    public OutputAndTexture getFirstFreeTextureView() {
+        for(OutputAndTexture ot: mViewsToDraw) {
+            if (ot.mEncoder == null) {
+                return ot;
+            }
+        }
+
+        return null;
+    }
+
+    public void log(String text) {
+
+    }
+
+    private Thread RunTestCase(Test test) {
         String filePath = test.getInput().getFilepath().toString();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());
         Thread t;
 
         final String description = test.getCommon().getDescription().toString();
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (test.getConfigure().getEncode()) {
-                    logText.append("\n\nStart Test: " + description);
-                } else {
-                    logText.append("\n\nStart Test of decoder: " + description +
-                            "(" + mInstancesRunning + ")");
-                }
-            }
-        });
+
+        if (test.getConfigure().getEncode()) {
+            log("\n\nStart Test: " + description);
+        } else {
+            log("\n\nStart Test of decoder: " + description +
+                    "(" + mInstancesRunning + ")");
+        }
+
+
 
         final Encoder transcoder;
         synchronized (mEncoderList) {
             Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
+
+
             if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                     filePath.toLowerCase(Locale.US).contains(".yuv") ||
                     filePath.toLowerCase(Locale.US).contains(".rgba") ||
                     filePath.toLowerCase(Locale.US).equals("camera")) {
                 if (test.getConfigure().getSurface()) {
-                    transcoder = new SurfaceEncoder(this);
+                    // If camera we need to share egl context
+                    OutputAndTexture ot = null;
+                    if (mCameraSourceMultiplier == null) {
+                        ot = getFirstFreeTextureView();
+                        mCameraSourceMultiplier = ot.mMult;
+                        // This is for camera, if mounted at an angle
+                        Size previewSize = new Size(1280, 720);
+                        configureTextureViewTransform(ot.mView,previewSize, ot.mView.getWidth(), ot.mView.getHeight());
+                    }
+                    transcoder = new SurfaceEncoder(this, mCameraSourceMultiplier);
+                    if (ot != null)
+                        ot.mEncoder = transcoder;
                 } else {
                     transcoder = new BufferEncoder();
                 }
 
             } else {
-                transcoder = new SurfaceTranscoder();
+                OutputAndTexture ot = getFirstFreeTextureView();
+                if (ot != null) {
+                    transcoder = new SurfaceTranscoder(ot.mMult);
+                    ot.mEncoder = transcoder;
+                } else {
+                    Log.e(TAG, "No view found");
+                    transcoder = new SurfaceTranscoder();
+                }
             }
 
 
@@ -467,33 +643,26 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "On test done, instances running: " + mInstancesRunning);
                     mPursuitOver = true;
                     if (status.length() > 0) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                logText.append("\nTest failed: " + description);
-                                logText.append("\n" + status);
-                                //    if (test.getPursuit() == 0) { TODO: pursuit
-                                Log.d(TAG, "Pursuit over");
-                                mPursuitOver = true;
-                                //  } else {
-                                //      Assert.assertTrue(status, false);
-                                //   }
-                            }
-                        });
+                        log("\nTest failed: " + description);
+                        log("\n" + status);
+                        //    if (test.getPursuit() == 0) { TODO: pursuit
+                        Log.d(TAG, "Pursuit over");
+                        mPursuitOver = true;
+                        //  } else {
+                        //      Assert.assertTrue(status, false);
+                        //   }
+
                     } else {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                                    Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
-                                    Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
-                                } catch (ArithmeticException aex) {
-                                    Log.e(TAG, aex.getMessage());
-                                }
-                                logText.append("\nDone test: " + description);
-                            }
-                        });
+
+                        try {
+                            Log.d(TAG, "Total time: " + stats.getProcessingTime());
+                            Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
+                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
+                        } catch (ArithmeticException aex) {
+                            Log.e(TAG, aex.getMessage());
+                        }
+                        log("\nDone test: " + description);
+
                     }
                 } finally {
                     decreaseTestsInflight();
@@ -522,5 +691,54 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private void configureTextureViewTransform(TextureView view, Size previewSize, int viewWidth, int viewHeight) {
+        if (null == view) {
+            return;
+        }
+        int rotation = this.getWindowManager().getDefaultDisplay().getRotation();
+        Log.d(TAG, "Rotation = " + rotation);
+        Matrix matrix = new Matrix();
+        RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
+        RectF bufferRect = new RectF(0, 0, previewSize.getHeight(), previewSize.getWidth());
+        float centerX = viewRect.centerX();
+        float centerY = viewRect.centerY();
+        if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+            bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+            matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+            float scale = Math.max(
+                    (float) viewHeight / previewSize.getHeight(),
+                    (float) viewWidth / previewSize.getWidth());
+            matrix.postScale(scale, scale, centerX, centerY);
+            matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+        }else if (Surface.ROTATION_180 == rotation) {
+            matrix.postRotate(180, centerX, centerY);
+        }
+        view.setTransform(matrix);
+    }
+
+
+    private class OutputAndTexture {
+        OutputMultiplier mMult;
+        TextureView mView;
+        Encoder mEncoder;
+        public OutputAndTexture(OutputMultiplier mul, TextureView view, Encoder encoder) {
+            mMult = mul;
+            mView = view;
+            mEncoder = encoder;
+        }
+    }
+
+    public void hideSystemUI() {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN);
+    }
 }
 

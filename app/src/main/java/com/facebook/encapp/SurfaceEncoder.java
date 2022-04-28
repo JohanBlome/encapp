@@ -6,9 +6,8 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.media.cts.BitmapRender;
-import android.media.cts.InputSurface;
-import android.media.cts.OutputSurface;
+import android.opengl.EGL14;
+import android.opengl.EGLDisplay;
 import android.os.Build;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
@@ -17,19 +16,21 @@ import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.util.Log;
 import android.util.Size;
-import android.view.Surface;
 
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
+import com.facebook.encapp.utils.grafika.EglSurfaceBase;
+import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
+
+import androidx.annotation.NonNull;
 
 
 /**
@@ -38,22 +39,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class SurfaceEncoder extends Encoder {
     Bitmap mBitmap = null;
-    AtomicReference<Surface> mInputSurfaceReference;
     Context mContext;
-    InputSurface mInputSurface;
+
     private Allocation mYuvIn;
     private Allocation mYuvOut;
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
-    BitmapRender mBitmapRender = null;
     SurfaceTexture mSurfaceTexture;
     boolean mIsRgbaSource = false;
     boolean mIsCameraSource = false;
-    CameraSource mCameraSource;
-    OutputSurface mOutputSurface;
 
     boolean mUseCameraTimestamp = true;
+    OutputMultiplier mOutputMult;
+    private EglSurfaceBase mEglSurface;
 
-    public SurfaceEncoder(Context context) {
+
+    public SurfaceEncoder(Context context,  OutputMultiplier multiplier) {
+        mOutputMult = multiplier;
         mContext = context;
     }
 
@@ -64,8 +65,7 @@ class SurfaceEncoder extends Encoder {
     public String encode(
             Test test,
             Object synchStart) {
-
-        Log.d(TAG, "** Raw input encoding - " + test.getCommon().getDescription() + " **");
+        Log.d(TAG, "** Surface input encoding - " + test.getCommon().getDescription() + " **");
         test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
         if (test.hasRuntime())
             mRuntimeParams = test.getRuntime();
@@ -87,7 +87,6 @@ class SurfaceEncoder extends Encoder {
             mRefFramesizeInBytes = (int) (width * height * 4);
         } else if (test.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
-            mCameraSource = CameraSource.getCamera(mContext);
             //TODO: handle other fps (i.e. try to set lower or higher fps)
             // Need to check what frame rate is actually set unless real frame time is being used
             mReferenceFrameRate = 30; //We strive for this at least
@@ -138,11 +137,10 @@ class SurfaceEncoder extends Encoder {
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             checkMediaFormat(format);
-            mInputSurfaceReference = new AtomicReference<>();
+
             Log.d(TAG, "Format of encoder");
             checkMediaFormat(format);
 
-            mInputSurfaceReference = new AtomicReference<>();
             mCodec.setCallback(new EncoderCallbackHandler());
             mCodec.configure(
                     format,
@@ -150,9 +148,8 @@ class SurfaceEncoder extends Encoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             checkMediaFormat(mCodec.getInputFormat());
+            mEglSurface = mOutputMult.addSurface( mCodec.createInputSurface());
 
-            mInputSurfaceReference.set(mCodec.createInputSurface());
-            mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setCodec(mCodec.getCanonicalName());
@@ -174,13 +171,6 @@ class SurfaceEncoder extends Encoder {
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
             return "Start encoding failed";
-        }
-
-        if (mIsCameraSource) {
-            mInputSurface.makeCurrent();
-            Log.d(TAG,"create output surface");
-            mOutputSurface = new OutputSurface(width, height, false);
-            mCameraSource.registerSurface(mOutputSurface.getSurface(), width, height);
         }
 
         Log.d(TAG, "Create muxer");
@@ -227,11 +217,10 @@ class SurfaceEncoder extends Encoder {
 
                 if (mIsCameraSource) {
                     try {
-                        long timestamp = mOutputSurface.awaitNewImage();
+                        long timestamp = mOutputMult.awaitNewImage();
                         if (firstTimestamp <= 0) {
                             firstTimestamp = timestamp;
                         }
-                        mOutputSurface.drawImage();
                         int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
                         int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
                         setRuntimeParameters(mInFramesCount);
@@ -248,8 +237,6 @@ class SurfaceEncoder extends Encoder {
                             } else {
                                 ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
                             }
-                            mInputSurface.setPresentationTime(ptsNsec);
-                            mInputSurface.swapBuffers();
 
                             mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
                             mFramesAdded++;
@@ -327,24 +314,17 @@ class SurfaceEncoder extends Encoder {
             }
         }
 
+        if (mEglSurface != null) {
+            mOutputMult.removeEglSurface(mEglSurface);
+        }
+
         if (mYuvReader != null)
             mYuvReader.closeFile();
 
-        if (mIsCameraSource) {
-            mCameraSource.closeCamera();
-        }
-
         if (mSurfaceTexture != null) {
-            mInputSurfaceReference.get().release();
-            mInputSurfaceReference.set(null);
             mSurfaceTexture.detachFromGLContext();
             mSurfaceTexture.releaseTexImage();
             mSurfaceTexture.release();
-        }
-
-        if (mOutputSurface != null) {
-            mOutputSurface.getSurface().release();
-            mOutputSurface.release();
         }
 
         return "";
@@ -387,17 +367,12 @@ class SurfaceEncoder extends Encoder {
             } else {
                 mBitmap.copyPixelsFromBuffer(buffer);
             }
-            mInputSurface.makeCurrent();
 
-            if (mBitmapRender == null){
-                mBitmapRender = new BitmapRender();
-                mBitmapRender.surfaceCreated();
-
-                mSurfaceTexture = new SurfaceTexture(mBitmapRender.getTextureId());
+            if (mOutputMult == null){
+                mOutputMult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
             }
-            mBitmapRender.drawFrame(mBitmap);
-            mInputSurface.setPresentationTime(ptsUsec * 1000);
-            mInputSurface.swapBuffers();
+            mOutputMult.newFrameAvailable();
+
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
@@ -410,5 +385,6 @@ class SurfaceEncoder extends Encoder {
         return read;
     }
 
-
+    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder){}
+    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info){}
 }

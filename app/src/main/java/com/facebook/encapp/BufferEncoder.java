@@ -9,6 +9,7 @@ import android.util.Size;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -17,12 +18,21 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
+import androidx.annotation.NonNull;
+
 
 /**
  * Created by jobl on 2018-02-27.
  */
 
 class BufferEncoder extends Encoder {
+    
+
+    public String start(Test td, OutputMultiplier multiplier){
+        //Maybe we can show it?
+        return start(td);
+    }
+    
     public String start(
             Test test) {
         Log.d(TAG, "** Raw buffer encoding - " + test.getCommon().getDescription() + " **");
@@ -226,4 +236,7 @@ class BufferEncoder extends Encoder {
         mYuvReader.closeFile();
         return "";
     }
+
+    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder){}
+    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info){}
 }
