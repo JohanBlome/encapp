@@ -242,13 +242,7 @@ public class SurfaceTranscoder extends BufferEncoder {
             return "Failed to create codec";
         }
 
-
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        long pts_offset = 0;
-        long last_pts = 0;
-        int current_loop = 1;
-
-        double mLoopTime = 0;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -265,9 +259,11 @@ public class SurfaceTranscoder extends BufferEncoder {
             e.printStackTrace();
         }
         mStats.stop();
+        Log.d(TAG, "Close muxer and streams");
+        if (mOutputMult != null) {
+            mOutputMult.stopAndRelease();
+        }
 
-        mStats.stop();
-        Log.d(TAG, "Done transcoding");
         try {
             if (mCodec != null) {
                 mCodec.flush();
@@ -412,7 +408,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 synchronized (mDecoderBuffers) {
                     if (mDecoderBuffers.size() == 0 && !mDone) {
                         try {
-                            mDecoderBuffers.wait();
+                            mDecoderBuffers.wait(WAIT_TIME_SHORT_MS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -446,6 +442,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         } else {
             // Buffer will be released when drawn
             mFramesAdded++;
+            mStats.stopDecodingFrame(info.presentationTimeUs);
             if (!mNoEncoding) {
                 mStats.startEncodingFrame(info.presentationTimeUs, mFramesAdded);
             }

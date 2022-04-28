@@ -106,9 +106,8 @@ public class Statistics {
             frame.setSize(size);
             frame.isIFrame(isIFrame);
             mEncodingFrames.put(frame.getPts(), frame);
-            if (pts != frame.getPts()) {
-                Log.e(TAG, "Warning, pts differs: " + pts + " vs " + frame.getPts() + " for frame: " + frame.getOriginalFrame());
-            }
+        } else {
+            Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
         mEncodingProcessingFrames -= 1;
     }
@@ -317,7 +316,12 @@ public class Statistics {
                 obj.put("iframe", (info.isIFrame())? 1: 0);
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
-                obj.put("proctime", info.getProcessingTime());
+                if (info.getStopTime() == 0) {
+                    Log.w(TAG, "Frame did not finish");
+                    obj.put("proctime", 0);
+                } else {
+                    obj.put("proctime", info.getProcessingTime());
+                }
                 obj.put("starttime",info.getStartTime());
                 obj.put("stoptime", info.getStopTime());
                 jsonArray.put(obj);

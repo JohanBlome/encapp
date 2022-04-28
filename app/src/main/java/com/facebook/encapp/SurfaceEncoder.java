@@ -187,7 +187,6 @@ class SurfaceEncoder extends Encoder {
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
-        long firstTimestamp = -1;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -218,8 +217,9 @@ class SurfaceEncoder extends Encoder {
                 if (mIsCameraSource) {
                     try {
                         long timestamp = mOutputMult.awaitNewImage();
-                        if (firstTimestamp <= 0) {
-                            firstTimestamp = timestamp;
+                        if (mFirstFrameTimestamp <= 0) {
+                            mFirstFrameTimestamp = timestamp/1000;
+                            Log.d(TAG, "Set first ts = " + mFirstFrameTimestamp);
                         }
                         int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
                         int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
@@ -233,12 +233,12 @@ class SurfaceEncoder extends Encoder {
                             long ptsNsec = 0;
                             if (mUseCameraTimestamp) {
                                 // Use the camera provided timestamp
-                                ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
+                                ptsNsec = mPts + (timestamp/1000 - (long)mFirstFrameTimestamp);
                             } else {
-                                ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
+                                ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime);
                             }
 
-                            mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
+                            mStats.startEncodingFrame(ptsNsec, mInFramesCount);
                             mFramesAdded++;
                         }
                         mInFramesCount++;
@@ -300,6 +300,10 @@ class SurfaceEncoder extends Encoder {
         mStats.stop();
 
         Log.d(TAG, "Close muxer and streams");
+        if (mOutputMult != null) {
+            mOutputMult.stopAndRelease();
+        }
+        
         if (mCodec != null) {
             mCodec.flush();
             mCodec.stop();

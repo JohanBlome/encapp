@@ -374,7 +374,7 @@ public class MainActivity extends AppCompatActivity {
                     nbrViews += countPotentialViews(test);
                 }
                 // Only one view for camera
-                if (nbrViews > 100) {
+                if (nbrViews >= 100) {
                     nbrViews = nbrViews%100 + 1;
                 }
                 final int tmp = nbrViews;
@@ -387,8 +387,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
-
-                while(mViewsToDraw.size() < nbrViews) {
+                
+                while(nbrViews > 0 && mViewsToDraw.size() < nbrViews) {
                     synchronized (mViewsToDraw) {
                         try {
                             mViewsToDraw.wait();
@@ -590,11 +590,15 @@ public class MainActivity extends AppCompatActivity {
                     // If camera we need to share egl context
                     OutputAndTexture ot = null;
                     if (mCameraSourceMultiplier == null) {
-                        ot = getFirstFreeTextureView();
-                        mCameraSourceMultiplier = ot.mMult;
-                        // This is for camera, if mounted at an angle
-                        Size previewSize = new Size(1280, 720);
-                        configureTextureViewTransform(ot.mView,previewSize, ot.mView.getWidth(), ot.mView.getHeight());
+                        if ( mViewsToDraw.size() > 0 ) {
+                            ot = getFirstFreeTextureView();
+                            mCameraSourceMultiplier = ot.mMult;
+                            // This is for camera, if mounted at an angle
+                            Size previewSize = new Size(1280, 720);
+                            configureTextureViewTransform(ot.mView,previewSize, ot.mView.getWidth(), ot.mView.getHeight());
+                        } else {
+                            mCameraSourceMultiplier = new OutputMultiplier();
+                        }
                     }
                     transcoder = new SurfaceEncoder(this, mCameraSourceMultiplier);
                     if (ot != null)
@@ -610,7 +614,7 @@ public class MainActivity extends AppCompatActivity {
                     ot.mEncoder = transcoder;
                 } else {
                     Log.e(TAG, "No view found");
-                    transcoder = new SurfaceTranscoder();
+                    transcoder = new SurfaceTranscoder(new OutputMultiplier());
                 }
             }
 
@@ -624,7 +628,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-
                     Log.d(TAG, "Start transcoder");
                     final String status = transcoder.start(test);
                     Log.d(TAG, "Transcoder done!");

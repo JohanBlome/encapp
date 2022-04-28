@@ -50,8 +50,6 @@ public abstract class Encoder {
     protected String mFilename;
     protected boolean mDropNext;
     protected Runtime mRuntimeParams;
-
-    boolean VP8_IS_BROKEN = false; // On some older hw vp did not generate key frames by itself
     protected FileReader mYuvReader;
     protected int mVideoTrack = -1;
     int mPts = 132;
@@ -69,6 +67,7 @@ public abstract class Encoder {
     public abstract String start(Test td);
 
     final static int WAIT_TIME_MS = 30000;  // 30 secs
+    final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
 
     public Encoder() {
         mDataWriter = new DataWriter();
@@ -495,33 +494,35 @@ public abstract class Encoder {
                         Log.d(TAG, "End of stream");
                         //break;
                     } else {
-                        if (mFirstFrameTimestamp == -1) {
-                            mFirstFrameTimestamp = buffer.mInfo.presentationTimeUs;
-                        }
-                        long timestamp = buffer.mInfo.presentationTimeUs;
+                        if (mFirstFrameTimestamp != -1) {
+                            long timestamp = mPts + (buffer.mInfo.presentationTimeUs - (long) mFirstFrameTimestamp);
 
-                        try {
-                            mStats.stopEncodingFrame(timestamp, buffer.mInfo.size,
-                                    (buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                            ++mOutFramesCount;
-                            if (mMuxer != null && mVideoTrack != -1) {
-                                ByteBuffer data = mCodec.getOutputBuffer(buffer.mBufferId);
-                                mMuxer.writeSampleData(mVideoTrack, data, buffer.mInfo);
+                            try {
+                                mStats.stopEncodingFrame(timestamp, buffer.mInfo.size,
+                                        (buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                                ++mOutFramesCount;
+                                if (mMuxer != null && mVideoTrack != -1) {
+                                    ByteBuffer data = mCodec.getOutputBuffer(buffer.mBufferId);
+                                    mMuxer.writeSampleData(mVideoTrack, data, buffer.mInfo);
+                                }
+
+                                mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                            } catch (IllegalStateException ise) {
+                                // Codec may be closed elsewhere...
+                                Log.e(TAG, "Failed to release buffer");
                             }
-
-                            mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
-                        } catch (IllegalStateException ise) {
-                            // Codec may be closed elsewhere...
-                            Log.e(TAG, "Failed to release buffer");
+                            mCurrentTime = timestamp / 1000000.0;
+                        } else {
+                            Log.d(TAG, "No start done?");
+			     mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
                         }
-                        mCurrentTime = timestamp / 1000000.0;
                     }
                 }
 
                 synchronized (mEncodeBuffers) {
                     if (mEncodeBuffers.size() == 0 && !mDone) {
                         try {
-                            mEncodeBuffers.wait();
+                            mEncodeBuffers.wait(WAIT_TIME_SHORT_MS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }

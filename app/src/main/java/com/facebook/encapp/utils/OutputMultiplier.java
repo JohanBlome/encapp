@@ -32,7 +32,8 @@ public class OutputMultiplier {
     private final float[] mTmpMatrix = new float[16];
     private int mTextureId;
     private EglSurfaceBase mMasterSurface = null;
-
+    final static int WAIT_TIME_SHORT_MS = 3000;  // 3 sec
+    
     MessageHandler mMessageHandler;
 
     private Object mLock = new Object();
@@ -92,6 +93,10 @@ public class OutputMultiplier {
        mRenderer.newFrameAvailable();
     }
 
+    public void stopAndRelease() {
+        mRenderer.quit();
+    }
+    
     public void newFrameAvailableInBuffer(MediaCodec codec, int bufferId, MediaCodec.BufferInfo info) {
         if (mRenderer != null) { // it will be null if no surface is connected
             mRenderer.newFrameAvailableInBuffer(codec, bufferId, info);
@@ -198,22 +203,20 @@ public class OutputMultiplier {
             mInputsurface = new Surface(mInputTexture);
 
             while (!mDone) {
-                Log.d(TAG, "LOOP - top");
                 synchronized (mInputFrameLock) {
                     try {
-                        if (frameAvailable == 0) {
-                            Log.d(TAG, "LOOP Wait for input frame");
-                            mInputFrameLock.wait();
+                        if (frameAvailable <= 0) {
+                            mInputFrameLock.wait(WAIT_TIME_SHORT_MS);
                         }
 
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
+                if (mDone) break;
                 if (mFrameBuffers.size() > 0) {
                     drawFrameFromBuffer();
                 } else {
-                    Log.d(TAG, "LOOP  - Draw imm");
                     drawFrameImmediate();
                 }
             }
@@ -270,7 +273,7 @@ public class OutputMultiplier {
         private long awaitNewImage() {
             synchronized (mFrameDrawnLock) {
                 try {
-                    mFrameDrawnLock.wait();
+                    mFrameDrawnLock.wait(WAIT_TIME_SHORT_MS);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -296,7 +299,7 @@ public class OutputMultiplier {
                     long diff = (buffer.mInfo.presentationTimeUs - mTimestamp0) * 1000;
                     while (diff - mCurrentVsync > 0) {
                         try {
-                            mVSynchLock.wait();
+                            mVSynchLock.wait(WAIT_TIME_SHORT_MS);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -308,7 +311,6 @@ public class OutputMultiplier {
                         break;
                     }
                     mMasterSurface.makeCurrent();
-                    mLatestTimestamp = mInputTexture.getTimestamp();
                     mInputTexture.updateTexImage();
                     mInputTexture.getTransformMatrix(mTmpMatrix);
                     mLatestTimestamp = mInputTexture.getTimestamp();
@@ -348,7 +350,6 @@ public class OutputMultiplier {
             synchronized (mLock) {
                 int counter = 0;
                 for (EglSurfaceBase surface : mEglSurfaces) {
-
                     surface.makeCurrent();
                     int width = surface.getWidth();
                     int height = surface.getHeight();
@@ -367,14 +368,12 @@ public class OutputMultiplier {
         }
         @Override
         public void onFrameAvailable(SurfaceTexture surfaceTexture) {
-            Log.d(TAG, "On frame availalable");
             synchronized (mInputFrameLock) {
                 frameAvailable += 1;
                 mInputFrameLock.notifyAll();
             }
         }
-
-
+        
         public void newFrameAvailableInBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
             synchronized (mInputFrameLock) {
                 mFrameBuffers.offer(new FrameBuffer(codec, id, info));
@@ -386,6 +385,13 @@ public class OutputMultiplier {
         public void newFrameAvailable() {
             synchronized (mInputFrameLock) {
                 frameAvailable += 1;
+                mInputFrameLock.notifyAll();
+            }
+        }
+        public void quit() {
+            mDone = true;
+            synchronized (mInputFrameLock) {
+                Log.d(TAG, "Renderer done - stop");
                 mInputFrameLock.notifyAll();
             }
         }
