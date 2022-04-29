@@ -16,7 +16,7 @@ import time
 import datetime
 import shutil
 
-from _version import __version__
+from encapp_tool import __version__
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
