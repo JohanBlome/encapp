@@ -4,8 +4,8 @@ import os
 
 VERSION_FILE = 'app/build.gradle'
 VERSION_TAG = 'versionName \"([0-9]*).([0-9]*)\"'
-SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+SCRIPT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..")
+ROOT_DIR = os.path.join(SCRIPT_DIR, "..")
 
 
 def lookupVersion():
