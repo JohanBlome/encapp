@@ -671,10 +671,10 @@ public class MainActivity extends AppCompatActivity {
                     decreaseTestsInflight();
                 }
             }
-        });
+        }, "TestRunner_" + test.getInput().getFilepath());
         t.start();
 
-        int waitime = 2000; //ms
+        int waitTime = 10000; //ms
         while(!transcoder.initDone()) {
             try {
                 // If we do not wait for the init to de done before starting next
@@ -682,9 +682,9 @@ public class MainActivity extends AppCompatActivity {
                 // on certain hw (not thread safe)
                 Log.d(TAG, "Sleep while waiting for init to be done");
                 Thread.sleep(200);
-                waitime -= 200;
-                if (waitime < 0) {
-                    Log.e(TAG, "Init not ready within " + waitime + " ms, probably failure");
+                waitTime -= 200;
+                if (waitTime < 0) {
+                    Log.e(TAG, "Init not ready within " + waitTime + " ms, probably failure");
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();

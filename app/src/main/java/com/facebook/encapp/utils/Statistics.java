@@ -51,8 +51,8 @@ public class Statistics {
 
     public Statistics(String desc, Test test) {
         mDesc = desc;
-        mEncodingFrames = new HashMap<>();
-        mDecodingFrames = new HashMap<>();
+        mEncodingFrames = new HashMap<>(20);
+        mDecodingFrames = new HashMap<>(20);
         mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();

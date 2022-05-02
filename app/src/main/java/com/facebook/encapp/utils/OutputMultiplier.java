@@ -33,7 +33,7 @@ public class OutputMultiplier {
     private int mTextureId;
     private EglSurfaceBase mMasterSurface = null;
     final static int WAIT_TIME_SHORT_MS = 3000;  // 3 sec
-    
+    private String mName = "OutputMultiplier";
     MessageHandler mMessageHandler;
 
     private Object mLock = new Object();
@@ -61,11 +61,18 @@ public class OutputMultiplier {
         } else {
             Log.d(TAG, "Create render");
             mRenderer = new Renderer(surface);
+            mRenderer.setName(mName);
             return mRenderer.setup();
         }
 
     }
-
+    
+    public void setName(String name) {
+        mName = name;
+        if (mRenderer != null) {
+            mRenderer.setName(mName);
+        }
+    }
 
     public EglSurfaceBase addSurfaceTexture(SurfaceTexture surfaceTexture) {
         if (mRenderer != null) {
@@ -201,7 +208,7 @@ public class OutputMultiplier {
             mInputTexture = new SurfaceTexture(mTextureId);
             mInputTexture.setOnFrameAvailableListener(this);
             mInputsurface = new Surface(mInputTexture);
-
+            this.setPriority(Thread.MAX_PRIORITY);
             while (!mDone) {
                 synchronized (mInputFrameLock) {
                     try {
@@ -222,6 +229,10 @@ public class OutputMultiplier {
             }
         }
 
+        public void setString(String name) {
+            this.setName(name);
+        }
+        
         public void vSync(long time) {
             synchronized (mVSynchLock) {
                 if (mVsync0 == -1) {
@@ -331,7 +342,7 @@ public class OutputMultiplier {
                 }
             }
             synchronized (mFrameDrawnLock) {
-                frameAvailable -= 1;
+                frameAvailable = (frameAvailable > 0)? frameAvailable - 1: 0;
                 mFrameDrawnLock.notifyAll();
             }
         }
@@ -362,7 +373,7 @@ public class OutputMultiplier {
             }
 
             synchronized (mFrameDrawnLock) {
-                frameAvailable -= 1;
+                frameAvailable = (frameAvailable > 0)? frameAvailable - 1: 0;
                 mFrameDrawnLock.notifyAll();
             }
         }
@@ -391,7 +402,6 @@ public class OutputMultiplier {
         public void quit() {
             mDone = true;
             synchronized (mInputFrameLock) {
-                Log.d(TAG, "Renderer done - stop");
                 mInputFrameLock.notifyAll();
             }
         }

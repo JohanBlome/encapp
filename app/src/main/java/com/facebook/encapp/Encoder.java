@@ -48,6 +48,7 @@ public abstract class Encoder {
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
+    protected Test mTest;
     protected boolean mDropNext;
     protected Runtime mRuntimeParams;
     protected FileReader mYuvReader;
