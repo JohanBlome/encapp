@@ -98,6 +98,7 @@ def parse_decoding_data(json, inputfile):
         decoded_data = pd.DataFrame(json['decoded_frames'])
         print(f'decoded data: {decoded_data}')
         decoded_data['source'] = inputfile
+        fps = 30
         if (len(decoded_data) > 0):
             try:
                 decoded_data['codec'] = json['decoder_media_format']['mime']
@@ -111,16 +112,39 @@ def parse_decoding_data(json, inputfile):
                 decoded_data['height'] = 'unknown height'
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
+
+
             # oh no we may have b frames...
             decoded_data['duration_ms'] = round(
                 (decoded_data['pts'].shift(-1, axis='index', fill_value=0) -
                  decoded_data['pts']) / 1000, 2)
+
             decoded_data['fps'] = round(
                 1000.0 / (decoded_data['duration_ms']), 2)
+            decoded_data['stop-stop_ms'] = round(
+            (decoded_data['stoptime'].shift(-1, axis='index', fill_value=0) -
+             decoded_data['stoptime']) / 1000000, 2)
+            decoded_data['proc_fps'] = round(1000.0/(decoded_data['stop-stop_ms']), 2)
+
+            start_ts = decoded_data.iloc[0]['starttime']
+            decoded_data['rel_start_ms'] = round((decoded_data['starttime'] - start_ts)/1000000, 2)
+            stop_ts = decoded_data.iloc[0]['stoptime']
+            decoded_data['rel_stop_ms'] = round((decoded_data['stoptime'] - stop_ts)/1000000, 2)
+
+            decoded_data['start_pts_diff_ms'] = round(
+                decoded_data['rel_start_ms'] - decoded_data['pts']/1000, 2)
+            decoded_data['av_fps'] = decoded_data['fps'].rolling(
+                fps,  min_periods=fps, win_type=None).sum()/fps
+            decoded_data['av_proc_fps'] = decoded_data['proc_fps'].rolling(
+                fps,  min_periods=fps, win_type=None).sum()/fps
+            decoded_data['av_fps'].fillna(decoded_data['fps'], inplace=True)
+            decoded_data['av_proc_fps'].fillna(decoded_data['proc_fps'], inplace=True)
             decoded_data.fillna(0)
+        
     except Exception as ex:
         print(f'Failed to parse decode data for {inputfile}: {ex}')
         decoded_data = None
+
 
     return decoded_data
 
@@ -245,10 +269,8 @@ def main():
             # print(f'{encoding_data}')
             encoding_data.to_csv(f'{options.file}_encoding_data.csv')
             mean_fps = round(np.mean(encoding_data['fps']), 2)
-            mean_proc_fps = round(np.mean(encoding_data['proc_fps']), 2)
 
             print(f'mean fps:{mean_fps}')
-            print(f'mean proc fps:{mean_proc_fps}')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
@@ -267,12 +289,6 @@ def main():
             name = f'{options.file}_time_diff.png'
             plt.savefig(name.replace(' ', '_'), format='png')
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
-            p = sb.lineplot(
-                x=encoding_data['pts']/1000000,
-                y=encoding_data['av_proc_fps'],
-                ci='sd', data=encoding_data,
-                ax=axs,
-                label=f'processing fps, average = {mean_proc_fps} ms')
 
             # p.set_ylim(0, 90)
             p = sb.lineplot(  # noqa: F841
@@ -280,16 +296,37 @@ def main():
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f'pts based fps, average = {mean_fps} ms')
+                label=f'pts based fps, average = {mean_fps} fps')
             # p.set_ylim(0, 90)
 
-            axs.set_title('Fps and proc fps')
+            axs.set_title('Fps')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}_fps.png'
             plt.savefig(name.replace(' ', '_'), format='png')
             plt.show()
         if not isinstance(decoded_data, type(None)):
             print(f'decoding data len = {len(decoded_data)}')
+            decoded_data.to_csv(f'{options.file}_decoding_data.csv')
+            mean_fps = round(np.mean(decoded_data['fps']), 2)
+            mean_proc_fps = round(np.mean(decoded_data['proc_fps']), 2)
+
+            print(f'mean fps:{mean_fps}')
+            fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
+
+            # p.set_ylim(0, 90)
+            p = sb.lineplot(  # noqa: F841
+                x=decoded_data['pts']/1000000,
+                y=decoded_data['av_fps'],
+                ci='sd', data=decoded_data,
+                ax=axs,
+                label=f'pts based fps, average = {mean_fps} fps')
+            # p.set_ylim(0, 90)
+
+            axs.set_title('Fps and proc fps')
+            axs.legend(loc='best', fancybox=True, framealpha=0.5)
+            name = f'{options.file}_dec_fps.png'
+            plt.savefig(name.replace(' ', '_'), format='png')
+            plt.show()
         if not isinstance(gpu_data, type(None)):
             print(f'gpu data len = {len(gpu_data)}')
 
