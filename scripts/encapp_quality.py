@@ -202,8 +202,11 @@ def run_quality(test_file, optionals):
 
         # Do calculations
         if optionals["recalc"] or not exists(vmaf_file):
+            # important: vmaf must be called with videos in the right order
+            # <distorted_video> <reference_video>
+            # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
             shell_cmd = (
-                f"{FFMPEG_SILENT} {ref_part} {dist_part} "
+                f"{FFMPEG_SILENT} {dist_part} {ref_part} "
                 "-filter_complex "
                 f'"{force_scale}libvmaf=log_path={vmaf_file}:'
                 'n_threads=16:log_fmt=json " -report -f null - 2>&1 '
