@@ -17,7 +17,6 @@ import com.facebook.encapp.utils.grafika.FullFrameRect;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import com.facebook.encapp.utils.grafika.WindowSurface;
 
-import java.util.Queue;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -31,13 +30,13 @@ public class OutputMultiplier {
     private Surface mInputsurface;
     private final float[] mTmpMatrix = new float[16];
     private int mTextureId;
-    private EglSurfaceBase mMasterSurface = null;
+    private FrameswapControl mMasterSurface = null;
     final static int WAIT_TIME_SHORT_MS = 3000;  // 3 sec
     private String mName = "OutputMultiplier";
     MessageHandler mMessageHandler;
 
     private Object mLock = new Object();
-    private Vector<EglSurfaceBase> mEglSurfaces = new Vector<>();
+    private Vector<FrameswapControl> mOutputSurfaces = new Vector<>();
     Texture2dProgram.ProgramType mProgramType = Texture2dProgram.ProgramType.TEXTURE_EXT;
 
     public OutputMultiplier(Texture2dProgram.ProgramType type) {
@@ -55,7 +54,7 @@ public class OutputMultiplier {
         return mInputsurface;
     }
 
-    public EglSurfaceBase addSurface(Surface surface) {
+    public FrameswapControl addSurface(Surface surface) {
         if (mRenderer != null) {
             return mRenderer.addSurface(surface);
         } else {
@@ -87,7 +86,7 @@ public class OutputMultiplier {
 
     public void removeEglSurface(EglSurfaceBase surface) {
         synchronized (mLock) {
-            mEglSurfaces.remove(surface);
+            mOutputSurfaces.remove((Object)surface);
         }
     }
 
@@ -101,7 +100,9 @@ public class OutputMultiplier {
     }
 
     public void stopAndRelease() {
-        mRenderer.quit();
+        if (mRenderer != null) {
+            mRenderer.quit();
+        }
     }
     
     public void newFrameAvailableInBuffer(MediaCodec codec, int bufferId, MediaCodec.BufferInfo info) {
@@ -191,16 +192,16 @@ public class OutputMultiplier {
         public void run() {
             Log.d(TAG, "Start rend");
             mEglCore = new EglCore(null, EglCore.FLAG_RECORDABLE);
-            WindowSurface windowSurface = null;
+            FrameswapControl windowSurface = null;
             if (mSurfaceObject instanceof SurfaceTexture){
-                mMasterSurface = new WindowSurface(mEglCore, (SurfaceTexture)mSurfaceObject);
+                mMasterSurface = new FrameswapControl(mEglCore, (SurfaceTexture)mSurfaceObject);
             } else if (mSurfaceObject instanceof Surface) {
-                mMasterSurface = new WindowSurface(mEglCore, (Surface)mSurfaceObject, false);
+                mMasterSurface = new FrameswapControl(mEglCore, (Surface)mSurfaceObject, false);
             } else {
                 throw new RuntimeException("No surface of SurfaceTexture available: " + mSurfaceObject);
             }
             mSurfaceObject = null; // we do not need it anymore
-            mEglSurfaces.add(mMasterSurface);
+            mOutputSurfaces.add(mMasterSurface);
             mMasterSurface.makeCurrent();
             mFullFrameBlit = new FullFrameRect(
                     new Texture2dProgram(mProgramType));
@@ -248,7 +249,7 @@ public class OutputMultiplier {
         }
 
 
-        public EglSurfaceBase setup(){
+        public FrameswapControl setup(){
             this.start();
             while (mMasterSurface == null) {
                 try {
@@ -260,23 +261,23 @@ public class OutputMultiplier {
             return mMasterSurface;
         }
 
-        public EglSurfaceBase addSurface(Surface surface) {
-            WindowSurface windowSurface = null;
+        public FrameswapControl addSurface(Surface surface) {
+            FrameswapControl windowSurface = null;
             synchronized (mLock) {
-                windowSurface = new WindowSurface(mEglCore, surface, true);
+                windowSurface = new FrameswapControl(mEglCore, surface, true);
 
-                mEglSurfaces.add(windowSurface);
+                mOutputSurfaces.add(windowSurface);
             }
 
             return windowSurface;
         }
 
-        public EglSurfaceBase addSurfaceTexture(SurfaceTexture texture) {
-            WindowSurface windowSurface = null;
+        public FrameswapControl addSurfaceTexture(SurfaceTexture texture) {
+            FrameswapControl windowSurface = null;
             synchronized (mLock) {
-                windowSurface = new WindowSurface(mEglCore, texture);
+                windowSurface = new FrameswapControl(mEglCore, texture);
 
-                mEglSurfaces.add(windowSurface);
+                mOutputSurfaces.add(windowSurface);
             }
             return windowSurface;
         }
@@ -329,8 +330,7 @@ public class OutputMultiplier {
                 }
 
                 synchronized (mLock) {
-                    for (EglSurfaceBase surface : mEglSurfaces) {
-
+                    for (EglSurfaceBase surface : mOutputSurfaces) {
                         surface.makeCurrent();
                         int width = surface.getWidth();
                         int height = surface.getHeight();
@@ -360,15 +360,22 @@ public class OutputMultiplier {
 
             synchronized (mLock) {
                 int counter = 0;
-                for (EglSurfaceBase surface : mEglSurfaces) {
-                    surface.makeCurrent();
-                    int width = surface.getWidth();
-                    int height = surface.getHeight();
-                    GLES20.glViewport(0, 0, width, height);
-                    mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
-                    counter += 1;
-                    surface.setPresentationTime(mLatestTimestamp);
-                    surface.swapBuffers();
+                for (FrameswapControl surface : mOutputSurfaces) {
+                    try {
+                        if (surface.keepFrame()) {
+                            surface.makeCurrent();
+                            int width = surface.getWidth();
+                            int height = surface.getHeight();
+                            GLES20.glViewport(0, 0, width, height);
+                            mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
+                            counter += 1;
+                            surface.setPresentationTime(mLatestTimestamp);
+                            surface.swapBuffers();
+                        }
+                    }
+                    catch(Exception ex) {
+                        Log.e(TAG, "Exception when drawing: " + ex);
+                    }
                 }
             }
 

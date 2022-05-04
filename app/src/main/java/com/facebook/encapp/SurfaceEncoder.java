@@ -6,9 +6,8 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.opengl.EGL14;
-import android.opengl.EGLDisplay;
 import android.os.Build;
+import android.os.Bundle;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -19,6 +18,8 @@ import android.util.Size;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FpsMeasure;
+import com.facebook.encapp.utils.FrameswapControl;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -50,9 +51,9 @@ class SurfaceEncoder extends Encoder {
 
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
-    private EglSurfaceBase mEglSurface;
-
-
+    private FrameswapControl mFrameSwapSurface;
+    Bundle mKeyFrameBundle;
+    
     public SurfaceEncoder(Context context,  OutputMultiplier multiplier) {
         mOutputMult = multiplier;
         mContext = context;
@@ -65,6 +66,9 @@ class SurfaceEncoder extends Encoder {
     public String encode(
             Test test,
             Object synchStart) {
+        mStable = false;
+        mKeyFrameBundle = new Bundle();
+        mKeyFrameBundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
         mTest = test;
         Log.d(TAG, "** Surface input encoding - " + mTest.getCommon().getDescription() + " **");
         mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
@@ -149,7 +153,7 @@ class SurfaceEncoder extends Encoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             checkMediaFormat(mCodec.getInputFormat());
-            mEglSurface = mOutputMult.addSurface( mCodec.createInputSurface());
+            mFrameSwapSurface = mOutputMult.addSurface( mCodec.createInputSurface());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setCodec(mCodec.getCanonicalName());
@@ -184,7 +188,9 @@ class SurfaceEncoder extends Encoder {
             mMuxer.start();
         }
 
-
+        mFpsMeasure = new FpsMeasure(mFrameRate);
+        mFpsMeasure.start();
+        
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
@@ -200,11 +206,9 @@ class SurfaceEncoder extends Encoder {
         mStats.start();
         int errorCounter = 0;
         while (!done) {
-            int index;
-
-            if (mFramesAdded % 100 == 0) {
+            if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        ", current loop: " + current_loop  + ", current time: " + mCurrentTime + " sec");
+                        " current time: " + mCurrentTime + " sec, frame rate: " + mFrameRate + ", id: " + mStats.getId());
             }
             try {
                 int flags = 0;
@@ -218,30 +222,41 @@ class SurfaceEncoder extends Encoder {
                 if (mIsCameraSource) {
                     try {
                         long timestamp = mOutputMult.awaitNewImage();
-                        if (mFirstFrameTimestamp <= 0) {
-                            mFirstFrameTimestamp = timestamp/1000;
-                        }
-                        int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
-                        int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
-                        setRuntimeParameters(mInFramesCount);
-                        mDropNext = dropFrame(mInFramesCount);
-                        updateDynamicFramerate(mInFramesCount);
-                        if (currentFrameNbr == nextFrameNbr || mDropNext) {
-                            mSkipped++;
-                            mDropNext = false;
-                        } else {
-                            long ptsNsec = 0;
-                            if (mUseCameraTimestamp) {
-                                // Use the camera provided timestamp
-                                ptsNsec = mPts + (timestamp/1000 - (long)mFirstFrameTimestamp);
+                        if (!MainActivity.isStable()) {
+                            if (!mFpsMeasure.isStable()) {
+                                mFpsMeasure.addPtsNsec(timestamp);
+                                mCodec.setParameters(mKeyFrameBundle);
                             } else {
-                                ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime);
+                                mStable = true;
                             }
-
-                            mStats.startEncodingFrame(ptsNsec, mInFramesCount);
-                            mFramesAdded++;
+                        } else {
+                            if (mFirstFrameTimestamp < 0) {
+                                mFirstFrameTimestamp = timestamp / 1000;
+                            }
+                            int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
+                            int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+                            setRuntimeParameters(mInFramesCount);
+                            mDropNext = dropFrame(mInFramesCount);
+                            updateDynamicFramerate(mInFramesCount);
+                            if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                                mFrameSwapSurface.dropNext(true);
+                                mSkipped++;
+                                mDropNext = false;
+                            } else {
+                                mFrameSwapSurface.dropNext(false);
+                                long ptsNsec = 0;
+                                if (mUseCameraTimestamp) {
+                                    // Use the camera provided timestamp
+                                    ptsNsec = mPts + (timestamp/1000 - (long)mFirstFrameTimestamp);
+                                } else {
+                                    ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime); 
+                                }
+    
+                                mStats.startEncodingFrame(ptsNsec, mInFramesCount);
+                                mFramesAdded++;
+                            }
+                            mInFramesCount++;
                         }
-                        mInFramesCount++;
                     } catch (Exception ex) {
                         //TODO: make a real fix for when a camera encoder quits before another
                         // and the surface is removed. The camera request needs to be updated.
@@ -299,11 +314,7 @@ class SurfaceEncoder extends Encoder {
         }
         mStats.stop();
 
-        Log.d(TAG, "Close muxer and streams");
-        if (mOutputMult != null) {
-            mOutputMult.stopAndRelease();
-        }
-        
+        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription() );
         if (mCodec != null) {
             mCodec.flush();
             mCodec.stop();
@@ -318,8 +329,8 @@ class SurfaceEncoder extends Encoder {
             }
         }
 
-        if (mEglSurface != null) {
-            mOutputMult.removeEglSurface(mEglSurface);
+        if (mFrameSwapSurface != null) {
+            mOutputMult.removeEglSurface(mFrameSwapSurface);
         }
 
         if (mYuvReader != null)

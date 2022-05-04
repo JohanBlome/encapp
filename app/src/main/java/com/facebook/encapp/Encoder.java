@@ -16,6 +16,7 @@ import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -66,14 +67,20 @@ public abstract class Encoder {
     boolean mInitDone = false;
     DataWriter mDataWriter;
     public abstract String start(Test td);
-
+    FpsMeasure mFpsMeasure;
     final static int WAIT_TIME_MS = 30000;  // 30 secs
     final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
-
+    boolean mStable = true;
+    
     public Encoder() {
         mDataWriter = new DataWriter();
         mDataWriter.start();
     }
+    
+    public boolean isStable() {
+        return mStable;
+    }
+    
     public String checkFilePath(String path) {
         if (path.startsWith("/sdcard/")) {
             return path;
@@ -106,19 +113,18 @@ public abstract class Encoder {
     }
 
     protected void sleepUntilNextFrame(long nextFrame) {
-        long now = System.nanoTime() - mFirstTime;
-        long nextTime = (long)(nextFrame * mFrameTime * 1000.0);
-        long sleepTime = (long)(mRefFrameTime / 1000.0);
+        long now = System.nanoTime()/1000; //To Us
+        long nextTime = (long)(nextFrame * mFrameTime);
+        long sleepTime = (long)(mRefFrameTime / 1000.0); //To ms
         if (mFirstTime == -1) {
-            mFirstTime = System.nanoTime();
-        } else {
-            sleepTime = (nextTime - now) / 1000000;
-            if (sleepTime < 0) {
-                // We have been delayed. Run forward.
-                now += -sleepTime * 1000000;
-                sleepTime = 0;
-            }
+            mFirstTime = now;
+        } 
+        sleepTime = (nextTime - (now - mFirstTime)) / 1000; //To ms
+        if (sleepTime < 0) {
+            // We have been delayed. Run forward.
+            sleepTime = 0;
         }
+    
         if (sleepTime > 0) {
             try {
                 Thread.sleep(sleepTime);
@@ -355,12 +361,13 @@ public abstract class Encoder {
             return true;
         }
         if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {
-            if ( frame >= test.getInput().getPlayoutFrames()  ) {
+            if ( frame >= test.getInput().getPlayoutFrames() ) {
                 done = true;
             }
         }
         if (test.getInput().hasStoptimeSec() && test.getInput().getStoptimeSec() > 0) {
-            if ( time >= test.getInput().getStoptimeSec()  ) {
+            if ( time >= test.getInput().getStoptimeSec() ) {
+                Log.d(TAG, "Stoptime reached: " + time + " - " + test.getInput().getStoptimeSec());
                 done = true;
             }
         }
@@ -486,7 +493,7 @@ public abstract class Encoder {
                     if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());
-                        if (mWriteFile) {
+                        if (mWriteFile && mMuxer != null) {
                             mVideoTrack = mMuxer.addTrack(oformat);
                             mMuxer.start();
                         }
@@ -514,8 +521,7 @@ public abstract class Encoder {
                             }
                             mCurrentTime = timestamp / 1000000.0;
                         } else {
-                            Log.d(TAG, "No start done?");
-			     mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+			                mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
                         }
                     }
                 }
@@ -594,5 +600,7 @@ public abstract class Encoder {
     public abstract void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder);
     public abstract void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info);
 
+
+    //TODO: write camera settings
 
 }

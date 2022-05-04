@@ -63,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     OutputMultiplier mCameraSourceMultiplier;
 
     TableLayout mTable;
+    private static boolean mStable = false;
 
     private String getCurrentAppVersion() {
         PackageManager pm = this.getPackageManager();
@@ -130,6 +131,10 @@ public class MainActivity extends AppCompatActivity {
             listCodecs();
         }
 
+    }
+    
+    public static boolean isStable() {
+        return mStable;
     }
 
 
@@ -277,7 +282,9 @@ public class MainActivity extends AppCompatActivity {
                 filePath.toLowerCase(Locale.US).equals("camera")) {
             if (filePath.toLowerCase(Locale.US).equals("camera")) {
                 //Count the camera in 100s
-                nbr += 100;
+                if (test.getInput().hasShow() && test.getInput().hasShow() == true) {
+                    nbr += 100;
+                }
             } else {
                 //Ignore
                 Log.d(TAG, filePath + " is will not give a visualization view");
@@ -378,6 +385,7 @@ public class MainActivity extends AppCompatActivity {
                     nbrViews = nbrViews%100 + 1;
                 }
                 final int tmp = nbrViews;
+                //nbrViews = 0;
                 if (nbrViews > 0) {
                     runOnUiThread(new Runnable() {
                         @Override
@@ -387,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                 }
-                
+
                 while(nbrViews > 0 && mViewsToDraw.size() < nbrViews) {
                     synchronized (mViewsToDraw) {
                         try {
@@ -420,7 +428,6 @@ public class MainActivity extends AppCompatActivity {
                             Log.d(TAG, "Started the test, check camera: " + mCameraCount);
                             if (mCameraCount > 0) {
                                 Log.d(TAG, "Start cameras");
-
                                 Surface outputSurface = null;
                                 while(outputSurface == null) {
                                     outputSurface = mCameraSourceMultiplier.getInputSurface();
@@ -430,12 +437,10 @@ public class MainActivity extends AppCompatActivity {
                                         e.printStackTrace();
                                     }
                                 }
-
-                                mCameraSource = CameraSource.getCamera(this);
                                 //Use max size, get from camera or test
                                 mCameraSource.registerSurface(outputSurface, 1280, 720);
-
                                 CameraSource.start();
+
                             }
 
                             // Start them all
@@ -445,7 +450,20 @@ public class MainActivity extends AppCompatActivity {
                                     enc.notifyAll();
                                 }
                             }
-
+                            
+                            // Wait for stable conditions
+                            int stableCounter = 0;
+                            while(stableCounter < mEncoderList.size()) {
+                                int count = 0;
+                                for (Encoder enc : mEncoderList) {
+                                    if(enc.isStable()) {
+                                        count++;
+                                    }
+                                }
+                                stableCounter = count;
+                            }
+                            mStable = true;
+                            Log.d(TAG, "\nAll inputs stable - go on!");
                             Log.d(TAG, "pursuit = " + pursuit);
                             if (pursuit != 0) {
                                 Log.d(TAG, "pursuit sleep, instances: " + mInstancesRunning);
@@ -559,6 +577,18 @@ public class MainActivity extends AppCompatActivity {
     public void log(String text) {
 
     }
+    
+    public void setupCamera(OutputAndTexture ot) {
+        mCameraSource = CameraSource.getCamera(this);
+        if (ot != null) {
+            mCameraSourceMultiplier = ot.mMult;
+            // This is for camera, if mounted at an angle
+            Size previewSize = new Size(1280, 720);
+            configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
+        } else {
+            mCameraSourceMultiplier = new OutputMultiplier();
+        }
+    }
 
     private Thread RunTestCase(Test test) {
         String filePath = test.getInput().getFilepath().toString();
@@ -592,13 +622,8 @@ public class MainActivity extends AppCompatActivity {
                     if (mCameraSourceMultiplier == null) {
                         if ( mViewsToDraw.size() > 0 ) {
                             ot = getFirstFreeTextureView();
-                            mCameraSourceMultiplier = ot.mMult;
-                            // This is for camera, if mounted at an angle
-                            Size previewSize = new Size(1280, 720);
-                            configureTextureViewTransform(ot.mView,previewSize, ot.mView.getWidth(), ot.mView.getHeight());
-                        } else {
-                            mCameraSourceMultiplier = new OutputMultiplier();
                         }
+                        setupCamera(ot);
                     }
                     transcoder = new SurfaceEncoder(this, mCameraSourceMultiplier);
                     if (ot != null)
@@ -608,7 +633,10 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } else {
-                OutputAndTexture ot = getFirstFreeTextureView();
+                OutputAndTexture ot = null;
+                if (test.getInput().hasShow() && test.getInput().getShow() == true) {
+                    ot = getFirstFreeTextureView();
+                }
                 if (ot != null) {
                     transcoder = new SurfaceTranscoder(ot.mMult);
                     ot.mEncoder = transcoder;
@@ -690,6 +718,7 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+        
         return t;
     }
 

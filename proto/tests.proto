@@ -31,6 +31,7 @@ message Input {
   optional int32 pursuit = 6;
   optional bool realtime = 7;
   optional float stoptime_sec = 8;
+  optional bool show = 9;
 }
 
 message Configure {

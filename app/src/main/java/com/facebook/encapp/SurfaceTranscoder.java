@@ -17,6 +17,7 @@ import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameswapControl;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -36,8 +37,6 @@ public class SurfaceTranscoder extends BufferEncoder {
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     AtomicReference<Surface> mInputSurfaceReference;
-    //InputSurface mInputSurface;
-    //OutputSurface mOutputSurface;
     DecoderRuntime mDecoderRuntimeParams;
     OutputMultiplier mOutputMult = null;
     boolean mDone = false;
@@ -45,7 +44,7 @@ public class SurfaceTranscoder extends BufferEncoder {
     int mCurrent_loop = 1;
     long mPts_offset = 0;
     long mLast_pts = 0;
-    private EglSurfaceBase mEglSurface;
+    private FrameswapControl mFrameSwapSurface;
     private SourceReader mSourceReader;
     boolean mNoEncoding = false;
 
@@ -78,8 +77,12 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
 
-        if (mTest.getInput().hasRealtime())
-            mRealtime = mTest.getInput().getRealtime();
+        if (mTest.getInput().hasRealtime()) {
+            if ((!mTest.getInput().hasShow()) ||
+                    (mTest.getInput().hasShow() && mTest.getInput().getShow() == false)) {
+                mRealtime = mTest.getInput().getRealtime();
+            }
+        }
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
         mWriteFile = (mTest.getConfigure().hasEncode()) ? mTest.getConfigure().getEncode() : true;
@@ -139,6 +142,9 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
             mReferenceFrameRate = (float) (inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
         }
+        if (mFrameRate <= 0) {
+            mFrameRate = mReferenceFrameRate;
+        }
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
 
         MediaFormat format;
@@ -183,7 +189,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         MediaCodec.CONFIGURE_FLAG_ENCODE);
                 Log.d(TAG, "Check input format after encoder is configured");
                 checkMediaFormat(mCodec.getInputFormat());
-                mEglSurface = mOutputMult.addSurface(mCodec.createInputSurface());
+                mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
             }
 
             Log.d(TAG, "Check input format before config decoder");
@@ -289,8 +295,8 @@ public class SurfaceTranscoder extends BufferEncoder {
         } catch (IllegalStateException iex) {
             Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
         }
-        if (mEglSurface != null) {
-            mOutputMult.removeEglSurface(mEglSurface);
+        if (mFrameSwapSurface != null) {
+            mOutputMult.removeEglSurface(mFrameSwapSurface);
         }
 
         if (mExtractor != null)
@@ -357,10 +363,15 @@ public class SurfaceTranscoder extends BufferEncoder {
         @Override
         public void run() {
             while (!mDone) {
-                while (mDecoderBuffers.size() > 0) {
-                    if (mFramesAdded % 100 == 0) {
-                        Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTime + " sec");
+                while (mDecoderBuffers.size() > 0 && !mDone) {
+                    if (mInFramesCount % 100 == 0) {
+                        if (mNoEncoding) {
+                            Log.d(TAG, "Decoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
+                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTime + " sec");
+                        } else {
+                            Log.d(TAG, "Transcoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
+                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTime + " sec");
+                        }
                     }
 
                     Integer index = mDecoderBuffers.poll();
@@ -368,7 +379,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     int flags = mExtractor.getSampleFlags();
-
                     if (doneReading(mTest, mInFramesCount, mCurrentTime, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
@@ -400,12 +410,19 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mCurrent_loop++;
                         mPts_offset = (long) (mLast_pts + mFrameTime);
                         mLoopTime = mCurrentTime;
-                        Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " ***");
+                        Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " - currentTime " + mCurrentTime + " ***");
                         if (doneReading(mTest, mInFramesCount, mCurrentTime, true)) {
                             mDone = true;
                         }
                     }
-                    mCurrentTime = mLoopTime + mExtractor.getSampleTime() / 1000000;
+                    // For encoders the timing is set when writing to the muxer but for the decoder we define it here
+                  /*  if (mNoEncoding && MainActivity.isStable()) {
+                        if (mFirstFrameTimestamp == -1) {
+                            mFirstFrameTimestamp = mLoopTime + mExtractor.getSampleTime() / 1000000;
+                        }
+                        mCurrentTime = mLoopTime + mExtractor.getSampleTime() / 1000000 - mFirstFrameTimestamp;
+
+                    }*/
                 }
 
                 synchronized (mDecoderBuffers) {
@@ -443,11 +460,38 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (encoder) {
             codec.releaseOutputBuffer(index, true);
         } else {
-            // Buffer will be released when drawn
-            mFramesAdded++;
-            mStats.stopDecodingFrame(info.presentationTimeUs);
-            if (!mNoEncoding) {
-                mStats.startEncodingFrame(info.presentationTimeUs, mFramesAdded);
+            long timestamp = info.presentationTimeUs;
+
+            if (MainActivity.isStable()) {
+                if (mFirstFrameTimestamp < 0) {
+                    mFirstFrameTimestamp = timestamp;
+                }
+
+                mCurrentTime = (timestamp - mFirstFrameTimestamp)/1000000;
+                // Buffer will be released when drawn
+                mStats.stopDecodingFrame(info.presentationTimeUs);
+                if (!mNoEncoding) { 
+
+                    //mStats.startEncodingFrame(info.presentationTimeUs, mFramesAdded);
+
+                    int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
+                    int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
+                    setRuntimeParameters(mInFramesCount);
+                    mDropNext = dropFrame(mInFramesCount);
+                    updateDynamicFramerate(mInFramesCount);
+                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                        mFrameSwapSurface.dropNext(true);
+                        mSkipped++;
+                        mDropNext = false;
+                    } else {
+                        mFrameSwapSurface.dropNext(false);
+                        long ptsNsec = 0;
+                        ptsNsec = mPts + (timestamp / 1000 - (long) mFirstFrameTimestamp);
+
+                        mStats.startEncodingFrame(ptsNsec, mInFramesCount);
+                        mFramesAdded++;
+                    }
+                }
             }
             mOutputMult.newFrameAvailableInBuffer(codec, index, info);
         }

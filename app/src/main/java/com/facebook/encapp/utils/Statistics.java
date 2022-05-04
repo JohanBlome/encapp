@@ -5,6 +5,8 @@ import android.os.Build;
 import android.util.Log;
 import android.util.Size;
 
+import androidx.collection.CircularArray;
+
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.Test;
 
@@ -28,8 +30,8 @@ public class Statistics {
     private final String mDesc;
     private String mEncodedfile = "";
     private String mCodec;
-    private long mStartTime;
-    private long mStopTime;
+    private long mStartTime = -1;
+    private long mStopTime = -1;
     private MediaFormat mEncoderConfigFormat;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
@@ -47,6 +49,7 @@ public class Statistics {
     Test mTest;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
+
     public static String NA = "na";
 
     public Statistics(String desc, Test test) {
@@ -56,6 +59,7 @@ public class Statistics {
         mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();
+
     }
 
     public String getId(){
@@ -399,7 +403,5 @@ public class Statistics {
             e.printStackTrace();
         }
     }
-
-    //TODO: write camera settings
 
 }

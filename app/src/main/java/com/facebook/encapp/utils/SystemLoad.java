@@ -63,7 +63,7 @@ public class SystemLoad {
                         }
                     }
                 }
-            });
+            }, "system_load_thread");
             t.start();
         }
     }
