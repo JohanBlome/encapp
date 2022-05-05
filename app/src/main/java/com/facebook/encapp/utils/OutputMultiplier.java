@@ -207,6 +207,7 @@ public class OutputMultiplier {
                     new Texture2dProgram(mProgramType));
             mTextureId = mFullFrameBlit.createTextureObject();
             mInputTexture = new SurfaceTexture(mTextureId);
+            mInputTexture.setDefaultBufferSize(1280, 720);
             mInputTexture.setOnFrameAvailableListener(this);
             mInputsurface = new Surface(mInputTexture);
             this.setPriority(Thread.MAX_PRIORITY);
