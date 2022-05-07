@@ -12,9 +12,10 @@ import shutil
 from datetime import datetime
 import pandas as pd
 import numpy as np
+
 import encapp as ep
 import encapp_search as es
-from encapp import run_cmd
+from encapp_tool.adb_cmds import run_cmd, get_device_info
 from encapp import convert_to_bps
 from google.protobuf import text_format
 import proto.tests_pb2 as proto
@@ -562,7 +563,9 @@ def main(argv):
             shutil.rmtree(workdir)
 
         os.mkdir(workdir)
-        model, serial = ep.get_device_info(options.serial)
+        model, serial = get_device_info(options.serial)
+        ep.remove_encapp_gen_files(serial)
+
         if type(model) is dict:
             if 'model' in model:
                 model = model.get('model')
