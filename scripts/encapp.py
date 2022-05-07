@@ -6,7 +6,6 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
-import subprocess
 import humanfriendly
 import json
 import sys
@@ -17,6 +16,7 @@ import datetime
 import shutil
 
 from encapp_tool import __version__
+from encapp_tool.adb_cmds import run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info, remove_files_using_regex
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
@@ -26,7 +26,6 @@ import proto.tests_pb2 as tests_definitions  # noqa: E402
 
 APPNAME_MAIN = 'com.facebook.encapp'
 ACTIVITY = f'{APPNAME_MAIN}/.MainActivity'
-ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 RD_RESULT_FILE_NAME = 'rd_results.json'
 
 SCRIPT_PATH = os.path.realpath(__file__)
@@ -127,83 +126,11 @@ R_FRAME_RATE_MAP = {
 }
 
 
-def run_cmd(cmd, debug=0):
-    ret = True
-    try:
-        if debug > 0:
-            print(cmd, sep=' ')
-        process = subprocess.Popen(cmd, shell=True,  # noqa: P204
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-        ret = True if process.returncode == 0 else False
-    except Exception:
-        ret = False
-        print('Failed to run command: ' + cmd)
-
-    return ret, stdout.decode(), stderr.decode()
-
-
-# returns info (device model and serial number) about the device where the
-# test will be run
-def get_device_info(serial_inp, debug=0):
-    # list all available devices
-    adb_cmd = 'adb devices -l'
-    ret, stdout, stderr = run_cmd(adb_cmd, debug)
-    assert ret, 'error: failed to get adb devices'
-
-    # parse list
-    device_info = {}
-    for line in stdout.split('\n'):
-        if line == 'List of devices attached' or line == '':
-            continue
-        serial = line.split()[0]
-        item_dict = {}
-        for item in line.split()[1:]:
-            # ':' used to separate key/values
-            if ':' in item:
-                key, val = item.split(':', 1)
-                item_dict[key] = val
-        # ensure the 'model' field exists
-        if 'model' not in item_dict:
-            item_dict['model'] = 'generic'
-        device_info[serial] = item_dict
-    assert len(device_info) > 0, 'error: no devices connected'
-    if debug > 2:
-        print('available devices: %r' % device_info)
-
-    # select output device
-    serial, model = None, None
-    if serial_inp is None:
-        # if user did not select a serial_inp, make sure there is only one
-        # device available
-        assert len(device_info) == 1, (
-            'error: need to choose a device %r' % list(device_info.keys()))
-        serial = list(device_info.keys())[0]
-        model = device_info[serial]
-
-    else:
-        # if user forced a serial number, make sure it is available
-        assert serial_inp in device_info, (
-            'error: device %s not available' % serial_inp)
-        serial = serial_inp
-        model = device_info[serial]
-
-    if debug > 0:
-        print('selecting device: serial: %s model: %s' % (serial, model))
-
+def remove_encapp_gen_files(serial, debug=0):
     # remove any files that are generated in previous runs
-    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
-    ret, stdout, stderr = run_cmd(adb_cmd, debug)
-    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE)
-    for file in output_files:
-        if file == '':
-            continue
-        # remove the output
-        adb_cmd = 'adb -s ' + serial + ' shell rm /sdcard/' + file
-        run_cmd(adb_cmd, debug)
-
-    return model, serial
+    regex_str = ENCAPP_OUTPUT_FILE_NAME_RE
+    location = '/sdcard/'
+    remove_files_using_regex(serial, regex_str, location, debug)
 
 
 def wait_for_exit(serial, debug=0):
@@ -364,11 +291,13 @@ def run_codec_tests_file(test_def, model, serial, workdir, settings):
         tests.ParseFromString(fd.read())
     return run_codec_tests(tests, model, serial, workdir, settings)
 
+
 def abort_test(workdir, message):
     print('\n*** Test failed ***')
     print(message)
     shutil.rmtree(workdir)
     exit(0)
+
 
 def run_codec_tests(tests, model, serial, workdir, settings):
     test_def = settings['configfile']  # todo: check
@@ -458,8 +387,8 @@ def run_codec_tests(tests, model, serial, workdir, settings):
 
 
 def list_codecs(serial, model, debug=0):
-    adb_cmd = f'adb -s {serial} shell am start '\
-              f'-e ui_hold_sec 3 '\
+    adb_cmd = f'adb -s {serial} shell am start ' \
+              f'-e ui_hold_sec 3 ' \
               f'-e list_codecs a {ACTIVITY}'
 
     run_cmd(adb_cmd, debug)
@@ -701,6 +630,8 @@ def main(argv):
 
     # get model and serial number
     model, serial = get_device_info(options.serial, options.debug)
+    remove_encapp_gen_files(serial, options.debug)
+
     # TODO(chema): fix this
     if type(model) is dict:
         if 'model' in model:
