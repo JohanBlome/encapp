@@ -13,7 +13,7 @@ from argparse import RawTextHelpFormatter
 import re
 
 from os.path import exists
-from encapp import run_cmd
+from encapp_tool.adb_cmds import run_cmd
 from encapp import convert_to_bps
 
 PSNR_RE = "average:([0-9.]*)"
