@@ -16,6 +16,7 @@ import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -97,7 +98,8 @@ public class MainActivity extends AppCompatActivity {
             }
             catch( android.content.ActivityNotFoundException ex) {
                 Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
-                System.exit(-1);
+                // System.exit(-1);
+                Toast.makeText(this, "Missing MANAGE_APP_ALL_FILES_ACCESS_PERMISSION request,", Toast.LENGTH_LONG).show();
             }
         }
 
