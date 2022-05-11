@@ -34,6 +34,8 @@ public class OutputMultiplier {
     final static int WAIT_TIME_SHORT_MS = 3000;  // 3 sec
     private String mName = "OutputMultiplier";
     MessageHandler mMessageHandler;
+    boolean mDropFrames = true;
+    int LATE_LIMIT_NS = 15 * 1000000000; // ms
 
     private Object mLock = new Object();
     private Vector<FrameswapControl> mOutputSurfaces = new Vector<>();
@@ -90,6 +92,13 @@ public class OutputMultiplier {
         }
     }
 
+    public void confirmSize(int width, int height) {
+        if (mRenderer != null) {
+            mRenderer.confirmSize(width, height);
+        } else {
+            Log.e(TAG, "No renderer exists");
+        }
+    }
     public long awaitNewImage() {
         return mRenderer.awaitNewImage();
     }
@@ -168,6 +177,8 @@ public class OutputMultiplier {
         private long mTimestamp0 = -1;
         private long mCurrentVsync = 0;
         private long mVsync0 = -1;
+        int mWidth = -1;
+        int mHeight = -1;
 
         // So, we can ignore sync...
         private int frameAvailable = 0;
@@ -177,6 +188,7 @@ public class OutputMultiplier {
         private Object mFrameDrawnLock = new Object();
         // Wait for vsynch and to synch with display
         private Object mVSynchLock = new Object();
+        private Object mSizeLock = new Object();
         // temporary object
         private Object mSurfaceObject;
         boolean mDone = false;
@@ -207,7 +219,19 @@ public class OutputMultiplier {
                     new Texture2dProgram(mProgramType));
             mTextureId = mFullFrameBlit.createTextureObject();
             mInputTexture = new SurfaceTexture(mTextureId);
-            mInputTexture.setDefaultBufferSize(1280, 720);
+
+            // We need to know how big the texture should be
+            synchronized(mSizeLock) {
+                try {
+                    mSizeLock.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            Log.d(TAG, "Set source texture buffer size: WxH = " + mWidth + "x" + mHeight);
+            if (mWidth > 0 && mHeight > 0) {
+                mInputTexture.setDefaultBufferSize(mWidth, mHeight);
+            }
             mInputTexture.setOnFrameAvailableListener(this);
             mInputsurface = new Surface(mInputTexture);
             this.setPriority(Thread.MAX_PRIORITY);
@@ -310,7 +334,7 @@ public class OutputMultiplier {
                         mTimestamp0 = buffer.mInfo.presentationTimeUs;
                     }
                     long diff = (buffer.mInfo.presentationTimeUs - mTimestamp0) * 1000;
-                    while (diff - mCurrentVsync > 0) {
+                    while (diff - mCurrentVsync > LATE_LIMIT_NS) {
                         try {
                             mVSynchLock.wait(WAIT_TIME_SHORT_MS);
                         } catch (InterruptedException e) {
@@ -322,6 +346,9 @@ public class OutputMultiplier {
                     } catch (IllegalStateException ise){
                         // not important
                         break;
+                    }
+                    if (mDropFrames && (diff - mCurrentVsync < 0)) {
+                        continue;
                     }
                     mMasterSurface.makeCurrent();
                     mInputTexture.updateTexImage();
@@ -411,6 +438,15 @@ public class OutputMultiplier {
             mDone = true;
             synchronized (mInputFrameLock) {
                 mInputFrameLock.notifyAll();
+            }
+        }
+    
+        public void confirmSize(int width, int height) {
+            Log.d(TAG, "Confirm size with " + width +  ", " + height);
+            synchronized (mSizeLock) {
+                mWidth = width;
+                mHeight = height;
+                mSizeLock.notifyAll();
             }
         }
     }

@@ -91,8 +91,6 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (!mYuvReader.openFile(mTest.getInput().getFilepath())) {
             return "\nCould not open file";
         }
-
-
         mExtractor = new MediaExtractor();
         MediaFormat inputFormat = null;
         try {
@@ -147,6 +145,15 @@ public class SurfaceTranscoder extends BufferEncoder {
         }
         mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
 
+        if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
+            width = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
+        }
+        if (inputFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
+            height = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        }
+        // If needed set the output
+        Log.d(TAG, "Start decoder, output size is WxH = " + width + "x" + height);
+        mOutputMult.confirmSize(width, height);
         MediaFormat format;
         try {
             if (!mNoEncoding) {
@@ -193,7 +200,6 @@ public class SurfaceTranscoder extends BufferEncoder {
             }
 
             Log.d(TAG, "Check input format before config decoder");
-            checkMediaFormat(inputFormat);
             setDecoderConfigureParams(mTest, inputFormat);
             mDecoder.setCallback(new DecoderCallbackHandler());
             Surface surface = mOutputMult.getInputSurface();

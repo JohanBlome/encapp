@@ -51,10 +51,12 @@ public class FpsMeasure extends Thread{
             Log.d(TAG, "Fps: " + (int)(100 * mFps)/100.0 + ", stableCount " + stableCount);
             lastFps = mFps;
             if (stableCount > STABLE_PERIOD_LIMIT) {
+                if ((int)mFps == 0) {
+                    Log.w(TAG, "Too low framerate!");
+                }
                 mStable = true;
                 return;
             }
-
         }
     }
 

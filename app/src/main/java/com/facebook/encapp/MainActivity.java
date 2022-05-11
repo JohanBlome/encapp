@@ -32,6 +32,7 @@ import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.ParseData;
+import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 
 import java.io.File;
@@ -61,7 +62,8 @@ public class MainActivity extends AppCompatActivity {
     Stack<Encoder> mEncoderList = new Stack<>();
     CameraSource mCameraSource = null;
     OutputMultiplier mCameraSourceMultiplier;
-
+    int mCameraMaxWidth = -1;
+    int mCameraMaxHeight = -1;
     TableLayout mTable;
     private static boolean mStable = false;
 
@@ -284,6 +286,16 @@ public class MainActivity extends AppCompatActivity {
                 //Count the camera in 100s
                 if (test.getInput().hasShow() && test.getInput().hasShow() == true) {
                     nbr += 100;
+                    // Check max camera size
+                    if (test.getInput().hasResolution()) {
+                        Size res = SizeUtils.parseXString(test.getInput().getResolution());
+                        if (res.getWidth() > mCameraMaxWidth) {
+                            mCameraMaxWidth = res.getWidth();
+                        }
+                        if (res.getHeight() > mCameraMaxHeight) {
+                            mCameraMaxHeight = res.getHeight();
+                        }
+                    }
                 }
             } else {
                 //Ignore
@@ -307,7 +319,6 @@ public class MainActivity extends AppCompatActivity {
                 public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                     Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view+", surface = " + surface + ", w, h = " + width + ", " + height);
                     item.mMult.addSurfaceTexture(surface);
-
                     synchronized (mViewsToDraw) {
                         mViewsToDraw.notifyAll();
                     }
@@ -523,8 +534,6 @@ public class MainActivity extends AppCompatActivity {
 
     Vector<OutputAndTexture> mViewsToDraw = new Vector<>();
     public void createTable() {
-        //hideSystemUI();
-
         int count = mViewsToDraw.size();
         int cols = 1;
         int rows = 1;
@@ -583,11 +592,12 @@ public class MainActivity extends AppCompatActivity {
         if (ot != null) {
             mCameraSourceMultiplier = ot.mMult;
             // This is for camera, if mounted at an angle
-            Size previewSize = new Size(1280, 720);
+            Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
             configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
         } else {
             mCameraSourceMultiplier = new OutputMultiplier();
         }
+        mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
     }
 
     private Thread RunTestCase(Test test) {
