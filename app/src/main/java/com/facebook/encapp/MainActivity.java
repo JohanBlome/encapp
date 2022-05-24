@@ -252,7 +252,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (test.getInput().getFilepath().toLowerCase().equals("camera")) {
+        if (test.getInput().getFilepath().toLowerCase(Locale.ROOT).equals("camera")) {
             mCameraCount += 1;
         }
         return t;
@@ -289,117 +289,115 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Tests testcases = null;
-            try {
-                if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
-                    Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
-                    FileInputStream fis = new FileInputStream(path.toFile());
-                    Log.d(TAG, "Test path = " + path.getFileName());
-                    testcases = Tests.parseFrom(fis);
-                    Log.d(TAG, "Data: " + Files.readAllBytes(path));
-                    // ERROR
-                    if (testcases.getTestList().size() <= 0) {
-                        Log.e(TAG, "Failed to read test");
-                        return;
-                    }
+        Tests testcases = null;
+        try {
+            if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
+                Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
+                FileInputStream fis = new FileInputStream(path.toFile());
+                Log.d(TAG, "Test path = " + path.getFileName());
+                testcases = Tests.parseFrom(fis);
+                Log.d(TAG, "Data: " + Files.readAllBytes(path));
+                // ERROR
+                if (testcases.getTestList().size() <= 0) {
+                    Log.e(TAG, "Failed to read test");
+                    return;
                 }
+            }
 
-                int pursuit = -1;// TODO: pursuit
-                while (!mPursuitOver) {
-                    Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
-                                     " number of combinations (parallels not counted) **");
-                    for (Test test : testcases.getTestList()) {
-                        mCameraCount = 0; // All used should have been closed already
+            int pursuit = -1;// TODO: pursuit
+            while (!mPursuitOver) {
+                Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
+                                 " number of combinations (parallels not counted) **");
+                for (Test test : testcases.getTestList()) {
+                    mCameraCount = 0; // All used should have been closed already
+                    if (pursuit > 0) pursuit -= 1;
+                    pursuit = test.getInput().getPursuit();
+                    mPursuitOver = false;
+                    Log.d(TAG, "Pursuit = " + pursuit);
+                    while (!mPursuitOver) {
                         if (pursuit > 0) pursuit -= 1;
-                        pursuit = test.getInput().getPursuit();
-                        mPursuitOver = false;
-                        Log.d(TAG, "Pursuit = " + pursuit);
-                        while (!mPursuitOver) {
-                            if (pursuit > 0) pursuit -= 1;
 
-                            if (pursuit == 0) {
-                                mPursuitOver = true;
+                        if (pursuit == 0) {
+                            mPursuitOver = true;
+                        }
+
+                        Stack<Thread> threads = new Stack<>();
+                        Thread t = startTest(test, logText, threads);
+
+                        Log.d(TAG, "Started the test, check camera: " + mCameraCount);
+                        if (mCameraCount > 0) {
+                            while (CameraSource.getClientCount() != mCameraCount) {
+                                try {
+                                    Thread.sleep(50);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            Log.d(TAG, "Start cameras");
+                            CameraSource.start();
+                        }
+
+                        // Start them all
+                        for (Encoder enc : mEncoderList) {
+                            synchronized (enc) {
+                                Log.d(TAG, "Start encoder: " + enc);
+                                enc.notifyAll();
+                            }
+                        }
+
+                        Log.d(TAG, "pursuit = " + pursuit);
+                        if (pursuit != 0) {
+                            Log.d(TAG, "pursuit sleep, instances: " + mInstancesRunning);
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
 
-                            Stack<Thread> threads = new Stack<>();
-                            Thread t = startTest(test, logText, threads);
+                        } else {
+                            try {
+                                // Run next test serially so wait for this test
+                                // and all parallels to be finished first
+                                Log.d(TAG, "Join " + t.getName() + ", state = " + t.getState());
+                                t.join();
 
-                            Log.d(TAG, "Started the test, check camera: " + mCameraCount);
-                            if (mCameraCount > 0) {
-                                while (CameraSource.getClientCount() != mCameraCount) {
+                                while (!threads.empty()) {
+                                    Thread p = threads.pop();
                                     try {
-                                        Thread.sleep(50);
+                                        Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState());
+                                        p.join();
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                     }
                                 }
-                                Log.d(TAG, "Start cameras");
-                                CameraSource.start();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
-
-                            // Start them all
-                            for (Encoder enc : mEncoderList) {
-                                synchronized (enc) {
-                                    Log.d(TAG, "Start encoder: " + enc);
-                                    enc.notifyAll();
-                                }
-                            }
-
-                            Log.d(TAG, "pursuit = " + pursuit);
-                            if (pursuit != 0) {
-                                Log.d(TAG, "pursuit sleep, instances: " + mInstancesRunning);
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-
-                            } else {
-                                try {
-                                    // Run next test serially so wait for this test
-                                    // and all parallels to be finished first
-                                    Log.d(TAG, "Join " + t.getName() + ", state = " + t.getState());
-                                    t.join();
-
-                                    while (!threads.empty()) {
-                                        Thread p = threads.pop();
-                                        try {
-                                            Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState());
-                                            p.join();
-                                        } catch (InterruptedException e) {
-                                            e.printStackTrace();
-                                        }
-                                    }
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-
                         }
+
                     }
                 }
-                Log.d(TAG, "All tests queued up, wait for finish");
-                do {
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    Log.d(TAG, "number of instances running:" + mInstancesRunning);
-
-                } while (mInstancesRunning > 0);
-                Log.d(TAG, "Done with tests, instances: " + mInstancesRunning);
+            }
+            Log.d(TAG, "All tests queued up, wait for finish");
+            do {
                 try {
-                    if (mUIHoldtimeSec > 0) {
-                        Thread.sleep(mUIHoldtimeSec);
-                    }
+                    Thread.sleep(2000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-            } catch (IOException iox) {
-                Log.e(TAG, "Test failed: " + iox.getMessage());
+                Log.d(TAG, "number of instances running:" + mInstancesRunning);
+
+            } while (mInstancesRunning > 0);
+            Log.d(TAG, "Done with tests, instances: " + mInstancesRunning);
+            try {
+                if (mUIHoldtimeSec > 0) {
+                    Thread.sleep(mUIHoldtimeSec);
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
+        } catch (IOException iox) {
+            Log.e(TAG, "Test failed: " + iox.getMessage());
         }
     }
 
