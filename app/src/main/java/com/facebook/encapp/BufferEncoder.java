@@ -7,6 +7,8 @@ import android.os.Build;
 import android.util.Log;
 import android.util.Size;
 
+import androidx.annotation.NonNull;
+
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.OutputMultiplier;
@@ -18,21 +20,19 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
-import androidx.annotation.NonNull;
-
 
 /**
  * Created by jobl on 2018-02-27.
  */
 
 class BufferEncoder extends Encoder {
-    
 
-    public String start(Test td, OutputMultiplier multiplier){
+
+    public String start(Test td, OutputMultiplier multiplier) {
         //Maybe we can show it?
         return start(td);
     }
-    
+
     public String start(
             Test test) {
         Log.d(TAG, "** Raw buffer encoding - " + test.getCommon().getDescription() + " **");
@@ -43,7 +43,7 @@ class BufferEncoder extends Encoder {
             mRealtime = test.getInput().getRealtime();
 
         mFrameRate = test.getConfigure().getFramerate();
-        mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
+        mWriteFile = !test.getConfigure().hasEncode() || test.getConfigure().getEncode();
         mSkipped = 0;
         mFramesAdded = 0;
         Size sourceResolution = SizeUtils.parseXString(test.getInput().getResolution());
@@ -107,8 +107,8 @@ class BufferEncoder extends Encoder {
         }
 
         float mReferenceFrameRate = test.getInput().getFramerate();
-        mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
-        mRefFrameTime  = calculateFrameTiming(mReferenceFrameRate);
+        mKeepInterval = mReferenceFrameRate / mFrameRate;
+        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         Log.d(TAG, "Create muxer");
@@ -171,7 +171,7 @@ class BufferEncoder extends Encoder {
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, mCurrentTime,true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTime, true)) {
                                 done = true;
                             }
 
@@ -206,14 +206,14 @@ class BufferEncoder extends Encoder {
                     break;
                 } else {
                     mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                                    (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                            (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                     ++mOutFramesCount;
                     if (mMuxer != null && mVideoTrack != -1) {
                         ByteBuffer data = mCodec.getOutputBuffer(index);
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
-                    currentTime = info.presentationTimeUs/1000000.0;
+                    currentTime = info.presentationTimeUs / 1000000.0;
                 }
             }
         }
@@ -237,6 +237,9 @@ class BufferEncoder extends Encoder {
         return "";
     }
 
-    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder){}
-    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info){}
+    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
+    }
+
+    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
 }

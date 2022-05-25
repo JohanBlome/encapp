@@ -20,10 +20,14 @@ import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
-import android.view.WindowInsetsController;
+import android.view.ViewTreeObserver;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.Tests;
@@ -47,14 +51,9 @@ import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
-    private Bundle mExtraData;
-    private int mInstancesRunning = 0;
+    private static boolean mStable = false;
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
@@ -62,131 +61,18 @@ public class MainActivity extends AppCompatActivity {
     Stack<Encoder> mEncoderList = new Stack<>();
     CameraSource mCameraSource = null;
     OutputMultiplier mCameraSourceMultiplier;
+    Vector<OutputAndTexture> mViewsToDraw = new Vector<>();
     int mCameraMaxWidth = -1;
     int mCameraMaxHeight = -1;
+    boolean mLayoutDone = false;
     TableLayout mTable;
-    private static boolean mStable = false;
+    TextView mLogText = null;
+    int mCameraCount = 0;
+    private Bundle mExtraData;
+    private int mInstancesRunning = 0;
 
-    private String getCurrentAppVersion() {
-        PackageManager pm = this.getPackageManager();
-        PackageInfo pInfo = null;
-
-        try {
-            pInfo = pm.getPackageInfo(this.getPackageName(), 0);
-
-        } catch (PackageManager.NameNotFoundException e1) {
-            e1.printStackTrace();
-        }
-        String currentVersion = pInfo.versionName;
-
-        return currentVersion;
-    }
-
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        //setContentView(R.layout.activity_main);
-        setContentView(R.layout.activity_visualize);
-
-        String[] permissions = retrieveNotGrantedPermissions(this);
-
-        if (permissions != null && permissions.length > 0) {
-            int REQUEST_ALL_PERMISSIONS = 0x4562;
-            ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
-        }
-        // Need to check permission strategy
-        getTestSettings();
-        boolean useNewMethod = true;
-        if (mExtraData != null && mExtraData.size() > 0) {
-            useNewMethod = !mExtraData.getBoolean(ParseData.OLD_AUTH_METHOD, false);
-        }
-
-        if ( Build.VERSION.SDK_INT >= 30 && useNewMethod && ! Environment.isExternalStorageManager()) {
-            Log.d(TAG, "Check ExternalStorageManager");
-            //request for the permission
-
-            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            Uri uri = Uri.fromParts("package", getPackageName(), null);
-            intent.setData(uri);
-            try {
-                startActivity(intent);
-            }
-            catch( android.content.ActivityNotFoundException ex) {
-                Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
-                System.exit(-1);
-            }
-        }
-
-        mTable = findViewById(R.id.viewTable);
-
-        Log.d(TAG, "Passed all permission checks");
-        if (getTestSettings()) {
-            (new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    performAllTests();
-                    exit();
-                }
-            })).start();
-        } else {
-            listCodecs();
-        }
-
-    }
-    
     public static boolean isStable() {
         return mStable;
-    }
-
-
-    protected void listCodecs() {
-        Log.d(TAG, "List codecs");
-        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-
-        StringBuffer encoders = new StringBuffer("encoders {\n");
-        StringBuffer decoders = new StringBuffer("decoders {\n");
-
-        for (MediaCodecInfo info : codecInfos) {
-            String str = MediaCodecInfoHelper.toText(info, 1);
-            if (str.toLowerCase(Locale.US).contains("video")) {
-                if (info.isEncoder()) {
-                    encoders.append(str);
-                }  else {
-                    decoders.append(str);
-                }
-
-            }
-
-
-        }
-        encoders.append("}\n");
-        decoders.append("}\n");
-
-        log(encoders.toString());
-        log("\n" + decoders);
-        Log.d(TAG, encoders + "\n" + decoders);
-
-        FileWriter writer = null;
-        try {
-            writer = new FileWriter(new File("/sdcard/codecs.txt"));
-            Log.d(TAG, "Write to file");
-            writer.write(encoders.toString());
-            writer.write(decoders.toString());
-            writer.flush();
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void exit() {
-        Log.d(TAG, "Finish and remove");
-        mMemLoad.stop();
-        finishAndRemoveTask();
-        Process.killProcess(Process.myPid());
-        Log.d(TAG, "EXIT");
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -214,10 +100,124 @@ public class MainActivity extends AppCompatActivity {
         return nonGrantedPerms.toArray(new String[nonGrantedPerms.size()]);
     }
 
+    private String getCurrentAppVersion() {
+        PackageManager pm = this.getPackageManager();
+        PackageInfo pInfo = null;
+        String currentVersion = "";
+        try {
+            pInfo = pm.getPackageInfo(this.getPackageName(), 0);
+            currentVersion = pInfo.versionName;
+        } catch (PackageManager.NameNotFoundException e1) {
+            e1.printStackTrace();
+        }
+
+        return currentVersion;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        //setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_visualize);
+
+        String[] permissions = retrieveNotGrantedPermissions(this);
+
+        if (permissions != null && permissions.length > 0) {
+            int REQUEST_ALL_PERMISSIONS = 0x4562;
+            ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
+        }
+        // Need to check permission strategy
+        getTestSettings();
+        boolean useNewMethod = true;
+        if (mExtraData != null && mExtraData.size() > 0) {
+            useNewMethod = !mExtraData.getBoolean(ParseData.OLD_AUTH_METHOD, false);
+        }
+
+        if (Build.VERSION.SDK_INT >= 30 && useNewMethod && !Environment.isExternalStorageManager()) {
+            Log.d(TAG, "Check ExternalStorageManager");
+            //request for the permission
+
+            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+            Uri uri = Uri.fromParts("package", getPackageName(), null);
+            intent.setData(uri);
+            try {
+                startActivity(intent);
+            } catch (android.content.ActivityNotFoundException ex) {
+                Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
+                System.exit(-1);
+            }
+        }
+
+        mTable = findViewById(R.id.viewTable);
+
+        Log.d(TAG, "Passed all permission checks");
+        if (getTestSettings()) {
+            (new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    performAllTests();
+                    exit();
+                }
+            })).start();
+        } else {
+            listCodecs();
+        }
+
+    }
+
+    protected void listCodecs() {
+        Log.d(TAG, "List codecs");
+        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+
+        StringBuffer encoders = new StringBuffer("encoders {\n");
+        StringBuffer decoders = new StringBuffer("decoders {\n");
+
+        for (MediaCodecInfo info : codecInfos) {
+            String str = MediaCodecInfoHelper.toText(info, 1);
+            if (str.toLowerCase(Locale.US).contains("video")) {
+                if (info.isEncoder()) {
+                    encoders.append(str);
+                } else {
+                    decoders.append(str);
+                }
+
+            }
+
+
+        }
+        encoders.append("}\n");
+        decoders.append("}\n");
+
+        log(encoders.toString());
+        log("\n" + decoders);
+        Log.d(TAG, encoders + "\n" + decoders);
+
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter("/sdcard/codecs.txt");
+            Log.d(TAG, "Write to file");
+            writer.write(encoders.toString());
+            writer.write(decoders.toString());
+            writer.flush();
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void exit() {
+        Log.d(TAG, "Finish and remove");
+        mMemLoad.stop();
+        finishAndRemoveTask();
+        Process.killProcess(Process.myPid());
+        Log.d(TAG, "EXIT");
+    }
+
     /**
      * Check if a test has fired up this activity.
      *
-     * @return
+     * @return true if extra settings are available
      */
     private boolean getTestSettings() {
         Intent intent = getIntent();
@@ -242,7 +242,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    int mCameraCount = 0;
     public Thread startTest(Test test, Stack<Thread> threads) {
         Log.d(TAG, "Start test: " + test.getCommon().getDescription());
 
@@ -250,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
         Thread t = RunTestCase(test);
 
         if (test.hasParallel()) {
-            for (Test parallell: test.getParallel().getTestList()) {
+            for (Test parallell : test.getParallel().getTestList()) {
                 Log.d(TAG, "Sleep before other parallel");
                 try {
                     Thread.sleep(200);
@@ -262,89 +261,11 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (test.getInput().getFilepath().toLowerCase().equals("camera")) {
+        if (test.getInput().getFilepath().equalsIgnoreCase("camera")) {
             mCameraCount += 1;
         }
         return t;
     }
-
-
-    public int countPotentialViews(Test test) {
-        int nbr = 0;
-        if (test.hasParallel()) {
-            for (Test par_test:test.getParallel().getTestList()){
-                nbr += countPotentialViews(par_test);
-            }
-        }
-
-        String filePath = test.getInput().getFilepath();
-        if (filePath.toLowerCase(Locale.US).contains(".raw") ||
-                filePath.toLowerCase(Locale.US).contains(".yuv") ||
-                filePath.toLowerCase(Locale.US).contains(".rgba") ||
-                filePath.toLowerCase(Locale.US).equals("camera")) {
-            if (filePath.toLowerCase(Locale.US).equals("camera")) {
-                //Count the camera in 100s
-                if (test.getInput().hasShow() && test.getInput().hasShow() == true) {
-                    nbr += 100;
-                    // Check max camera size
-                    if (test.getInput().hasResolution()) {
-                        Size res = SizeUtils.parseXString(test.getInput().getResolution());
-                        if (res.getWidth() > mCameraMaxWidth) {
-                            mCameraMaxWidth = res.getWidth();
-                        }
-                        if (res.getHeight() > mCameraMaxHeight) {
-                            mCameraMaxHeight = res.getHeight();
-                        }
-                    }
-                }
-            } else {
-                //Ignore
-                Log.d(TAG, filePath + " is will not give a visualization view");
-            }
-        } else {
-            nbr++;
-        }
-        return nbr;
-    }
-
-    public void prepareViews(int count) {
-        Log.d(TAG, "Prepare views, count = " + count);
-        for (int i = 0; i < count; i++) {
-
-            TextureView view = new TextureView(this);
-            OutputAndTexture item = new OutputAndTexture(new OutputMultiplier(), view, null);
-            mViewsToDraw.add(item);
-            view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-                @Override
-                public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-                    Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view+", surface = " + surface + ", w, h = " + width + ", " + height);
-                    item.mMult.addSurfaceTexture(surface);
-                    synchronized (mViewsToDraw) {
-                        mViewsToDraw.notifyAll();
-                    }
-                }
-
-                @Override
-                public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
-
-                }
-
-                @Override
-                public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
-                    return false;
-                }
-
-                @Override
-                public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
-
-                }
-            });
-        }
-
-        createTable();
-
-    }
-
 
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
@@ -385,6 +306,10 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                 }
+                if (testcases == null) {
+                    Log.d(TAG, "No test case");
+                    return;
+                }
 
                 int nbrViews = 0;
                 // Prepare views for visualization
@@ -393,21 +318,24 @@ public class MainActivity extends AppCompatActivity {
                 }
                 // Only one view for camera
                 if (nbrViews >= 100) {
-                    nbrViews = nbrViews%100 + 1;
+                    nbrViews = nbrViews % 100 + 1;
                 }
                 final int tmp = nbrViews;
                 //nbrViews = 0;
                 if (nbrViews > 0) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Log.d(TAG, "Prepare views");
-                            prepareViews(tmp);
-                        }
+                    runOnUiThread(() -> {
+                        Log.d(TAG, "Prepare views");
+                        prepareViews(tmp);
+                    });
+                } else {
+                    runOnUiThread(() -> {
+                        Log.d(TAG, "Prepare text");
+                        setContentView(R.layout.activity_main);
+                        mLogText = findViewById(R.id.logText);
                     });
                 }
 
-                while(nbrViews > 0 && mViewsToDraw.size() < nbrViews) {
+                while (nbrViews > 0 && mViewsToDraw.size() < nbrViews) {
                     synchronized (mViewsToDraw) {
                         try {
                             mViewsToDraw.wait();
@@ -419,7 +347,7 @@ public class MainActivity extends AppCompatActivity {
                 int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
                     Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
-                                     " number of combinations (parallels not counted) **");
+                            " number of combinations (parallels not counted) **");
                     for (Test test : testcases.getTestList()) {
                         mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;
@@ -440,7 +368,8 @@ public class MainActivity extends AppCompatActivity {
                             if (mCameraCount > 0) {
                                 Log.d(TAG, "Start cameras");
                                 Surface outputSurface = null;
-                                while(outputSurface == null) {
+                                while (outputSurface == null) {
+                                    Log.d(TAG, "Wait for input surface");
                                     outputSurface = mCameraSourceMultiplier.getInputSurface();
                                     try {
                                         Thread.sleep(50);
@@ -450,6 +379,8 @@ public class MainActivity extends AppCompatActivity {
                                 }
                                 //Use max size, get from camera or test
                                 mCameraSource.registerSurface(outputSurface, 1280, 720);
+                                if (test.getInput().hasFramerate())
+                                    mCameraSource.setFps(test.getInput().getFramerate());
                                 CameraSource.start();
 
                             }
@@ -461,20 +392,30 @@ public class MainActivity extends AppCompatActivity {
                                     enc.notifyAll();
                                 }
                             }
-                            
+
                             // Wait for stable conditions
                             int stableCounter = 0;
-                            while(stableCounter < mEncoderList.size()) {
+                            while (stableCounter < mEncoderList.size()) {
                                 int count = 0;
+
                                 for (Encoder enc : mEncoderList) {
-                                    if(enc.isStable()) {
+                                    if (enc.isStable() || !enc.mTest.getInput().getShow()) {
                                         count++;
                                     }
                                 }
                                 stableCounter = count;
                             }
+                            Log.d(TAG, "Check views and layout done: " + mViewsToDraw.size() + " - " + mLayoutDone);
+                            while (mViewsToDraw.size() > 0 && !mLayoutDone) {
+                                try {
+                                    Log.d(TAG, "Wait for layout to be made");
+                                    Thread.sleep(50);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
                             mStable = true;
-                            Log.d(TAG, "\nAll inputs stable - go on!");
+                            Log.d(TAG, "\n\n*** All inputs stable - go on!   ***\n\n");
                             Log.d(TAG, "pursuit = " + pursuit);
                             if (pursuit != 0) {
                                 Log.d(TAG, "pursuit sleep, instances: " + mInstancesRunning);
@@ -532,81 +473,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    Vector<OutputAndTexture> mViewsToDraw = new Vector<>();
-    public void createTable() {
-        int count = mViewsToDraw.size();
-        int cols = 1;
-        int rows = 1;
-
-        rows = (int)(Math.sqrt(count));
-        cols = (int)((float)count / (float)rows + 0.5f);
-        int extra = count - rows * cols;
-        if (extra > 0){
-            cols += extra;
-        }
-        int counter = 0;
-
-        for (int row = 0; row < rows; row++) {
-            TableRow tr = new TableRow(this);
-            for (int col = 0; col < cols; col++) {
-                try {
-                    if (counter >= count)
-                        break;
-                    OutputAndTexture item = mViewsToDraw.elementAt(counter++);
-                   // item.mView.setMinimumHeight(100);
-                   // item.mView.setMinimumWidth(100);
-                    item.mView.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.FILL_PARENT,
-                            TableRow.LayoutParams.WRAP_CONTENT));
-                    tr.addView(item.mView);
-                    Log.d(TAG, "Add to: " + tr + ", count = " + tr.getChildCount());
-                } catch (IndexOutOfBoundsException iox) {
-                    iox.printStackTrace();
-                }
-            }
-            Log.d(TAG, "Table row, " + tr + ", children: " + tr.getChildCount());
-            tr.setLayoutParams(new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, 0, 0.25f));
-            mTable.addView(tr);
-        }
-        mTable.setShrinkAllColumns(true);
-        mTable.setStretchAllColumns(true);
-        Log.d(TAG, "Request layout: "+mTable.getChildCount());
-        mTable.requestLayout();
-    }
-
-    public OutputAndTexture getFirstFreeTextureView() {
-        for(OutputAndTexture ot: mViewsToDraw) {
-            if (ot.mEncoder == null) {
-                return ot;
-            }
-        }
-
-        return null;
-    }
-
-    public void log(String text) {
-
-    }
-    
-    public void setupCamera(OutputAndTexture ot) {
-        mCameraSource = CameraSource.getCamera(this);
-        if (ot != null) {
-            mCameraSourceMultiplier = ot.mMult;
-            // This is for camera, if mounted at an angle
-            Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
-            configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
-        } else {
-            mCameraSourceMultiplier = new OutputMultiplier();
-        }
-        mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
-    }
-
     private Thread RunTestCase(Test test) {
-        String filePath = test.getInput().getFilepath().toString();
+        String filePath = test.getInput().getFilepath();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());
         Thread t;
 
-        final String description = test.getCommon().getDescription().toString();
+        final String description = test.getCommon().getDescription();
 
         if (test.getConfigure().getEncode()) {
             log("\n\nStart Test: " + description);
@@ -614,7 +487,6 @@ public class MainActivity extends AppCompatActivity {
             log("\n\nStart Test of decoder: " + description +
                     "(" + mInstancesRunning + ")");
         }
-
 
 
         final Encoder transcoder;
@@ -630,7 +502,9 @@ public class MainActivity extends AppCompatActivity {
                     // If camera we need to share egl context
                     OutputAndTexture ot = null;
                     if (mCameraSourceMultiplier == null) {
-                        if ( mViewsToDraw.size() > 0 ) {
+                        if (mViewsToDraw.size() > 0 &&
+                                test.getInput().hasShow() &&
+                                test.getInput().getShow()) {
                             ot = getFirstFreeTextureView();
                         }
                         setupCamera(ot);
@@ -644,12 +518,16 @@ public class MainActivity extends AppCompatActivity {
 
             } else {
                 OutputAndTexture ot = null;
-                if (test.getInput().hasShow() && test.getInput().getShow() == true) {
+                if (test.getInput().hasShow() && test.getInput().getShow()) {
                     ot = getFirstFreeTextureView();
                 }
                 if (ot != null) {
                     transcoder = new SurfaceTranscoder(ot.mMult);
                     ot.mEncoder = transcoder;
+                    if (!test.getConfigure().getEncode()) {
+                        Log.d(TAG, "Decode only, use view size");
+                        ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
+                    }
                 } else {
                     Log.e(TAG, "No view found");
                     transcoder = new SurfaceTranscoder(new OutputMultiplier());
@@ -713,7 +591,7 @@ public class MainActivity extends AppCompatActivity {
         t.start();
 
         int waitTime = 10000; //ms
-        while(!transcoder.initDone()) {
+        while (!transcoder.initDone()) {
             try {
                 // If we do not wait for the init to de done before starting next
                 // transcoder there may be issue in the surface handling on lower levels
@@ -728,8 +606,165 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
-        
+
         return t;
+    }
+
+
+    public void createTable() {
+        int count = mViewsToDraw.size();
+        int cols = 1;
+        int rows = 1;
+
+        rows = (int) (Math.sqrt(count));
+        cols = (int) ((float) count / (float) rows + 0.5f);
+        int extra = count - rows * cols;
+        if (extra > 0) {
+            cols += extra;
+        }
+        int counter = 0;
+
+        for (int row = 0; row < rows; row++) {
+            TableRow tr = new TableRow(this);
+            for (int col = 0; col < cols; col++) {
+                try {
+                    if (counter >= count)
+                        break;
+                    OutputAndTexture item = mViewsToDraw.elementAt(counter++);
+                    item.mView.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT,
+                            TableRow.LayoutParams.WRAP_CONTENT));
+                    tr.addView(item.mView);
+                    Log.d(TAG, "Add to: " + tr + ", count = " + tr.getChildCount());
+                } catch (IndexOutOfBoundsException iox) {
+                    iox.printStackTrace();
+                }
+            }
+            Log.d(TAG, "Table row, " + tr + ", children: " + tr.getChildCount());
+            tr.setLayoutParams(new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, 0, 0.25f));
+            mTable.addView(tr);
+        }
+        mTable.setShrinkAllColumns(true);
+        mTable.setStretchAllColumns(true);
+        Log.d(TAG, "Request layout: " + mTable.getChildCount());
+        mTable.requestLayout();
+        mTable.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                Log.d(TAG, "Table layed out.");
+                mLayoutDone = true;
+            }
+        });
+    }
+
+    public OutputAndTexture getFirstFreeTextureView() {
+        for (OutputAndTexture ot : mViewsToDraw) {
+            if (ot.mEncoder == null) {
+                return ot;
+            }
+        }
+
+        return null;
+    }
+
+    public void log(String text) {
+        if (mLogText != null) {
+            runOnUiThread(() -> {
+                mLogText.append(text);
+            });
+        }
+    }
+
+    public void setupCamera(OutputAndTexture ot) {
+        mCameraSource = CameraSource.getCamera(this);
+        if (ot != null) {
+            mCameraSourceMultiplier = ot.mMult;
+            // This is for camera, if mounted at an angle
+            Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
+            configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
+        } else {
+            mCameraSourceMultiplier = new OutputMultiplier();
+        }
+        mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
+    }
+
+
+    public int countPotentialViews(Test test) {
+        int nbr = 0;
+        if (test.hasParallel()) {
+            for (Test par_test : test.getParallel().getTestList()) {
+                nbr += countPotentialViews(par_test);
+            }
+        }
+
+        String filePath = test.getInput().getFilepath();
+        if (test.getInput().hasShow() && test.getInput().getShow()) {
+            if (filePath.toLowerCase(Locale.US).contains(".raw") ||
+                    filePath.toLowerCase(Locale.US).contains(".yuv") ||
+                    filePath.toLowerCase(Locale.US).contains(".rgba") ||
+                    filePath.toLowerCase(Locale.US).equals("camera")) {
+                if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                    //Count the camera in 100s
+
+                    Log.d(TAG, "Add camera");
+                    nbr += 100;
+                    // Check max camera size
+                    if (test.getInput().hasResolution()) {
+                        Size res = SizeUtils.parseXString(test.getInput().getResolution());
+                        if (res.getWidth() > mCameraMaxWidth) {
+                            mCameraMaxWidth = res.getWidth();
+                        }
+                        if (res.getHeight() > mCameraMaxHeight) {
+                            mCameraMaxHeight = res.getHeight();
+                        }
+                    }
+
+                } else {
+                    //Ignore
+                    Log.d(TAG, filePath + " is will not give a visualization view");
+                }
+            } else {
+                nbr++;
+            }
+        }
+        return nbr;
+    }
+
+    public void prepareViews(int count) {
+        Log.d(TAG, "Prepare views, count = " + count);
+        for (int i = 0; i < count; i++) {
+
+            TextureView view = new TextureView(this);
+            OutputAndTexture item = new OutputAndTexture(new OutputMultiplier(), view, null);
+            mViewsToDraw.add(item);
+            view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+                @Override
+                public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
+                    Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view + ", surface = " + surface + ", w, h = " + width + ", " + height);
+                    item.mMult.addSurfaceTexture(surface);
+                    synchronized (mViewsToDraw) {
+                        mViewsToDraw.notifyAll();
+                    }
+                }
+
+                @Override
+                public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+
+                }
+
+                @Override
+                public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+                    return false;
+                }
+
+                @Override
+                public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+
+                }
+            });
+        }
+
+        createTable();
+
     }
 
 
@@ -752,22 +787,10 @@ public class MainActivity extends AppCompatActivity {
                     (float) viewWidth / previewSize.getWidth());
             matrix.postScale(scale, scale, centerX, centerY);
             matrix.postRotate(90 * (rotation - 2), centerX, centerY);
-        }else if (Surface.ROTATION_180 == rotation) {
+        } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180, centerX, centerY);
         }
         view.setTransform(matrix);
-    }
-
-
-    private class OutputAndTexture {
-        OutputMultiplier mMult;
-        TextureView mView;
-        Encoder mEncoder;
-        public OutputAndTexture(OutputMultiplier mul, TextureView view, Encoder encoder) {
-            mMult = mul;
-            mView = view;
-            mEncoder = encoder;
-        }
     }
 
     public void hideSystemUI() {
@@ -782,5 +805,16 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN);
     }
-}
 
+    private class OutputAndTexture {
+        OutputMultiplier mMult;
+        TextureView mView;
+        Encoder mEncoder;
+
+        public OutputAndTexture(OutputMultiplier mul, TextureView view, Encoder encoder) {
+            mMult = mul;
+            mView = view;
+            mEncoder = encoder;
+        }
+    }
+}

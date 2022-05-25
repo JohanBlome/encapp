@@ -1,6 +1,4 @@
 package com.facebook.encapp.utils;
-import android.graphics.SurfaceTexture;
-import android.view.Surface;
 
 import com.facebook.encapp.utils.grafika.*;
 import android.graphics.SurfaceTexture;
@@ -25,4 +23,3 @@ public class FrameswapControl extends WindowSurface {
         mDropNext = drop;
     }
 }
-

@@ -16,6 +16,8 @@ import android.renderscript.Type;
 import android.util.Log;
 import android.util.Size;
 
+import androidx.annotation.NonNull;
+
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
@@ -24,14 +26,11 @@ import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
-import com.facebook.encapp.utils.grafika.EglSurfaceBase;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-
-import androidx.annotation.NonNull;
 
 
 /**
@@ -41,20 +40,19 @@ import androidx.annotation.NonNull;
 class SurfaceEncoder extends Encoder {
     Bitmap mBitmap = null;
     Context mContext;
-
-    private Allocation mYuvIn;
-    private Allocation mYuvOut;
-    private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     SurfaceTexture mSurfaceTexture;
     boolean mIsRgbaSource = false;
     boolean mIsCameraSource = false;
-
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
-    private FrameswapControl mFrameSwapSurface;
     Bundle mKeyFrameBundle;
-    
-    public SurfaceEncoder(Context context,  OutputMultiplier multiplier) {
+    SurfaceTexture mSurfTex = null;
+    private Allocation mYuvIn;
+    private Allocation mYuvOut;
+    private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
+    private FrameswapControl mFrameSwapSurface;
+
+    public SurfaceEncoder(Context context, OutputMultiplier multiplier) {
         mOutputMult = multiplier;
         mContext = context;
     }
@@ -78,7 +76,7 @@ class SurfaceEncoder extends Encoder {
             mRealtime = mTest.getInput().getRealtime();
 
         mFrameRate = mTest.getConfigure().getFramerate();
-        mWriteFile = (mTest.getConfigure().hasEncode())?mTest.getConfigure().getEncode():true;
+        mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
         mStats = new Statistics("raw encoder", mTest);
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
@@ -89,13 +87,13 @@ class SurfaceEncoder extends Encoder {
 
         if (mTest.getInput().getFilepath().endsWith("rgba")) {
             mIsRgbaSource = true;
-            mRefFramesizeInBytes = (int) (width * height * 4);
+            mRefFramesizeInBytes = width * height * 4;
         } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
             //TODO: handle other fps (i.e. try to set lower or higher fps)
             // Need to check what frame rate is actually set unless real frame time is being used
             mReferenceFrameRate = 30; //We strive for this at least
-            mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
+            mKeepInterval = mReferenceFrameRate / mFrameRate;
 
             if (!mTest.getInput().hasPlayoutFrames() && !mTest.getInput().hasStoptimeSec()) {
                 // In case we do not have a limit, limit to 60 secs
@@ -153,7 +151,8 @@ class SurfaceEncoder extends Encoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             checkMediaFormat(mCodec.getInputFormat());
-            mFrameSwapSurface = mOutputMult.addSurface( mCodec.createInputSurface());
+            mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
+            mOutputMult.confirmSize(width, height);
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setCodec(mCodec.getCanonicalName());
@@ -180,7 +179,7 @@ class SurfaceEncoder extends Encoder {
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
 
-      
+
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
@@ -188,9 +187,10 @@ class SurfaceEncoder extends Encoder {
             mMuxer.start();
         }
 
-        mFpsMeasure = new FpsMeasure(mFrameRate);
+        Log.d(TAG, "Create fps measure: " + this);
+        mFpsMeasure = new FpsMeasure(mFrameRate, this.toString());
         mFpsMeasure.start();
-        
+        double frameTime = mRefFrameTime * mKeepInterval;
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
@@ -208,7 +208,10 @@ class SurfaceEncoder extends Encoder {
         while (!done) {
             if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        " current time: " + mCurrentTime + " sec, frame rate: " + mFrameRate + ", id: " + mStats.getId());
+                        " current time: " + mCurrentTime + " sec, frame rate: " + mFrameRate +
+                        ", calc. frame rate: " + (int) (mFramesAdded / mCurrentTime + .5f) +
+                        ", input frame rate: " + (int) (mInFramesCount / mCurrentTime + .5f) +
+                        ", id: " + mStats.getId());
             }
             try {
                 int flags = 0;
@@ -221,38 +224,43 @@ class SurfaceEncoder extends Encoder {
 
                 if (mIsCameraSource) {
                     try {
-                        long timestamp = mOutputMult.awaitNewImage();
+                        long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
                         if (!MainActivity.isStable()) {
                             if (!mFpsMeasure.isStable()) {
-                                mFpsMeasure.addPtsNsec(timestamp);
+                                mFpsMeasure.addPtsUsec(timestampUsec);
                                 mCodec.setParameters(mKeyFrameBundle);
+                                Log.d(TAG, "Not stable, current fps: " + mFpsMeasure.getFps() + "( " +
+                                        mFpsMeasure.getAverageFps() + ")");
+
                             } else {
                                 mStable = true;
                             }
                         } else {
-                            if (mFirstFrameTimestamp < 0) {
-                                mFirstFrameTimestamp = timestamp / 1000;
+                            if (mFirstFrameTimestampUsec < 0) {
+                                mFirstFrameTimestampUsec = timestampUsec;
                             }
-                            int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
-                            int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
                             setRuntimeParameters(mInFramesCount);
                             mDropNext = dropFrame(mInFramesCount);
+                            double diff = timestampUsec - mFirstFrameTimestampUsec;
+                            if (mFramesAdded * frameTime + frameTime > diff) {
+                                mDropNext = true;
+                            }
                             updateDynamicFramerate(mInFramesCount);
-                            if (currentFrameNbr == nextFrameNbr || mDropNext) {
+                            if (mDropNext) {
                                 mFrameSwapSurface.dropNext(true);
                                 mSkipped++;
                                 mDropNext = false;
                             } else {
                                 mFrameSwapSurface.dropNext(false);
-                                long ptsNsec = 0;
+                                long ptsUsec = 0;
                                 if (mUseCameraTimestamp) {
                                     // Use the camera provided timestamp
-                                    ptsNsec = mPts + (timestamp/1000 - (long)mFirstFrameTimestamp);
+                                    ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
-                                    ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime); 
+                                    ptsUsec = computePresentationTime(mInFramesCount, mRefFrameTime);
                                 }
-    
-                                mStats.startEncodingFrame(ptsNsec, mInFramesCount);
+
+                                mStats.startEncodingFrame(ptsUsec, mInFramesCount);
                                 mFramesAdded++;
                             }
                             mInFramesCount++;
@@ -314,7 +322,7 @@ class SurfaceEncoder extends Encoder {
         }
         mStats.stop();
 
-        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription() );
+        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
         if (mCodec != null) {
             mCodec.flush();
             mCodec.stop();
@@ -330,7 +338,7 @@ class SurfaceEncoder extends Encoder {
         }
 
         if (mFrameSwapSurface != null) {
-            mOutputMult.removeEglSurface(mFrameSwapSurface);
+            mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
         }
 
         if (mYuvReader != null)
@@ -344,9 +352,6 @@ class SurfaceEncoder extends Encoder {
 
         return "";
     }
-
-
-    SurfaceTexture mSurfTex = null;
 
     /**
      * Fills input buffer for encoder from YUV buffers.
@@ -383,7 +388,7 @@ class SurfaceEncoder extends Encoder {
                 mBitmap.copyPixelsFromBuffer(buffer);
             }
 
-            if (mOutputMult == null){
+            if (mOutputMult == null) {
                 mOutputMult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
             }
             mOutputMult.newFrameAvailable();
@@ -400,6 +405,9 @@ class SurfaceEncoder extends Encoder {
         return read;
     }
 
-    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder){}
-    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info){}
+    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
+    }
+
+    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
 }

@@ -18,6 +18,7 @@ enum DataValueType {
     longType = 3;
 }
 
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;

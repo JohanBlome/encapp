@@ -3,7 +3,6 @@ package com.facebook.encapp.utils;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
-import android.util.Range;
 
 import java.util.List;
 import java.util.Arrays;
@@ -42,20 +41,18 @@ public class MediaCodecInfoHelper {
         }
     }
 
-    final static List<String> mFeatureList = Arrays.asList(new String[]{
-        MediaCodecInfo.CodecCapabilities.FEATURE_AdaptivePlayback,
-        MediaCodecInfo.CodecCapabilities.FEATURE_DynamicTimestamp,
-        //MediaCodecInfo.CodecCapabilities.FEATURE_EncodingStatistics,
-        MediaCodecInfo.CodecCapabilities.FEATURE_FrameParsing,
-        //MediaCodecInfo.CodecCapabilities.FEATURE_HdrEditing,
-        MediaCodecInfo.CodecCapabilities.FEATURE_IntraRefresh,
-        MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency,
-        MediaCodecInfo.CodecCapabilities.FEATURE_MultipleFrames,
-        MediaCodecInfo.CodecCapabilities.FEATURE_PartialFrame,
-        //MediaCodecInfo.CodecCapabilities.FEATURE_QpBounds,
-        MediaCodecInfo.CodecCapabilities.FEATURE_SecurePlayback,
-        MediaCodecInfo.CodecCapabilities.FEATURE_TunneledPlayback,
-    });
+    final static List<String> mFeatureList = Arrays.asList(MediaCodecInfo.CodecCapabilities.FEATURE_AdaptivePlayback,
+            MediaCodecInfo.CodecCapabilities.FEATURE_DynamicTimestamp,
+            //MediaCodecInfo.CodecCapabilities.FEATURE_EncodingStatistics,
+            MediaCodecInfo.CodecCapabilities.FEATURE_FrameParsing,
+            //MediaCodecInfo.CodecCapabilities.FEATURE_HdrEditing,
+            MediaCodecInfo.CodecCapabilities.FEATURE_IntraRefresh,
+            MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency,
+            MediaCodecInfo.CodecCapabilities.FEATURE_MultipleFrames,
+            MediaCodecInfo.CodecCapabilities.FEATURE_PartialFrame,
+            //MediaCodecInfo.CodecCapabilities.FEATURE_QpBounds,
+            MediaCodecInfo.CodecCapabilities.FEATURE_SecurePlayback,
+            MediaCodecInfo.CodecCapabilities.FEATURE_TunneledPlayback);
 
     public static String encoderCapabilitiesToString(MediaCodecInfo.EncoderCapabilities encoder_capabilities, int indent) {
         if (encoder_capabilities == null) {
@@ -463,4 +460,3 @@ public class MediaCodecInfoHelper {
 
     }
 }
-
