@@ -280,3 +280,8 @@ Collecting protobuf
   Downloading protobuf-3.19.4-cp39-cp39-macosx_10_9_x86_64.whl (961 kB)
 ...
 ```
+
+
+# 8. License
+
+encapp is BSD licensed, as found in the [LICENSE](LICENSE) file.
