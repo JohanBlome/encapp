@@ -31,7 +31,7 @@ import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public abstract class Encoder {
-    protected static final String TAG = "encapp";
+    protected static final String TAG = "encapp.encoder";
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000000;
     final static int WAIT_TIME_MS = 30000;  // 30 secs
     final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
@@ -42,7 +42,7 @@ public abstract class Encoder {
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
-    protected double mFrameTime = 0;
+    protected double mFrameTimeUsec = 0;
     protected double mRefFrameTime = 0;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
@@ -56,16 +56,16 @@ public abstract class Encoder {
     long mLastTime = -1;
     long mFirstTime = -1;
     boolean mRealtime = false;
-    double mCurrentTime;
+    double mCurrentTimeSec;
     double mFirstFrameTimestampUsec = -1;
     float mReferenceFrameRate = 30;
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
-    int mCurrentLoop = 0;
     boolean mInitDone = false;
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
+
     public Encoder() {
         mDataWriter = new DataWriter();
         mDataWriter.start();
@@ -195,20 +195,19 @@ public abstract class Encoder {
 
     protected void sleepUntilNextFrame(long nextFrame) {
         long now = System.nanoTime() / 1000; //To Us
-        long nextTime = (long) (nextFrame * mFrameTime);
-        long sleepTime = (long) (mRefFrameTime / 1000.0); //To ms
+        long nextTime = (long) (nextFrame * mFrameTimeUsec);
         if (mFirstTime == -1) {
             mFirstTime = now;
         }
-        sleepTime = (nextTime - (now - mFirstTime)) / 1000; //To ms
-        if (sleepTime < 0) {
+        long sleepTimeMs = (nextTime - (now - mFirstTime)) / 1000; //To ms
+        if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
-            sleepTime = 0;
+            sleepTimeMs = 0;
         }
 
-        if (sleepTime > 0) {
+        if (sleepTimeMs > 0) {
             try {
-                Thread.sleep(sleepTime);
+                Thread.sleep(sleepTimeMs);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -218,12 +217,12 @@ public abstract class Encoder {
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTime(int frameIndex, double frameTime) {
-        return mPts + (long) (frameIndex * frameTime);
+    protected long computePresentationTimeUsec(int frameIndex, double frameTimeUsec) {
+        return mPts + (long) (frameIndex * frameTimeUsec);
     }
 
-    protected double calculateFrameTiming(float frameRate) {
-        return mFrameTime = 1000000.0 / frameRate;
+    protected double calculateFrameTimingUsec(float frameRate) {
+        return mFrameTimeUsec = 1000000.0 / frameRate;
     }
 
     public boolean initDone() {
@@ -459,7 +458,7 @@ public abstract class Encoder {
             read = -2;
         } else if (read == size) {
             mFramesAdded++;
-            long ptsUsec = computePresentationTime(frameCount, mRefFrameTime);
+            long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
@@ -476,9 +475,14 @@ public abstract class Encoder {
 
     public abstract void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info);
 
-    private class DataWriter extends Thread {
+    protected class DataWriter extends Thread {
         ConcurrentLinkedQueue<FrameBuffer> mEncodeBuffers = new ConcurrentLinkedQueue<>();
         boolean mDone = false;
+
+        public void stopWriter() {
+            mDone = true;
+        }
+
 
         @Override
         public void run() {
@@ -489,18 +493,22 @@ public abstract class Encoder {
                         Log.e(TAG, "Buffer empty");
                         continue;
                     }
+
                     if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+                        Log.d(TAG, "Start muxer: " + mMuxer +", write? " + mWriteFile);
                         if (mWriteFile && mMuxer != null) {
                             mVideoTrack = mMuxer.addTrack(oformat);
+                            Log.d(TAG, "Start muxer, track = " + mVideoTrack);
                             mMuxer.start();
                         }
                         mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
-                    } else if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        Log.d(TAG, "End of stream");
-                        //break;
                     } else {
+                        if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                            Log.d(TAG, "End of stream: ");
+                            mDone = true;
+                        }
                         if (mFirstFrameTimestampUsec != -1) {
                             long timestamp = mPts + (buffer.mInfo.presentationTimeUs - (long) mFirstFrameTimestampUsec);
 
@@ -518,7 +526,7 @@ public abstract class Encoder {
                                 // Codec may be closed elsewhere...
                                 Log.e(TAG, "Failed to release buffer");
                             }
-                            mCurrentTime = timestamp / 1000000.0;
+                            mCurrentTimeSec = timestamp / 1000000.0;
                         } else {
                             mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
                         }
@@ -595,8 +603,4 @@ public abstract class Encoder {
             Encoder.checkMediaFormat(oformat);
         }
     }
-
-
-    //TODO: write camera settings
-
 }

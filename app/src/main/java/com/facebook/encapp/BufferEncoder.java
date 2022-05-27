@@ -26,8 +26,6 @@ import java.util.Locale;
  */
 
 class BufferEncoder extends Encoder {
-
-
     public String start(Test td, OutputMultiplier multiplier) {
         //Maybe we can show it?
         return start(td);
@@ -108,7 +106,7 @@ class BufferEncoder extends Encoder {
 
         float mReferenceFrameRate = test.getInput().getFramerate();
         mKeepInterval = mReferenceFrameRate / mFrameRate;
-        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
+        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         Log.d(TAG, "Create muxer");
@@ -144,7 +142,7 @@ class BufferEncoder extends Encoder {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
 
-                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
+                if (doneReading(test, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     done = true;
                 }
@@ -171,7 +169,7 @@ class BufferEncoder extends Encoder {
                         } else if (size <= 0) {
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mInFramesCount, mCurrentTime, true)) {
+                            if (doneReading(test, mInFramesCount, mCurrentTimeSec, true)) {
                                 done = true;
                             }
 

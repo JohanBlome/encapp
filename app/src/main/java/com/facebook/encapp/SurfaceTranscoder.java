@@ -37,10 +37,8 @@ public class SurfaceTranscoder extends BufferEncoder {
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
-    AtomicReference<Surface> mInputSurfaceReference;
     DecoderRuntime mDecoderRuntimeParams;
     OutputMultiplier mOutputMult = null;
-    boolean mDone = false;
     double mLoopTime = 0;
     int mCurrent_loop = 1;
     long mPts_offset = 0;
@@ -141,7 +139,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         mRefFramesizeInBytes = (int) (width * height * 1.5);
 
         mReferenceFrameRate = mTest.getInput().getFramerate();
-        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
+        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
         if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
             mReferenceFrameRate = (float) (inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
@@ -279,6 +277,25 @@ public class SurfaceTranscoder extends BufferEncoder {
         }
         mStats.stop();
         Log.d(TAG, "Close muxer and streams");
+
+
+        try {
+            mDataWriter.stopWriter();
+            mDataWriter.join(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            if (mMuxer != null) {
+                mMuxer.stop();
+                mMuxer.release();
+            }
+        } catch (IllegalStateException iex) {
+            Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
+        }
+
+
         if (mOutputMult != null) {
             mOutputMult.stopAndRelease();
         }
@@ -293,14 +310,6 @@ public class SurfaceTranscoder extends BufferEncoder {
                 mDecoder.flush();
                 mDecoder.stop();
                 mDecoder.release();
-            }
-        } catch (IllegalStateException iex) {
-            Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
-        }
-        try {
-            if (mMuxer != null) {
-                mMuxer.stop();
-                mMuxer.release();
             }
         } catch (IllegalStateException iex) {
             Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
@@ -395,9 +404,13 @@ public class SurfaceTranscoder extends BufferEncoder {
             if (MainActivity.isStable()) {
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
+                    // Request key frame
+                    Bundle bundle = new Bundle();
+                    bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                    mCodec.setParameters(bundle);
                 }
 
-                mCurrentTime = (timestamp - mFirstFrameTimestampUsec) / 1000000;
+                mCurrentTimeSec = (timestamp - mFirstFrameTimestampUsec) / 1000000;
                 // Buffer will be released when drawn
                 mStats.stopDecodingFrame(info.presentationTimeUs);
                 if (!mNoEncoding) {
@@ -439,10 +452,10 @@ public class SurfaceTranscoder extends BufferEncoder {
                     if (mInFramesCount % 100 == 0) {
                         if (mNoEncoding) {
                             Log.d(TAG, "Decoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTime + " sec");
+                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTimeSec + " sec");
                         } else {
                             Log.d(TAG, "Transcoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTime + " sec");
+                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTimeSec + " sec");
                         }
                     }
 
@@ -451,7 +464,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     int flags = mExtractor.getSampleFlags();
-                    if (doneReading(mTest, mInFramesCount, mCurrentTime, false)) {
+                    if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
                     }
@@ -480,10 +493,10 @@ public class SurfaceTranscoder extends BufferEncoder {
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                         mCurrent_loop++;
-                        mPts_offset = (long) (mLast_pts + mFrameTime);
-                        mLoopTime = mCurrentTime;
-                        Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " - currentTime " + mCurrentTime + " ***");
-                        if (doneReading(mTest, mInFramesCount, mCurrentTime, true)) {
+                        mPts_offset = (long) (mLast_pts + mFrameTimeUsec);
+                        mLoopTime = mCurrentTimeSec;
+                        Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " - currentTime " + mCurrentTimeSec + " ***");
+                        if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
                             mDone = true;
                         }
                     }

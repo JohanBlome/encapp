@@ -39,7 +39,6 @@ import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -242,31 +241,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public Thread startTest(Test test, Stack<Thread> threads) {
-        Log.d(TAG, "Start test: " + test.getCommon().getDescription());
-
-        increaseTestsInflight();
-        Thread t = RunTestCase(test);
-
-        if (test.hasParallel()) {
-            for (Test parallell : test.getParallel().getTestList()) {
-                Log.d(TAG, "Sleep before other parallel");
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                Log.d(TAG, "Start parallel");
-                threads.push(startTest(parallell, threads));
-            }
-        }
-
-        if (test.getInput().getFilepath().equalsIgnoreCase("camera")) {
-            mCameraCount += 1;
-        }
-        return t;
-    }
-
+    /**
+     * Run everything found in the bundle data
+     * and exit.
+     */
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
         mMemLoad.start();
@@ -325,7 +303,7 @@ public class MainActivity extends AppCompatActivity {
                 if (nbrViews > 0) {
                     runOnUiThread(() -> {
                         Log.d(TAG, "Prepare views");
-                        prepareViews(tmp);
+                        prepareViews(tmp, mViewsToDraw, mTable);
                     });
                 } else {
                     runOnUiThread(() -> {
@@ -473,7 +451,50 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private Thread RunTestCase(Test test) {
+
+    /**
+     * Traverse list of test cases below this and starts them keeping
+     * track of all threads.
+     *
+     * @param test
+     * @param threads a lit of started test case, each has its own thread
+     * @return the thread that belong to the Test test
+     */
+    public Thread startTest(Test test, Stack<Thread> threads) {
+        Log.d(TAG, "Start test: " + test.getCommon().getDescription());
+
+        increaseTestsInflight();
+        Thread t = PerformaTest(test);
+
+        if (test.hasParallel()) {
+            for (Test parallell : test.getParallel().getTestList()) {
+                Log.d(TAG, "Sleep before other parallel");
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                Log.d(TAG, "Start parallel");
+                threads.push(startTest(parallell, threads));
+            }
+        }
+
+        if (test.getInput().getFilepath().equalsIgnoreCase("camera")) {
+            mCameraCount += 1;
+        }
+        return t;
+    }
+
+
+    /**
+     * This is the starting point for the actual test
+     * In here a processing unit (encoder/decode/transcoder) is created
+     * and if needed a surface/surfacetexture is attached
+     *
+     * @param test
+     * @return the thread belonging to Test test
+     */
+    private Thread PerformaTest(Test test) {
         String filePath = test.getInput().getFilepath();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());
@@ -489,11 +510,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        final Encoder transcoder;
+        final Encoder coder;
         synchronized (mEncoderList) {
             Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
-
-
             if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                     filePath.toLowerCase(Locale.US).contains(".yuv") ||
                     filePath.toLowerCase(Locale.US).contains(".rgba") ||
@@ -509,11 +528,11 @@ public class MainActivity extends AppCompatActivity {
                         }
                         setupCamera(ot);
                     }
-                    transcoder = new SurfaceEncoder(this, mCameraSourceMultiplier);
+                    coder = new SurfaceEncoder(this, mCameraSourceMultiplier);
                     if (ot != null)
-                        ot.mEncoder = transcoder;
+                        ot.mEncoder = coder;
                 } else {
-                    transcoder = new BufferEncoder();
+                    coder = new BufferEncoder();
                 }
 
             } else {
@@ -522,21 +541,21 @@ public class MainActivity extends AppCompatActivity {
                     ot = getFirstFreeTextureView();
                 }
                 if (ot != null) {
-                    transcoder = new SurfaceTranscoder(ot.mMult);
-                    ot.mEncoder = transcoder;
+                    coder = new SurfaceTranscoder(ot.mMult);
+                    ot.mEncoder = coder;
                     if (!test.getConfigure().getEncode()) {
                         Log.d(TAG, "Decode only, use view size");
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
                 } else {
                     Log.e(TAG, "No view found");
-                    transcoder = new SurfaceTranscoder(new OutputMultiplier());
+                    coder = new SurfaceTranscoder(new OutputMultiplier());
                 }
             }
 
 
             Log.d(TAG, "Add encoder to list");
-            mEncoderList.add(transcoder);
+            mEncoderList.add(coder);
         }
 
 
@@ -545,10 +564,10 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 try {
                     Log.d(TAG, "Start transcoder");
-                    final String status = transcoder.start(test);
+                    final String status = coder.start(test);
                     Log.d(TAG, "Transcoder done!");
                     Log.d(TAG, "Get stats");
-                    final Statistics stats = transcoder.getStatistics();
+                    final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
@@ -559,7 +578,7 @@ public class MainActivity extends AppCompatActivity {
                         e.printStackTrace();
                     }
 
-                    Log.d(TAG, "On test done, instances running: " + mInstancesRunning);
+                    Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
                     mPursuitOver = true;
                     if (status.length() > 0) {
                         log("\nTest failed: " + description);
@@ -591,7 +610,7 @@ public class MainActivity extends AppCompatActivity {
         t.start();
 
         int waitTime = 10000; //ms
-        while (!transcoder.initDone()) {
+        while (!coder.initDone()) {
             try {
                 // If we do not wait for the init to de done before starting next
                 // transcoder there may be issue in the surface handling on lower levels
@@ -611,14 +630,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void createTable() {
-        int count = mViewsToDraw.size();
+    public void createTable(int nbrViews, TableLayout layout) {
+        //int count = nbrViews;/mViewsToDraw.size();
         int cols = 1;
         int rows = 1;
 
-        rows = (int) (Math.sqrt(count));
-        cols = (int) ((float) count / (float) rows + 0.5f);
-        int extra = count - rows * cols;
+        rows = (int) (Math.sqrt(nbrViews));
+        cols = (int) ((float) nbrViews / (float) rows + 0.5f);
+        int extra = nbrViews - rows * cols;
         if (extra > 0) {
             cols += extra;
         }
@@ -628,7 +647,7 @@ public class MainActivity extends AppCompatActivity {
             TableRow tr = new TableRow(this);
             for (int col = 0; col < cols; col++) {
                 try {
-                    if (counter >= count)
+                    if (counter >= nbrViews)
                         break;
                     OutputAndTexture item = mViewsToDraw.elementAt(counter++);
                     item.mView.setLayoutParams(new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT,
@@ -641,13 +660,13 @@ public class MainActivity extends AppCompatActivity {
             }
             Log.d(TAG, "Table row, " + tr + ", children: " + tr.getChildCount());
             tr.setLayoutParams(new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, 0, 0.25f));
-            mTable.addView(tr);
+            layout.addView(tr);
         }
-        mTable.setShrinkAllColumns(true);
-        mTable.setStretchAllColumns(true);
-        Log.d(TAG, "Request layout: " + mTable.getChildCount());
-        mTable.requestLayout();
-        mTable.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+        layout.setShrinkAllColumns(true);
+        layout.setStretchAllColumns(true);
+        Log.d(TAG, "Request layout: " + layout.getChildCount());
+        layout.requestLayout();
+        layout.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
                 Log.d(TAG, "Table layed out.");
@@ -729,20 +748,20 @@ public class MainActivity extends AppCompatActivity {
         return nbr;
     }
 
-    public void prepareViews(int count) {
+    public void prepareViews(int count, Vector<OutputAndTexture> views, TableLayout layout) {
         Log.d(TAG, "Prepare views, count = " + count);
         for (int i = 0; i < count; i++) {
 
             TextureView view = new TextureView(this);
             OutputAndTexture item = new OutputAndTexture(new OutputMultiplier(), view, null);
-            mViewsToDraw.add(item);
+            views.add(item);
             view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
                 @Override
                 public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                     Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view + ", surface = " + surface + ", w, h = " + width + ", " + height);
                     item.mMult.addSurfaceTexture(surface);
                     synchronized (mViewsToDraw) {
-                        mViewsToDraw.notifyAll();
+                        views.notifyAll();
                     }
                 }
 
@@ -763,8 +782,7 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        createTable();
-
+        createTable(views.size(), layout);
     }
 
 

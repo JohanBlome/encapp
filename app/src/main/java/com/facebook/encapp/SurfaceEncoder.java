@@ -38,6 +38,7 @@ import java.util.Locale;
  */
 
 class SurfaceEncoder extends Encoder {
+    protected static final String TAG = "encapp.encoder";
     Bitmap mBitmap = null;
     Context mContext;
     SurfaceTexture mSurfaceTexture;
@@ -46,7 +47,6 @@ class SurfaceEncoder extends Encoder {
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
     Bundle mKeyFrameBundle;
-    SurfaceTexture mSurfTex = null;
     private Allocation mYuvIn;
     private Allocation mYuvOut;
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
@@ -83,7 +83,7 @@ class SurfaceEncoder extends Encoder {
         int width = res.getWidth();
         int height = res.getHeight();
         mRefFramesizeInBytes = (int) (width * height * 1.5);
-        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
+        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
         if (mTest.getInput().getFilepath().endsWith("rgba")) {
             mIsRgbaSource = true;
@@ -184,6 +184,7 @@ class SurfaceEncoder extends Encoder {
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
             mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            Log.d(TAG, "Start muxer, track = " + mVideoTrack);
             mMuxer.start();
         }
 
@@ -208,15 +209,17 @@ class SurfaceEncoder extends Encoder {
         while (!done) {
             if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        " current time: " + mCurrentTime + " sec, frame rate: " + mFrameRate +
-                        ", calc. frame rate: " + (int) (mFramesAdded / mCurrentTime + .5f) +
-                        ", input frame rate: " + (int) (mInFramesCount / mCurrentTime + .5f) +
+                        " current time: " + mCurrentTimeSec + " sec, frame rate: " + mFrameRate +
+                        ", calc. frame rate: " + (int) (mFramesAdded / mCurrentTimeSec + .5f) +
+                        ", input frame rate: " + (int) (mInFramesCount / mCurrentTimeSec + .5f) +
                         ", id: " + mStats.getId());
             }
             try {
                 int flags = 0;
-                if (doneReading(mTest, mInFramesCount, mCurrentTime, false)) {
+                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                    Log.d(TAG, "Done with input, flag endof stream!");
+                    mOutputMult.stopAndRelease();
                     done = true;
                 }
 
@@ -231,13 +234,16 @@ class SurfaceEncoder extends Encoder {
                                 mCodec.setParameters(mKeyFrameBundle);
                                 Log.d(TAG, "Not stable, current fps: " + mFpsMeasure.getFps() + "( " +
                                         mFpsMeasure.getAverageFps() + ")");
-
                             } else {
                                 mStable = true;
                             }
                         } else {
                             if (mFirstFrameTimestampUsec < 0) {
                                 mFirstFrameTimestampUsec = timestampUsec;
+                                // Request key frame
+                                Bundle bundle = new Bundle();
+                                bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                                mCodec.setParameters(bundle);
                             }
                             setRuntimeParameters(mInFramesCount);
                             mDropNext = dropFrame(mInFramesCount);
@@ -257,7 +263,7 @@ class SurfaceEncoder extends Encoder {
                                     // Use the camera provided timestamp
                                     ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
-                                    ptsUsec = computePresentationTime(mInFramesCount, mRefFrameTime);
+                                    ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
                                 }
 
                                 mStats.startEncodingFrame(ptsUsec, mInFramesCount);
@@ -299,7 +305,8 @@ class SurfaceEncoder extends Encoder {
                                 mYuvReader.closeFile();
                             }
                             current_loop++;
-                            if (doneReading(mTest, mInFramesCount, mCurrentTime, true)) {
+                            if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
+                                Log.d(TAG, "Done with input!");
                                 done = true;
                             }
 
@@ -320,21 +327,22 @@ class SurfaceEncoder extends Encoder {
 
 
         }
+        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
         mStats.stop();
 
-        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
-        if (mCodec != null) {
-            mCodec.flush();
-            mCodec.stop();
-            mCodec.release();
-        }
         if (mMuxer != null) {
             try {
                 mMuxer.release(); //Release calls stop
             } catch (IllegalStateException ise) {
                 //Most likely mean that the muxer is already released. Stupid API
-                Log.e(TAG, "Illegal state exception when trying to release the muxer");
+                Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
             }
+            mMuxer = null;
+        }
+        if (mCodec != null) {
+            mCodec.flush();
+            mCodec.stop();
+            mCodec.release();
         }
 
         if (mFrameSwapSurface != null) {
@@ -349,6 +357,8 @@ class SurfaceEncoder extends Encoder {
             mSurfaceTexture.releaseTexImage();
             mSurfaceTexture.release();
         }
+        Log.d(TAG, "Stop writer");
+        mDataWriter.stopWriter();
 
         return "";
     }
@@ -372,7 +382,7 @@ class SurfaceEncoder extends Encoder {
             mDropNext = false;
             read = -2;
         } else if (read == size) {
-            long ptsUsec = computePresentationTime(mInFramesCount, mRefFrameTime);
+            long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
             mFramesAdded++;
             if (mRealtime) {
                 sleepUntilNextFrame();
