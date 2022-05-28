@@ -2,6 +2,7 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -54,6 +55,10 @@ class SurfaceEncoder extends Encoder {
 
     public SurfaceEncoder(Context context, OutputMultiplier multiplier) {
         mOutputMult = multiplier;
+        mContext = context;
+    }
+
+    public SurfaceEncoder(Context context) {
         mContext = context;
     }
 
@@ -143,7 +148,7 @@ class SurfaceEncoder extends Encoder {
 
             Log.d(TAG, "Format of encoder");
             checkMediaFormat(format);
-            mOutputMult.setName("SE_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
+
             mCodec.setCallback(new EncoderCallbackHandler());
             mCodec.configure(
                     format,
@@ -152,7 +157,8 @@ class SurfaceEncoder extends Encoder {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             checkMediaFormat(mCodec.getInputFormat());
             mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
-            mOutputMult.confirmSize(width, height);
+            setupOutputMult(width, height);
+
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setCodec(mCodec.getCanonicalName());
@@ -283,44 +289,47 @@ class SurfaceEncoder extends Encoder {
                     }
 
                 } else {
-                    while (size < 0 && !done) {
-                        try {
-                            if (mYuvReader != null) {
-                                size = queueInputBufferEncoder(
-                                        mCodec,
-                                        buffer,
-                                        mInFramesCount,
-                                        flags,
-                                        mRefFramesizeInBytes);
-                            }
-                            mInFramesCount++;
-                        } catch (IllegalStateException isx) {
-                            Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
-                            return "Illegal state: " + isx.getMessage();
-                        }
-                        if (size == -2) {
-                            continue;
-                        } else if (size <= 0 && !mIsCameraSource) {
-                            if (mYuvReader != null) {
-                                mYuvReader.closeFile();
-                            }
-                            current_loop++;
-                            if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
-                                Log.d(TAG, "Done with input!");
-                                done = true;
-                            }
+                    if (MainActivity.isStable()) {
 
-                            if (!done) {
+                        while (size < 0 && !done) {
+                            try {
                                 if (mYuvReader != null) {
-                                    Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                    mYuvReader.openFile(mTest.getInput().getFilepath());
-                                    Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                                    size = queueInputBufferEncoder(
+                                            mCodec,
+                                            buffer,
+                                            mInFramesCount,
+                                            flags,
+                                            mRefFramesizeInBytes);
+                                }
+                                mInFramesCount++;
+                            } catch (IllegalStateException isx) {
+                                Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
+                                return "Illegal state: " + isx.getMessage();
+                            }
+                            if (size == -2) {
+                                continue;
+                            } else if (size <= 0 && !mIsCameraSource) {
+                                if (mYuvReader != null) {
+                                    mYuvReader.closeFile();
+                                }
+                                current_loop++;
+                                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
+                                    Log.d(TAG, "Done with input!");
+                                    done = true;
+                                }
+
+                                if (!done) {
+                                    if (mYuvReader != null) {
+                                        Log.d(TAG, " *********** OPEN FILE AGAIN *******");
+                                        mYuvReader.openFile(mTest.getInput().getFilepath());
+                                        Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                                    }
                                 }
                             }
                         }
                     }
-
                 }
+                mStable = true;
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -359,8 +368,15 @@ class SurfaceEncoder extends Encoder {
         }
         Log.d(TAG, "Stop writer");
         mDataWriter.stopWriter();
-
+        mOutputMult.stopAndRelease();
         return "";
+    }
+
+    private void setupOutputMult(int width, int height) {
+        if (mOutputMult != null) {
+            mOutputMult.setName("SE_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
+            mOutputMult.confirmSize(width, height);
+        }
     }
 
     /**
@@ -398,20 +414,22 @@ class SurfaceEncoder extends Encoder {
                 mBitmap.copyPixelsFromBuffer(buffer);
             }
 
-            if (mOutputMult == null) {
-                mOutputMult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
-            }
-            mOutputMult.newFrameAvailable();
-
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
+            if (mFirstFrameTimestampUsec == -1) {
+                mFirstFrameTimestampUsec = ptsUsec;
+            }
+            mOutputMult.newBitmapAvailable(mBitmap, ptsUsec);
             mStats.startEncodingFrame(ptsUsec, frameCount);
         } else {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             read = -1;
         }
 
+        if (mRealtime) {
+            sleepUntilNextFrame(mInFramesCount);
+        }
         return read;
     }
 

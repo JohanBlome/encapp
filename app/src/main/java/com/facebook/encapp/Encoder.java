@@ -510,10 +510,10 @@ public abstract class Encoder {
                             mDone = true;
                         }
                         if (mFirstFrameTimestampUsec != -1) {
-                            long timestamp = mPts + (buffer.mInfo.presentationTimeUs - (long) mFirstFrameTimestampUsec);
+                            long timestampUsec = mPts + (buffer.mInfo.presentationTimeUs - (long) mFirstFrameTimestampUsec);
 
                             try {
-                                mStats.stopEncodingFrame(timestamp, buffer.mInfo.size,
+                                mStats.stopEncodingFrame(timestampUsec, buffer.mInfo.size,
                                         (buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                                 ++mOutFramesCount;
                                 if (mMuxer != null && mVideoTrack != -1) {
@@ -526,7 +526,7 @@ public abstract class Encoder {
                                 // Codec may be closed elsewhere...
                                 Log.e(TAG, "Failed to release buffer");
                             }
-                            mCurrentTimeSec = timestamp / 1000000.0;
+                            mCurrentTimeSec = timestampUsec / 1000000.0;
                         } else {
                             mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
                         }

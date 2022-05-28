@@ -1,22 +1,24 @@
 package com.facebook.encapp.utils;
 
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.opengl.GLES20;
+import android.opengl.GLUtils;
+import android.opengl.Matrix;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Message;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.Surface;
 
-import androidx.annotation.NonNull;
-
 import com.facebook.encapp.utils.grafika.EglCore;
 import com.facebook.encapp.utils.grafika.EglSurfaceBase;
 import com.facebook.encapp.utils.grafika.FullFrameRect;
+import com.facebook.encapp.utils.grafika.GlUtil;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
+import java.nio.ByteBuffer;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -55,6 +57,7 @@ public class OutputMultiplier {
     }
 
     public FrameswapControl addSurface(Surface surface) {
+        Log.d(TAG, "ADD SURFACE: "+mRenderer);
         if (mRenderer != null) {
             Log.d(TAG, "Add surface");
             return mRenderer.addSurface(surface);
@@ -75,6 +78,7 @@ public class OutputMultiplier {
     }
 
     public EglSurfaceBase addSurfaceTexture(SurfaceTexture surfaceTexture) {
+        Log.d(TAG, "ADD SURFACETEXTURE: "+mRenderer);
         if (mRenderer != null) {
             Log.d(TAG, "Add surface texture");
             return mRenderer.addSurfaceTexture(surfaceTexture);
@@ -105,6 +109,10 @@ public class OutputMultiplier {
         return mRenderer.awaitNewImage();
     }
 
+
+    public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
+        mRenderer.newBitmapAvailable(bitmap, timestampUsec);
+    }
 
     public void newFrameAvailable() {
         mRenderer.newFrameAvailable();
@@ -183,7 +191,7 @@ public class OutputMultiplier {
         int mHeight = -1;
         boolean mDone = false;
         ConcurrentLinkedQueue<FrameBuffer> mFrameBuffers = new ConcurrentLinkedQueue<>();
-        private long mLatestTimestamp = 0;
+        private long mLatestTimestampNsec = 0;
         private long mTimestamp0 = -1;
         private long mCurrentVsync = 0;
         private long mVsync0 = -1;
@@ -191,6 +199,7 @@ public class OutputMultiplier {
         private int frameAvailable = 0;
         // temporary object
         private Object mSurfaceObject;
+        private Bitmap mBitmap = null;
 
         public Renderer(Object surface) {
             super("Outputmultiplier Renderer");
@@ -248,6 +257,8 @@ public class OutputMultiplier {
                 if (mDone) break;
                 if (mFrameBuffers.size() > 0) {
                     drawFrameFromBuffer();
+                } else if (mBitmap != null) {
+                    drawBitmap();
                 } else {
                     drawFrameImmediate();
                 }
@@ -314,7 +325,7 @@ public class OutputMultiplier {
                     e.printStackTrace();
                 }
             }
-            return mLatestTimestamp;
+            return mLatestTimestampNsec;
         }
 
         public void drawFrameFromBuffer() {
@@ -353,7 +364,7 @@ public class OutputMultiplier {
                         mMasterSurface.makeCurrent();
                         mInputTexture.updateTexImage();
                         mInputTexture.getTransformMatrix(mTmpMatrix);
-                        mLatestTimestamp = mInputTexture.getTimestamp();
+                        mLatestTimestampNsec = mInputTexture.getTimestamp();
 
                     }
 
@@ -364,7 +375,7 @@ public class OutputMultiplier {
                             int height = surface.getHeight();
                             GLES20.glViewport(0, 0, width, height);
                             mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
-                            surface.setPresentationTime(mLatestTimestamp);
+                            surface.setPresentationTime(mLatestTimestampNsec);
                             surface.swapBuffers();
                         }
                     }
@@ -387,7 +398,7 @@ public class OutputMultiplier {
                 mMasterSurface.makeCurrent();
                 mInputTexture.updateTexImage();
                 mInputTexture.getTransformMatrix(mTmpMatrix);
-                mLatestTimestamp = mInputTexture.getTimestamp();
+                mLatestTimestampNsec = mInputTexture.getTimestamp();
 
                 synchronized (mLock) {
                     int counter = 0;
@@ -401,7 +412,56 @@ public class OutputMultiplier {
                                 GLES20.glViewport(0, 0, width, height);
                                 mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
                                 counter += 1;
-                                surface.setPresentationTime(mLatestTimestamp);
+                                surface.setPresentationTime(mLatestTimestampNsec);
+                                surface.swapBuffers();
+                            }
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Exception when drawing: " + ex);
+                        }
+                    }
+                }
+
+                synchronized (mFrameDrawnLock) {
+                    frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
+                    mFrameDrawnLock.notifyAll();
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "Exception: " + ex.getMessage());
+            }
+        }
+
+        public void drawBitmap() {
+            try {
+                if (mEglCore == null) {
+                    Log.d(TAG, "Skipping drawFrame after shutdown");
+                    return;
+                }
+                mMasterSurface.makeCurrent();
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureId);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
+                        GLES20.GL_LINEAR);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER,
+                        GLES20.GL_LINEAR);
+                GlUtil.checkGlError("loadImageTexture");
+                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, mBitmap, 0);
+                GlUtil.checkGlError("loadImageTexture");
+                mInputTexture.getTransformMatrix(mTmpMatrix);
+                Matrix.rotateM(mTmpMatrix, 0, 180, 1f, 0, 0);
+
+                synchronized (mLock) {
+
+                    int counter = 0;
+                    for (FrameswapControl surface : mOutputSurfaces) {
+                        try {
+                            if (surface.keepFrame()) {
+                                surface.makeCurrent();
+                                int width = surface.getWidth();
+                                int height = surface.getHeight();
+                                GLES20.glViewport(0, 0, width, height);
+                                GlUtil.checkGlError("glViewport");
+                                mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
+                                counter += 1;
+                                surface.setPresentationTime(mLatestTimestampNsec);
                                 surface.swapBuffers();
                             }
                         } catch (Exception ex) {
@@ -438,6 +498,14 @@ public class OutputMultiplier {
         public void newFrameAvailable() {
             synchronized (mInputFrameLock) {
                 frameAvailable += 1;
+                mInputFrameLock.notifyAll();
+            }
+        }
+
+        public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
+            synchronized (mInputFrameLock) {
+                mBitmap = bitmap;
+                mLatestTimestampNsec = timestampUsec * 1000;
                 mInputFrameLock.notifyAll();
             }
         }

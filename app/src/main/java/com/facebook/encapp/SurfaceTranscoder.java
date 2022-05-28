@@ -277,24 +277,15 @@ public class SurfaceTranscoder extends BufferEncoder {
         }
         mStats.stop();
         Log.d(TAG, "Close muxer and streams");
-
-
-        try {
-            mDataWriter.stopWriter();
-            mDataWriter.join(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            if (mMuxer != null) {
-                mMuxer.stop();
-                mMuxer.release();
+        if (mMuxer != null) {
+            try {
+                mMuxer.release(); //Release calls stop
+            } catch (IllegalStateException ise) {
+                //Most likely mean that the muxer is already released. Stupid API
+                Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
             }
-        } catch (IllegalStateException iex) {
-            Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
+            mMuxer = null;
         }
-
 
         if (mOutputMult != null) {
             mOutputMult.stopAndRelease();
@@ -328,6 +319,8 @@ public class SurfaceTranscoder extends BufferEncoder {
 
         if (mExtractor != null)
             mExtractor.release();
+        Log.d(TAG, "Stop writer");
+        mDataWriter.stopWriter();
         return "";
     }
 
@@ -405,6 +398,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
                     // Request key frame
+                    Log.d(TAG, "Request key frame");
                     Bundle bundle = new Bundle();
                     bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
                     mCodec.setParameters(bundle);

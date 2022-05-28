@@ -38,6 +38,7 @@ import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -268,8 +269,6 @@ public class MainActivity extends AppCompatActivity {
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-
             Tests testcases = null;
             try {
                 if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
@@ -290,13 +289,15 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 int nbrViews = 0;
+                boolean hasCameraPreview = false;
                 // Prepare views for visualization
                 for (Test test : testcases.getTestList()) {
-                    nbrViews += countPotentialViews(test);
+                    nbrViews += countInputPreviews(test);
+                    hasCameraPreview |= showCameraPreview(test);
                 }
                 // Only one view for camera
-                if (nbrViews >= 100) {
-                    nbrViews = nbrViews % 100 + 1;
+                if (hasCameraPreview) {
+                    nbrViews = nbrViews + 1;
                 }
                 final int tmp = nbrViews;
                 //nbrViews = 0;
@@ -519,18 +520,32 @@ public class MainActivity extends AppCompatActivity {
                     filePath.toLowerCase(Locale.US).equals("camera")) {
                 if (test.getConfigure().getSurface()) {
                     // If camera we need to share egl context
-                    OutputAndTexture ot = null;
-                    if (mCameraSourceMultiplier == null) {
+                    if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                        OutputAndTexture ot = null;
+                        if (mCameraSourceMultiplier == null) {
+                            if (mViewsToDraw.size() > 0 &&
+                                    test.getInput().hasShow() &&
+                                    test.getInput().getShow()) {
+                                ot = getFirstFreeTextureView();
+                            }
+                            setupCamera(ot);
+                        }
+                        coder = new SurfaceEncoder(this, mCameraSourceMultiplier);
+                        if (ot != null)
+                            ot.mEncoder = coder;
+                    } else {
+                        OutputAndTexture ot = null;
                         if (mViewsToDraw.size() > 0 &&
                                 test.getInput().hasShow() &&
                                 test.getInput().getShow()) {
                             ot = getFirstFreeTextureView();
+                            ot.mMult =  new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
+                            ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
+                            coder = new SurfaceEncoder(this, ot.mMult);
+                        } else{
+                            coder = new SurfaceEncoder(this,  new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D));
                         }
-                        setupCamera(ot);
                     }
-                    coder = new SurfaceEncoder(this, mCameraSourceMultiplier);
-                    if (ot != null)
-                        ot.mEncoder = coder;
                 } else {
                     coder = new BufferEncoder();
                 }
@@ -696,6 +711,8 @@ public class MainActivity extends AppCompatActivity {
     public void setupCamera(OutputAndTexture ot) {
         mCameraSource = CameraSource.getCamera(this);
         if (ot != null) {
+            ot.mMult = new OutputMultiplier();
+            ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
             mCameraSourceMultiplier = ot.mMult;
             // This is for camera, if mounted at an angle
             Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
@@ -706,12 +723,37 @@ public class MainActivity extends AppCompatActivity {
         mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
     }
 
+    public boolean showCameraPreview(Test test) {
+        boolean hasPreview = false;
+        if (test.hasParallel()) {
+            for (Test par_test : test.getParallel().getTestList()) {
+                hasPreview |= showCameraPreview(par_test);
+            }
+        }
+        if (test.getInput().hasShow() && test.getInput().getShow()) {
+            if (test.getInput().getFilepath().toLowerCase(Locale.US).equals("camera")) {
+                // Check max camera size
+                if (test.getInput().hasResolution()) {
+                    Size res = SizeUtils.parseXString(test.getInput().getResolution());
+                    if (res.getWidth() > mCameraMaxWidth) {
+                        mCameraMaxWidth = res.getWidth();
+                    }
+                    if (res.getHeight() > mCameraMaxHeight) {
+                        mCameraMaxHeight = res.getHeight();
+                    }
+                }
+            }
+            hasPreview = true;
+        }
+        return hasPreview;
+    }
 
-    public int countPotentialViews(Test test) {
+
+    public int countInputPreviews(Test test) {
         int nbr = 0;
         if (test.hasParallel()) {
             for (Test par_test : test.getParallel().getTestList()) {
-                nbr += countPotentialViews(par_test);
+                nbr += countInputPreviews(par_test);
             }
         }
 
@@ -721,26 +763,7 @@ public class MainActivity extends AppCompatActivity {
                     filePath.toLowerCase(Locale.US).contains(".yuv") ||
                     filePath.toLowerCase(Locale.US).contains(".rgba") ||
                     filePath.toLowerCase(Locale.US).equals("camera")) {
-                if (filePath.toLowerCase(Locale.US).equals("camera")) {
-                    //Count the camera in 100s
-
-                    Log.d(TAG, "Add camera");
-                    nbr += 100;
-                    // Check max camera size
-                    if (test.getInput().hasResolution()) {
-                        Size res = SizeUtils.parseXString(test.getInput().getResolution());
-                        if (res.getWidth() > mCameraMaxWidth) {
-                            mCameraMaxWidth = res.getWidth();
-                        }
-                        if (res.getHeight() > mCameraMaxHeight) {
-                            mCameraMaxHeight = res.getHeight();
-                        }
-                    }
-
-                } else {
-                    //Ignore
-                    Log.d(TAG, filePath + " is will not give a visualization view");
-                }
+                //Ignore
             } else {
                 nbr++;
             }
@@ -753,13 +776,14 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < count; i++) {
 
             TextureView view = new TextureView(this);
-            OutputAndTexture item = new OutputAndTexture(new OutputMultiplier(), view, null);
+            OutputAndTexture item = new OutputAndTexture(null, view, null);
             views.add(item);
+
             view.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
                 @Override
                 public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
                     Log.d(TAG, "onSurfaceTextureAvailable, item = " + item + ", view = " + view + ", surface = " + surface + ", w, h = " + width + ", " + height);
-                    item.mMult.addSurfaceTexture(surface);
+                    //item.mMult.addSurfaceTexture(surface);
                     synchronized (mViewsToDraw) {
                         views.notifyAll();
                     }
