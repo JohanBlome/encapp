@@ -28,10 +28,8 @@ import android.util.Log;
 import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
-
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
@@ -523,7 +521,7 @@ public class CameraSource {
         @Override
         public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest captureRequest, @NonNull CaptureFailure failure) {
             super.onCaptureFailed(session, captureRequest, failure);
-            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() +", "+failure.toString());  
+            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() +", "+failure.toString());
         }
     }
 

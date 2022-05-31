@@ -25,11 +25,9 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
@@ -40,7 +38,6 @@ import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
-
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -51,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
+
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
@@ -244,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
     /**
      * Run everything found in the bundle data
      * and exit.
@@ -270,20 +269,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Tests testcases = null;
-            try {
-                if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
-                    Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
-                    FileInputStream fis = new FileInputStream(path.toFile());
-                    Log.d(TAG, "Test path = " + path.getFileName());
-                    testcases = Tests.parseFrom(fis);
-                    Log.d(TAG, "Data: " + Files.readAllBytes(path));
-                    // ERROR
-                    if (testcases.getTestList().size() <= 0) {
-                        Log.e(TAG, "Failed to read test");
-                        return;
-                    }
+        Tests testcases = null;
+        try {
+            if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
+                Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
+                FileInputStream fis = new FileInputStream(path.toFile());
+                Log.d(TAG, "Test path = " + path.getFileName());
+                testcases = Tests.parseFrom(fis);
+                Log.d(TAG, "Data: " + Files.readAllBytes(path));
+                // ERROR
+                if (testcases.getTestList().size() <= 0) {
+                    Log.e(TAG, "Failed to read test");
+                    return;
                 }
                 if (testcases == null) {
                     Log.d(TAG, "No test case");
@@ -444,11 +441,14 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-            } catch (IOException iox) {
-                Log.e(TAG, "Test failed: " + iox.getMessage());
-            }
+            } 
         }
+        catch (IOException iox) {
+                Log.e(TAG, "Test failed: " + iox.getMessage());
+        }
+        
     }
+
 
 
     /**
@@ -463,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Start test: " + test.getCommon().getDescription());
 
         increaseTestsInflight();
-        Thread t = PerformaTest(test);
+        Thread t = PerformTest(test);
 
         if (test.hasParallel()) {
             for (Test parallell : test.getParallel().getTestList()) {
@@ -493,7 +493,7 @@ public class MainActivity extends AppCompatActivity {
      * @param test
      * @return the thread belonging to Test test
      */
-    private Thread PerformaTest(Test test) {
+    private Thread PerformTest(Test test) {
         String filePath = test.getInput().getFilepath();
         Log.d(TAG, "Run test case, source : " + filePath);
         Log.d(TAG, "test" + test.toString());

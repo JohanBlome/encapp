@@ -4,8 +4,8 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
 
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
 
 
 public class MediaCodecInfoHelper {

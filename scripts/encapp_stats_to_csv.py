@@ -314,12 +314,12 @@ def main():
             p.set_xlabel('time (sec)')
             p.set_ylabel('frame duration (ms)')
             axs.set_title(f"{source_name} vs. System Frame Duration")
+
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.frame_duration.png'
             plt.savefig(name.replace(' ', '_'), format='png')
             print(f'output1: {name}')
             # plot the framerate
-
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
@@ -327,6 +327,8 @@ def main():
                 ci='sd', data=encoding_data,
                 ax=axs,
                 label=f'system fps, average = {mean_sys_fps} ms')
+            p.set_xlabel('time (sec)')
+            p.set_ylabel('framerate (fps)')
             # p.set_ylim(0, 90)
             p = sb.lineplot(  # noqa: F841
                 x=encoding_data['pts']/1000000,
@@ -357,14 +359,18 @@ def main():
                 y=decoded_data['av_fps'],
                 ci='sd', data=decoded_data,
                 ax=axs,
-                label=f'pts based fps, average = {mean_fps} fps')
+                label=f"{source_name}, average = {mean_cam_fps} ms")
+            p.set_xlabel('time (sec)')
+            p.set_ylabel('framerate (fps)')
             # p.set_ylim(0, 90)
 
-            axs.set_title('Fps and proc fps')
+            axs.set_title(f"{source_name} Framerate vs. System Framerate")
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
-            name = f'{options.file}_dec_fps.png'
+            name = f'{options.file}.framerate.png'
+            print(f'output2: {name}')
             plt.savefig(name.replace(' ', '_'), format='png')
-            plt.show()
+            # plt.show()
+        if not isinstance(decoded_data, type(None)):
             print(f'decoding_data_len: {len(decoded_data)}')
         if not isinstance(gpu_data, type(None)):
             print(f'gpu_data_len: {len(gpu_data)}')
