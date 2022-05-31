@@ -1,7 +1,5 @@
 package com.facebook.encapp.utils;
 
-import static android.content.Context.CAMERA_SERVICE;
-
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -34,6 +32,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.Executor;
+
+import static android.content.Context.CAMERA_SERVICE;
 
 
 public class CameraSource {
@@ -117,25 +117,24 @@ public class CameraSource {
                 Iterator<CameraCharacteristics.Key<?>> iter = keys.iterator();
                 while (iter.hasNext()) {
                     CameraCharacteristics.Key<?> key = iter.next();
-
                     Object obj = chars.get(key);
-                    if (obj instanceof Range[]) {
+                    if (obj instanceof Range[] ) {
                         Log.d(TAG, "Key: " + key.getName());
-                        for (Range range : (Range[]) obj) {
+                        for (Range range: (Range[])obj) {
                             Log.d(TAG, range.getLower() + "->" + range.getUpper());
                         }
                     } else if (obj instanceof MandatoryStreamCombination[]) {
                         Log.d(TAG, key.getName());
-                        for (MandatoryStreamCombination comb : (MandatoryStreamCombination[]) obj) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        if (Build.VERSION.SDK_INT >= 29) {
+                            for (MandatoryStreamCombination comb: (MandatoryStreamCombination[])obj) {
                                 Log.d(TAG, "descr: " + comb.getDescription());
                             }
                         }
-                    } else {
-                        Log.d(TAG, key.getName() + " - " + chars.get(key));
+                    }
+                    else {
+                        Log.d(TAG, key.getName() + " - "  + chars.get(key));
 
                     }
-
                 }
             }
 
@@ -172,40 +171,35 @@ public class CameraSource {
                 }
             }
 
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 RecommendedStreamConfigurationMap recomended = characs.getRecommendedStreamConfigurationMap(RecommendedStreamConfigurationMap.USECASE_PREVIEW);
             }
 
             Range<Integer>[] fpsRanges = characs.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-            Log.d(TAG, "_____\n");
             if (fpsRanges != null) {
-                Log.d(TAG, "fps ranges: " + fpsRanges.length);
-                for (Range range : fpsRanges) {
-                    Log.d(TAG, range.getLower() + " -> " + range.getUpper());
+                for (Range range: fpsRanges) {
+                    Log.d(TAG, "fps range: " + range.getLower() + " -> " + range.getUpper());
                 }
             } else {
                 Log.d(TAG, "no fps ranges");
             }
-            Log.d(TAG, "_____\n");
+
             Range<Integer> sensorRange = characs.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
             if (sensorRange != null)
                 Log.d(TAG, "Sensor range: " + sensorRange.getLower() + " -> " + sensorRange.getUpper());
             else
                 Log.d(TAG, "No sensor range");
 
-            Log.d(TAG, "_____\n");
             Range<Long> exposureRange = characs.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
             if (exposureRange != null)
                 Log.d(TAG, "Exposure range: " + exposureRange.getLower() + " -> " + exposureRange.getUpper());
             else
                 Log.d(TAG, "No exposure range");
-            Log.d(TAG, "_____\n");
+
             Long maxDuration = characs.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION);
             Log.d(TAG, "Max frame duration: " + maxDuration);
 
-            Log.d(TAG, "_____\n");
-            int[] facedetectionModes = characs.get(CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES);
+            int[] facedetectionModes= characs.get(CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES);
             if (facedetectionModes != null) {
                 Log.d(TAG, "facedetectionModes: " + facedetectionModes.length);
                 for (int mode : facedetectionModes) {
@@ -222,7 +216,8 @@ public class CameraSource {
                     }
                 }
 
-            } else
+            }
+            else
                 Log.d(TAG, "No face detection modes");
 
             mCameraManager.openCamera(cams[0],
@@ -234,7 +229,6 @@ public class CameraSource {
 
             mHwLevel = characs.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
             Log.d(TAG, "Hw level: " + hwLevelToText(mHwLevel));
-            Log.d(TAG, "_____\n");
         } catch (CameraAccessException cameraAccessException) {
             cameraAccessException.printStackTrace();
         }
@@ -455,6 +449,8 @@ public class CameraSource {
         public void onReady(@NonNull CameraCaptureSession session) {
             super.onReady(session);
             Log.d(TAG, "onReady!!!");
+            //session.getInputSurface().setFrameRate(30, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+            //session.switchToOffline(Arrays.asList(mSurface), new CamExec(), new Offline());
         }
 
 
@@ -521,7 +517,7 @@ public class CameraSource {
         @Override
         public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest captureRequest, @NonNull CaptureFailure failure) {
             super.onCaptureFailed(session, captureRequest, failure);
-            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() +", "+failure.toString());
+            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() + ", " + failure.toString());
         }
     }
 
@@ -575,7 +571,6 @@ public class CameraSource {
     class SurfaceData {
         Surface mSurface;
         int mWidth, mHeight;
-
         public SurfaceData(Surface surface, int width, int height) {
             mSurface = surface;
             mWidth = width;
