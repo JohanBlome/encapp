@@ -2,14 +2,13 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.media.cts.BitmapRender;
-import android.media.cts.InputSurface;
-import android.media.cts.OutputSurface;
 import android.os.Build;
+import android.os.Bundle;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -17,19 +16,22 @@ import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.util.Log;
 import android.util.Size;
-import android.view.Surface;
+
+import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FpsMeasure;
+import com.facebook.encapp.utils.FrameswapControl;
+import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
+import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
@@ -37,21 +39,24 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 
 class SurfaceEncoder extends Encoder {
+    protected static final String TAG = "encapp.encoder";
     Bitmap mBitmap = null;
-    AtomicReference<Surface> mInputSurfaceReference;
     Context mContext;
-    InputSurface mInputSurface;
-    private Allocation mYuvIn;
-    private Allocation mYuvOut;
-    private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
-    BitmapRender mBitmapRender = null;
     SurfaceTexture mSurfaceTexture;
     boolean mIsRgbaSource = false;
     boolean mIsCameraSource = false;
-    CameraSource mCameraSource;
-    OutputSurface mOutputSurface;
-
     boolean mUseCameraTimestamp = true;
+    OutputMultiplier mOutputMult;
+    Bundle mKeyFrameBundle;
+    private Allocation mYuvIn;
+    private Allocation mYuvOut;
+    private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
+    private FrameswapControl mFrameSwapSurface;
+
+    public SurfaceEncoder(Context context, OutputMultiplier multiplier) {
+        mOutputMult = multiplier;
+        mContext = context;
+    }
 
     public SurfaceEncoder(Context context) {
         mContext = context;
@@ -64,38 +69,40 @@ class SurfaceEncoder extends Encoder {
     public String encode(
             Test test,
             Object synchStart) {
+        mStable = false;
+        mKeyFrameBundle = new Bundle();
+        mKeyFrameBundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+        mTest = test;
+        Log.d(TAG, "** Surface input encoding - " + mTest.getCommon().getDescription() + " **");
+        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        if (mTest.hasRuntime())
+            mRuntimeParams = mTest.getRuntime();
+        if (mTest.getInput().hasRealtime())
+            mRealtime = mTest.getInput().getRealtime();
 
-        Log.d(TAG, "** Raw input encoding - " + test.getCommon().getDescription() + " **");
-        test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
-        if (test.hasRuntime())
-            mRuntimeParams = test.getRuntime();
-        if (test.getInput().hasRealtime())
-            mRealtime = test.getInput().getRealtime();
+        mFrameRate = mTest.getConfigure().getFramerate();
+        mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
+        mStats = new Statistics("raw encoder", mTest);
 
-        mFrameRate = test.getConfigure().getFramerate();
-        mWriteFile = (test.getConfigure().hasEncode())?test.getConfigure().getEncode():true;
-        mStats = new Statistics("raw encoder", test);
-
-        Size res = SizeUtils.parseXString(test.getInput().getResolution());
+        Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
         int height = res.getHeight();
         mRefFramesizeInBytes = (int) (width * height * 1.5);
-        mRefFrameTime = calculateFrameTiming(mReferenceFrameRate);
+        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
-        if (test.getInput().getFilepath().endsWith("rgba")) {
+        if (mTest.getInput().getFilepath().endsWith("rgba")) {
             mIsRgbaSource = true;
-            mRefFramesizeInBytes = (int) (width * height * 4);
-        } else if (test.getInput().getFilepath().equals("camera")) {
+            mRefFramesizeInBytes = width * height * 4;
+        } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
-            mCameraSource = CameraSource.getCamera(mContext);
             //TODO: handle other fps (i.e. try to set lower or higher fps)
             // Need to check what frame rate is actually set unless real frame time is being used
             mReferenceFrameRate = 30; //We strive for this at least
-            mKeepInterval = mReferenceFrameRate / (float) mFrameRate;
+            mKeepInterval = mReferenceFrameRate / mFrameRate;
 
-            if (!test.getInput().hasPlayoutFrames() && !test.getInput().hasStoptimeSec()) {
+            if (!mTest.getInput().hasPlayoutFrames() && !mTest.getInput().hasStoptimeSec()) {
                 // In case we do not have a limit, limit to 60 secs
-                test = TestDefinitionHelper.updatePlayoutFrames(test, 1800);
+                mTest = TestDefinitionHelper.updatePlayoutFrames(mTest, 1800);
                 Log.d(TAG, "Set playout limit for camera to 1800 frames");
             }
         }
@@ -114,7 +121,7 @@ class SurfaceEncoder extends Encoder {
             mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
             mYuvReader = new FileReader();
-            if (!mYuvReader.openFile(test.getInput().getFilepath())) {
+            if (!mYuvReader.openFile(mTest.getInput().getFilepath())) {
                 return "\nCould not open file";
             }
 
@@ -126,23 +133,22 @@ class SurfaceEncoder extends Encoder {
         try {
 
             //Unless we have a mime, do lookup
-            if (test.getConfigure().getMime().length() == 0) {
-                Log.d(TAG, "codec id: " + test.getConfigure().getCodec());
+            if (mTest.getConfigure().getMime().length() == 0) {
+                Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
                 //TODO: throw error on failed lookup
-                test = setCodecNameAndIdentifier(test);
+                mTest = setCodecNameAndIdentifier(mTest);
             }
-            Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
-            mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
+            Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
+            mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
 
-            format = TestDefinitionHelper.buildMediaFormat(test);
+            format = TestDefinitionHelper.buildMediaFormat(mTest);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             checkMediaFormat(format);
-            mInputSurfaceReference = new AtomicReference<>();
+
             Log.d(TAG, "Format of encoder");
             checkMediaFormat(format);
 
-            mInputSurfaceReference = new AtomicReference<>();
             mCodec.setCallback(new EncoderCallbackHandler());
             mCodec.configure(
                     format,
@@ -150,9 +156,9 @@ class SurfaceEncoder extends Encoder {
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             checkMediaFormat(mCodec.getInputFormat());
+            mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
+            setupOutputMult(width, height);
 
-            mInputSurfaceReference.set(mCodec.createInputSurface());
-            mInputSurface = new InputSurface(mInputSurfaceReference.get());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setCodec(mCodec.getCanonicalName());
@@ -176,28 +182,25 @@ class SurfaceEncoder extends Encoder {
             return "Start encoding failed";
         }
 
-        if (mIsCameraSource) {
-            mInputSurface.makeCurrent();
-            Log.d(TAG,"create output surface");
-            mOutputSurface = new OutputSurface(width, height, false);
-            mCameraSource.registerSurface(mOutputSurface.getSurface(), width, height);
-        }
-
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
+
 
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
             mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            Log.d(TAG, "Start muxer, track = " + mVideoTrack);
             mMuxer.start();
         }
 
-
+        Log.d(TAG, "Create fps measure: " + this);
+        mFpsMeasure = new FpsMeasure(mFrameRate, this.toString());
+        mFpsMeasure.start();
+        double frameTime = mRefFrameTime * mKeepInterval;
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
-        long firstTimestamp = -1;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -210,16 +213,19 @@ class SurfaceEncoder extends Encoder {
         mStats.start();
         int errorCounter = 0;
         while (!done) {
-            int index;
-
-            if (mFramesAdded % 100 == 0) {
+            if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
                 Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        ", current loop: " + current_loop  + ", current time: " + mCurrentTime + " sec");
+                        " current time: " + mCurrentTimeSec + " sec, frame rate: " + mFrameRate +
+                        ", calc. frame rate: " + (int) (mFramesAdded / mCurrentTimeSec + .5f) +
+                        ", input frame rate: " + (int) (mInFramesCount / mCurrentTimeSec + .5f) +
+                        ", id: " + mStats.getId());
             }
             try {
                 int flags = 0;
-                if (doneReading(test, mInFramesCount, mCurrentTime, false)) {
+                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                    Log.d(TAG, "Done with input, flag endof stream!");
+                    mOutputMult.stopAndRelease();
                     done = true;
                 }
 
@@ -227,34 +233,50 @@ class SurfaceEncoder extends Encoder {
 
                 if (mIsCameraSource) {
                     try {
-                        long timestamp = mOutputSurface.awaitNewImage();
-                        if (firstTimestamp <= 0) {
-                            firstTimestamp = timestamp;
-                        }
-                        mOutputSurface.drawImage();
-                        int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
-                        int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
-                        setRuntimeParameters(mInFramesCount);
-                        mDropNext = dropFrame(mInFramesCount);
-                        updateDynamicFramerate(mInFramesCount);
-                        if (currentFrameNbr == nextFrameNbr || mDropNext) {
-                            mSkipped++;
-                            mDropNext = false;
-                        } else {
-                            long ptsNsec = 0;
-                            if (mUseCameraTimestamp) {
-                                // Use the camera provided timestamp
-                                ptsNsec = mPts * 1000 + (timestamp - firstTimestamp);
+                        long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
+                        if (!MainActivity.isStable()) {
+                            if (!mFpsMeasure.isStable()) {
+                                mFpsMeasure.addPtsUsec(timestampUsec);
+                                mCodec.setParameters(mKeyFrameBundle);
+                                Log.d(TAG, "Not stable, current fps: " + mFpsMeasure.getFps() + "( " +
+                                        mFpsMeasure.getAverageFps() + ")");
                             } else {
-                                ptsNsec = computePresentationTime(mInFramesCount, mRefFrameTime) * 1000;
+                                mStable = true;
                             }
-                            mInputSurface.setPresentationTime(ptsNsec);
-                            mInputSurface.swapBuffers();
+                        } else {
+                            if (mFirstFrameTimestampUsec < 0) {
+                                mFirstFrameTimestampUsec = timestampUsec;
+                                // Request key frame
+                                Bundle bundle = new Bundle();
+                                bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                                mCodec.setParameters(bundle);
+                            }
+                            setRuntimeParameters(mInFramesCount);
+                            mDropNext = dropFrame(mInFramesCount);
+                            double diff = timestampUsec - mFirstFrameTimestampUsec;
+                            if (mFramesAdded * frameTime + frameTime > diff) {
+                                mDropNext = true;
+                            }
+                            updateDynamicFramerate(mInFramesCount);
+                            if (mDropNext) {
+                                mFrameSwapSurface.dropNext(true);
+                                mSkipped++;
+                                mDropNext = false;
+                            } else {
+                                mFrameSwapSurface.dropNext(false);
+                                long ptsUsec = 0;
+                                if (mUseCameraTimestamp) {
+                                    // Use the camera provided timestamp
+                                    ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
+                                } else {
+                                    ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+                                }
 
-                            mStats.startEncodingFrame(ptsNsec / 1000, mInFramesCount);
-                            mFramesAdded++;
+                                mStats.startEncodingFrame(ptsUsec, mInFramesCount);
+                                mFramesAdded++;
+                            }
+                            mInFramesCount++;
                         }
-                        mInFramesCount++;
                     } catch (Exception ex) {
                         //TODO: make a real fix for when a camera encoder quits before another
                         // and the surface is removed. The camera request needs to be updated.
@@ -267,91 +289,95 @@ class SurfaceEncoder extends Encoder {
                     }
 
                 } else {
-                    while (size < 0 && !done) {
-                        try {
-                            if (mYuvReader != null) {
-                                size = queueInputBufferEncoder(
-                                        mCodec,
-                                        buffer,
-                                        mInFramesCount,
-                                        flags,
-                                        mRefFramesizeInBytes);
-                            }
-                            mInFramesCount++;
-                        } catch (IllegalStateException isx) {
-                            Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
-                            return "Illegal state: " + isx.getMessage();
-                        }
-                        if (size == -2) {
-                            continue;
-                        } else if (size <= 0 && !mIsCameraSource) {
-                            if (mYuvReader != null) {
-                                mYuvReader.closeFile();
-                            }
-                            current_loop++;
-                            if (doneReading(test, mInFramesCount, mCurrentTime, true)) {
-                                done = true;
-                            }
+                    if (MainActivity.isStable()) {
 
-                            if (!done) {
+                        while (size < 0 && !done) {
+                            try {
                                 if (mYuvReader != null) {
-                                    Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                    mYuvReader.openFile(test.getInput().getFilepath());
-                                    Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                                    size = queueInputBufferEncoder(
+                                            mCodec,
+                                            buffer,
+                                            mInFramesCount,
+                                            flags,
+                                            mRefFramesizeInBytes);
+                                }
+                                mInFramesCount++;
+                            } catch (IllegalStateException isx) {
+                                Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
+                                return "Illegal state: " + isx.getMessage();
+                            }
+                            if (size == -2) {
+                                continue;
+                            } else if (size <= 0 && !mIsCameraSource) {
+                                if (mYuvReader != null) {
+                                    mYuvReader.closeFile();
+                                }
+                                current_loop++;
+                                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
+                                    Log.d(TAG, "Done with input!");
+                                    done = true;
+                                }
+
+                                if (!done) {
+                                    if (mYuvReader != null) {
+                                        Log.d(TAG, " *********** OPEN FILE AGAIN *******");
+                                        mYuvReader.openFile(mTest.getInput().getFilepath());
+                                        Log.d(TAG, "*** Loop ended start " + current_loop + "***");
+                                    }
                                 }
                             }
                         }
                     }
-
                 }
+                mStable = true;
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
 
 
         }
+        Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
         mStats.stop();
 
-        Log.d(TAG, "Close muxer and streams");
-        if (mCodec != null) {
-            mCodec.flush();
-            mCodec.stop();
-            mCodec.release();
-        }
         if (mMuxer != null) {
             try {
                 mMuxer.release(); //Release calls stop
             } catch (IllegalStateException ise) {
                 //Most likely mean that the muxer is already released. Stupid API
-                Log.e(TAG, "Illegal state exception when trying to release the muxer");
+                Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
             }
+            mMuxer = null;
+        }
+        if (mCodec != null) {
+            mCodec.flush();
+            mCodec.stop();
+            mCodec.release();
+        }
+
+        if (mFrameSwapSurface != null) {
+            mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
         }
 
         if (mYuvReader != null)
             mYuvReader.closeFile();
 
-        if (mIsCameraSource) {
-            mCameraSource.closeCamera();
-        }
-
         if (mSurfaceTexture != null) {
-            mInputSurfaceReference.get().release();
-            mInputSurfaceReference.set(null);
             mSurfaceTexture.detachFromGLContext();
             mSurfaceTexture.releaseTexImage();
             mSurfaceTexture.release();
         }
-
-        if (mOutputSurface != null) {
-            mOutputSurface.getSurface().release();
-            mOutputSurface.release();
-        }
-
+        Log.d(TAG, "Stop writer");
+        mDataWriter.stopWriter();
+        mOutputMult.stopAndRelease();
         return "";
     }
 
-
-    SurfaceTexture mSurfTex = null;
+    private void setupOutputMult(int width, int height) {
+        if (mOutputMult != null) {
+            mOutputMult.setName("SE_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
+            mOutputMult.confirmSize(width, height);
+        }
+    }
 
     /**
      * Fills input buffer for encoder from YUV buffers.
@@ -372,7 +398,7 @@ class SurfaceEncoder extends Encoder {
             mDropNext = false;
             read = -2;
         } else if (read == size) {
-            long ptsUsec = computePresentationTime(mInFramesCount, mRefFrameTime);
+            long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
             mFramesAdded++;
             if (mRealtime) {
                 sleepUntilNextFrame();
@@ -387,28 +413,29 @@ class SurfaceEncoder extends Encoder {
             } else {
                 mBitmap.copyPixelsFromBuffer(buffer);
             }
-            mInputSurface.makeCurrent();
 
-            if (mBitmapRender == null){
-                mBitmapRender = new BitmapRender();
-                mBitmapRender.surfaceCreated();
-
-                mSurfaceTexture = new SurfaceTexture(mBitmapRender.getTextureId());
-            }
-            mBitmapRender.drawFrame(mBitmap);
-            mInputSurface.setPresentationTime(ptsUsec * 1000);
-            mInputSurface.swapBuffers();
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
+            if (mFirstFrameTimestampUsec == -1) {
+                mFirstFrameTimestampUsec = ptsUsec;
+            }
+            mOutputMult.newBitmapAvailable(mBitmap, ptsUsec);
             mStats.startEncodingFrame(ptsUsec, frameCount);
         } else {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             read = -1;
         }
 
+        if (mRealtime) {
+            sleepUntilNextFrame(mInFramesCount);
+        }
         return read;
     }
 
+    public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
+    }
 
+    public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
 }

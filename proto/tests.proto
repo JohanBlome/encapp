@@ -18,6 +18,7 @@ enum DataValueType {
     longType = 3;
 }
 
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -31,6 +32,7 @@ message Input {
   optional int32 pursuit = 6;
   optional bool realtime = 7;
   optional float stoptime_sec = 8;
+  optional bool show = 9;
 }
 
 message Configure {

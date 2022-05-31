@@ -22,7 +22,7 @@ public class SystemLoad {
     ArrayList<String> mGpuClock = new ArrayList<>();
     public void start() {
         String tmp = readSystemData("/sys/class/kgsl/kgsl-3d0/gpu_model");
-        if (tmp == "") {
+        if (!tmp.equals("")) {
             Log.e(TAG, "Could not read system data, \"adb root && adb shell setenforce 0\" needed");
             return;
         } else {
@@ -63,7 +63,7 @@ public class SystemLoad {
                         }
                     }
                 }
-            });
+            }, "system_load_thread");
             t.start();
         }
     }
@@ -97,10 +97,8 @@ public class SystemLoad {
                     e.printStackTrace();
                 }
             }
-
-
-            return value.toString();
         }
+        return value.toString();
     }
 
     public int[] getGPULoadPercentagePerTimeUnit() {

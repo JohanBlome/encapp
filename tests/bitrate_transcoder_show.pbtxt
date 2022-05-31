@@ -1,14 +1,12 @@
 test {
     common {
-        id: "Camera"
-        description: "Camera source encoding"
+        id: "Bitrate"
+        description: "Verify encoding bitrate - surface"
     }
     input {
-        filepath: "camera"
-        resolution: "1280x720"
+        filepath: "/tmp/akiyo_qcif.mp4"
+        resolution: "176x144"
         framerate: 30
-        playout_frames: 300
-        pursuit: 3
         show: true
     }
     configure {
