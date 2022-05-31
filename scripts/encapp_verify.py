@@ -21,11 +21,14 @@ import proto.tests_pb2 as proto
 
 DEFAULT_TESTS = ['bitrate_buffer.pbtxt',
                  'bitrate_surface.pbtxt',
+                 'bitrate_transcoder_show.pbtxt',
                  'dynamic_bitrate.pbtxt',
                  'dynamic_framerate.pbtxt',
                  'dynamic_idr.pbtxt',
                  'lt2.pbtxt',
                  'ltr-2ref.pbtxt',
+                 'camera.pbtxt',
+                 'camera_parallel.pbtxt'
                  ]
 
 
@@ -587,6 +590,7 @@ def main(argv):
 
             if os.path.exists(es.INDEX_FILE_NAME):
                 os.remove(es.INDEX_FILE_NAME)
+                print(f"removed path: {es.INDEX_FILE_NAME}")
             '''
             args = []
             args.append(__file__)

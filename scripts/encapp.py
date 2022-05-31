@@ -322,12 +322,17 @@ def verify_video_size(videofile, resolution):
 
 def update_file_paths(test, new_name):
     path = test.input.filepath
-    if new_name is not None:
-        path = new_name
-    if path != 'camera':
-        test.input.filepath = f'/sdcard/{os.path.basename(path)}'
     for para in test.parallel.test:
         update_file_paths(para, new_name)
+
+    if path == 'camera':
+        return
+
+    if new_name is not None:
+        path = new_name
+
+    test.input.filepath = f'/sdcard/{os.path.basename(path)}'
+    path = test.input.filepath
 
 
 def add_files(test, files_to_push):

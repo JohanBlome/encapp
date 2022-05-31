@@ -293,11 +293,7 @@ public class MainActivity extends AppCompatActivity {
                 // Prepare views for visualization
                 for (Test test : testcases.getTestList()) {
                     nbrViews += countInputPreviews(test);
-                    hasCameraPreview |= showCameraPreview(test);
-                }
-                // Only one view for camera
-                if (hasCameraPreview) {
-                    nbrViews = nbrViews + 1;
+                    showCameraPreview(test);
                 }
                 final int tmp = nbrViews;
                 //nbrViews = 0;
@@ -511,64 +507,62 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        final Encoder coder;
+        Encoder coder;
         synchronized (mEncoderList) {
             Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
-            if (filePath.toLowerCase(Locale.US).contains(".raw") ||
-                    filePath.toLowerCase(Locale.US).contains(".yuv") ||
-                    filePath.toLowerCase(Locale.US).contains(".rgba") ||
-                    filePath.toLowerCase(Locale.US).equals("camera")) {
-                if (test.getConfigure().getSurface()) {
-                    // If camera we need to share egl context
-                    if (filePath.toLowerCase(Locale.US).equals("camera")) {
-                        OutputAndTexture ot = null;
-                        if (mCameraSourceMultiplier == null) {
-                            if (mViewsToDraw.size() > 0 &&
-                                    test.getInput().hasShow() &&
-                                    test.getInput().getShow()) {
-                                ot = getFirstFreeTextureView();
-                            }
-                            setupCamera(ot);
-                        }
-                        coder = new SurfaceEncoder(this, mCameraSourceMultiplier);
-                        if (ot != null)
-                            ot.mEncoder = coder;
-                    } else {
-                        OutputAndTexture ot = null;
-                        if (mViewsToDraw.size() > 0 &&
-                                test.getInput().hasShow() &&
-                                test.getInput().getShow()) {
-                            ot = getFirstFreeTextureView();
-                            ot.mMult =  new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
-                            ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
-                            coder = new SurfaceEncoder(this, ot.mMult);
-                        } else{
-                            coder = new SurfaceEncoder(this,  new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D));
-                        }
-                    }
-                } else {
-                    coder = new BufferEncoder();
-                }
+            OutputAndTexture ot = null;
+            if (test.getConfigure().getSurface()) {
 
-            } else {
-                OutputAndTexture ot = null;
-                if (test.getInput().hasShow() && test.getInput().getShow()) {
+                if (mViewsToDraw.size() > 0 &&
+                        test.getInput().hasShow() &&
+                        test.getInput().getShow()) {
                     ot = getFirstFreeTextureView();
                 }
+
+            }
+            if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                setupCamera(ot);
+            }
+
+            if (filePath.toLowerCase(Locale.US).contains(".mp4") ||
+                    filePath.toLowerCase(Locale.US).contains(".webm")) {
+                // A decoder is needed
                 if (ot != null) {
+                    ot.mMult = new OutputMultiplier();
                     coder = new SurfaceTranscoder(ot.mMult);
                     ot.mEncoder = coder;
-                    if (!test.getConfigure().getEncode()) {
+                    if (!test.getConfigure().getEncode() &&
+                            ot.mMult != null &&
+                            ot.mView != null) {
                         Log.d(TAG, "Decode only, use view size");
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
                 } else {
-                    Log.e(TAG, "No view found");
                     coder = new SurfaceTranscoder(new OutputMultiplier());
                 }
+            } else if (test.getConfigure().getSurface()) {
+                OutputMultiplier mult = null;
+                if (filePath.toLowerCase(Locale.US).contains(".raw") ||
+                        filePath.toLowerCase(Locale.US).contains(".yuv") ||
+                        filePath.toLowerCase(Locale.US).contains(".rgba")) {
+                    mult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
+                } else if (filePath.toLowerCase(Locale.US).contains("camera")) {
+                    mult = mCameraSourceMultiplier;
+                }
+                if (ot != null) {
+                    ot.mMult = mult;
+                }
+                coder = new SurfaceEncoder(this, mult);
+
+            } else {
+                coder = new BufferEncoder();
             }
 
 
+            if (ot != null) {
+                ot.mEncoder = coder;
+                ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
+            }
             Log.d(TAG, "Add encoder to list");
             mEncoderList.add(coder);
         }
@@ -710,17 +704,19 @@ public class MainActivity extends AppCompatActivity {
 
     public void setupCamera(OutputAndTexture ot) {
         mCameraSource = CameraSource.getCamera(this);
+        if (mCameraSourceMultiplier == null) {
+            mCameraSourceMultiplier = new OutputMultiplier();
+            mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
+        }
         if (ot != null) {
-            ot.mMult = new OutputMultiplier();
-            ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
+            ot.mMult = mCameraSourceMultiplier;
+            //ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
             mCameraSourceMultiplier = ot.mMult;
             // This is for camera, if mounted at an angle
             Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
             configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
-        } else {
-            mCameraSourceMultiplier = new OutputMultiplier();
         }
-        mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
+
     }
 
     public boolean showCameraPreview(Test test) {
@@ -759,14 +755,7 @@ public class MainActivity extends AppCompatActivity {
 
         String filePath = test.getInput().getFilepath();
         if (test.getInput().hasShow() && test.getInput().getShow()) {
-            if (filePath.toLowerCase(Locale.US).contains(".raw") ||
-                    filePath.toLowerCase(Locale.US).contains(".yuv") ||
-                    filePath.toLowerCase(Locale.US).contains(".rgba") ||
-                    filePath.toLowerCase(Locale.US).equals("camera")) {
-                //Ignore
-            } else {
-                nbr++;
-            }
+            nbr++;
         }
         return nbr;
     }

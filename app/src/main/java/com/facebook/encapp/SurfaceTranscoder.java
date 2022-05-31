@@ -401,7 +401,9 @@ public class SurfaceTranscoder extends BufferEncoder {
                     Log.d(TAG, "Request key frame");
                     Bundle bundle = new Bundle();
                     bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                    mCodec.setParameters(bundle);
+                    if (mCodec != null) {
+                        mCodec.setParameters(bundle);
+                    }
                 }
 
                 mCurrentTimeSec = (timestamp - mFirstFrameTimestampUsec) / 1000000;
