@@ -318,6 +318,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 }
+                boolean cameraStarted = false;
                 int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
                     Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
@@ -339,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
                             Thread t = startTest(test, threads);
 
                             Log.d(TAG, "Started the test, check camera: " + mCameraCount);
-                            if (mCameraCount > 0) {
+                            if (mCameraCount > 0 && !cameraStarted) {
                                 Log.d(TAG, "Start cameras");
                                 Surface outputSurface = null;
                                 while (outputSurface == null) {
@@ -356,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
                                 if (test.getInput().hasFramerate())
                                     mCameraSource.setFps(test.getInput().getFramerate());
                                 CameraSource.start();
-
+                                cameraStarted = true;
                             }
 
                             // Start them all
@@ -398,7 +399,6 @@ public class MainActivity extends AppCompatActivity {
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
-
                             } else {
                                 try {
                                     // Run next test serially so wait for this test
@@ -441,12 +441,12 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-            } 
+            }
         }
         catch (IOException iox) {
                 Log.e(TAG, "Test failed: " + iox.getMessage());
         }
-        
+
     }
 
 
@@ -590,7 +590,6 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
-                    mPursuitOver = true;
                     if (status.length() > 0) {
                         log("\nTest failed: " + description);
                         log("\n" + status);

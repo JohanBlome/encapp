@@ -9,6 +9,7 @@ test {
         framerate: 30
         playout_frames: 300
         pursuit: 3
+        show: true
     }
     configure {
         codec: "OMX.google.h264.encoder"
