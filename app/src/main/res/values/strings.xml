@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Encapp</string>
+    <string name="test_is_running">Test is running...</string>
 </resources>

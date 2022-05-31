@@ -24,70 +24,69 @@ import java.util.UUID;
 
 public class Statistics {
     final static String TAG = "statistics";
+    public static String NA = "na";
     private final String mId;
     private final String mDesc;
+    private final HashMap<Long, FrameInfo> mEncodingFrames;
+    private final HashMap<Long, FrameInfo> mDecodingFrames;
+    int mEncodingProcessingFrames = 0;
+    Test mTest;
+    Date mStartDate;
+    SystemLoad mLoad = new SystemLoad();
     private String mEncodedfile = "";
     private String mCodec;
-    private long mStartTime;
-    private long mStopTime;
+    private long mStartTime = -1;
+    private long mStopTime = -1;
     private MediaFormat mEncoderConfigFormat;
     private MediaFormat mEncoderMediaFormat;
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
+    private String mAppVersion = "";
+
+    public Statistics(String desc, Test test) {
+        mDesc = desc;
+        mEncodingFrames = new HashMap<>(20);
+        mDecodingFrames = new HashMap<>(20);
+        mTest = test;
+        mStartDate = new Date();
+        mId = "encapp_" + UUID.randomUUID().toString();
+
+    }
 
     public void setAppVersion(String mAppVersion) {
         this.mAppVersion = mAppVersion;
     }
 
-    private String mAppVersion = "";
-
-    private final HashMap<Long,FrameInfo> mEncodingFrames;
-    private final HashMap<Long,FrameInfo> mDecodingFrames;
-    int mEncodingProcessingFrames = 0;
-    Test mTest;
-    Date mStartDate;
-    SystemLoad mLoad = new SystemLoad();
-    public static String NA = "na";
-
-    public Statistics(String desc, Test test) {
-        mDesc = desc;
-        mEncodingFrames = new HashMap<>();
-        mDecodingFrames = new HashMap<>();
-        mTest = test;
-        mStartDate = new Date();
-        mId = "encapp_" + UUID.randomUUID().toString();
-    }
-
-    public String getId(){
+    public String getId() {
         return mId;
     }
 
     public String toString() {
         ArrayList<FrameInfo> allEncodingFrames = new ArrayList<>(mEncodingFrames.values());
-        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
+        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
         Collections.sort(allEncodingFrames, compareByPts);
 
         StringBuffer buffer = new StringBuffer();
         int counter = 0;
-        for (FrameInfo info: allEncodingFrames) {
+        for (FrameInfo info : allEncodingFrames) {
             buffer.append(mId + ", " +
-                          counter + ", " +
-                          info.isIFrame() + ", " +
-                          info.getSize() + ", " +
-                          info.getPts() + ", " +
-                          info.getProcessingTime() + "\n");
+                    counter + ", " +
+                    info.isIFrame() + ", " +
+                    info.getSize() + ", " +
+                    info.getPts() + ", " +
+                    info.getProcessingTime() + "\n");
             counter++;
         }
 
         return buffer.toString();
     }
 
-    public void start(){
+    public void start() {
         mStartTime = System.nanoTime();
         mLoad.start();
     }
 
-    public void stop(){
+    public void stop() {
         mStopTime = System.nanoTime();
         mLoad.stop();
     }
@@ -106,9 +105,8 @@ public class Statistics {
             frame.setSize(size);
             frame.isIFrame(isIFrame);
             mEncodingFrames.put(frame.getPts(), frame);
-            if (pts != frame.getPts()) {
-                Log.e(TAG, "Warning, pts differs: " + pts + " vs " + frame.getPts() + " for frame: " + frame.getOriginalFrame());
-            }
+        } else {
+            Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
         mEncodingProcessingFrames -= 1;
     }
@@ -142,26 +140,26 @@ public class Statistics {
 
     public int getAverageBitrate() {
         ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
-        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
+        Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
         Collections.sort(allFrames, compareByPts);
         int framecount = allFrames.size();
         if (framecount > 0) {
             long startPts = allFrames.get(0).mPts;
             //We just ignore the last frame, for the average does not mean much.
             long lastTime = allFrames.get(allFrames.size() - 1).mPts;
-            double totalTime =  ((double)(lastTime - startPts)) / 1000000.0;
+            double totalTime = ((double) (lastTime - startPts)) / 1000000.0;
             long totalSize = 0;
-            for (FrameInfo info: allFrames) {
+            for (FrameInfo info : allFrames) {
                 totalSize += info.getSize();
             }
             totalSize -= allFrames.get(framecount - 1).mSize;
-            return (int)(Math.round(8 * totalSize/(totalTime))); // bytes/Secs -> bit/sec
+            return (int) (Math.round(8 * totalSize / (totalTime))); // bytes/Secs -> bit/sec
         } else {
             return 0;
         }
     }
 
-    public void  setEncodedfile(String filename) {
+    public void setEncodedfile(String filename) {
         mEncodedfile = filename;
     }
 
@@ -182,24 +180,22 @@ public class Statistics {
     }
 
 
-
-
     private JSONObject getSettingsFromMediaFormat(MediaFormat format) {
         JSONObject mediaformat = new JSONObject();
         if (format == null) {
             return mediaformat;
         }
 
-        if ( Build.VERSION.SDK_INT >= 29) {
+        if (Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
-            for (String feature: features) {
+            for (String feature : features) {
                 Log.d(TAG, "MediaFormat: " + feature);
             }
 
             Set<String> keys = format.getKeys();
 
 
-            for (String key: keys) {
+            for (String key : keys) {
                 int type = format.getValueTypeForKey(key);
                 try {
                     switch (type) {
@@ -222,12 +218,12 @@ public class Statistics {
                             mediaformat.put(key, format.getString(key));
                             break;
                     }
-                } catch (JSONException jex){
+                } catch (JSONException jex) {
                     Log.d(TAG, key + ", Failed to parse MediaFormat: " + jex.getMessage());
                 }
             }
         } else {
-           // TODO: Go through the settings
+            // TODO: Go through the settings
             try {
                 mediaformat.put(MediaFormat.KEY_FRAME_RATE, getVal(format, MediaFormat.KEY_FRAME_RATE, "unknown"));
                 mediaformat.put(MediaFormat.KEY_BITRATE_MODE, getVal(format, MediaFormat.KEY_BITRATE_MODE, "unknown"));
@@ -237,18 +233,18 @@ public class Statistics {
         }
         return mediaformat;
     }
-    
+
     private String getVal(MediaFormat format, String key, String val) {
         if (format == null) {
             return val;
         }
         if (format.containsKey(key)) {
-           return format.getString(key);
+            return format.getString(key);
         }
         return val;
     }
 
-    
+
     private JSONObject getConfigSettings(Configure config) throws JSONException {
         JSONObject settings = new JSONObject();
         settings.put("codec", mCodec);
@@ -256,14 +252,14 @@ public class Statistics {
             settings.put("gop", config.getIFrameInterval());
         }
         settings.put("fps", config.getFramerate());
-        settings.put("bitrate",config.getBitrate());
+        settings.put("bitrate", config.getBitrate());
         settings.put("meanbitrate", getAverageBitrate());
         if (config.hasResolution()) {
             Size s = Size.parseSize(mTest.getConfigure().getResolution());
             settings.put("width", s.getWidth());
             settings.put("height", s.getHeight());
         }
-        if ( mTest.getConfigure().hasBitrateMode()) {
+        if (mTest.getConfigure().hasBitrateMode()) {
             settings.put("encmode", mTest.getConfigure().getBitrateMode());
         }
         if (config.hasColorRange())
@@ -277,7 +273,7 @@ public class Statistics {
         return settings;
     }
 
-    
+
     public void writeJSON(Writer writer) throws IOException {
         Log.d(TAG, "Write stats for " + mId);
         try {
@@ -304,21 +300,26 @@ public class Statistics {
             }
 
             ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
-            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo( Long.valueOf(o2.getPts() ));
+            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
             int counter = 0;
             JSONArray jsonArray = new JSONArray();
 
             JSONObject obj = null;
-            for (FrameInfo info: allFrames) {
+            for (FrameInfo info : allFrames) {
                 obj = new JSONObject();
 
                 obj.put("frame", counter++);
-                obj.put("iframe", (info.isIFrame())? 1: 0);
+                obj.put("iframe", (info.isIFrame()) ? 1 : 0);
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
-                obj.put("proctime", info.getProcessingTime());
-                obj.put("starttime",info.getStartTime());
+                if (info.getStopTime() == 0) {
+                    Log.w(TAG, "Frame did not finish");
+                    obj.put("proctime", 0);
+                } else {
+                    obj.put("proctime", info.getProcessingTime());
+                }
+                obj.put("starttime", info.getStartTime());
                 obj.put("stoptime", info.getStopTime());
                 jsonArray.put(obj);
             }
@@ -356,7 +357,7 @@ public class Statistics {
             JSONObject gpuData = new JSONObject();
             HashMap<String, String> gpuInfo = mLoad.getGPUInfo();
 
-            for (String key: gpuInfo.keySet()) {
+            for (String key : gpuInfo.keySet()) {
                 gpuData.put(key, gpuInfo.get(key));
             }
 
@@ -364,12 +365,12 @@ public class Statistics {
             jsonArray = new JSONArray();
 
             int[] gpuload = mLoad.getGPULoadPercentagePerTimeUnit();
-            float timer = (float)(1.0/mLoad.getSampleFrequency());
+            float timer = (float) (1.0 / mLoad.getSampleFrequency());
             obj = null;
             for (int load : gpuload) {
                 obj = new JSONObject();
                 int msec = Math.round(counter * timer * 1000);
-                obj.put("time_sec", msec/1000.0);
+                obj.put("time_sec", msec / 1000.0);
                 obj.put("load_percentage", load);
                 counter++;
                 jsonArray.put(obj);
@@ -382,7 +383,7 @@ public class Statistics {
                 obj = new JSONObject();
 
                 int msec = Math.round(counter * timer * 1000);
-                obj.put("time_sec", msec/1000.0);
+                obj.put("time_sec", msec / 1000.0);
                 obj.put("clock_MHz", clock);
                 counter++;
                 jsonArray.put(obj);
@@ -395,7 +396,5 @@ public class Statistics {
             e.printStackTrace();
         }
     }
-
-    //TODO: write camera settings
 
 }

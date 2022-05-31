@@ -2,7 +2,7 @@ all: none
 
 
 tests_pb2.py: tests.proto
-	protoc -I=. --python_out=. tests.proto
+	protoc -I=. --python_out=../scripts/proto/ tests.proto
 
 clean:
 	rm -f *pyc

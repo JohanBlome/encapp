@@ -49,7 +49,7 @@ public class MemoryLoad {
                             long pssCount = Debug.getPss();
                             //Debug.MemoryInfo[] mi = am.getProcessMemoryInfo(new int[]{pid});
                             Map<String, String> stats = Debug.getRuntimeStats();// mi[0].getMemoryStats();
-
+/*
                             Log.d(TAG, "****");
                             Log.d(TAG, "nativeHeapAlloc: " + nativeHeapAlloc);
                             Log.d(TAG, "nativeHeapaFree: " + nativeHeapaFree);
@@ -59,7 +59,7 @@ public class MemoryLoad {
                             Log.d(TAG, "free: " + freeSize);
                             Log.d(TAG, "total: " + totalSize);
                             Log.d(TAG, "used: " + usedSize);
-
+*/
                             for (String key: stats.keySet()) {
                                 Log.d(TAG, key + ": " + stats.get(key));
                             }
@@ -73,7 +73,7 @@ public class MemoryLoad {
                         }
                     }
                 }
-            });
+            }, "memory_load_thread");
             t.start();
         }
     }

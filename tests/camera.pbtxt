@@ -11,7 +11,7 @@ test {
     }
     configure {
         codec: "OMX.google.h264.encoder"
-        bitrate: "100 kbps"
+        bitrate: "1000 kbps"
         surface: true
     }
 }

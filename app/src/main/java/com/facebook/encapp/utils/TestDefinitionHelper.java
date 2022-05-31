@@ -12,14 +12,14 @@ import com.facebook.encapp.proto.Test;
 
 
 public class TestDefinitionHelper {
-    private static String TAG = "encapp";
+    private static final String TAG = "encapp";
     public static MediaFormat buildMediaFormat(Test test) {
         Configure config = test.getConfigure();
         Input input = test.getInput();
         Size sourceResolution = SizeUtils.parseXString(input.getResolution());
 
         MediaFormat format = MediaFormat.createVideoFormat(
-                config.getMime().toString(), sourceResolution.getWidth(), sourceResolution.getHeight());
+                config.getMime(), sourceResolution.getWidth(), sourceResolution.getHeight());
 
         format.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(config.getBitrate()));
         format.setFloat(MediaFormat.KEY_FRAME_RATE, input.getFramerate());
@@ -89,14 +89,14 @@ public class TestDefinitionHelper {
         }
 
         int val = 0;
-        if (text.endsWith("k")) {
-            val = Integer.parseInt(text.substring(0, text.lastIndexOf('k')).trim()) * 1000;
+        if (text == null) {
+            return 0;
+        } else if (text.endsWith("k")) {
+                val = Integer.parseInt(text.substring(0, text.lastIndexOf('k')).trim()) * 1000;
         } else if (text.endsWith("M")) {
             val = Integer.parseInt(text.substring(0, text.lastIndexOf('M')).trim()) * 1000000;
-        } else if (text != null && text.length() > 0){
+        } else if (text.length() > 0){
             val = Integer.parseInt(text);
-        } else {
-            val = 0;
         }
 
         return val;
@@ -116,9 +116,13 @@ public class TestDefinitionHelper {
         try {
             framerate = format.getFloat(MediaFormat.KEY_FRAME_RATE);
         } catch (Exception ex) {
-            Log.e(TAG, "Failed to grab framerate as float.");
-            framerate = (float)format.getInteger(MediaFormat.KEY_FRAME_RATE);
-            Log.e(TAG, "framerate as int: " + framerate);
+            try {
+                Log.e(TAG, "Failed to grab framerate as float.");
+                framerate = (float) format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                Log.e(TAG, "framerate as int: " + framerate);
+            } catch (Exception ex2) {
+                Log.e(TAG, "Failed to grab framerate as int - just set 30 fps");
+            }
         }
         input.setFramerate(framerate);
         builder.setInput(input);

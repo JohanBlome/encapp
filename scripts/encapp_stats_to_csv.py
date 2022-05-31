@@ -101,6 +101,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         decoded_data = pd.DataFrame(json['decoded_frames'])
         print(f'decoded data: {decoded_data}')
         decoded_data['source'] = inputfile
+        fps = 30
         if (len(decoded_data) > 0):
             try:
                 decoded_data['codec'] = json['decoder_media_format']['mime']
@@ -114,16 +115,39 @@ def parse_decoding_data(json, inputfile, debug=0):
                 decoded_data['height'] = 'unknown height'
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
+
+
             # oh no we may have b frames...
             decoded_data['duration_ms'] = round(
                 (decoded_data['pts'].shift(-1, axis='index', fill_value=0) -
                  decoded_data['pts']) / 1000, 2)
+
             decoded_data['fps'] = round(
                 1000.0 / (decoded_data['duration_ms']), 2)
+            decoded_data['stop-stop_ms'] = round(
+            (decoded_data['stoptime'].shift(-1, axis='index', fill_value=0) -
+             decoded_data['stoptime']) / 1000000, 2)
+            decoded_data['proc_fps'] = round(1000.0/(decoded_data['stop-stop_ms']), 2)
+
+            start_ts = decoded_data.iloc[0]['starttime']
+            decoded_data['rel_start_ms'] = round((decoded_data['starttime'] - start_ts)/1000000, 2)
+            stop_ts = decoded_data.iloc[0]['stoptime']
+            decoded_data['rel_stop_ms'] = round((decoded_data['stoptime'] - stop_ts)/1000000, 2)
+
+            decoded_data['start_pts_diff_ms'] = round(
+                decoded_data['rel_start_ms'] - decoded_data['pts']/1000, 2)
+            decoded_data['av_fps'] = decoded_data['fps'].rolling(
+                fps,  min_periods=fps, win_type=None).sum()/fps
+            decoded_data['av_proc_fps'] = decoded_data['proc_fps'].rolling(
+                fps,  min_periods=fps, win_type=None).sum()/fps
+            decoded_data['av_fps'].fillna(decoded_data['fps'], inplace=True)
+            decoded_data['av_proc_fps'].fillna(decoded_data['proc_fps'], inplace=True)
             decoded_data.fillna(0)
+        
     except Exception as ex:
         print(f'Failed to parse decode data for {inputfile}: {ex}')
         decoded_data = None
+
 
     return decoded_data
 
@@ -253,20 +277,25 @@ def main():
                                            options.debug)
         gpu_data = parse_gpu_data(alldata, options.file, options.debug)
         if not isinstance(encoding_data, type(None)):
+            source_name = 'input'
+            search_str = "filepath: 'camera')"
+            definition = alldata['testdefinition']
+            isCamera = definition.find("filepath: \"camera\"")
+            if (isCamera != -1):
+                source_name = 'camera'
+
             print(f'encoding_data_len: {len(encoding_data)}')
             # print(f'{encoding_data}')
-            name = f'{options.file}.encoding_data.csv'
-            encoding_data.to_csv(name)
-            print(f'output0: {name}')
+            encoding_data.to_csv(f'{options.file}_encoding_data.csv')
             # `fps` column contains the framerate calculated from the
-            # camera-reported timings (the camera framerate)
-            mean_cam_fps = round(np.mean(encoding_data['fps']), 2)
+            # input-reported timings (the input/camera framerate)
+            mean_input_fps = round(np.mean(encoding_data['fps']), 2)
             # `proc_fps` column contains the framerate calculated from the
             # system-reported timings (the gettimeofday framerate)
             mean_sys_fps = round(np.mean(encoding_data['proc_fps']), 2)
-            print(f'mean_camera_fps: {mean_cam_fps}')
-            print(f'mean_system_fps: {mean_sys_fps}')
-            # plot the frame duration
+            print(f"mean {source_name} fps: {mean_input_fps}")
+            print(f'mean system fps: {mean_sys_fps}')
+
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
                 x=encoding_data['pts']/1000000,
@@ -281,10 +310,11 @@ def main():
                 y=encoding_data['duration_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label='camera frame duration')
+                label=f"{source_name} frame duration")
             p.set_xlabel('time (sec)')
             p.set_ylabel('frame duration (ms)')
-            axs.set_title('Camera vs. System Frame Duration')
+            axs.set_title(f"{source_name} vs. System Frame Duration")
+
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.frame_duration.png'
             plt.savefig(name.replace(' ', '_'), format='png')
@@ -305,12 +335,36 @@ def main():
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f'camera fps, average = {mean_cam_fps} ms')
+                label=f"{source_name} fps, average = {mean_input_fps} ms")
+            # p.set_ylim(0, 90)
+
+            axs.set_title(f"{source_name} Framerate vs. System Framerate")
+            axs.legend(loc='best', fancybox=True, framealpha=0.5)
+            name = f'{options.file}.framerate.png'
+            print(f'output2: {name}')
+            plt.savefig(name.replace(' ', '_'), format='png')
+            # plt.show()
+        if not isinstance(decoded_data, type(None)):
+            print(f'decoding data len = {len(decoded_data)}')
+            decoded_data.to_csv(f'{options.file}_decoding_data.csv')
+            mean_fps = round(np.mean(decoded_data['fps']), 2)
+            mean_proc_fps = round(np.mean(decoded_data['proc_fps']), 2)
+
+            print(f'mean fps:{mean_fps}')
+            fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
+
+            # p.set_ylim(0, 90)
+            p = sb.lineplot(  # noqa: F841
+                x=decoded_data['pts']/1000000,
+                y=decoded_data['av_fps'],
+                ci='sd', data=decoded_data,
+                ax=axs,
+                label=f"{source_name}, average = {mean_cam_fps} ms")
             p.set_xlabel('time (sec)')
             p.set_ylabel('framerate (fps)')
             # p.set_ylim(0, 90)
 
-            axs.set_title('Camera Framerate vs. System Framerate')
+            axs.set_title(f"{source_name} Framerate vs. System Framerate")
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.framerate.png'
             print(f'output2: {name}')
