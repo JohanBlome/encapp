@@ -18,7 +18,7 @@ import shutil
 from encapp_tool import __version__
 from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
-    remove_files_using_regex)
+    remove_files_using_regex, get_app_pid)
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
@@ -136,27 +136,17 @@ def remove_encapp_gen_files(serial, debug=0):
 
 
 def wait_for_exit(serial, debug=0):
-    adb_cmd = f'adb -s {serial} shell pidof {APPNAME_MAIN}'
     pid = -1
     current = 1
-    while (current != -1):
-        if pid == -1:
-            ret, stdout, stderr = run_cmd(adb_cmd, debug)
-            pid = -1
-            if len(stdout) > 0:
-                pid = int(stdout)
+    while current != -1:
+        current = get_app_pid(serial, APPNAME_MAIN, debug)
+        if current > 0:
+            pid = current
         time.sleep(1)
-        ret, stdout, stderr = run_cmd(adb_cmd, debug)
-        current = -2
-        if len(stdout) > 0:
-            try:
-                current = int(stdout)
-            except Exception:
-                print(f'wait for exit caught exception: {stdout}')
-                continue
-        else:
-            current = -1
-    print(f'Exit from {pid}')
+    if pid != -1:
+        print(f'Exit from {pid}')
+    else:
+        print(f'{APPNAME_MAIN} was not active')
 
 
 def install_app(serial, debug=0):

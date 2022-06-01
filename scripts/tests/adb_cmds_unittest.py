@@ -116,6 +116,24 @@ class TestAdbCommands(unittest.TestCase):
             any_order=True,
         )
 
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_get_app_pid_active_process_shall_return_pid(self, mock_run):
+        mock_run.return_value = (True, "19519", "")
+        actual_pid = adb_cmds.get_app_pid(ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0)
+        self.assertEqual(actual_pid, 19519)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_get_app_pid_inactive_process_shall_return_not_running_code(self, mock_run):
+        mock_run.return_value = (True, "", "")
+        actual_pid = adb_cmds.get_app_pid(ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0)
+        self.assertEqual(actual_pid, -1)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_get_app_pid_invalid_id_output_shall_return_error_code(self, mock_run):
+        mock_run.return_value = (True, "INVALID", "")
+        actual_pid = adb_cmds.get_app_pid(ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0)
+        self.assertEqual(actual_pid, -2)
+
 
 if __name__ == "__main__":
     unittest.main()

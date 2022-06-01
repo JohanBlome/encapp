@@ -20,9 +20,9 @@ def run_cmd(cmd: str, debug: int = 0) -> Tuple[bool, str, str]:
     try:
         if debug > 0:
             print(cmd, sep=" ")
-        process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)  # noqa: P204
-        stdout, stderr = process.communicate()
-        ret = True if process.returncode == 0 else False
+        with Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE) as process:
+            stdout, stderr = process.communicate()
+            ret = bool(process.returncode == 0)
     except SubprocessError:
         print("Failed to run command: " + cmd)
         return False, "", ""
@@ -124,3 +124,27 @@ def get_connected_devices(debug: int) -> Dict:
             item_dict["model"] = "generic"
         device_info[serial] = item_dict
     return device_info
+
+
+def get_app_pid(serial: str, package_name: str, debug=0):
+    """Get running pid for an specified program.
+
+    Args:
+        serial (str): Android device serial no.
+        package_name (str): Android package name.
+        debug (int): Debug level
+
+    Returns:
+        Current process ID if program is running,
+        -1 if process not running; -2 if fail to process.
+    """
+    pid = -1
+    adb_cmd = f"adb -s {serial} shell pidof {package_name}"
+    ret, stdout, _ = run_cmd(adb_cmd, debug)
+    if ret is True and stdout:
+        try:
+            pid = int(stdout)
+        except ValueError:
+            print(f'Unable to cast stdout: "{stdout}" to int')
+            pid = -2
+    return pid
