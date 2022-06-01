@@ -117,6 +117,7 @@ public class CameraCharacteristicsHelper {
                 return "UNKNOWN";
             case ImageFormat.Y8:
                 return "Y8";
+            // TODO(chema): requires Build.VERSION.SDK_INT >= 31
             //case ImageFormat.YCBCR_P010:
             //    return "YCBCR_P010";
             case ImageFormat.YUV_420_888:
