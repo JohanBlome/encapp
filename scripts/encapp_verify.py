@@ -546,6 +546,10 @@ def main(argv):
     model = None
     serial = None
 
+    if options.serial is None and 'ANDROID_SERIAL' in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ['ANDROID_SERIAL']
+
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ''
