@@ -195,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
 
         FileWriter writer = null;
         try {
-            writer = new FileWriter("/sdcard/codecs.txt");
+            writer = new FileWriter(Environment.getExternalStorageDirectory().getPath() + "/codecs.txt");
             Log.d(TAG, "Write to file");
             writer.write(encoders.toString());
             writer.write(decoders.toString());
@@ -581,8 +581,9 @@ public class MainActivity extends AppCompatActivity {
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
-                        Log.d(TAG, "Write stats for " + stats.getId() + " to /sdcard/" + stats.getId() + ".json");
-                        FileWriter fw = new FileWriter("/sdcard/" + stats.getId() + ".json", false);
+                        String fullFilename = Environment.getExternalStorageDirectory().getPath() + "/" + stats.getId() + ".json";
+                        Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
+                        FileWriter fw = new FileWriter(fullFilename, false);
                         stats.writeJSON(fw);
                         fw.close();
                     } catch (IOException e) {
