@@ -7,6 +7,7 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -163,16 +164,16 @@ public abstract class Encoder {
     }
 
     public String checkFilePath(String path) {
-        if (path.startsWith("/sdcard/")) {
+        if (path.startsWith(Environment.getExternalStorageDirectory().getPath())) {
             return path;
         }
 
         int last_dir = path.lastIndexOf('/');
         if (last_dir == -1) {
-            return "/sdcard/" + path;
+            return Environment.getExternalStorageDirectory().getPath() + "/" + path;
         }
 
-        return "/sdcard/" + path.substring(last_dir);
+        return Environment.getExternalStorageDirectory().getPath() + "/" + path.substring(last_dir);
     }
 
     protected void sleepUntilNextFrame() {
@@ -232,7 +233,7 @@ public abstract class Encoder {
     protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
         if (!useStatId) {
             Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-            mFilename = String.format(Locale.US, "/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
+            mFilename = String.format(Locale.US, Environment.getExternalStorageDirectory().getPath() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
                     encoder.getCodecInfo().getName().toLowerCase(Locale.US),
                     (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
                     (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
@@ -246,7 +247,7 @@ public abstract class Encoder {
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase(Locale.US).contains("vp")) {
             if (!useStatId) {
-                mFilename = String.format(Locale.US, "/sdcard/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
+                mFilename = String.format(Locale.US, Environment.getExternalStorageDirectory().getPath() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
                         encoder.getCodecInfo().getName().toLowerCase(Locale.US),
                         (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
                         (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
@@ -260,8 +261,9 @@ public abstract class Encoder {
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
         }
         try {
-            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + "/sdcard/" + mFilename);
-            mMuxer = new MediaMuxer("/sdcard/" + mFilename, type);
+            String fullFilename = Environment.getExternalStorageDirectory().getPath() + "/" + mFilename;
+            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + fullFilename);
+            mMuxer = new MediaMuxer(fullFilename, type);
         } catch (IOException e) {
             Log.d(TAG, "FAILED Create mMuxer with type " + type + " and filename: " + mFilename);
             e.printStackTrace();

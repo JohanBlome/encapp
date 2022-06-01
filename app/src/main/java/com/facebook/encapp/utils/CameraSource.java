@@ -20,6 +20,7 @@ import android.hardware.camera2.params.RecommendedStreamConfigurationMap;
 import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -131,7 +132,7 @@ public class CameraSource {
             // Write info to sdcard
             FileWriter writer = null;
             try {
-                writer = new FileWriter("/sdcard/encapp.CameraCharacteristics.txt");
+                writer = new FileWriter(Environment.getExternalStorageDirectory().getPath() + "/encapp.CameraCharacteristics.txt");
                 Log.d(TAG, "Write to file");
                 writer.write(camera_characteristics_info.toString());
                 writer.flush();
