@@ -101,7 +101,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vfiles", nargs="+", help="VMAF Files", type=str)
     parser.add_argument("--labels", nargs="+", help="Curve labels", type=str)
-    parser.add_argument("--fig", help="Specify a file name to save figure", type=str)
+    parser.add_argument(
+        "--fig",
+        help="Specify a file name to save figure",
+        type=str)
     args = parser.parse_args()
     rd_plot = VMAFPlot()
     vmaf_files = []

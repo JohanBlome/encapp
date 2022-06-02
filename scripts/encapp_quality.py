@@ -109,7 +109,9 @@ def run_quality(test_file, optionals):
         and exists(psnr_file)
         and not optionals["recalc"]
     ):
-        print("All quality indicators already calculated for media, " f"{vmaf_file}")
+        print(
+            "All quality indicators already calculated for media, "
+            f"{vmaf_file}")
     else:
         input_media_format = test.get("decoder_media_format")
         raw = True
@@ -144,7 +146,7 @@ def run_quality(test_file, optionals):
                 input_width = int(input_media_format.get("width"))
                 input_height = int(input_media_format.get("height"))
                 # If we did not get aything here use the encoded size
-            except:
+            except BaseException:
                 print("Warning. Input size if wrong.")
                 print(f"Json {input_media_format.get('width')}x"
                       f"{input_media_format.get('height')}")
@@ -266,7 +268,11 @@ def get_options(argv):
     )
 
     parser.add_argument("test", nargs="*", help="Test result in JSON format.")
-    parser.add_argument("-o", "--output", help="csv output", default="quality.csv")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="csv output",
+        default="quality.csv")
     parser.add_argument("--media", help="Media directory", default="")
     parser.add_argument(
         "--pix_fmt", help="pixel format i.e. nv12 or yuv420p", default=""
@@ -285,7 +291,10 @@ def get_options(argv):
         help="Overriden reference resolution WxH",
         default="",
     )
-    parser.add_argument("--header", help="print header to output", action="store_true")
+    parser.add_argument(
+        "--header",
+        help="print header to output",
+        action="store_true")
     parser.add_argument(
         "--fr_fr",
         help=("force full range to full range on " "distorted file"),
