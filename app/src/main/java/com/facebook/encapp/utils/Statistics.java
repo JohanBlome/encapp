@@ -19,15 +19,17 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Vector;
 
 public class Statistics {
-    final static String TAG = "statistics";
+    final static String TAG = "encapp.statistics";
     public static String NA = "na";
     private final String mId;
     private final String mDesc;
-    private final HashMap<Long, FrameInfo> mEncodingFrames;
+    private final ArrayList<FrameInfo> mEncodingFrames;
     private final HashMap<Long, FrameInfo> mDecodingFrames;
     int mEncodingProcessingFrames = 0;
     Test mTest;
@@ -45,7 +47,7 @@ public class Statistics {
 
     public Statistics(String desc, Test test) {
         mDesc = desc;
-        mEncodingFrames = new HashMap<>(20);
+        mEncodingFrames = new ArrayList<>(20);
         mDecodingFrames = new HashMap<>(20);
         mTest = test;
         mStartDate = new Date();
@@ -62,7 +64,7 @@ public class Statistics {
     }
 
     public String toString() {
-        ArrayList<FrameInfo> allEncodingFrames = new ArrayList<>(mEncodingFrames.values());
+        ArrayList<FrameInfo> allEncodingFrames = mEncodingFrames;
         Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
         Collections.sort(allEncodingFrames, compareByPts);
 
@@ -94,22 +96,41 @@ public class Statistics {
     public void startEncodingFrame(long pts, int originalFrame) {
         FrameInfo frame = new FrameInfo(pts, originalFrame);
         frame.start();
-        mEncodingFrames.put(Long.valueOf(pts), frame);
+        mEncodingFrames.add(frame);
         mEncodingProcessingFrames += 1;
     }
 
     public void stopEncodingFrame(long pts, long size, boolean isIFrame) {
-        FrameInfo frame = mEncodingFrames.get(Long.valueOf(pts));
+        FrameInfo frame = getClosestMatch(pts);
         if (frame != null) {
             frame.stop();
             frame.setSize(size);
             frame.isIFrame(isIFrame);
-            mEncodingFrames.put(frame.getPts(), frame);
         } else {
             Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
         mEncodingProcessingFrames -= 1;
     }
+
+    private FrameInfo getClosestMatch(long pts) {
+        long minDist = Long.MAX_VALUE;
+        FrameInfo match = null;
+        for (int i = mEncodingFrames.size() - 1; i  >= 0; i--) {
+            FrameInfo info = mEncodingFrames.get(i);
+            if (info == null) {
+                Log.e(TAG, "Failed to lookip object at " + i);
+            }
+            long dist = Math.abs(pts - info.getPts());
+            if (dist <= minDist) {
+                minDist = dist;
+                match = info;
+            } else if (dist > minDist) {
+                return match;
+            }
+        }
+        return match;
+    }
+
 
     public void startDecodingFrame(long pts, long size, int flags) {
         FrameInfo frame = new FrameInfo(pts);
@@ -139,7 +160,7 @@ public class Statistics {
     }
 
     public int getAverageBitrate() {
-        ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
+        ArrayList<FrameInfo> allFrames = mEncodingFrames;
         Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
         Collections.sort(allFrames, compareByPts);
         int framecount = allFrames.size();
@@ -299,7 +320,7 @@ public class Statistics {
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
             }
 
-            ArrayList<FrameInfo> allFrames = new ArrayList<>(mEncodingFrames.values());
+            ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
             int counter = 0;

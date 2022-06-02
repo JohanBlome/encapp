@@ -40,12 +40,14 @@ public class OutputMultiplier {
     private int mTextureId;
     private FrameswapControl mMasterSurface = null;
     private String mName = "OutputMultiplier";
+    private int mWidth = -1;
+    private int mHeight = -1;
+    private boolean mVsynchWait = true;
 
     public OutputMultiplier(Texture2dProgram.ProgramType type) {
         super();
         mProgramType = type;
     }
-
 
     public OutputMultiplier() {
         mMessageHandler = new MessageHandler();
@@ -102,7 +104,13 @@ public class OutputMultiplier {
             mRenderer.confirmSize(width, height);
         } else {
             Log.e(TAG, "No renderer exists");
+            mWidth = width;
+            mHeight = height;
         }
+    }
+
+    public void setRealtime(boolean realtime) {
+        mVsynchWait = realtime;
     }
 
     public long awaitNewImage() {
@@ -151,7 +159,7 @@ public class OutputMultiplier {
         /**
          * Called when a new display frame is being rendered.
          * <p>
-         * This method provides the time in nanoseconds when the frame started being rendered.
+             * This method provides the time in nanoseconds when the frame started being rendered.
          * The frame time provides a stable time base for synchronizing animations
          * and drawing.  It should be used instead of {@link SystemClock#uptimeMillis()}
          * or {@link System#nanoTime()} for animations and drawing in the UI.  Using the frame
@@ -187,8 +195,6 @@ public class OutputMultiplier {
         // Wait for vsynch and to synch with display
         private final Object mVSynchLock = new Object();
         private final Object mSizeLock = new Object();
-        int mWidth = -1;
-        int mHeight = -1;
         boolean mDone = false;
         ConcurrentLinkedQueue<FrameBuffer> mFrameBuffers = new ConcurrentLinkedQueue<>();
         private long mLatestTimestampNsec = 0;
@@ -256,7 +262,9 @@ public class OutputMultiplier {
                 }
                 if (mDone) break;
                 if (mFrameBuffers.size() > 0) {
-                    drawFrameFromBuffer();
+                    while (mFrameBuffers.size() > 0) {
+                        drawFrameFromBuffer();
+                    }
                 } else if (mBitmap != null) {
                     drawBitmap();
                 } else {
@@ -334,42 +342,42 @@ public class OutputMultiplier {
                 return;
             }
             try {
-                while (mFrameBuffers.size() > 0) {
-                    synchronized (mVSynchLock) {
-                        FrameBuffer buffer = mFrameBuffers.poll();
-                        if (buffer == null) {
-                            break;
-                        }
-
+                synchronized (mVSynchLock) {
+                    FrameBuffer buffer = mFrameBuffers.poll();
+                    if (buffer == null) {
+                        return;
+                    }
+                    long diff = 0;
+                    long timeUs = 0;
+                    if (mVsynchWait) {
+                        timeUs = buffer.mInfo.presentationTimeUs * 1000;
                         if (mTimestamp0 == -1) {
-                            mTimestamp0 = buffer.mInfo.presentationTimeUs;
+                            mTimestamp0 = timeUs;
                         }
-                        long diff = (buffer.mInfo.presentationTimeUs - mTimestamp0) * 1000;
-                        while (diff - mCurrentVsync > LATE_LIMIT_NS) {
+                        while ((timeUs - mTimestamp0  - mCurrentVsync) > LATE_LIMIT_NS) {
                             try {
                                 mVSynchLock.wait(WAIT_TIME_SHORT_MS);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
                         }
-                        try {
-                            buffer.mCodec.releaseOutputBuffer(buffer.mBufferId, true);
-                        } catch (IllegalStateException ise) {
-                            // not important
-                            break;
-                        }
-                        if (mDropFrames && (diff - mCurrentVsync < 0)) {
-                            continue;
-                        }
-                        mMasterSurface.makeCurrent();
-                        mInputTexture.updateTexImage();
-                        mInputTexture.getTransformMatrix(mTmpMatrix);
-                        mLatestTimestampNsec = mInputTexture.getTimestamp();
-
+                    }
+                    try {
+                        mLatestTimestampNsec = timeUs;
+                        buffer.mCodec.releaseOutputBuffer(buffer.mBufferId, true);
+                    } catch (IllegalStateException ise) {
+                        // not important
                     }
 
-                    synchronized (mLock) {
-                        for (EglSurfaceBase surface : mOutputSurfaces) {
+                    mMasterSurface.makeCurrent();
+                    mInputTexture.updateTexImage();
+                    mInputTexture.getTransformMatrix(mTmpMatrix);
+                    mMasterSurface.setPresentationTime(mLatestTimestampNsec);
+                }
+
+                synchronized (mLock) {
+                    for (FrameswapControl surface : mOutputSurfaces) {
+                        if (surface.keepFrame()) {
                             surface.makeCurrent();
                             int width = surface.getWidth();
                             int height = surface.getHeight();
@@ -380,6 +388,7 @@ public class OutputMultiplier {
                         }
                     }
                 }
+
                 synchronized (mFrameDrawnLock) {
                     frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
                     mFrameDrawnLock.notifyAll();
@@ -401,7 +410,6 @@ public class OutputMultiplier {
                 mLatestTimestampNsec = mInputTexture.getTimestamp();
 
                 synchronized (mLock) {
-                    int counter = 0;
                     for (FrameswapControl surface : mOutputSurfaces) {
                         try {
                             if (surface.keepFrame()) {
@@ -411,7 +419,6 @@ public class OutputMultiplier {
                                 int height = surface.getHeight();
                                 GLES20.glViewport(0, 0, width, height);
                                 mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
-                                counter += 1;
                                 surface.setPresentationTime(mLatestTimestampNsec);
                                 surface.swapBuffers();
                             }
@@ -518,7 +525,6 @@ public class OutputMultiplier {
         }
 
         public void confirmSize(int width, int height) {
-            Log.d(TAG, "Confirm size with " + width + ", " + height);
             synchronized (mSizeLock) {
                 mWidth = width;
                 mHeight = height;

@@ -77,8 +77,19 @@ class SurfaceEncoder extends Encoder {
         mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
-        if (mTest.getInput().hasRealtime())
-            mRealtime = mTest.getInput().getRealtime();
+        if (mTest.getInput().hasRealtime()) {
+            if ( mTest.getInput().getRealtime()) {
+                // If we ae using vsync (i.e. showing video) and
+                // want realtime the synch will be done in mOutputMult
+                // and we should not sleep double the time.
+                // If we lack a prewview sleep here.
+                if (mTest.getInput().hasShow() && !mTest.getInput().getShow()) {
+                    mRealtime = true;
+                }
+            } else {
+                mOutputMult.setRealtime(false);
+            }
+        }
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
@@ -197,7 +208,7 @@ class SurfaceEncoder extends Encoder {
         Log.d(TAG, "Create fps measure: " + this);
         mFpsMeasure = new FpsMeasure(mFrameRate, this.toString());
         mFpsMeasure.start();
-        double frameTime = mRefFrameTime * mKeepInterval;
+        mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         int current_loop = 1;
         ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
@@ -253,10 +264,7 @@ class SurfaceEncoder extends Encoder {
                             }
                             setRuntimeParameters(mInFramesCount);
                             mDropNext = dropFrame(mInFramesCount);
-                            double diff = timestampUsec - mFirstFrameTimestampUsec;
-                            if (mFramesAdded * frameTime + frameTime > diff) {
-                                mDropNext = true;
-                            }
+                            mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                             updateDynamicFramerate(mInFramesCount);
                             if (mDropNext) {
                                 mFrameSwapSurface.dropNext(true);
@@ -271,7 +279,6 @@ class SurfaceEncoder extends Encoder {
                                 } else {
                                     ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
                                 }
-
                                 mStats.startEncodingFrame(ptsUsec, mInFramesCount);
                                 mFramesAdded++;
                             }
@@ -301,7 +308,6 @@ class SurfaceEncoder extends Encoder {
                                             flags,
                                             mRefFramesizeInBytes);
                                 }
-                                mInFramesCount++;
                             } catch (IllegalStateException isx) {
                                 Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
                                 return "Illegal state: " + isx.getMessage();
@@ -388,22 +394,17 @@ class SurfaceEncoder extends Encoder {
             MediaCodec codec, ByteBuffer buffer, int frameCount, int flags, int size) {
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
-        int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
-        int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
+        long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
+        mDropNext |= dropFromDynamicFramerate(mInFramesCount);
         updateDynamicFramerate(mInFramesCount);
-        if (currentFrameNbr == nextFrameNbr || mDropNext) {
+        if (mDropNext) {
             mSkipped++;
             mDropNext = false;
             read = -2;
         } else if (read == size) {
-            long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
             mFramesAdded++;
-            if (mRealtime) {
-                sleepUntilNextFrame();
-            }
-
             if (!mIsRgbaSource) {
                 mYuvIn.copyFrom(buffer.array());
                 yuvToRgbIntrinsic.setInput(mYuvIn);
@@ -414,9 +415,6 @@ class SurfaceEncoder extends Encoder {
                 mBitmap.copyPixelsFromBuffer(buffer);
             }
 
-            if (mRealtime) {
-                sleepUntilNextFrame();
-            }
             if (mFirstFrameTimestampUsec == -1) {
                 mFirstFrameTimestampUsec = ptsUsec;
             }
@@ -424,12 +422,12 @@ class SurfaceEncoder extends Encoder {
             mStats.startEncodingFrame(ptsUsec, frameCount);
         } else {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
-            read = -1;
+            return -1;
         }
-
         if (mRealtime) {
-            sleepUntilNextFrame(mInFramesCount);
+            sleepUntilNextFrame(mRefFrameTime);
         }
+        mInFramesCount++;
         return read;
     }
 

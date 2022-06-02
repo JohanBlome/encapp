@@ -66,6 +66,7 @@ public abstract class Encoder {
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
+    double mLastFrameTimestamp = 0;
 
     public Encoder() {
         mDataWriter = new DataWriter();
@@ -176,36 +177,13 @@ public abstract class Encoder {
         return Environment.getExternalStorageDirectory().getPath() + "/" + path.substring(last_dir);
     }
 
-    protected void sleepUntilNextFrame() {
-        long now = System.nanoTime();
-        if (mLastTime == -1) {
-            mLastTime = System.nanoTime();
-        } else {
-            long diff = (now - mLastTime) / 1000000;
-            long sleepTime = (long) (mRefFrameTime / 1000.0 - diff);
-            if (sleepTime > 0) {
-                try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        mLastTime = now;
-    }
-
-    protected void sleepUntilNextFrame(long nextFrame) {
+    protected void sleepUntilNextFrame(double frameTimeUsec) {
         long now = System.nanoTime() / 1000; //To Us
-        long nextTime = (long) (nextFrame * mFrameTimeUsec);
-        if (mFirstTime == -1) {
-            mFirstTime = now;
-        }
-        long sleepTimeMs = (nextTime - (now - mFirstTime)) / 1000; //To ms
+        long sleepTimeMs = (long)(frameTimeUsec - (now - mLastTime)) / 1000; //To ms
         if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
             sleepTimeMs = 0;
         }
-
         if (sleepTimeMs > 0) {
             try {
                 Thread.sleep(sleepTimeMs);
@@ -213,7 +191,26 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
+        mLastTime = now;
     }
+
+    protected void sleepUntilNextFrame() {
+        long now = System.nanoTime() / 1000; //To Us
+        long sleepTimeMs = (long)(mFrameTimeUsec - (now - mLastTime)) / 1000; //To ms
+        if (sleepTimeMs < 0) {
+            // We have been delayed. Run forward.
+            sleepTimeMs = 0;
+        }
+        if (sleepTimeMs > 0) {
+            try {
+                Thread.sleep(sleepTimeMs);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        mLastTime = now;
+    }
+
 
     /**
      * Generates the presentation time for frameIndex, in microseconds.
@@ -434,9 +431,17 @@ public abstract class Encoder {
         for (Runtime.DynamicFramerateParameter rate : mRuntimeParams.getDynamicFramerateList()) {
             if (rate.getFramenum() == frame) {
                 mKeepInterval = mFrameRate / rate.getFramerate();
+                mFrameTimeUsec = calculateFrameTimingUsec(rate.getFramerate());
                 return;
             }
         }
+    }
+
+
+    public boolean dropFromDynamicFramerate(int frame) {
+        int currentFrameNbr = (int) ((float) (frame) / mKeepInterval);
+        int nextFrameNbr = (int) ((float) ((frame + 1)) / mKeepInterval);
+        return (currentFrameNbr == nextFrameNbr);
     }
 
 
@@ -449,18 +454,17 @@ public abstract class Encoder {
             MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
         buffer.clear();
         int read = mYuvReader.fillBuffer(buffer, size);
-        int currentFrameNbr = (int) ((float) (frameCount) / mKeepInterval);
-        int nextFrameNbr = (int) ((float) ((frameCount + 1)) / mKeepInterval);
+        long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
+        mDropNext |= dropFromDynamicFramerate(mInFramesCount);
         updateDynamicFramerate(mInFramesCount);
-        if (currentFrameNbr == nextFrameNbr || mDropNext) {
+        if (mDropNext) {
             mSkipped++;
             mDropNext = false;
             read = -2;
         } else if (read == size) {
             mFramesAdded++;
-            long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
@@ -472,6 +476,7 @@ public abstract class Encoder {
 
         return read;
     }
+
 
     public abstract void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder);
 
@@ -512,8 +517,11 @@ public abstract class Encoder {
                             mDone = true;
                         }
                         if (mFirstFrameTimestampUsec != -1) {
-                            long timestampUsec = mPts + (buffer.mInfo.presentationTimeUs - (long) mFirstFrameTimestampUsec);
-
+                            long timestampUsec = mPts + (long) (buffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
+                            if (timestampUsec < 0) {
+                                mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                                continue;
+                            }
                             try {
                                 mStats.stopEncodingFrame(timestampUsec, buffer.mInfo.size,
                                         (buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
@@ -524,9 +532,9 @@ public abstract class Encoder {
                                 }
 
                                 mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
-                            } catch (IllegalStateException ise) {
+                            } catch (Exception ise) {
                                 // Codec may be closed elsewhere...
-                                Log.e(TAG, "Failed to release buffer");
+                                Log.e(TAG, "Writing failed: " + ise.getMessage());
                             }
                             mCurrentTimeSec = timestampUsec / 1000000.0;
                         } else {
@@ -548,6 +556,7 @@ public abstract class Encoder {
         }
 
         public void addBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
+            Log.d(TAG, "Add buffer: " + info.presentationTimeUs/1000000.0 + " sec");
             mEncodeBuffers.add(new FrameBuffer(codec, id, info));
             synchronized (mEncodeBuffers) {
                 mEncodeBuffers.notifyAll();
