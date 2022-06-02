@@ -66,21 +66,22 @@ def parse_encoding_data(json, inputfile, debug=0):
 
         data.loc[data['proctime'] < 0] = 0
         data.loc[data['duration_ms'] < 0] = 0
-        data['fps'] = round(1000.0/(data['duration_ms']), 2)
-        data['proc_fps'] = round(1000.0/(data['stop-stop_ms']), 2)
+        data['fps'] = round(1000.0 / (data['duration_ms']), 2)
+        data['proc_fps'] = round(1000.0 / (data['stop-stop_ms']), 2)
         # delete the last item
         data = data.loc[data['starttime'] > 0]
         start_ts = data.iloc[0]['starttime']
-        data['rel_start_ms'] = round((data['starttime'] - start_ts)/1000000, 2)
+        data['rel_start_ms'] = round(
+            (data['starttime'] - start_ts) / 1000000, 2)
         stop_ts = data.iloc[0]['stoptime']
-        data['rel_stop_ms'] = round((data['stoptime'] - stop_ts)/1000000, 2)
+        data['rel_stop_ms'] = round((data['stoptime'] - stop_ts) / 1000000, 2)
 
         data['start_pts_diff_ms'] = round(
-            data['rel_start_ms'] - data['pts']/1000, 2)
+            data['rel_start_ms'] - data['pts'] / 1000, 2)
         data['av_fps'] = data['fps'].rolling(
-            fps,  min_periods=fps, win_type=None).sum()/fps
+            fps, min_periods=fps, win_type=None).sum() / fps
         data['av_proc_fps'] = data['proc_fps'].rolling(
-            fps,  min_periods=fps, win_type=None).sum()/fps
+            fps, min_periods=fps, win_type=None).sum() / fps
         data['av_fps'].fillna(data['fps'], inplace=True)
         data['av_proc_fps'].fillna(data['proc_fps'], inplace=True)
         data.fillna(0, inplace=True)
@@ -116,7 +117,6 @@ def parse_decoding_data(json, inputfile, debug=0):
 
             decoded_data = decoded_data.loc[decoded_data['proctime'] >= 0]
 
-
             # oh no we may have b frames...
             decoded_data['duration_ms'] = round(
                 (decoded_data['pts'].shift(-1, axis='index', fill_value=0) -
@@ -125,29 +125,32 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data['fps'] = round(
                 1000.0 / (decoded_data['duration_ms']), 2)
             decoded_data['stop-stop_ms'] = round(
-            (decoded_data['stoptime'].shift(-1, axis='index', fill_value=0) -
-             decoded_data['stoptime']) / 1000000, 2)
-            decoded_data['proc_fps'] = round(1000.0/(decoded_data['stop-stop_ms']), 2)
+                (decoded_data['stoptime'].shift(-1, axis='index', fill_value=0) -
+                 decoded_data['stoptime']) / 1000000, 2)
+            decoded_data['proc_fps'] = round(
+                1000.0 / (decoded_data['stop-stop_ms']), 2)
 
             start_ts = decoded_data.iloc[0]['starttime']
-            decoded_data['rel_start_ms'] = round((decoded_data['starttime'] - start_ts)/1000000, 2)
+            decoded_data['rel_start_ms'] = round(
+                (decoded_data['starttime'] - start_ts) / 1000000, 2)
             stop_ts = decoded_data.iloc[0]['stoptime']
-            decoded_data['rel_stop_ms'] = round((decoded_data['stoptime'] - stop_ts)/1000000, 2)
+            decoded_data['rel_stop_ms'] = round(
+                (decoded_data['stoptime'] - stop_ts) / 1000000, 2)
 
             decoded_data['start_pts_diff_ms'] = round(
-                decoded_data['rel_start_ms'] - decoded_data['pts']/1000, 2)
+                decoded_data['rel_start_ms'] - decoded_data['pts'] / 1000, 2)
             decoded_data['av_fps'] = decoded_data['fps'].rolling(
-                fps,  min_periods=fps, win_type=None).sum()/fps
+                fps, min_periods=fps, win_type=None).sum() / fps
             decoded_data['av_proc_fps'] = decoded_data['proc_fps'].rolling(
-                fps,  min_periods=fps, win_type=None).sum()/fps
+                fps, min_periods=fps, win_type=None).sum() / fps
             decoded_data['av_fps'].fillna(decoded_data['fps'], inplace=True)
-            decoded_data['av_proc_fps'].fillna(decoded_data['proc_fps'], inplace=True)
+            decoded_data['av_proc_fps'].fillna(
+                decoded_data['proc_fps'], inplace=True)
             decoded_data.fillna(0)
-        
+
     except Exception as ex:
         print(f'Failed to parse decode data for {inputfile}: {ex}')
         decoded_data = None
-
 
     return decoded_data
 
@@ -162,8 +165,8 @@ def parse_gpu_data(json, inputfile, debug=0):
             gpuclock_data = pd.DataFrame(json['gpu_data']['gpu_clock_freq'])
             gpu_max_clock = int(json['gpu_data']['gpu_max_clock'])
             gpu_data['clock_perc'] = (
-                 100.0 * gpuclock_data['clock_MHz'].astype(float) /
-                 gpu_max_clock)
+                100.0 * gpuclock_data['clock_MHz'].astype(float) /
+                gpu_max_clock)
             gpu_data = gpu_data.merge(gpuclock_data)
             gpu_model = json['gpu_data']['gpu_model']
             gpu_data['source'] = inputfile
@@ -298,7 +301,7 @@ def main():
 
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
-                x=encoding_data['pts']/1000000,
+                x=encoding_data['pts'] / 1000000,
                 y=encoding_data['start_pts_diff_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
@@ -306,7 +309,7 @@ def main():
             p.set_xlabel('time (sec)')
             p.set_ylabel('frame duration (ms)')
             p = sb.lineplot(
-                x=encoding_data['pts']/1000000,
+                x=encoding_data['pts'] / 1000000,
                 y=encoding_data['duration_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
@@ -322,7 +325,7 @@ def main():
             # plot the framerate
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
             p = sb.lineplot(
-                x=encoding_data['pts']/1000000,
+                x=encoding_data['pts'] / 1000000,
                 y=encoding_data['av_proc_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
@@ -331,7 +334,7 @@ def main():
             p.set_ylabel('framerate (fps)')
             # p.set_ylim(0, 90)
             p = sb.lineplot(  # noqa: F841
-                x=encoding_data['pts']/1000000,
+                x=encoding_data['pts'] / 1000000,
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
@@ -355,7 +358,7 @@ def main():
 
             # p.set_ylim(0, 90)
             p = sb.lineplot(  # noqa: F841
-                x=decoded_data['pts']/1000000,
+                x=decoded_data['pts'] / 1000000,
                 y=decoded_data['av_fps'],
                 ci='sd', data=decoded_data,
                 ax=axs,
