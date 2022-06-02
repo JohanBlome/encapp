@@ -30,7 +30,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class SurfaceTranscoder extends BufferEncoder {
     private final String TAG = "encapp.surfacetranscoder";
@@ -78,8 +77,16 @@ public class SurfaceTranscoder extends BufferEncoder {
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
 
         if (mTest.getInput().hasRealtime()) {
-            if ((!mTest.getInput().hasShow()) || mTest.getInput().getShow() == false) {
-                mRealtime = mTest.getInput().getRealtime();
+            if ( mTest.getInput().getRealtime()) {
+                // If we ae using vsync (i.e. showing video) and
+                // want realtime the synch will be done in mOutputMult
+                // and we should not sleep double the time.
+                // If we lack a prewview sleep here.
+                if (mTest.getInput().hasShow() && !mTest.getInput().getShow()) {
+                    mRealtime = true;
+                }
+            } else {
+                mOutputMult.setRealtime(false);
             }
         }
         mFrameRate = mTest.getConfigure().getFramerate();
@@ -258,7 +265,7 @@ public class SurfaceTranscoder extends BufferEncoder {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
         }
-
+        mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
@@ -393,7 +400,6 @@ public class SurfaceTranscoder extends BufferEncoder {
             codec.releaseOutputBuffer(index, true);
         } else {
             long timestamp = info.presentationTimeUs;
-
             if (MainActivity.isStable()) {
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
@@ -406,29 +412,34 @@ public class SurfaceTranscoder extends BufferEncoder {
                     }
                 }
 
-                mCurrentTimeSec = (timestamp - mFirstFrameTimestampUsec) / 1000000;
+                double timestampUsec = (timestamp - mFirstFrameTimestampUsec);
+                mCurrentTimeSec = timestampUsec / 1000000;
                 // Buffer will be released when drawn
                 mStats.stopDecodingFrame(info.presentationTimeUs);
+                mInFramesCount++;
                 if (!mNoEncoding) {
-                    int currentFrameNbr = (int) ((float) (mInFramesCount) / mKeepInterval);
-                    int nextFrameNbr = (int) ((float) ((mInFramesCount + 1)) / mKeepInterval);
                     setRuntimeParameters(mInFramesCount);
+
                     mDropNext = dropFrame(mInFramesCount);
+                    mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                     updateDynamicFramerate(mInFramesCount);
-                    if (currentFrameNbr == nextFrameNbr || mDropNext) {
-                        mFrameSwapSurface.dropNext(true);
+                    if (mDropNext) {
                         mSkipped++;
                         mDropNext = false;
+                        codec.releaseOutputBuffer(index, false);
                     } else {
-                        mFrameSwapSurface.dropNext(false);
                         long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
-
                         mStats.startEncodingFrame(ptsUsec, mInFramesCount);
                         mFramesAdded++;
+                        mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                     }
+                } else {
+                    mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                 }
+            } else {
+                codec.releaseOutputBuffer(index, false);
             }
-            mOutputMult.newFrameAvailableInBuffer(codec, index, info);
+
         }
     }
 
@@ -477,9 +488,8 @@ public class SurfaceTranscoder extends BufferEncoder {
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
                     long pts = mExtractor.getSampleTime() + mPts_offset;
                     mLast_pts = pts;
-                    mInFramesCount++;
                     if (mRealtime) {
-                        sleepUntilNextFrame(mInFramesCount);
+                        sleepUntilNextFrame();
                     }
                     mStats.startDecodingFrame(pts, size, flags);
                     if (size > 0) {
