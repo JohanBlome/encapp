@@ -64,7 +64,7 @@ class RDPlot:
 
     def plot_rd_curve(self, quality_csv):
         rd_results = None
-        with open(quality_csv, "r") as fp:
+        with open(quality_csv, 'r') as fp:
             data = pd.read_csv(fp)
             fp.close()
 

@@ -283,7 +283,7 @@ def main():
             source_name = 'input'
             search_str = "filepath: 'camera')"
             definition = alldata['testdefinition']
-            isCamera = definition.find("filepath: \"camera\"")
+            isCamera = definition.find('filepath: "camera"')
             if (isCamera != -1):
                 source_name = 'camera'
 
@@ -296,7 +296,7 @@ def main():
             # `proc_fps` column contains the framerate calculated from the
             # system-reported timings (the gettimeofday framerate)
             mean_sys_fps = round(np.mean(encoding_data['proc_fps']), 2)
-            print(f"mean {source_name} fps: {mean_input_fps}")
+            print(f'mean {source_name} fps: {mean_input_fps}')
             print(f'mean system fps: {mean_sys_fps}')
 
             fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
@@ -313,10 +313,10 @@ def main():
                 y=encoding_data['duration_ms'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f"{source_name} frame duration")
+                label=f'{source_name} frame duration')
             p.set_xlabel('time (sec)')
             p.set_ylabel('frame duration (ms)')
-            axs.set_title(f"{source_name} vs. System Frame Duration")
+            axs.set_title(f'{source_name} vs. System Frame Duration')
 
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.frame_duration.png'
@@ -338,10 +338,10 @@ def main():
                 y=encoding_data['av_fps'],
                 ci='sd', data=encoding_data,
                 ax=axs,
-                label=f"{source_name} fps, average = {mean_input_fps} ms")
+                label=f'{source_name} fps, average = {mean_input_fps} ms')
             # p.set_ylim(0, 90)
 
-            axs.set_title(f"{source_name} Framerate vs. System Framerate")
+            axs.set_title(f'{source_name} Framerate vs. System Framerate')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.framerate.png'
             print(f'output2: {name}')
@@ -362,12 +362,12 @@ def main():
                 y=decoded_data['av_fps'],
                 ci='sd', data=decoded_data,
                 ax=axs,
-                label=f"{source_name}, average = {mean_cam_fps} ms")
+                label=f'{source_name}, average = {mean_cam_fps} ms')
             p.set_xlabel('time (sec)')
             p.set_ylabel('framerate (fps)')
             # p.set_ylim(0, 90)
 
-            axs.set_title(f"{source_name} Framerate vs. System Framerate")
+            axs.set_title(f'{source_name} Framerate vs. System Framerate')
             axs.legend(loc='best', fancybox=True, framealpha=0.5)
             name = f'{options.file}.framerate.png'
             print(f'output2: {name}')
