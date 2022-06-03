@@ -281,7 +281,7 @@ def get_options(argv):
         "-ref",
         "--override_reference",
         help=(
-            "Override reference, used when source is" " downsampled prior to encoding"
+            "Override reference, used when source is downsampled prior to encoding"
         ),
         default="",
     )
@@ -297,7 +297,7 @@ def get_options(argv):
         action="store_true")
     parser.add_argument(
         "--fr_fr",
-        help=("force full range to full range on " "distorted file"),
+        help=("force full range to full range on distorted file"),
         action="store_true",
     )
     parser.add_argument(
@@ -307,12 +307,12 @@ def get_options(argv):
     )
     parser.add_argument(
         "--lr_lr",
-        help=("force limited range to limited range on " "distorted file"),
+        help=("force limited range to limited range on distorted file"),
         action="store_true",
     )
     parser.add_argument(
         "--fr_lr",
-        help=("force full range to limited range on " "distorted file"),
+        help=("force full range to limited range on distorted file"),
         action="store_true",
     )
     parser.add_argument(
