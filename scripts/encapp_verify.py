@@ -597,7 +597,7 @@ def main(argv):
 
             if os.path.exists(es.INDEX_FILE_NAME):
                 os.remove(es.INDEX_FILE_NAME)
-                print(f"removed path: {es.INDEX_FILE_NAME}")
+                print(f'removed path: {es.INDEX_FILE_NAME}')
             '''
             args = []
             args.append(__file__)

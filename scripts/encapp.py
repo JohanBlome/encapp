@@ -295,7 +295,7 @@ def add_files(test, files_to_push):
 def run_codec_tests_file(test_def, model, serial, workdir, settings):
     print(f'run test: {test_def}')
     tests = tests_definitions.Tests()
-    with open(test_def, "rb") as fd:
+    with open(test_def, 'rb') as fd:
         tests.ParseFromString(fd.read())
     return run_codec_tests(tests, model, serial, workdir, settings)
 
@@ -386,7 +386,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
         else:
             ok = False
-            print(f'File: \"{filepath}\" does not exist, check path')
+            print(f'File: "{filepath}" does not exist, check path')
 
     if not ok:
         abort_test(workdir, 'Check file paths and try again')
@@ -518,7 +518,7 @@ def get_options(argv):
         'func', type=str, nargs='?',
         default=default_values['func'],
         choices=FUNC_CHOICES.keys(),
-        metavar='%s' % (' | '.join("{}: {}".format(k, v) for k, v in
+        metavar='%s' % (' | '.join('{}: {}'.format(k, v) for k, v in
                                    FUNC_CHOICES.items())),
         help='function arg',)
     parser.add_argument(
@@ -536,7 +536,7 @@ def get_options(argv):
         default=default_values['bps'],
         metavar='input-video-bitrate',
         help='input video bitrate, either as a single number, '
-        '\"100 kbps\" or a lst 100kbps,200kbps or a range '
+        '"100 kbps" or a lst 100kbps,200kbps or a range '
         '100k-1M-100k (start-stop-step)',)
     parser.add_argument(
         'configfile', type=str, nargs='?',
@@ -550,7 +550,7 @@ def get_options(argv):
         help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
-    options.desc = "testing"
+    options.desc = 'testing'
     if options.version:
         return options
 
