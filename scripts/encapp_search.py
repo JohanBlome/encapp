@@ -93,7 +93,7 @@ def getData(options, recursive):
 
 def search(options):
     data = getData(options, not options.no_rec)
-    data['bitrate']  = data['bitrate'].apply(lambda x: convert_to_bps(x))
+    data['bitrate'] = data['bitrate'].apply(lambda x: convert_to_bps(x))
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
     if options.bitrate:

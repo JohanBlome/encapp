@@ -437,7 +437,7 @@ def check_mean_bitrate_deviation(resultpath):
                     # Calc mean in bits per second
                     num = len(filtered)
                     if num > 0:
-                        mean = (fps * 8 * accum/num)
+                        mean = (fps * 8 * accum / num)
                     else:
                         mean = 0
                     ratio = mean / target_bitrate
@@ -467,8 +467,8 @@ def check_mean_bitrate_deviation(resultpath):
                     result_string += ('\n      {:3d}% error in {:4d}:{:4d} '
                                       '({:4d}kbps) for {:4d}kbps'
                                       .format(item[4], item[0], item[1],
-                                              int(item[3]/1000),
-                                              int(item[2]/1000)))
+                                              int(item[3] / 1000),
+                                              int(item[2] / 1000)))
                 result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
             else:
                 mean_bitrate = encoder_settings.get('meanbitrate')
@@ -496,8 +496,8 @@ def check_mean_bitrate_deviation(resultpath):
                 '\n{:s} "Bitrate accuracy" {:3d} % error for '
                 '{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
                 .format(status,
-                        row.error, int(row.bitrate/1000),
-                        int(row.real_bitrate/1000),
+                        row.error, int(row.bitrate / 1000),
+                        int(row.real_bitrate / 1000),
                         row.codec,
                         row.height,
                         row.fps,
@@ -546,6 +546,10 @@ def main(argv):
     model = None
     serial = None
 
+    if options.serial is None and 'ANDROID_SERIAL' in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ['ANDROID_SERIAL']
+
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ''
@@ -569,7 +573,7 @@ def main(argv):
         model, serial = get_device_info(options.serial)
         ep.remove_encapp_gen_files(serial)
 
-        if type(model) is dict:
+        if isinstance(model, dict):
             if 'model' in model:
                 model = model.get('model')
             else:
@@ -593,7 +597,7 @@ def main(argv):
 
             if os.path.exists(es.INDEX_FILE_NAME):
                 os.remove(es.INDEX_FILE_NAME)
-                print(f"removed path: {es.INDEX_FILE_NAME}")
+                print(f'removed path: {es.INDEX_FILE_NAME}')
             '''
             args = []
             args.append(__file__)

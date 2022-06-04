@@ -16,7 +16,9 @@ import datetime
 import shutil
 
 from encapp_tool import __version__
-from encapp_tool.adb_cmds import run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info, remove_files_using_regex
+from encapp_tool.adb_cmds import (
+    run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
+    remove_files_using_regex)
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
@@ -165,12 +167,17 @@ def install_app(serial, debug=0):
 
 
 def grant_storage_permissions(serial, debug):
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} android.permission.WRITE_EXTERNAL_STORAGE', debug)
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} android.permission.READ_EXTERNAL_STORAGE', debug)
-    run_cmd(f'adb -s {serial} shell appops set --uid {APPNAME_MAIN} MANAGE_EXTERNAL_STORAGE allow', debug)
+    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
+            'android.permission.WRITE_EXTERNAL_STORAGE', debug)
+    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
+            'android.permission.READ_EXTERNAL_STORAGE', debug)
+    run_cmd(f'adb -s {serial} shell appops set --uid {APPNAME_MAIN} '
+            'MANAGE_EXTERNAL_STORAGE allow', debug)
+
 
 def grant_camera_permission(serial, debug):
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} android.permission.CAMERA', debug)
+    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
+            'android.permission.CAMERA', debug)
 
 
 def install_ok(serial, debug=0):
@@ -249,8 +256,9 @@ def verify_video_size(videofile, resolution):
 
     if video_is_raw(videofile):
         file_size = os.path.getsize(videofile)
-        if (resolution != None):
-            framesize = int(resolution.split('x')[0]) * int(resolution.split('x')[1]) * 1.5
+        if resolution is not None:
+            framesize = (int(resolution.split('x')[0]) *
+                         int(resolution.split('x')[1]) * 1.5)
             if file_size % framesize == 0:
                 return True
         return False
@@ -287,7 +295,7 @@ def add_files(test, files_to_push):
 def run_codec_tests_file(test_def, model, serial, workdir, settings):
     print(f'run test: {test_def}')
     tests = tests_definitions.Tests()
-    with open(test_def, "rb") as fd:
+    with open(test_def, 'rb') as fd:
         tests.ParseFromString(fd.read())
     return run_codec_tests(tests, model, serial, workdir, settings)
 
@@ -323,13 +331,13 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             files_to_push.append(videofile)
             # verify video and resolution
             if not verify_video_size(videofile, test.input.resolution):
-                abort_test(workdir, 'Video size is not matching the raw file size')
+                abort_test(workdir, 'Video size is not matching the raw '
+                           'file size')
         else:
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
 
         update_file_paths(test, videofile)
-
 
         print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
@@ -378,7 +386,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
         else:
             ok = False
-            print(f'File: \"{filepath}\" does not exist, check path')
+            print(f'File: "{filepath}" does not exist, check path')
 
     if not ok:
         abort_test(workdir, 'Check file paths and try again')
@@ -510,7 +518,7 @@ def get_options(argv):
         'func', type=str, nargs='?',
         default=default_values['func'],
         choices=FUNC_CHOICES.keys(),
-        metavar='%s' % (' | '.join("{}: {}".format(k, v) for k, v in
+        metavar='%s' % (' | '.join('{}: {}'.format(k, v) for k, v in
                                    FUNC_CHOICES.items())),
         help='function arg',)
     parser.add_argument(
@@ -528,7 +536,7 @@ def get_options(argv):
         default=default_values['bps'],
         metavar='input-video-bitrate',
         help='input video bitrate, either as a single number, '
-        '\"100 kbps\" or a lst 100kbps,200kbps or a range '
+        '"100 kbps" or a lst 100kbps,200kbps or a range '
         '100k-1M-100k (start-stop-step)',)
     parser.add_argument(
         'configfile', type=str, nargs='?',
@@ -542,7 +550,7 @@ def get_options(argv):
         help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
-    options.desc = "testing"
+    options.desc = 'testing'
     if options.version:
         return options
 

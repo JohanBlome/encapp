@@ -27,7 +27,7 @@ class RDPlot:
         line = self.lines[index % len(self.lines)]
         self.curve_index += 1
 
-        return color+marker+line
+        return color + marker + line
 
     def vmaf_figure(self, title):
         plt.figure()
@@ -38,7 +38,7 @@ class RDPlot:
         self.x_max = 0
         self.y_min = 100
         self.y_max = 0
-    
+
     def bitrate_figure(self, title):
         plt.figure()
         plt.title(os.path.basename(title))
@@ -58,19 +58,19 @@ class RDPlot:
         plt.legend(loc='lower right')
 
     def finish(self):
-        plt.axis([self.x_min, self.x_max+100, self.y_min-5, self.y_max])
+        plt.axis([self.x_min, self.x_max + 100, self.y_min - 5, self.y_max])
         plt.grid()
         plt.draw()
 
     def plot_rd_curve(self, quality_csv):
         rd_results = None
-        with open(quality_csv, "r") as fp:
+        with open(quality_csv, 'r') as fp:
             data = pd.read_csv(fp)
             fp.close()
 
-            heights =  np.unique(data['height'])
-            codecs =  np.unique(data['codec'])
-           
+            heights = np.unique(data['height'])
+            codecs = np.unique(data['codec'])
+
             for height in heights:
                 filtHeight = data.loc[data['height'] == height]
                 filtHeight = filtHeight.apply(pd.to_numeric, errors='ignore')
@@ -81,18 +81,18 @@ class RDPlot:
                     filtCodec = filtHeight.loc[filtHeight['height'] == height]
                     filtHeight = filtHeight.sort_values('real_bitrate')
                     if len(filtHeight) > 0:
-                        self.draw(filtHeight['real_bitrate']/1000,
-                              filtHeight['vmaf'],
-                              f'{codec}')
+                        self.draw(filtHeight['real_bitrate'] / 1000,
+                                  filtHeight['vmaf'],
+                                  f'{codec}')
                 self.finish()
                 self.bitrate_figure(f'Bitrate accuracy for {height}p')
                 for codec in codecs:
                     filtCodec = filtHeight.loc[filtHeight['height'] == height]
                     filtHeight = filtHeight.sort_values('real_bitrate')
                     if len(filtHeight) > 0:
-                        self.draw(filtHeight['real_bitrate']/1000,
-                              filtHeight['bitrate']/1000,
-                              f'{codec}')
+                        self.draw(filtHeight['real_bitrate'] / 1000,
+                                  filtHeight['bitrate'] / 1000,
+                                  f'{codec}')
                 self.finish()
         plt.show()
 

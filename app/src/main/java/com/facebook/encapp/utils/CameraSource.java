@@ -1,7 +1,5 @@
 package com.facebook.encapp.utils;
 
-import static android.content.Context.CAMERA_SERVICE;
-
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -22,6 +20,7 @@ import android.hardware.camera2.params.RecommendedStreamConfigurationMap;
 import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -30,10 +29,15 @@ import android.util.Size;
 import android.view.Surface;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import com.facebook.encapp.utils.CameraCharacteristicsHelper;
+import java.io.IOException;
+import java.io.FileWriter;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.Executor;
+
+import static android.content.Context.CAMERA_SERVICE;
 
 
 public class CameraSource {
@@ -100,7 +104,6 @@ public class CameraSource {
         }
     }
 
-
     private boolean openCamera() {
         mCameraManager = (CameraManager) mContext.getSystemService(CAMERA_SERVICE);
         if (mCameraManager == null) {
@@ -109,132 +112,47 @@ public class CameraSource {
         }
 
         try {
-            String[] cams = mCameraManager.getCameraIdList();
-            for (String cam : cams) {
-                Log.d(TAG, "Camera: " + cam);
-                CameraCharacteristics chars = mCameraManager.getCameraCharacteristics(cam);
-                List<CameraCharacteristics.Key<?>> keys = chars.getKeys();
-                Iterator<CameraCharacteristics.Key<?>> iter = keys.iterator();
-                while (iter.hasNext()) {
-                    CameraCharacteristics.Key<?> key = iter.next();
+            String[] cameraIdList = mCameraManager.getCameraIdList();
+            StringBuffer camera_characteristics_info = new StringBuffer();
 
-                    Object obj = chars.get(key);
-                    if (obj instanceof Range[]) {
-                        Log.d(TAG, "Key: " + key.getName());
-                        for (Range range : (Range[]) obj) {
-                            Log.d(TAG, range.getLower() + "->" + range.getUpper());
-                        }
-                    } else if (obj instanceof MandatoryStreamCombination[]) {
-                        Log.d(TAG, key.getName());
-                        for (MandatoryStreamCombination comb : (MandatoryStreamCombination[]) obj) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                Log.d(TAG, "descr: " + comb.getDescription());
-                            }
-                        }
-                    } else {
-                        Log.d(TAG, key.getName() + " - " + chars.get(key));
+            // Select the very first first
+            String cameraId = cameraIdList[0];
+            camera_characteristics_info.append("selected_camera_id: " + cameraId + "\n");
 
-                    }
+            // List info about all cameras
+            camera_characteristics_info.append("camera_characteristics {\n");
+            for (String id : cameraIdList) {
+                CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(id);
+                String str = CameraCharacteristicsHelper.toText(cameraCharacteristics, id, 1);
+                camera_characteristics_info.append(str);
+            }
+            camera_characteristics_info.append("}\n");
+            Log.d(TAG, camera_characteristics_info + "\n");
 
-                }
+            // Write info to sdcard
+            FileWriter writer = null;
+            try {
+                writer = new FileWriter(Environment.getExternalStorageDirectory().getPath() + "/encapp.CameraCharacteristics.txt");
+                Log.d(TAG, "Write to file");
+                writer.write(camera_characteristics_info.toString());
+                writer.flush();
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
+            // Create a handler thread
             HandlerThread handlerThread = new HandlerThread("camera");
             handlerThread.start();
             mHandler = new Handler(handlerThread.getLooper());
-            ///Choose first
+
             if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
-            CameraCharacteristics characs = mCameraManager.getCameraCharacteristics(cams[0]);
-            StreamConfigurationMap streamConfigurationMap = characs.get(
-                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
-            int[] formats = streamConfigurationMap.getOutputFormats();
-            for (int format : formats) {
-                Log.d(TAG, "Pixel format: " + format);
-                Size[] previewSizes = streamConfigurationMap.getOutputSizes(format);
-                for (Size previewSize : previewSizes) {
-                    Log.d(TAG, "Preview size for the format: " + previewSize);
-                }
-            }
-            Size[] previewSizes = streamConfigurationMap.getOutputSizes(SurfaceTexture.class);
-            for (Size previewSize : previewSizes) {
-                Log.d(TAG, "Preview size for surface class: " + previewSize);
-            }
+            // Open the selected camera
+            mCameraManager.openCamera(cameraId, new StateHolder(), mHandler);
 
-            int[] inputFormats = streamConfigurationMap.getInputFormats();
-            for (int format : inputFormats) {
-                Log.d(TAG, "Input format: " + format);
-                Size[] inputsizes = streamConfigurationMap.getInputSizes(format);
-                for (Size size : inputsizes) {
-                    Log.d(TAG, format + " - " + size);
-                }
-            }
-
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                RecommendedStreamConfigurationMap recomended = characs.getRecommendedStreamConfigurationMap(RecommendedStreamConfigurationMap.USECASE_PREVIEW);
-            }
-
-            Range<Integer>[] fpsRanges = characs.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-            Log.d(TAG, "_____\n");
-            if (fpsRanges != null) {
-                Log.d(TAG, "fps ranges: " + fpsRanges.length);
-                for (Range range : fpsRanges) {
-                    Log.d(TAG, range.getLower() + " -> " + range.getUpper());
-                }
-            } else {
-                Log.d(TAG, "no fps ranges");
-            }
-            Log.d(TAG, "_____\n");
-            Range<Integer> sensorRange = characs.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
-            if (sensorRange != null)
-                Log.d(TAG, "Sensor range: " + sensorRange.getLower() + " -> " + sensorRange.getUpper());
-            else
-                Log.d(TAG, "No sensor range");
-
-            Log.d(TAG, "_____\n");
-            Range<Long> exposureRange = characs.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
-            if (exposureRange != null)
-                Log.d(TAG, "Exposure range: " + exposureRange.getLower() + " -> " + exposureRange.getUpper());
-            else
-                Log.d(TAG, "No exposure range");
-            Log.d(TAG, "_____\n");
-            Long maxDuration = characs.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION);
-            Log.d(TAG, "Max frame duration: " + maxDuration);
-
-            Log.d(TAG, "_____\n");
-            int[] facedetectionModes = characs.get(CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES);
-            if (facedetectionModes != null) {
-                Log.d(TAG, "facedetectionModes: " + facedetectionModes.length);
-                for (int mode : facedetectionModes) {
-                    switch (mode) {
-                        case CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_OFF:
-                            Log.d(TAG, "Mode off available");
-                            break;
-                        case CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_SIMPLE:
-                            Log.d(TAG, "Mode simple available");
-                            break;
-                        case CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_FULL:
-                            Log.d(TAG, "Mode full available");
-                            break;
-                    }
-                }
-
-            } else
-                Log.d(TAG, "No face detection modes");
-
-            mCameraManager.openCamera(cams[0],
-                    new StateHolder(),
-                    mHandler);
-
-            int orientation = characs.get(CameraCharacteristics.SENSOR_ORIENTATION);
-            Log.d(TAG, "Sensor orientation: " + orientation);
-
-            mHwLevel = characs.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-            Log.d(TAG, "Hw level: " + hwLevelToText(mHwLevel));
-            Log.d(TAG, "_____\n");
         } catch (CameraAccessException cameraAccessException) {
             cameraAccessException.printStackTrace();
         }
@@ -395,11 +313,11 @@ public class CameraSource {
                         CaptureRequest.Builder captureRequest
                                 = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
                         CapResult capRes = new CapResult();
-                        CameraCharacteristics characs = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
-                        Range<Integer>[] fpsRanges = characs.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-                        Range<Integer> sensorRange = characs.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+                        CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(mCameraDevice.getId());
+                        Range<Integer>[] fpsRanges = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+                        Range<Integer> sensorRange = cameraCharacteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
 
-                        mHasAwbLock = characs.get(CameraCharacteristics.CONTROL_AWB_LOCK_AVAILABLE);
+                        mHasAwbLock = cameraCharacteristics.get(CameraCharacteristics.CONTROL_AWB_LOCK_AVAILABLE);
 
                         while (!mCameraReady && mHasAwbLock) {
 
@@ -455,6 +373,8 @@ public class CameraSource {
         public void onReady(@NonNull CameraCaptureSession session) {
             super.onReady(session);
             Log.d(TAG, "onReady!!!");
+            //session.getInputSurface().setFrameRate(30, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+            //session.switchToOffline(Arrays.asList(mSurface), new CamExec(), new Offline());
         }
 
 
@@ -521,61 +441,13 @@ public class CameraSource {
         @Override
         public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest captureRequest, @NonNull CaptureFailure failure) {
             super.onCaptureFailed(session, captureRequest, failure);
-            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() +", "+failure.toString());
+            Log.d(TAG, "onCaptureFailed, reason:" + failure.getReason() + ", " + failure.toString());
         }
-    }
-
-    String hwLevelToText(int deviceLevel) {
-
-        switch (deviceLevel) {
-            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
-                return "INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY";
-
-            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL:
-                return "INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL";
-
-            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
-                return "INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED";
-
-            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL:
-                return "INFO_SUPPORTED_HARDWARE_LEVEL_FULL";
-
-            case CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3:
-                return "INFO_SUPPORTED_HARDWARE_LEVEL_3";
-
-            default:
-                return "Whoops, what is this?";
-        }
-    }
-
-    // Returns true if the device supports the required hardware level, or better.
-    boolean isHardwareLevelSupported(CameraCharacteristics c, int requiredLevel) {
-        final int[] sortedHwLevels = {
-                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY,
-                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL,
-                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED,
-                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL,
-                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3
-        };
-        int deviceLevel = c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-        if (requiredLevel == deviceLevel) {
-            return true;
-        }
-
-        for (int sortedlevel : sortedHwLevels) {
-            if (sortedlevel == requiredLevel) {
-                return true;
-            } else if (sortedlevel == deviceLevel) {
-                return false;
-            }
-        }
-        return false; // Should never reach here
     }
 
     class SurfaceData {
         Surface mSurface;
         int mWidth, mHeight;
-
         public SurfaceData(Surface surface, int width, int height) {
             mSurface = surface;
             mWidth = width;

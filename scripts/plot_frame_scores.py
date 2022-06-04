@@ -13,25 +13,25 @@ import numpy as np
 class VMAFPlot:
     def __init__(self):
         self.curve_index = 0
-        self.colors = ["b", "g", "r", "c", "m", "y", "k"]
+        self.colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
         self.markers = [
-            "o",
-            "v",
-            "^",
-            "<",
-            ">",
-            "8",
-            "s",
-            "p",
-            "*",
-            "h",
-            "H",
-            "D",
-            "d",
-            "P",
-            "X",
+            'o',
+            'v',
+            '^',
+            '<',
+            '>',
+            '8',
+            's',
+            'p',
+            '*',
+            'h',
+            'H',
+            'D',
+            'd',
+            'P',
+            'X',
         ]
-        self.lines = ["-", "--", "-."]
+        self.lines = ['-', '--', '-.']
         self.x_min = 0
         self.x_max = 0
         self.y_min = 100
@@ -49,8 +49,8 @@ class VMAFPlot:
     def new_figure(self, title):
         plt.figure()
         plt.title(os.path.basename(title))
-        plt.xlabel("Frame Number")
-        plt.ylabel("VMAF Score")
+        plt.xlabel('Frame Number')
+        plt.ylabel('VMAF Score')
         self.x_min = 0
         self.x_max = 0
         self.y_min = 100
@@ -69,11 +69,11 @@ class VMAFPlot:
         if fig_file is None:
             plt.show()
         else:
-            plt.savefig(fig_file, format="png")
+            plt.savefig(fig_file, format='png')
 
     def plot_rd_curve(self, vmaf_json, labels, fig_file):
         rd_results = None
-        self.new_figure("VMAF")
+        self.new_figure('VMAF')
         label_id = 0
         for file in vmaf_json:
             if labels is not None and len(labels) == len(vmaf_json):
@@ -81,27 +81,30 @@ class VMAFPlot:
             else:
                 label = file
             label_id += 1
-            with open(file, "r") as fp:
+            with open(file, 'r') as fp:
                 rd_results = json.load(fp)
                 fp.close()
                 frame_nums = []
                 vmaf_scores = []
-                for frame in rd_results["frames"]:
-                    if "VMAF_score" in frame:
-                        val = frame["VMAF_score"]
+                for frame in rd_results['frames']:
+                    if 'VMAF_score' in frame:
+                        val = frame['VMAF_score']
                     else:
-                        val = frame["metrics"]["vmaf"]
+                        val = frame['metrics']['vmaf']
                     vmaf_scores.append(val)
-                    frame_nums.append(frame["frameNum"])
+                    frame_nums.append(frame['frameNum'])
                 self.draw(frame_nums, vmaf_scores, label)
         self.finish(fig_file)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("vfiles", nargs="+", help="VMAF Files", type=str)
-    parser.add_argument("--labels", nargs="+", help="Curve labels", type=str)
-    parser.add_argument("--fig", help="Specify a file name to save figure", type=str)
+    parser.add_argument('vfiles', nargs='+', help='VMAF Files', type=str)
+    parser.add_argument('--labels', nargs='+', help='Curve labels', type=str)
+    parser.add_argument(
+        '--fig',
+        help='Specify a file name to save figure',
+        type=str)
     args = parser.parse_args()
     rd_plot = VMAFPlot()
     vmaf_files = []
