@@ -115,7 +115,3 @@ class TestAdbCommands(unittest.TestCase):
             ],
             any_order=True,
         )
-
-
-if __name__ == "__main__":
-    unittest.main()
