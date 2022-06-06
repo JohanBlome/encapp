@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-
+import math
 
 def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({',': '_', ' ': '_'}))
@@ -27,6 +27,8 @@ def plotAverageBitrate(data, options):
                 if len(filtered) > 0:
                     match = filtered.iloc[0]
                     realbr = match['average_bitrate']
+                    if math.isinf(realbr):
+                        realbr = 0
                     pair.append([br, int(realbr), codec, height])
 
     bitrates = pd.DataFrame(
