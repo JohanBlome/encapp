@@ -163,8 +163,8 @@ def check_long_term_ref(resultpath):
                 for frame in iframes:
                     lt_mark[frame['frame']] = 0  # implicit marking of 0th
                     for ltr in range(0, ltr_count - 1, 1):
-                        mark_frame[frame['frame'] + ltr] = ltr
-                        use_frame[frame['frame'] + ltr_count + 1] = ltr
+                        mark_frame[frame['original_frame'] + ltr] = ltr
+                        use_frame[frame['original_frame'] + ltr_count + 1] = ltr
 
                 ok_range = 2
                 matching = {}
@@ -507,6 +507,130 @@ def check_mean_bitrate_deviation(resultpath):
     return result_string
 
 
+
+def check_framerate_deviation(resultpath):
+    result_string = ''
+    framerate_error = []
+
+    for file in resultpath:
+        with open(file) as resultfile:
+            result = json.load(resultfile)
+            _, resultfilename = os.path.split(file)
+            encoder_settings = result.get('settings')
+            codec = encoder_settings.get('codec')
+            testname = result.get('test')
+            bitrate = convert_to_bps(encoder_settings.get('bitrate'))
+            fps = encoder_settings.get('fps')
+
+            test_def = result.get('testdefinition')
+            test = text_format.Parse(test_def, proto.Test())
+            parse_dynamic_settings(test.runtime)
+            dynamic_video_framerates = parse_dynamic_settings(test.runtime)[
+                'framerates']
+            frames = result.get('frames')
+            print(f"dyn frmrate: {dynamic_video_framerates}")
+            if (dynamic_video_framerates is not None
+               and len(dynamic_video_framerates) > 0):
+                previous_limit = 0
+                dyn_data = []
+                limits = list(dynamic_video_framerates.keys())
+                limits.append(frames[-1]['original_frame'])
+                status = 'passed'
+                limit_too_high = False
+                target_rate = fps
+                for limit in limits:
+                    if limit > len(frames):
+                        limit_too_high = True
+                    filtered = list(filter(lambda x: (x['original_frame'] >=
+                                                      int(previous_limit) and
+                                                      x['original_frame'] < int(limit)),
+                                           frames))
+                    frame1 = filtered[0]
+                    frame2 = filtered[-1]
+                    actual_framerate, deviation_perc = calcFrameRate(frame1,
+                                                                     frame2,
+                                                                     target_rate)
+                    if abs(deviation_perc) > ERROR_LIMIT:
+                        status = 'failed'
+                    dyn_data.append([int(previous_limit), int(limit),
+                                     target_rate, round(actual_framerate, 2),
+                                     int(round(deviation_perc, 0))])
+
+                    previous_limit = limit
+                    if limit in dynamic_video_framerates:
+                        target_rate = dynamic_video_framerates[limit]
+
+                print(f"Dyn data = {dyn_data}")
+                result_string += f'\n\n----- test case: [{testname}] -----'
+
+                result_string += (f'\n{status} "Dynamic framerate", ')
+                result_string += (f" codec: {encoder_settings.get('codec')}"
+                                  f", {encoder_settings.get('height')}"
+                                  f'p @ {fps}fps'
+                                  f', {resultfilename}')
+
+                if limit_too_high:
+                    result_string += (
+                        f'\nERROR: limit higher than available frames '
+                        f'({len(frames)}), adjust test case')
+                for item in dyn_data:
+                    result_string += ('\n      {:3d}% error in {:4d}:{:4d} '
+                                      '({:.2f} fps) for {:.2f} fps'
+                                      .format(item[4],
+                                              item[0],
+                                              item[1],
+                                              item[3],
+                                              item[2]))
+                result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
+            else:
+                framerate = encoder_settings.get('framerate')
+                frame1 = frames[0]
+                frame2 = frames[-1]
+                actual_framerate, deviation_perc = calcFrameRate(frame1,
+                                                                 frame2,
+                                                                 fps)
+                framerate_error.append([testname, int(round(deviation_perc, 0)),
+                                      fps, actual_framerate,
+                                      codec, encoder_settings.get('height'),
+                                      fps, resultfilename])
+
+                labels = ['test', 'error', 'framerate', 'real_framerate',
+                          'codec', 'height', 'fps', 'file']
+                data = pd.DataFrame.from_records(framerate_error, columns=labels,
+                                                 coerce_float=True)
+                data = data.sort_values(by=['framerate'])
+                print(f'{data}')
+                test_names = np.unique(data['test'])
+                for name in test_names:
+                    result_string += f'\n\n----- test case: [{testname}] -----'
+                    files = data.loc[data['test'] == name]
+                    for row in files.itertuples():
+                        status = 'passed'
+                        if abs(row.error) > ERROR_LIMIT:
+                            status = 'failed'
+                        result_string += (
+                            '\n{:s} "Framerate accuracy" {:3d} % error for '
+                            '{:.2f} fps ({:.2f} fps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
+                            .format(status,
+                                    row.error,
+                                    row.framerate,
+                                    row.real_framerate,
+                                    row.codec,
+                                    row.height,
+                                    row.fps,
+                                    row.file))
+                    result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
+    return result_string
+
+
+def calcFrameRate(frame1, frame2, target_rate):
+    time_delta = (frame2['pts'] -  frame1['pts'])/1000000
+    frame_delta = frame2['frame'] - frame1['frame']
+    framerate = frame_delta/time_delta
+    framerate_error_perc = 100 * (1 - target_rate/framerate);
+    return framerate, framerate_error_perc;
+
+
 def print_partial_result(header, partial_result):
     if len(partial_result) > 0:
         result_string = f'\n\n\n   ===  {header} ==='
@@ -556,6 +680,7 @@ def main(argv):
     idr_string = ''
     temporal_string = ''
     ltr_string = ''
+    framerate_string = ''
     workdir = options.dir
     if options.result is not None:
         results = []
@@ -565,6 +690,7 @@ def main(argv):
         idr_string += check_idr_placement(results)
         temporal_string += check_temporal_layer(results)
         ltr_string += check_long_term_ref(results)
+        framerate_string += check_framerate_deviation(results)
     else:
         if os.path.exists(workdir):
             shutil.rmtree(workdir)
@@ -631,9 +757,12 @@ def main(argv):
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
             ltr_string += check_long_term_ref(result)
+            framerate_string += check_framerate_deviation(result)
 
     result_string += print_partial_result(
         'Verify bitrate accuracy', bitrate_string)
+    result_string += print_partial_result(
+        'Verify framerate accuracy', framerate_string)
     result_string += print_partial_result('Verify idr accuracy', idr_string)
     result_string += print_partial_result(
         'Verify temporal layers', temporal_string)

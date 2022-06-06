@@ -323,7 +323,7 @@ public class Statistics {
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
-            int counter = 0;
+            int counter = 1;
             JSONArray jsonArray = new JSONArray();
 
             JSONObject obj = null;
@@ -331,6 +331,7 @@ public class Statistics {
                 obj = new JSONObject();
 
                 obj.put("frame", counter++);
+                obj.put("original_frame", info.getOriginalFrame());
                 obj.put("iframe", (info.isIFrame()) ? 1 : 0);
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
@@ -350,7 +351,7 @@ public class Statistics {
 
                 allFrames = new ArrayList<>(mDecodingFrames.values());
                 Collections.sort(allFrames, compareByPts);
-                counter = 0;
+                counter = 1;
                 jsonArray = new JSONArray();
 
                 obj = null;
@@ -382,7 +383,7 @@ public class Statistics {
                 gpuData.put(key, gpuInfo.get(key));
             }
 
-            counter = 0;
+            counter = 1;
             jsonArray = new JSONArray();
 
             int[] gpuload = mLoad.getGPULoadPercentagePerTimeUnit();
