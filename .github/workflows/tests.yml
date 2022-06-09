@@ -22,4 +22,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest humanfriendly numpy pandas seaborn protobuf
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pytest scripts/tests
+          pytest scripts/tests/unit
