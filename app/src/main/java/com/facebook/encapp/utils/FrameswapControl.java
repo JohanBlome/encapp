@@ -10,15 +10,15 @@ public class FrameswapControl extends WindowSurface {
     public FrameswapControl(EglCore eglCore, Surface surface, boolean releaseSurface) {
         super(eglCore, surface, releaseSurface);
     }
-    
+
     public FrameswapControl(EglCore eglCore, SurfaceTexture surfaceTexture) {
         super(eglCore, surfaceTexture);
     }
-    
+
     public boolean keepFrame() {
         return !mDropNext;
     }
-    
+
     public void dropNext(boolean drop) {
         mDropNext = drop;
     }
