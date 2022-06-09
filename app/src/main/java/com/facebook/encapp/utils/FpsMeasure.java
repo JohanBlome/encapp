@@ -31,7 +31,7 @@ public class FpsMeasure extends Thread {
     @Override
     public void run() {
         // The frame rate is calculated with a one period window
-        mLatestPts = new long[(int) (mTargetFps + 1)];
+        mLatestPts = new long[(int)(mTargetFps + 1)];
         mHistoryLength = mLatestPts.length;
         double lastFps = 0;
         int stableCount = 0;
@@ -51,14 +51,14 @@ public class FpsMeasure extends Thread {
             if (s1 == 0) {
                 continue;
             }
-            double diff = (double) (s2 - s1) / 1000000000.0; // to sec
+            double diff = (double)(s2 - s1) / 1000000000.0; // to sec
 
             mFps = mTargetFps / diff;
             if (mHistory.size() == mHistoryLength) {
                 float old = mHistory.remove(0);
                 mCurrentHistorySum -= old;
             }
-            mHistory.add(new Float(mFps));
+            mHistory.add((float)mFps);
             mCurrentHistorySum += mFps;
             double fpsDiff = mFps - lastFps;
             if (Math.abs(fpsDiff) < STABLE_LIMIT && (mHistory.size() == mHistoryLength)) {
@@ -69,7 +69,7 @@ public class FpsMeasure extends Thread {
 
             lastFps = mFps;
             if (stableCount > STABLE_PERIOD_LIMIT && !mStable) {
-                if ((int) mFps == 0) {
+                if ((int)mFps == 0) {
                     Log.w(TAG, "Too low framerate!");
                 }
                 mStable = true;
