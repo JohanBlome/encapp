@@ -27,6 +27,11 @@ jobs:
           flake8 scripts --exclude scripts/proto --count --exit-zero --statistics
           pylint scripts --ignore scripts/proto --errors-only --exit-zero
           pylint scripts --ignore scripts/proto --exit-zero
+      
+      - uses: actions/setup-java@v2
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Build android
         uses: reactivecircus/android-emulator-runner@v2
