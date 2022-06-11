@@ -18,7 +18,6 @@ import com.facebook.encapp.utils.grafika.FullFrameRect;
 import com.facebook.encapp.utils.grafika.GlUtil;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
-import java.nio.ByteBuffer;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -45,8 +44,9 @@ public class OutputMultiplier {
     private boolean mVsynchWait = true;
 
     public OutputMultiplier(Texture2dProgram.ProgramType type) {
-        super();
         mProgramType = type;
+        mMessageHandler = new MessageHandler();
+        mMessageHandler.start();
     }
 
     public OutputMultiplier() {
@@ -196,7 +196,7 @@ public class OutputMultiplier {
         private final Object mVSynchLock = new Object();
         private final Object mSizeLock = new Object();
         boolean mDone = false;
-        ConcurrentLinkedQueue<FrameBuffer> mFrameBuffers = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<BufferObject> mFrameBuffers = new ConcurrentLinkedQueue<>();
         private long mLatestTimestampNsec = 0;
         private long mTimestamp0 = -1;
         private long mCurrentVsync = 0;
@@ -205,7 +205,7 @@ public class OutputMultiplier {
         private int frameAvailable = 0;
         // temporary object
         private Object mSurfaceObject;
-        private Bitmap mBitmap = null;
+        //private Bitmap mBitmap = null;
 
         public Renderer(Object surface) {
             super("Outputmultiplier Renderer");
@@ -263,12 +263,10 @@ public class OutputMultiplier {
                 if (mDone) break;
                 if (mFrameBuffers.size() > 0) {
                     while (mFrameBuffers.size() > 0) {
-                        drawFrameFromBuffer();
+                        drawBufferSwap();
                     }
-                } else if (mBitmap != null) {
-                    drawBitmap();
-                } else {
-                    drawFrameImmediate();
+                }  else {
+                    drawFrameImmediateSwap();
                 }
             }
         }
@@ -336,21 +334,21 @@ public class OutputMultiplier {
             return mLatestTimestampNsec;
         }
 
-        public void drawFrameFromBuffer() {
+        public void drawBufferSwap() {
             if (mEglCore == null) {
                 Log.d(TAG, "Skipping drawFrame after shutdown");
                 return;
             }
             try {
                 synchronized (mVSynchLock) {
-                    FrameBuffer buffer = mFrameBuffers.poll();
+                    BufferObject buffer = mFrameBuffers.poll();
                     if (buffer == null) {
                         return;
                     }
                     long diff = 0;
                     long timeUs = 0;
                     if (mVsynchWait) {
-                        timeUs = buffer.mInfo.presentationTimeUs * 1000;
+                        timeUs = buffer.getTimestampUs() * 1000;
                         if (mTimestamp0 == -1) {
                             mTimestamp0 = timeUs;
                         }
@@ -364,16 +362,23 @@ public class OutputMultiplier {
                     }
                     try {
                         mLatestTimestampNsec = timeUs;
-                        buffer.mCodec.releaseOutputBuffer(buffer.mBufferId, true);
+                        if (buffer instanceof FrameBuffer) {
+                            // Draw texture
+                            FrameBuffer fb = (FrameBuffer)buffer;
+                            fb.mCodec.releaseOutputBuffer(fb.mBufferId, true);
+                            mMasterSurface.makeCurrent();
+                            mInputTexture.updateTexImage();
+                            mInputTexture.getTransformMatrix(mTmpMatrix);
+                        } else {
+                            // Draw bitmap
+                            drawBitmap(((BitmapBuffer)buffer).mBitmap);
+                        }
                     } catch (IllegalStateException ise) {
                         // not important
                     }
 
-                    mMasterSurface.makeCurrent();
-                    mInputTexture.updateTexImage();
-                    mInputTexture.getTransformMatrix(mTmpMatrix);
-                    mMasterSurface.setPresentationTime(mLatestTimestampNsec);
                 }
+                mMasterSurface.setPresentationTime(mLatestTimestampNsec);
 
                 synchronized (mLock) {
                     for (FrameswapControl surface : mOutputSurfaces) {
@@ -398,7 +403,7 @@ public class OutputMultiplier {
             }
         }
 
-        public void drawFrameImmediate() {
+        public void drawFrameImmediateSwap() {
             try {
                 if (mEglCore == null) {
                     Log.d(TAG, "Skipping drawFrame after shutdown");
@@ -437,7 +442,7 @@ public class OutputMultiplier {
             }
         }
 
-        public void drawBitmap() {
+        public void drawBitmap(Bitmap bitmap) {
             try {
                 if (mEglCore == null) {
                     Log.d(TAG, "Skipping drawFrame after shutdown");
@@ -450,38 +455,10 @@ public class OutputMultiplier {
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER,
                         GLES20.GL_LINEAR);
                 GlUtil.checkGlError("loadImageTexture");
-                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, mBitmap, 0);
+                GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
                 GlUtil.checkGlError("loadImageTexture");
                 mInputTexture.getTransformMatrix(mTmpMatrix);
                 Matrix.rotateM(mTmpMatrix, 0, 180, 1f, 0, 0);
-
-                synchronized (mLock) {
-
-                    int counter = 0;
-                    for (FrameswapControl surface : mOutputSurfaces) {
-                        try {
-                            if (surface.keepFrame()) {
-                                surface.makeCurrent();
-                                int width = surface.getWidth();
-                                int height = surface.getHeight();
-                                GLES20.glViewport(0, 0, width, height);
-                                GlUtil.checkGlError("glViewport");
-                                mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
-                                counter += 1;
-                                surface.setPresentationTime(mLatestTimestampNsec);
-                                surface.swapBuffers();
-                            }
-                        } catch (Exception ex) {
-                            Log.e(TAG, "Exception when drawing: " + ex);
-                        }
-                    }
-                }
-
-                synchronized (mFrameDrawnLock) {
-                    mBitmap = null;
-                    frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
-                    mFrameDrawnLock.notifyAll();
-                }
             } catch (Exception ex) {
                 Log.e(TAG, "Exception: " + ex.getMessage());
             }
@@ -512,20 +489,18 @@ public class OutputMultiplier {
 
         public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
             synchronized (mInputFrameLock) {
+                mFrameBuffers.offer(new BitmapBuffer(bitmap.copy(bitmap.getConfig(), true), timestampUsec));
                 frameAvailable += 1;
-                if (mBitmap != null) {
-                    synchronized (mFrameDrawnLock) {
-                        try {
-                            // We only have on bitmap, draw synchronous
-                            mFrameDrawnLock.wait();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                mInputFrameLock.notifyAll();
+            }
+            if (mVsynchWait) {
+                synchronized (mFrameDrawnLock) {
+                    try {
+                        mFrameDrawnLock.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
-                mBitmap = bitmap;
-                mLatestTimestampNsec = timestampUsec * 1000;
-                mInputFrameLock.notifyAll();
             }
         }
 

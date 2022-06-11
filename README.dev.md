@@ -11,6 +11,9 @@ In order to do encapp development, you need:
 * android sdk setup and environment variables set
 * android ndk
 
+Please note that since JDK 16 gradle versions < 7 are broken.
+This means that a JDK version >= 16 must be used for building.
+
 
 # 2. Operation
 

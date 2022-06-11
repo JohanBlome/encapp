@@ -77,22 +77,6 @@ class SurfaceEncoder extends Encoder {
         mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
-        if (mTest.getInput().hasRealtime()) {
-            if ( mTest.getInput().getRealtime()) {
-                // If we ae using vsync (i.e. showing video) and
-                // want realtime the synch will be done in mOutputMult
-                // and we should not sleep double the time.
-                // If we lack a prewview sleep here.
-                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
-                    Log.d(TAG, "Realtime controlled by vsync");
-                } else {
-                    Log.d(TAG, "Caclulated realtime");
-                    mRealtime = true;
-                }
-            } else {
-                mOutputMult.setRealtime(false);
-            }
-        }
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
@@ -118,6 +102,23 @@ class SurfaceEncoder extends Encoder {
                 // In case we do not have a limit, limit to 60 secs
                 mTest = TestDefinitionHelper.updatePlayoutFrames(mTest, 1800);
                 Log.d(TAG, "Set playout limit for camera to 1800 frames");
+            }
+        }
+
+        if (mTest.getInput().hasRealtime()) {
+            if ( mTest.getInput().getRealtime()) {
+                // If we ae using vsync (i.e. showing video) and
+                // want realtime the synch will be done in mOutputMult
+                // and we should not sleep double the time.
+                // If we lack a prewview sleep here.
+                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
+                    Log.d(TAG, "Realtime controlled by vsync");
+                } else {
+                    Log.d(TAG, "Caclulated realtime");
+                    mRealtime = true;
+                }
+            } else {
+                mOutputMult.setRealtime(false);
             }
         }
 
@@ -429,7 +430,6 @@ class SurfaceEncoder extends Encoder {
             return -1;
         }
         if (mRealtime) {
-            Log.d(TAG, "Realtime - sleep, ref = " + mRefFrameTime);
             sleepUntilNextFrame(mRefFrameTime);
         }
         mInFramesCount++;
