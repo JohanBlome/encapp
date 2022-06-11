@@ -478,6 +478,7 @@ public class OutputMultiplier {
                 }
 
                 synchronized (mFrameDrawnLock) {
+                    mBitmap = null;
                     frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
                     mFrameDrawnLock.notifyAll();
                 }
@@ -511,6 +512,17 @@ public class OutputMultiplier {
 
         public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
             synchronized (mInputFrameLock) {
+                frameAvailable += 1;
+                if (mBitmap != null) {
+                    synchronized (mFrameDrawnLock) {
+                        try {
+                            // We only have on bitmap, draw synchronous
+                            mFrameDrawnLock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
                 mBitmap = bitmap;
                 mLatestTimestampNsec = timestampUsec * 1000;
                 mInputFrameLock.notifyAll();

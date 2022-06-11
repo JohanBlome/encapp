@@ -336,7 +336,7 @@ public class Statistics {
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
                 if (info.getStopTime() == 0) {
-                    Log.w(TAG, "Frame did not finish");
+                    Log.w(TAG, "Frame did not finish: " + (counter - 1) + ", orig: " +  info.getOriginalFrame());
                     obj.put("proctime", 0);
                 } else {
                     obj.put("proctime", info.getProcessingTime());

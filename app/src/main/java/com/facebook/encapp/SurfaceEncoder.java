@@ -83,7 +83,10 @@ class SurfaceEncoder extends Encoder {
                 // want realtime the synch will be done in mOutputMult
                 // and we should not sleep double the time.
                 // If we lack a prewview sleep here.
-                if (mTest.getInput().hasShow() && !mTest.getInput().getShow()) {
+                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
+                    Log.d(TAG, "Realtime controlled by vsync");
+                } else {
+                    Log.d(TAG, "Caclulated realtime");
                     mRealtime = true;
                 }
             } else {
@@ -344,6 +347,7 @@ class SurfaceEncoder extends Encoder {
         }
         Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
         mStats.stop();
+        mCodec.flush();
 
         if (mMuxer != null) {
             try {
@@ -425,6 +429,7 @@ class SurfaceEncoder extends Encoder {
             return -1;
         }
         if (mRealtime) {
+            Log.d(TAG, "Realtime - sleep, ref = " + mRefFrameTime);
             sleepUntilNextFrame(mRefFrameTime);
         }
         mInFramesCount++;

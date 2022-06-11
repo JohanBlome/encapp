@@ -556,7 +556,6 @@ public abstract class Encoder {
         }
 
         public void addBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
-            Log.d(TAG, "Add buffer: " + info.presentationTimeUs/1000000.0 + " sec");
             mEncodeBuffers.add(new FrameBuffer(codec, id, info));
             synchronized (mEncodeBuffers) {
                 mEncodeBuffers.notifyAll();
