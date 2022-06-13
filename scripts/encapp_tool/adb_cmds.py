@@ -109,7 +109,7 @@ def get_connected_devices(debug: int) -> Dict:
     assert ret, "error: failed to get adb devices"
     # parse list
     device_info = {}
-    for line in stdout.split("\n"):
+    for line in stdout.splitlines():
         if line in ["List of devices attached", ""]:
             continue
         serial = line.split()[0]
