@@ -16,25 +16,19 @@ import datetime
 import shutil
 
 from encapp_tool import __version__
+from encapp_tool.app_utils import (
+    APPNAME_MAIN, SCRIPT_DIR, ACTIVITY,
+    install_app)
 from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
     remove_files_using_regex, get_app_pid)
 
-SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
 sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
 
-APPNAME_MAIN = 'com.facebook.encapp'
-ACTIVITY = f'{APPNAME_MAIN}/.MainActivity'
 RD_RESULT_FILE_NAME = 'rd_results.json'
-
-SCRIPT_PATH = os.path.realpath(__file__)
-SCRIPT_DIR, _ = os.path.split(SCRIPT_PATH)
-APK_DIR = os.path.join(SCRIPT_DIR, '../app/releases')
-APK_NAME_MAIN = f'{APPNAME_MAIN}-v{__version__}-debug.apk'
-APK_MAIN = os.path.join(APK_DIR, APK_NAME_MAIN)
 
 DEBUG = False
 
@@ -147,27 +141,6 @@ def wait_for_exit(serial, debug=0):
         print(f'Exit from {pid}')
     else:
         print(f'{APPNAME_MAIN} was not active')
-
-
-def install_app(serial, debug=0):
-    run_cmd(f'adb -s {serial} install -g {APK_MAIN}', debug)
-    grant_camera_permission(serial, debug)
-    grant_storage_permissions(serial, debug)
-    run_cmd(f'adb -s {serial} shell am force-stop -n com.facebook.encapp')
-
-
-def grant_storage_permissions(serial, debug):
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
-            'android.permission.WRITE_EXTERNAL_STORAGE', debug)
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
-            'android.permission.READ_EXTERNAL_STORAGE', debug)
-    run_cmd(f'adb -s {serial} shell appops set --uid {APPNAME_MAIN} '
-            'MANAGE_EXTERNAL_STORAGE allow', debug)
-
-
-def grant_camera_permission(serial, debug):
-    run_cmd(f'adb -s {serial} shell pm grant {APPNAME_MAIN} '
-            'android.permission.CAMERA', debug)
 
 
 def install_ok(serial, debug=0):

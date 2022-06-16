@@ -148,3 +148,76 @@ def get_app_pid(serial: str, package_name: str, debug=0):
             print(f'Unable to cast stdout: "{stdout}" to int')
             pid = -2
     return pid
+
+
+def install_apk(serial: str, apk_to_install: str, debug=0):
+    """Install apk on android device.
+
+    Args:
+        serial (str): Android device serial no.
+        apk_to_install (str): Host path of apk to install
+        debug (int): Debug level
+
+    Raises:
+        RuntimeError if unable to install app on device
+    """
+    r_code, _, err = run_cmd(
+        f"adb -s {serial} install -g {apk_to_install}",
+        debug
+    )
+    if r_code is False:
+        raise RuntimeError(
+            f"Unable to install {apk_to_install} "
+            f"at device {serial} due to {err}"
+        )
+
+
+def grant_storage_permissions(serial: str, package: str, debug=0):
+    """Grant all android storage permissions to a package
+
+    Args:
+        serial (str): Android device serial no.
+        package (str): Android package name
+        debug (int): Debug level
+    """
+    run_cmd(
+        f"adb -s {serial} shell pm grant {package} "
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        debug,
+    )
+    run_cmd(
+        f"adb -s {serial} shell pm grant {package} "
+        "android.permission.READ_EXTERNAL_STORAGE",
+        debug,
+    )
+    run_cmd(
+        f"adb -s {serial} shell appops set --uid {package} "
+        "MANAGE_EXTERNAL_STORAGE allow",
+        debug,
+    )
+
+
+def grant_camera_permission(serial: str, package: str, debug=0):
+    """Grant android camera permission to a package
+
+    Args:
+        serial (str): Android device serial no.
+        package (str): Android package name
+        debug (int): Debug level
+    """
+    run_cmd(
+        f"adb -s {serial} shell pm grant {package} "
+        "android.permission.CAMERA",
+        debug
+    )
+
+
+def force_stop(serial: str, package: str, debug=0):
+    """Stop everything associated with app's package name
+
+    Args:
+        serial (str): Android device serial no.
+        package (str): Android package name
+        debug (int): Debug level
+    """
+    run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)

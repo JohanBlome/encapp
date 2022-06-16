@@ -34,6 +34,14 @@ ADB_LS_ENCAPP = (
     "Android\nDCIM\nencapp_1.txt\nmyencapp_2.txt\nenc.txt\nencapp_logs.log\n"
 )
 
+ADB_INSTALL_ERROR = """
+Performing Streamed Install
+adb: failed to install ../app/releases/com.facebook.encapp-v1.6-debug.apk:
+Exception occurred while executing:
+android.os.ParcelableException: java.io.IOException: Requested internal only, but not enough space
+\tat android.util.ExceptionUtils.wrap(ExceptionUtils.java:34)
+"""
+
 
 class TestAdbCommands(unittest.TestCase):
     @patch("encapp_tool.adb_cmds.run_cmd")
@@ -133,6 +141,54 @@ class TestAdbCommands(unittest.TestCase):
         mock_run.return_value = (True, "INVALID", "")
         actual_pid = adb_cmds.get_app_pid(ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0)
         self.assertEqual(actual_pid, -2)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_install_apk_shall_run_install_cmd(self, mock_run):
+        apk = "apk_to_install.apk"
+        output = "Performing Streamed Install\nSuccess\n"
+        mock_run.return_value = (True, output, "")
+        expected_cmd = f"adb -s {ADB_DEVICE_VALID_ID} install -g {apk}"
+        adb_cmds.install_apk(ADB_DEVICE_VALID_ID, apk)
+        mock_run.assert_called_with(expected_cmd, 0)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_install_apk_shall_raise_exception_if_fail(self, mock_run):
+        apk = "apk_to_install.apk"
+        mock_run.return_value = (False, "", ADB_INSTALL_ERROR)
+        with self.assertRaises(RuntimeError) as exc:
+            adb_cmds.install_apk(ADB_DEVICE_VALID_ID, apk)
+            self.assertEqual(
+                exc.exception.__str__(),
+                f"Unable to install apk_to_install.apk at "
+                f"device {ADB_DEVICE_VALID_ID} due to {ADB_INSTALL_ERROR}",
+            )
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_grant_storage_permission_shall_grant_external_storage_with_adb(
+        self, mock_run
+    ):
+        apk = "com.example.myapp"
+        pm_grant_str = f"adb -s {ADB_DEVICE_VALID_ID} shell pm grant com.example.myapp "
+        adb_cmds.grant_storage_permissions(ADB_DEVICE_VALID_ID, apk, 0)
+        mock_run.assert_has_calls(
+            [
+                call(pm_grant_str + "android.permission.WRITE_EXTERNAL_STORAGE", 0),
+                call(pm_grant_str + "android.permission.READ_EXTERNAL_STORAGE", 0),
+                call(
+                    f"adb -s {ADB_DEVICE_VALID_ID} shell appops "
+                    f"set --uid com.example.myapp MANAGE_EXTERNAL_STORAGE allow",
+                    0,
+                ),
+            ],
+            any_order=True,
+        )
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_force_stop_shall_use_am_to_stop_package(self, mock_run):
+        apk = "com.example.myapp"
+        expected_cmd = f"adb -s {ADB_DEVICE_VALID_ID} shell am force-stop {apk}"
+        adb_cmds.force_stop(ADB_DEVICE_VALID_ID, apk)
+        mock_run.assert_called_with(expected_cmd, 0)
 
 
 if __name__ == "__main__":
