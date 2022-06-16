@@ -62,6 +62,7 @@ class SurfaceEncoder extends Encoder {
         mContext = context;
     }
 
+    public SurfaceEncoder(){}
     public String start(Test test) {
         return encode(test, null);
     }
@@ -105,22 +106,7 @@ class SurfaceEncoder extends Encoder {
             }
         }
 
-        if (mTest.getInput().hasRealtime()) {
-            if ( mTest.getInput().getRealtime()) {
-                // If we ae using vsync (i.e. showing video) and
-                // want realtime the synch will be done in mOutputMult
-                // and we should not sleep double the time.
-                // If we lack a prewview sleep here.
-                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
-                    Log.d(TAG, "Realtime controlled by vsync");
-                } else {
-                    Log.d(TAG, "Caclulated realtime");
-                    mRealtime = true;
-                }
-            } else {
-                mOutputMult.setRealtime(false);
-            }
-        }
+        checkRealtime();
 
         if (!mIsRgbaSource && !mIsCameraSource) {
             RenderScript rs = RenderScript.create(mContext);
@@ -381,6 +367,25 @@ class SurfaceEncoder extends Encoder {
         mDataWriter.stopWriter();
         mOutputMult.stopAndRelease();
         return "";
+    }
+
+    protected void checkRealtime() {
+        if (mTest.getInput().hasRealtime()) {
+            if ( mTest.getInput().getRealtime()) {
+                // If we ae using vsync (i.e. showing video) and
+                // want realtime the synch will be done in mOutputMult
+                // and we should not sleep double the time.
+                // If we lack a prewview sleep here.
+                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
+                    Log.d(TAG, "Realtime controlled by vsync");
+                } else {
+                    Log.d(TAG, "Caclulated realtime");
+                    mRealtime = true;
+                }
+            } else {
+                mOutputMult.setRealtime(false);
+            }
+        }
     }
 
     private void setupOutputMult(int width, int height) {

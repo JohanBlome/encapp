@@ -582,7 +582,7 @@ def check_framerate_deviation(resultpath):
                                               item[3],
                                               item[2]))
                 result_string += f'\n      (limit set to {ERROR_LIMIT}%)'
-            else:
+            elif len(frames) > 0:
                 framerate = encoder_settings.get('framerate')
                 frame1 = frames[0]
                 frame2 = frames[-1]

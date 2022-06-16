@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class SurfaceTranscoder extends BufferEncoder {
+public class SurfaceTranscoder extends SurfaceEncoder {
     private final String TAG = "encapp.surfacetranscoder";
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;
@@ -48,13 +48,11 @@ public class SurfaceTranscoder extends BufferEncoder {
     public SurfaceTranscoder(OutputMultiplier multiplier) {
         mOutputMult = multiplier;
         mSourceReader = new SourceReader();
-        mSourceReader.start();
     }
 
     public SurfaceTranscoder() {
         mOutputMult = new OutputMultiplier();
         mSourceReader = new SourceReader();
-        mSourceReader.start();
     }
 
 
@@ -67,6 +65,7 @@ public class SurfaceTranscoder extends BufferEncoder {
         }
         if (mNoEncoding) {
             Log.d(TAG, "**** Surface Decode, no encode ***");
+            mStable = true;
         } else {
             Log.d(TAG, "**** Surface Transcode - " + mTest.getCommon().getDescription() + " ***");
         }
@@ -76,19 +75,8 @@ public class SurfaceTranscoder extends BufferEncoder {
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
 
-        if (mTest.getInput().hasRealtime()) {
-            if ( mTest.getInput().getRealtime()) {
-                // If we ae using vsync (i.e. showing video) and
-                // want realtime the synch will be done in mOutputMult
-                // and we should not sleep double the time.
-                // If we lack a prewview sleep here.
-                if (mTest.getInput().hasShow() && !mTest.getInput().getShow()) {
-                    mRealtime = true;
-                }
-            } else {
-                mOutputMult.setRealtime(false);
-            }
-        }
+        checkRealtime();
+
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
@@ -276,6 +264,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                 e.printStackTrace();
             }
         }
+        mSourceReader.start();
         mStats.start();
         try {
             mSourceReader.join();
@@ -403,21 +392,20 @@ public class SurfaceTranscoder extends BufferEncoder {
             if (MainActivity.isStable()) {
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
-                    // Request key frame
-                    Log.d(TAG, "Request key frame");
-                    Bundle bundle = new Bundle();
-                    bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                    if (mCodec != null) {
-                        mCodec.setParameters(bundle);
-                    }
                 }
-
-                double timestampUsec = (timestamp - mFirstFrameTimestampUsec);
-                mCurrentTimeSec = timestampUsec / 1000000;
                 // Buffer will be released when drawn
-                mStats.stopDecodingFrame(info.presentationTimeUs);
+                mStats.stopDecodingFrame(timestamp);
                 mInFramesCount++;
                 if (!mNoEncoding) {
+                    if (mFirstFrameTimestampUsec == timestamp ) {
+                        // Request key frame
+                        Log.d(TAG, "Request key frame");
+                        Bundle bundle = new Bundle();
+                        bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                        if (mCodec != null) {
+                            mCodec.setParameters(bundle);
+                        }
+                    }
                     setRuntimeParameters(mInFramesCount);
 
                     mDropNext = dropFrame(mInFramesCount);
@@ -434,6 +422,7 @@ public class SurfaceTranscoder extends BufferEncoder {
                         mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                     }
                 } else {
+                    mCurrentTimeSec = timestamp/1000000.0;
                     mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                 }
             } else {
@@ -471,7 +460,12 @@ public class SurfaceTranscoder extends BufferEncoder {
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
                     int size = mExtractor.readSampleData(buffer, 0);
                     int flags = mExtractor.getSampleFlags();
-                    if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, false)) {
+
+                    double runtime = mCurrentTimeSec;
+                    if (mFirstFrameTimestampUsec > 0) {
+                        runtime -= mFirstFrameTimestampUsec/1000000.0;
+                    }
+                    if (doneReading(mTest, mInFramesCount, runtime, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
                     }
@@ -487,7 +481,6 @@ public class SurfaceTranscoder extends BufferEncoder {
 
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
                     long pts = mExtractor.getSampleTime() + mPts_offset;
-                    mLast_pts = pts;
                     if (mRealtime) {
                         sleepUntilNextFrame();
                     }
@@ -495,17 +488,27 @@ public class SurfaceTranscoder extends BufferEncoder {
                     if (size > 0) {
                         mDecoder.queueInputBuffer(index, 0, size, pts, flags);
                     }
+                    if (mFirstFrameTimestampUsec > 0) {
+                        runtime -= mFirstFrameTimestampUsec/1000000.0;
+                    }
                     boolean eof = !mExtractor.advance();
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                         mCurrent_loop++;
-                        mPts_offset = (long) (mLast_pts + mFrameTimeUsec);
-                        mLoopTime = mCurrentTimeSec;
+                        if (pts > mLast_pts) {
+                            mPts_offset = pts;
+                        } else {
+                            mPts_offset = mLast_pts;
+                            pts = mPts_offset;
+                        }
+
+                        mLoopTime = mPts_offset/1000000.0;
                         Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " - currentTime " + mCurrentTimeSec + " ***");
-                        if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
+                        if (doneReading(mTest, mInFramesCount, runtime, true)) {
                             mDone = true;
                         }
                     }
+                    mLast_pts = pts;
                 }
 
                 synchronized (mDecoderBuffers) {
