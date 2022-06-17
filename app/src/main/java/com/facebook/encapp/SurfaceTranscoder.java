@@ -290,11 +290,27 @@ public class SurfaceTranscoder extends SurfaceEncoder {
         try {
             if (mCodec != null) {
                 mCodec.flush();
+                // Give it some time
+                synchronized (this) {
+                    try {
+                        this.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
                 mCodec.stop();
                 mCodec.release();
             }
             if (mDecoder != null) {
                 mDecoder.flush();
+                // Give it some time
+                synchronized (this) {
+                    try {
+                        this.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
                 mDecoder.stop();
                 mDecoder.release();
             }

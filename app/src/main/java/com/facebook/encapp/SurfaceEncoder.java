@@ -347,6 +347,13 @@ class SurfaceEncoder extends Encoder {
         }
         if (mCodec != null) {
             mCodec.flush();
+            synchronized (this) {
+                try {
+                    this.wait(WAIT_TIME_SHORT_MS);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
             mCodec.stop();
             mCodec.release();
         }

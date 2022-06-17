@@ -409,7 +409,7 @@ public class MainActivity extends AppCompatActivity {
                                     while (!threads.empty()) {
                                         Thread p = threads.pop();
                                         try {
-                                            Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState());
+                                            Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState() + ", threads: " + threads.size());
                                             p.join();
                                         } catch (InterruptedException e) {
                                             e.printStackTrace();
@@ -606,15 +606,17 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             Log.d(TAG, "Total time: " + stats.getProcessingTime());
                             Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
-                            Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
+                            if (stats.getEncodedFrameCount() > 0) {
+                                Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
+                            }
                         } catch (ArithmeticException aex) {
                             Log.e(TAG, aex.getMessage());
                         }
-                        log("\nDone test: " + description);
-
                     }
                 } finally {
                     decreaseTestsInflight();
+                    log("\nDone test: " + description);
+                    Log.d(TAG, "Done test: " + description + ", to go: " + mInstancesRunning);
                 }
             }
         }, "TestRunner_" + test.getInput().getFilepath());
