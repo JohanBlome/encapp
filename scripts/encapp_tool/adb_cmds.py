@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import re
 from subprocess import PIPE, Popen, SubprocessError
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 
@@ -170,6 +170,57 @@ def install_apk(serial: str, apk_to_install: str, debug=0):
             f"Unable to install {apk_to_install} "
             f"at device {serial} due to {err}"
         )
+
+
+def uninstall_apk(serial: str, apk: str, debug=0):
+    """Uninstall app at android device
+
+    Args:
+        serial (str): Android device serial no.
+        apk (str): apk/package to uninstall
+        debug (int): Debug level
+    """
+    package_list = installed_apps(serial, debug)
+    if apk in package_list:
+        run_cmd(f"adb -s {serial} uninstall {apk}", debug)
+    else:
+        print(f"warning: {apk} not installed")
+
+
+def installed_apps(serial: str, debug=0) -> List:
+    """Get installed apps at android device using pm list
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+
+    Returns:
+        List of packages installed at android device.
+    """
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell pm list packages", debug
+    )
+    assert ret, f"error: failed to get installed app list: {stderr}"
+    return _parse_pm_list_packages(stdout)
+
+
+def _parse_pm_list_packages(stdout: str) -> List:
+    """Parse pm list output to get packages list
+
+    Args:
+        stdout (str): pm list cmd output string
+
+    Returns:
+        List of packages installed at android device
+    """
+    package_list = []
+    for line in stdout.splitlines():
+        # ignore blank lines
+        if not line:
+            continue
+        if line.startswith("package:"):
+            package_list.append(line[len("package:"):])
+    return package_list
 
 
 def grant_storage_permissions(serial: str, package: str, debug=0):

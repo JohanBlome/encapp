@@ -18,7 +18,7 @@ import shutil
 from encapp_tool import __version__
 from encapp_tool.app_utils import (
     APPNAME_MAIN, SCRIPT_DIR, ACTIVITY,
-    install_app)
+    install_app, uninstall_app, install_ok)
 from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
     remove_files_using_regex, get_app_pid)
@@ -141,39 +141,6 @@ def wait_for_exit(serial, debug=0):
         print(f'Exit from {pid}')
     else:
         print(f'{APPNAME_MAIN} was not active')
-
-
-def install_ok(serial, debug=0):
-    package_list = installed_apps(serial, debug)
-    if APPNAME_MAIN not in package_list:
-        return False
-    return True
-
-
-def uninstall_app(serial, debug=0):
-    package_list = installed_apps(serial, debug)
-    if APPNAME_MAIN in package_list:
-        run_cmd(f'adb -s {serial} uninstall {APPNAME_MAIN}', debug)
-    else:
-        print(f'warning: {APPNAME_MAIN} not installed')
-
-
-def parse_pm_list_packages(stdout):
-    package_list = []
-    for line in stdout.split('\n'):
-        # ignore blank lines
-        if not line:
-            continue
-        if line.startswith('package:'):
-            package_list.append(line[len('package:'):])
-    return package_list
-
-
-def installed_apps(serial, debug=0):
-    ret, stdout, stderr = run_cmd(f'adb -s {serial} shell pm list packages',
-                                  debug)
-    assert ret, 'error: failed to get installed app list'
-    return parse_pm_list_packages(stdout)
 
 
 def collect_result(workdir, test_name, serial):
