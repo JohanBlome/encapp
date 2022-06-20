@@ -29,3 +29,29 @@ def install_app(serial, debug=0):
     adb_cmds.grant_camera_permission(serial, debug)
     adb_cmds.grant_storage_permissions(serial, debug)
     adb_cmds.force_stop(serial, APPNAME_MAIN, debug)
+
+
+def install_ok(serial: str, debug=0) -> bool:
+    """Verify encapp installation at android device
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+
+    Returns:
+        True if encapp is installed at device, False otherwise.
+    """
+    package_list = adb_cmds.installed_apps(serial, debug)
+    if APPNAME_MAIN not in package_list:
+        return False
+    return True
+
+
+def uninstall_app(serial: str, debug=0):
+    """Uninstall encapp at android device
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+    """
+    adb_cmds.uninstall_apk(serial, APPNAME_MAIN, debug)

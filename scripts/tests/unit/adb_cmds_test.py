@@ -42,6 +42,12 @@ android.os.ParcelableException: java.io.IOException: Requested internal only, bu
 \tat android.util.ExceptionUtils.wrap(ExceptionUtils.java:34)
 """
 
+ADB_PM_LIST_OUT = """
+package:com.android.package.a
+package:com.android.package.b
+package:com.android.package.c
+"""
+
 
 class TestAdbCommands(unittest.TestCase):
     @patch("encapp_tool.adb_cmds.run_cmd")
@@ -189,6 +195,36 @@ class TestAdbCommands(unittest.TestCase):
         expected_cmd = f"adb -s {ADB_DEVICE_VALID_ID} shell am force-stop {apk}"
         adb_cmds.force_stop(ADB_DEVICE_VALID_ID, apk)
         mock_run.assert_called_with(expected_cmd, 0)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    def test_installed_apps_shall_list_pm_list_packages(self, mock_run):
+        mock_run.return_value = (True, ADB_PM_LIST_OUT, "")
+        result = adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, 1)
+        expect_out = [
+            "com.android.package.a",
+            "com.android.package.b",
+            "com.android.package.c",
+        ]
+        self.assertEqual(result, expect_out)
+        expected_call = f"adb -s {ADB_DEVICE_VALID_ID} shell pm list packages"
+        mock_run.assert_called_with(expected_call, 1)
+
+    @patch("encapp_tool.adb_cmds.run_cmd")
+    @patch("encapp_tool.adb_cmds.installed_apps")
+    def test_uninstall_apk_shall_uninstall_pkg_if_found(
+            self, mock_installed, mock_run):
+        installed_packages = [
+            "com.android.package.a",
+            "com.android.package.b",
+            "com.android.package.c",
+        ]
+        mock_installed.return_value = installed_packages
+        adb_cmds.uninstall_apk(ADB_DEVICE_VALID_ID, "com.not.found.package", 0)
+        mock_run.assert_not_called()
+        adb_cmds.uninstall_apk(ADB_DEVICE_VALID_ID, "com.android.package.a", 1)
+        mock_run.assert_called_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} uninstall com.android.package.a", 1
+        )
 
 
 if __name__ == "__main__":
