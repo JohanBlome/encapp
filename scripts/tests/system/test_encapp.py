@@ -37,3 +37,36 @@ def test_install():
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE,
     )
+
+
+def test_uninstall():
+    """Verify uninstall work on specified android device"""
+    subprocess.run(
+        [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+         f"--serial {ANDROID_SERIAL} uninstall"],
+        shell=True,
+        check=True,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+
+
+def test_list(tmp_path):
+    """Verify list work on specified android device"""
+    subprocess.run(
+        [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+         f"--serial {ANDROID_SERIAL} install"],
+        shell=True,
+        check=True,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE
+    )
+    subprocess.run(
+        [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+         f"--serial {ANDROID_SERIAL} list"],
+        shell=True,
+        check=True,
+        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        cwd=tmp_path
+    )
