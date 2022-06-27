@@ -154,8 +154,9 @@ def collect_result(workdir, test_name, serial):
                               re.MULTILINE)
     base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
     sub_dir = '_'.join([base_file_name, 'files'])
-    output_dir = f'{workdir}/{sub_dir}/'
-    run_cmd(f'mkdir {output_dir}')
+    output_dir = os.path.join(workdir, sub_dir)
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
     result_json = []
     for file in output_files:
         if file == '':
@@ -172,7 +173,7 @@ def collect_result(workdir, test_name, serial):
         run_cmd(adb_cmd)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
-            result_json.append(f'{output_dir}/{tmpname}')
+            result_json.append(os.path.join(output_dir, tmpname))
 
     adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
     run_cmd(adb_cmd)
@@ -304,8 +305,8 @@ def run_codec_tests(tests, model, serial, workdir, settings):
 
     test_file = os.path.basename(test_def)
     testname = f"{test_file[0:test_file.rindex('.')]}.run.bin"
-    output = f'{workdir}/{testname}'
-    os.system('mkdir -p ' + workdir)
+    output = os.path.join(workdir, testname)
+    os.makedirs(workdir, exist_ok=True)
     with open(output, 'wb') as binfile:
         binfile.write(fresh.SerializeToString())
         files_to_push.append(output)
@@ -389,8 +390,9 @@ def convert_to_frames(value, fps=30):
 
 def convert_test(path):
     output = f"{path[0:path.rindex('.')]}.bin"
-    root = f"{SCRIPT_DIR[0:SCRIPT_DIR.rindex('/')]}"
-    cmd = (f'protoc -I / --encode="Tests" {root}/proto/tests.proto '
+    root = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
+    proto_file = os.path.join(root, "proto", "tests.proto")
+    cmd = (f'protoc -I / --encode="Tests" {proto_file} '
            f'< {path} > {output}')
     print(f'cmd: {cmd}')
     run_cmd(cmd)
