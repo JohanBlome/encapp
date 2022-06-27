@@ -1,5 +1,6 @@
 import os
 import subprocess
+import pytest
 
 PYTHON_ENV = "python3"
 MODULE_PATH = os.path.dirname(__file__)
@@ -17,11 +18,15 @@ def test_is_verify_script_found():
 
 def test_help_option():
     """Verify encapp_verify.py --help do not throw any error"""
-    subprocess.run(
-        [f"{PYTHON_ENV} {VERIFY_SCRIPT_PATH} "
-         f"--help"],
-        shell=True,
-        check=True,
-        stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE
-    )
+    try:
+        subprocess.run(
+            [f"{PYTHON_ENV} {VERIFY_SCRIPT_PATH} "
+             f"--help"],
+            shell=True,
+            check=True,
+            universal_newlines=True,
+            stderr=subprocess.STDOUT,
+            stdout=subprocess.PIPE
+        )
+    except subprocess.CalledProcessError as err:
+        pytest.fail(err.stdout)
