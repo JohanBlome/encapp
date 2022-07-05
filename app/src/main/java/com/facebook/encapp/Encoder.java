@@ -37,14 +37,18 @@ public abstract class Encoder {
     final static int WAIT_TIME_MS = 30000;  // 30 secs
     final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
     protected float mFrameRate = 30;
+    float mReferenceFrameRate = 30;
+    protected double mFrameTimeUsec = 0;
+    protected double mRefFrameTime = 0;
+    double mCurrentTimeSec;
+    double mFirstFrameTimestampUsec = -1;
+    long mLastTime = -1;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
     protected MediaMuxer mMuxer;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
-    protected double mFrameTimeUsec = 0;
-    protected double mRefFrameTime = 0;
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
@@ -53,20 +57,16 @@ public abstract class Encoder {
     protected Runtime mRuntimeParams;
     protected FileReader mYuvReader;
     protected int mVideoTrack = -1;
-    int mPts = 132;
-    long mLastTime = -1;
-    long mFirstTime = -1;
+    long mPts = 132;
     boolean mRealtime = false;
-    double mCurrentTimeSec;
-    double mFirstFrameTimestampUsec = -1;
-    float mReferenceFrameRate = 30;
+
+
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
     boolean mInitDone = false;
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
-    double mLastFrameTimestamp = 0;
 
     public Encoder() {
         mDataWriter = new DataWriter();

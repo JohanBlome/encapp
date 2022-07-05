@@ -24,6 +24,8 @@ import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
+import com.facebook.encapp.utils.VsyncHandler;
+import com.facebook.encapp.utils.VsyncListener;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,7 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class SurfaceTranscoder extends SurfaceEncoder {
+public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     private final String TAG = "encapp.surfacetranscoder";
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;
@@ -39,20 +41,26 @@ public class SurfaceTranscoder extends SurfaceEncoder {
     DecoderRuntime mDecoderRuntimeParams;
     OutputMultiplier mOutputMult = null;
     double mLoopTime = 0;
-    int mCurrent_loop = 1;
-    long mPts_offset = 0;
-    long mLast_pts = 0;
+    int mCurrentLoop = 1;
+    long mPtsOffset = 0;
+    long mLastPts = -1;
     boolean mNoEncoding = false;
     private FrameswapControl mFrameSwapSurface;
+    private VsyncHandler mVsyncHandler;
+    Object mSyncLock = new Object();
+    long mVsyncTimeNs = 0;
+    long mFirstSynchNs = -1;
 
-    public SurfaceTranscoder(OutputMultiplier multiplier) {
+    public SurfaceTranscoder(OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         mOutputMult = multiplier;
         mSourceReader = new SourceReader();
+        mVsyncHandler = vsyncHandler;
     }
 
-    public SurfaceTranscoder() {
-        mOutputMult = new OutputMultiplier();
+    public SurfaceTranscoder(VsyncHandler vsyncHandler) {
+        mOutputMult = new OutputMultiplier(vsyncHandler);
         mSourceReader = new SourceReader();
+        mVsyncHandler = vsyncHandler;
     }
 
 
@@ -76,6 +84,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
 
         checkRealtime();
+        if (mRealtime) {
+            mVsyncHandler.addListener(this);
+        }
 
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
@@ -264,6 +275,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 e.printStackTrace();
             }
         }
+        Log.d(TAG, "Start source reader");
         mSourceReader.start();
         mStats.start();
         try {
@@ -405,7 +417,11 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             codec.releaseOutputBuffer(index, true);
         } else {
             long timestamp = info.presentationTimeUs;
+
             if (MainActivity.isStable()) {
+                if (mRealtime) {
+                    timestamp = mPts;
+                }
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
                 }
@@ -442,6 +458,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                 }
             } else {
+                Log.d(TAG, "Main not yet stable");
                 codec.releaseOutputBuffer(index, false);
             }
 
@@ -450,6 +467,14 @@ public class SurfaceTranscoder extends SurfaceEncoder {
 
     public OutputMultiplier getOutputMultiplier() {
         return mOutputMult;
+    }
+
+    @Override
+    public void vsync(long frameTimeNs) {
+        synchronized (mSyncLock) {
+            mVsyncTimeNs = frameTimeNs;
+            mSyncLock.notifyAll();
+        }
     }
 
     private class SourceReader extends Thread {
@@ -464,10 +489,10 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     if (mInFramesCount % 100 == 0) {
                         if (mNoEncoding) {
                             Log.d(TAG, "Decoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTimeSec + " sec");
+                                    ", current loop: " + mCurrentLoop + ", current time: " + mCurrentTimeSec + " sec");
                         } else {
                             Log.d(TAG, "Transcoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrent_loop + ", current time: " + mCurrentTimeSec + " sec");
+                                    ", current loop: " + mCurrentLoop + ", current time: " + mCurrentTimeSec + " sec");
                         }
                     }
 
@@ -496,9 +521,11 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     }
 
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
-                    long pts = mExtractor.getSampleTime() + mPts_offset;
+                    // Source time is always what is read
+                    long pts = mExtractor.getSampleTime() + mPtsOffset;
                     if (mRealtime) {
-                        sleepUntilNextFrame();
+                        // Limit the pace of incoming frames to the framerate
+                        sleepUntilNextFrameSynched();
                     }
                     mStats.startDecodingFrame(pts, size, flags);
                     if (size > 0) {
@@ -510,21 +537,21 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     boolean eof = !mExtractor.advance();
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-                        mCurrent_loop++;
-                        if (pts > mLast_pts) {
-                            mPts_offset = pts;
+                        mCurrentLoop++;
+                        if (pts > mLastPts) {
+                            mPtsOffset = pts;
                         } else {
-                            mPts_offset = mLast_pts;
-                            pts = mPts_offset;
+                            mPtsOffset = mLastPts;
+                            pts = mPtsOffset;
                         }
 
-                        mLoopTime = mPts_offset/1000000.0;
-                        Log.d(TAG, "*** Loop ended starting " + mCurrent_loop + " - currentTime " + mCurrentTimeSec + " ***");
+                        mLoopTime = mPtsOffset /1000000.0;
+                        Log.d(TAG, "*** Loop ended starting " + mCurrentLoop + " - currentTime " + mCurrentTimeSec + " ***");
                         if (doneReading(mTest, mInFramesCount, runtime, true)) {
                             mDone = true;
                         }
                     }
-                    mLast_pts = pts;
+                    mLastPts = pts;
                 }
 
                 synchronized (mDecoderBuffers) {
@@ -545,5 +572,31 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 mDecoderBuffers.notifyAll();
             }
         }
+    }
+
+    public  long sleepUntilNextFrameSynched() {
+        if (mLastPts == -1) {
+            Log.d(TAG,"First time - no wait");
+        } else {
+            synchronized (mSyncLock) {
+                long startTime = mVsyncTimeNs;
+                try {
+                    long distance = mVsyncTimeNs - startTime;
+                    while (distance < mFrameTimeUsec * 1000) {
+                        mSyncLock.wait();
+                        distance = mVsyncTimeNs - startTime;
+                    }
+                    mLastTime = mVsyncTimeNs;
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        if (mFirstSynchNs == -1) {
+            Log.d(TAG, "Set first sync: "+mVsyncTimeNs);
+            mFirstSynchNs = mVsyncTimeNs;
+        }
+        return mVsyncTimeNs;
     }
 }

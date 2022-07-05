@@ -379,16 +379,10 @@ class SurfaceEncoder extends Encoder {
     protected void checkRealtime() {
         if (mTest.getInput().hasRealtime()) {
             if ( mTest.getInput().getRealtime()) {
-                // If we ae using vsync (i.e. showing video) and
-                // want realtime the synch will be done in mOutputMult
-                // and we should not sleep double the time.
-                // If we lack a prewview sleep here.
-                if (mTest.getInput().hasShow() && mTest.getInput().getShow()) {
-                    Log.d(TAG, "Realtime controlled by vsync");
-                } else {
-                    Log.d(TAG, "Caclulated realtime");
-                    mRealtime = true;
-                }
+                // Realtime will limit the read pace to fps speed
+                // Without it the extractor will read as fast a possible
+                // until no buffers are available.
+                mRealtime = true;
             } else {
                 mOutputMult.setRealtime(false);
             }
@@ -441,9 +435,9 @@ class SurfaceEncoder extends Encoder {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             return -1;
         }
-        if (mRealtime) {
+       /* if (mRealtime) {
             sleepUntilNextFrame(mRefFrameTime);
-        }
+        }*/
         mInFramesCount++;
         return read;
     }

@@ -37,6 +37,7 @@ import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.VsyncHandler;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -69,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
     int mCameraCount = 0;
     private Bundle mExtraData;
     private int mInstancesRunning = 0;
+    VsyncHandler mVsyncHandler;
 
     public static boolean isStable() {
         return mStable;
@@ -116,6 +118,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mVsyncHandler = new VsyncHandler();
+        mVsyncHandler.start();
         //setContentView(R.layout.activity_main);
         setContentView(R.layout.activity_visualize);
 
@@ -530,8 +534,8 @@ public class MainActivity extends AppCompatActivity {
                     filePath.toLowerCase(Locale.US).contains(".webm")) {
                 // A decoder is needed
                 if (ot != null) {
-                    ot.mMult = new OutputMultiplier();
-                    coder = new SurfaceTranscoder(ot.mMult);
+                    ot.mMult = new OutputMultiplier(mVsyncHandler);
+                    coder = new SurfaceTranscoder(ot.mMult, mVsyncHandler);
                     ot.mEncoder = coder;
                     if (!test.getConfigure().getEncode() &&
                             ot.mMult != null &&
@@ -540,14 +544,14 @@ public class MainActivity extends AppCompatActivity {
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
                 } else {
-                    coder = new SurfaceTranscoder(new OutputMultiplier());
+                    coder = new SurfaceTranscoder(new OutputMultiplier(mVsyncHandler), mVsyncHandler);
                 }
             } else if (test.getConfigure().getSurface()) {
                 OutputMultiplier mult = null;
                 if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                         filePath.toLowerCase(Locale.US).contains(".yuv") ||
                         filePath.toLowerCase(Locale.US).contains(".rgba")) {
-                    mult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D);
+                    mult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D, mVsyncHandler);
                 } else if (filePath.toLowerCase(Locale.US).contains("camera")) {
                     mult = mCameraSourceMultiplier;
                 }
@@ -709,13 +713,14 @@ public class MainActivity extends AppCompatActivity {
     public void setupCamera(OutputAndTexture ot) {
         mCameraSource = CameraSource.getCamera(this);
         if (mCameraSourceMultiplier == null) {
-            mCameraSourceMultiplier = new OutputMultiplier();
+            mCameraSourceMultiplier = new OutputMultiplier(mVsyncHandler);
             mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
         }
         if (ot != null) {
             ot.mMult = mCameraSourceMultiplier;
             //ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
             mCameraSourceMultiplier = ot.mMult;
+            mCameraSourceMultiplier.setHighPrio();
             // This is for camera, if mounted at an angle
             Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);
             configureTextureViewTransform(ot.mView, previewSize, ot.mView.getWidth(), ot.mView.getHeight());
