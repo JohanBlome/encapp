@@ -6,10 +6,7 @@ import android.media.MediaCodec;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
 import android.opengl.Matrix;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
-import android.view.Choreographer;
 import android.view.Surface;
 
 import com.facebook.encapp.utils.grafika.EglCore;
@@ -27,7 +24,7 @@ public class OutputMultiplier {
     private final float[] mTmpMatrix = new float[16];
     final private Object mLock = new Object();
     private final Vector<FrameswapControl> mOutputSurfaces = new Vector<>();
-    MessageHandler mMessageHandler;
+    VsyncHandler mMessageHandler;
     boolean mDropFrames = true;
     int LATE_LIMIT_NS = 15 * 1000000000; // ms
     Texture2dProgram.ProgramType mProgramType = Texture2dProgram.ProgramType.TEXTURE_EXT;
@@ -42,16 +39,19 @@ public class OutputMultiplier {
     private int mWidth = -1;
     private int mHeight = -1;
     private boolean mVsynchWait = true;
+    boolean mHighPrio = false;
 
-    public OutputMultiplier(Texture2dProgram.ProgramType type) {
+    public OutputMultiplier(Texture2dProgram.ProgramType type, VsyncHandler vsyncHandler) {
         mProgramType = type;
-        mMessageHandler = new MessageHandler();
-        mMessageHandler.start();
+        mMessageHandler = vsyncHandler;
     }
 
-    public OutputMultiplier() {
-        mMessageHandler = new MessageHandler();
-        mMessageHandler.start();
+    public OutputMultiplier(VsyncHandler vsyncHandler) {
+        mMessageHandler = vsyncHandler;
+    }
+
+    public void setHighPrio() {
+        mHighPrio = true;
     }
 
     public Surface getInputSurface() {
@@ -67,6 +67,7 @@ public class OutputMultiplier {
             Log.d(TAG, "Create render");
             mRenderer = new Renderer(surface);
             mRenderer.setName(mName);
+            mMessageHandler.addListener(mRenderer);
             return mRenderer.setup();
         }
 
@@ -87,6 +88,7 @@ public class OutputMultiplier {
         } else {
             // Start up the Renderer thread.  It'll sleep until the TextureView is ready.
             mRenderer = new Renderer(surfaceTexture);
+            mMessageHandler.addListener(mRenderer);
             return mRenderer.setup();
         }
 
@@ -130,6 +132,7 @@ public class OutputMultiplier {
         if (mRenderer != null) {
             mRenderer.quit();
         }
+        Log.d(TAG, "Done stop and release");
     }
 
     public void newFrameAvailableInBuffer(MediaCodec codec, int bufferId, MediaCodec.BufferInfo info) {
@@ -140,53 +143,7 @@ public class OutputMultiplier {
         }
     }
 
-    private class MessageHandler extends Thread implements Choreographer.FrameCallback {
-        private Handler mHandler;
-
-        @Override
-        public void run() {
-            Looper.prepare();
-            mHandler = new Handler(msg -> {
-                Log.d(TAG, "Message");
-                return false;
-            });
-            Choreographer.getInstance().postFrameCallback(this);
-            Looper.loop();
-            Log.d(TAG, "Exit");
-        }
-
-
-        /**
-         * Called when a new display frame is being rendered.
-         * <p>
-             * This method provides the time in nanoseconds when the frame started being rendered.
-         * The frame time provides a stable time base for synchronizing animations
-         * and drawing.  It should be used instead of {@link SystemClock#uptimeMillis()}
-         * or {@link System#nanoTime()} for animations and drawing in the UI.  Using the frame
-         * time helps to reduce inter-frame jitter because the frame time is fixed at the time
-         * the frame was scheduled to start, regardless of when the animations or drawing
-         * callback actually runs.  All callbacks that run as part of rendering a frame will
-         * observe the same frame time so using the frame time also helps to synchronize effects
-         * that are performed by different callbacks.
-         * </p><p>
-         * Please note that the framework already takes care to process animations and
-         * drawing using the frame time as a stable time base.  Most applications should
-         * not need to use the frame time information directly.
-         * </p>
-         *
-         * @param frameTimeNanos The time in nanoseconds when the frame started being rendered,
-         *                       in the {@link System#nanoTime()} timebase.  Divide this value by {@code 1000000}
-         *                       to convert it to the {@link SystemClock#uptimeMillis()} time base.
-         */
-        @Override
-        public void doFrame(long frameTimeNanos) {
-            if (mRenderer != null)
-                mRenderer.vSync(frameTimeNanos);
-            Choreographer.getInstance().postFrameCallback(this);
-        }
-    }
-
-    private class Renderer extends Thread implements SurfaceTexture.OnFrameAvailableListener {
+    private class Renderer extends Thread implements SurfaceTexture.OnFrameAvailableListener, VsyncListener {
 
         // Waiting for incoming frames on input surface
         private final Object mInputFrameLock = new Object();
@@ -198,8 +155,8 @@ public class OutputMultiplier {
         boolean mDone = false;
         ConcurrentLinkedQueue<BufferObject> mFrameBuffers = new ConcurrentLinkedQueue<>();
         private long mLatestTimestampNsec = 0;
-        private long mTimestamp0 = -1;
-        private long mCurrentVsync = 0;
+        private long mTimestamp0Ns = -1;
+        private long mCurrentVsyncNs = 0;
         private long mVsync0 = -1;
         // So, we can ignore sync...
         private int frameAvailable = 0;
@@ -238,8 +195,7 @@ public class OutputMultiplier {
                     if (mWidth == -1 && mHeight == -1) {
                         mSizeLock.wait();
                     }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                } catch (InterruptedException e) {e.printStackTrace();
                 }
             }
             Log.d(TAG, "Set source texture buffer size: WxH = " + mWidth + "x" + mHeight);
@@ -248,7 +204,8 @@ public class OutputMultiplier {
             }
             mInputTexture.setOnFrameAvailableListener(this);
             mInputSurface = new Surface(mInputTexture);
-            this.setPriority(Thread.MAX_PRIORITY);
+
+            if (mHighPrio) this.setPriority(Thread.MAX_PRIORITY);
             while (!mDone) {
                 synchronized (mInputFrameLock) {
                     try {
@@ -275,12 +232,9 @@ public class OutputMultiplier {
             this.setName(name);
         }
 
-        public void vSync(long time) {
+        public void vsync(long timeNs) {
             synchronized (mVSynchLock) {
-                if (mVsync0 == -1) {
-                    mVsync0 = time;
-                }
-                mCurrentVsync = time - mVsync0;
+                mCurrentVsyncNs = timeNs;
                 mVSynchLock.notifyAll();
             }
         }
@@ -346,22 +300,34 @@ public class OutputMultiplier {
                         return;
                     }
                     long diff = 0;
-                    long timeUs = 0;
+                    long timeNs = 0;
                     if (mVsynchWait) {
-                        timeUs = buffer.getTimestampUs() * 1000;
-                        if (mTimestamp0 == -1) {
-                            mTimestamp0 = timeUs;
+                        timeNs = buffer.getTimestampUs() * 1000;
+                        if (mTimestamp0Ns == -1) {
+                            mTimestamp0Ns = timeNs;
+                            mVsync0 = mCurrentVsyncNs;
                         }
-                        while ((timeUs - mTimestamp0  - mCurrentVsync) > LATE_LIMIT_NS) {
+                        diff = timeNs - mTimestamp0Ns;
+                        while ((diff - (mCurrentVsyncNs - mVsync0)) > LATE_LIMIT_NS) {
                             try {
                                 mVSynchLock.wait(WAIT_TIME_SHORT_MS);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
                         }
+
+                        // Drop frame if we have frame in the buffert and we are more than one frame late
+                        if((diff - (mCurrentVsyncNs - mVsync0)) < -2 * LATE_LIMIT_NS && mFrameBuffers.size() > 0) {
+                            FrameBuffer fb = (FrameBuffer)buffer;
+                            fb.mCodec.releaseOutputBuffer(fb.mBufferId, false);
+                            synchronized (mFrameDrawnLock) {
+                                frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
+                                mFrameDrawnLock.notifyAll();
+                            }
+                        }
                     }
                     try {
-                        mLatestTimestampNsec = timeUs;
+                        mLatestTimestampNsec = timeNs;
                         if (buffer instanceof FrameBuffer) {
                             // Draw texture
                             FrameBuffer fb = (FrameBuffer)buffer;
@@ -416,9 +382,9 @@ public class OutputMultiplier {
 
                 synchronized (mLock) {
                     for (FrameswapControl surface : mOutputSurfaces) {
+
                         try {
                             if (surface.keepFrame()) {
-
                                 surface.makeCurrent();
                                 int width = surface.getWidth();
                                 int height = surface.getHeight();
