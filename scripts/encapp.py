@@ -6,6 +6,7 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
+import platform
 import humanfriendly
 import json
 import sys
@@ -14,6 +15,7 @@ import re
 import time
 import datetime
 import shutil
+import subprocess
 
 from encapp_tool import __version__
 from encapp_tool.app_utils import (
@@ -23,7 +25,7 @@ from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
     remove_files_using_regex, get_app_pid)
 
-SCRIPT_ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+SCRIPT_ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
 sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
@@ -392,10 +394,16 @@ def convert_test(path):
     output = f"{path[0:path.rindex('.')]}.bin"
     root = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
     proto_file = os.path.join(root, "proto", "tests.proto")
-    cmd = (f'protoc -I / --encode="Tests" {proto_file} '
-           f'< {path} > {output}')
-    print(f'cmd: {cmd}')
-    run_cmd(cmd)
+    cmd = f'protoc -I  {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
+    with open(path, 'rb') as in_f, open(output, 'wb') as out_file:
+        subprocess.run(
+            cmd,
+            shell=True,
+            stdout=out_file,
+            stderr=subprocess.PIPE,
+            input=in_f.read(),
+            check=True
+        )
     return output
 
 
