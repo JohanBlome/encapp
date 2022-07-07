@@ -5,6 +5,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.Choreographer;
 
+import java.util.Enumeration;
 import java.util.Vector;
 
 public class VsyncHandler extends Thread implements Choreographer.FrameCallback {
@@ -56,8 +57,8 @@ public class VsyncHandler extends Thread implements Choreographer.FrameCallback 
      */
     @Override
     public void doFrame(long frameTimeNanos) {
-        for (VsyncListener listener: mListeners) {
-            listener.vsync(frameTimeNanos);
+        for (Object listener: mListeners.toArray()) {
+            ((VsyncListener)(listener)).vsync(frameTimeNanos);
         }
         Choreographer.getInstance().postFrameCallback(this);
     }

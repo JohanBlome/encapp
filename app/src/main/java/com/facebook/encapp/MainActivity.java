@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     private Bundle mExtraData;
     private int mInstancesRunning = 0;
     VsyncHandler mVsyncHandler;
+    final static int WAIT_TIME_MS = 5000;  // 5 secs
 
     public static boolean isStable() {
         return mStable;
@@ -417,7 +418,16 @@ public class MainActivity extends AppCompatActivity {
                                             }
                                             Thread p = threads.pop();
                                             Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState() + ", threads: " + threads.size());
-                                            p.join();
+                                            // Most of the time all parallel tests are run the same time length, assuming this we can catch
+                                            // some errors here
+                                            p.join(WAIT_TIME_MS);
+                                            if (p.getState() == Thread.State.WAITING ||
+                                                p.getState() == Thread.State.TIMED_WAITING ||
+                                                p.getState() == Thread.State.BLOCKED) {
+                                                Log.d(TAG, p.getName() + " is still waiting. \nThis is probably not correct.");
+                                                p.interrupt();
+                                                decreaseTestsInflight(); //????
+                                            }
                                         } catch (InterruptedException e) {
                                             e.printStackTrace();
                                         }
