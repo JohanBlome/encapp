@@ -73,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
     VsyncHandler mVsyncHandler;
     final static int WAIT_TIME_MS = 5000;  // 5 secs
 
+
     public static boolean isStable() {
         return mStable;
     }
