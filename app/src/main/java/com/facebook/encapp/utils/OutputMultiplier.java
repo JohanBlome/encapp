@@ -193,7 +193,7 @@ public class OutputMultiplier {
             synchronized (mSizeLock) {
                 try {
                     if (mWidth == -1 && mHeight == -1) {
-                        mSizeLock.wait();
+                        mSizeLock.wait(WAIT_TIME_SHORT_MS);
                     }
                 } catch (InterruptedException e) {e.printStackTrace();
                 }

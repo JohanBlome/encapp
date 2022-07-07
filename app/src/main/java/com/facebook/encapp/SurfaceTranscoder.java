@@ -284,7 +284,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             e.printStackTrace();
         }
         mStats.stop();
-        Log.d(TAG, "Close muxer and streams");
+        Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
         if (mMuxer != null) {
             try {
                 mMuxer.release(); //Release calls stop
@@ -314,6 +314,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 mCodec.release();
             }
             if (mDecoder != null) {
+                Log.d(TAG, "FLUSH DECODER");
                 mDecoder.flush();
                 // Give it some time
                 synchronized (this) {
@@ -506,6 +507,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
                     }
+
                     if (doneReading(mTest, mInFramesCount, runtime, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
@@ -527,9 +529,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         // Limit the pace of incoming frames to the framerate
                         sleepUntilNextFrameSynched();
                     }
-                    mStats.startDecodingFrame(pts, size, flags);
                     if (size > 0) {
+                        mStats.startDecodingFrame(pts, size, flags);
                         mDecoder.queueInputBuffer(index, 0, size, pts, flags);
+                    } else {
+                        mDecoderBuffers.add(index);
                     }
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
@@ -583,7 +587,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 try {
                     long distance = mVsyncTimeNs - startTime;
                     while (distance < mFrameTimeUsec * 1000) {
-                        mSyncLock.wait();
+                        mSyncLock.wait(WAIT_TIME_MS);
                         distance = mVsyncTimeNs - startTime;
                     }
                     mLastTime = mVsyncTimeNs;
