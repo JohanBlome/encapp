@@ -283,6 +283,9 @@ public class OutputMultiplier {
                     mFrameDrawnLock.wait(WAIT_TIME_SHORT_MS);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                    Log.e(TAG, "Forced to release a timed wait indicates an error.");
+                    Log.e(TAG, "Release me.");
+                    stopAndRelease();
                 }
             }
             return mLatestTimestampNsec;
@@ -474,6 +477,9 @@ public class OutputMultiplier {
             mDone = true;
             synchronized (mInputFrameLock) {
                 mInputFrameLock.notifyAll();
+            }
+            synchronized (mFrameDrawnLock) {
+                mFrameDrawnLock.notifyAll();
             }
         }
 
