@@ -411,8 +411,11 @@ public class MainActivity extends AppCompatActivity {
                                     t.join();
 
                                     while (!threads.empty()) {
-                                        Thread p = threads.pop();
                                         try {
+                                            for (Thread t_: threads) {
+                                                Log.d(TAG, "Thread: " + t_.getName() + " - state: " + t_.getState());
+                                            }
+                                            Thread p = threads.pop();
                                             Log.d(TAG, "Join " + p.getName() + ", state = " + p.getState() + ", threads: " + threads.size());
                                             p.join();
                                         } catch (InterruptedException e) {
@@ -578,9 +581,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    Log.d(TAG, "Start transcoder");
+                    Log.d(TAG, "Start test");
                     final String status = coder.start(test);
-                    Log.d(TAG, "Transcoder done!");
+                    Log.d(TAG, "Test done: " + coder.mFilename + " - " + coder.getStatistics().getId());
                     Log.d(TAG, "Get stats");
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
@@ -620,10 +623,10 @@ public class MainActivity extends AppCompatActivity {
                 } finally {
                     decreaseTestsInflight();
                     log("\nDone test: " + description);
-                    Log.d(TAG, "Done test: " + description + ", to go: " + mInstancesRunning);
+                    Log.d(TAG, "Done test: " + coder.getStatistics().getId() + ", to go: " + mInstancesRunning);
                 }
             }
-        }, "TestRunner_" + test.getInput().getFilepath());
+        }, "TestRunner_" + coder.getOutputFilename());
         t.start();
 
         int waitTime = 10000; //ms
