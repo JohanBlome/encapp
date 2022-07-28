@@ -3,8 +3,11 @@ package com.facebook.encapp.utils;
 import android.util.Log;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,7 +16,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class SystemLoad {
-    protected static final String TAG = "SystemLoad";
+    protected static final String TAG = "encapp.systemload";
     protected boolean mCannotRead = false;
     Boolean started = Boolean.FALSE;
     int mFrequencyHz = 10;
@@ -22,7 +25,7 @@ public class SystemLoad {
     ArrayList<String> mGpuClock = new ArrayList<>();
     public void start() {
         String tmp = readSystemData("/sys/class/kgsl/kgsl-3d0/gpu_model");
-        if (!tmp.equals("")) {
+        if (tmp.equals("")) {
             Log.e(TAG, "Could not read system data, \"adb root && adb shell setenforce 0\" needed");
             return;
         } else {
@@ -75,13 +78,19 @@ public class SystemLoad {
     }
 
     private String readSystemData(String path) {
+        Path realPath = FileSystems.getDefault().getPath("", path);
+
         BufferedReader reader = null;
         StringBuffer value = new StringBuffer();
         try {
-            reader = new BufferedReader(new FileReader(path));
-            Stream<String> data= reader.lines();
-            Object[] lines = data.toArray();
+            reader = new BufferedReader(new FileReader(realPath.toFile()));
+            if (reader == null) {
+                Log.e(TAG, "failed to create reader");
+                return "";
+            }
 
+            Stream<String> data = reader.lines();
+            Object[] lines = data.toArray();
             for (Object str: lines) {
                 value.append(str);
                 value.append('\n');
@@ -126,7 +135,7 @@ public class SystemLoad {
         return ret;
     }
 
-    public ArrayList<String> getGPUClockFreqPerTimeUnit() {return mGpuClock;}
+    public ArrayList<String> getGPUClockFreqPerTimeUnit() { return mGpuClock; }
 
     public HashMap<String, String> getGPUInfo() { return mGPUInfo; }
 
@@ -134,4 +143,3 @@ public class SystemLoad {
         return mFrequencyHz;
     }
 }
-
