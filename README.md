@@ -90,6 +90,12 @@ Note: The `scripts/encapp.py` scripts will install a prebuild apk before running
 
 # 3. Operation: Run an Encoding Experiment Using encapp
 
+To make sure the test data is avalable. run:
+
+```
+$ bash scripts/prepare_test_data.sh`
+```
+
 ## 3.1. Small QCIF Encoding
 
 First, select one of the codecs from step 4. In this case, we will use `OMX.google.h264.encoder`.
@@ -131,6 +137,36 @@ $ encapp.py run tests/bitrate_buffer.720p.pbtxt
 results collect: ['PATH/bitrate_buffer.720p_files/encapp_XXX.json'
 
 ```
+
+
+## 3.3 Video decoding/encoding in series
+
+Instead of using yuv video data and encoded video can be used as a source.
+A suitable decoder will be chosen by the system (normally hardware decoders are prioritized).
+```
+$ encapp.py run tests/bitrate_transcoder_show.pbtxt
+...
+results collect: ['PATH/bitrate_transcoder_show_files/encapp_XXX.json']
+```
+
+This example also shows a different feature: visualization. It is possible to show videos in a grid like pattern (layout is automatic). 
+
+The parameter for showing the video is 'show' in the 'input' section. Currently there is no provision for visualizing the encoded result (which would require an additional decoder). Likewise the encoder is not available for explicit setting at the moment.
+
+
+
+## 3.4 Video encoding using camera source
+
+Encapp also supports camera using the Camera2 API.
+```
+$ encapp.py run tests/camera_parallel.pbtxt 
+...
+['PATH/camera_parallel_files/encapp_XXX.json', 'PATH/camera_parallel_files/encapp_XXX.json']
+```
+
+This example will run two encodings with the camera as source in parallel and show the viewfinder in fullscreen. 
+
+Currently there are no camera settings exposed. However, the resolution and frame rate will be determined by the first encoder which will cause Encapp to try to find a suitable setting (if possible).
 
 
 # 4. Multiple Encoding Experiments
