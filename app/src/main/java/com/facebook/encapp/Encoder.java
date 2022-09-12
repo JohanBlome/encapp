@@ -208,7 +208,7 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
-        mLastTime = now;
+        mLastTime = System.nanoTime() / 1000;
     }
 
 
