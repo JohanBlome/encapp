@@ -272,3 +272,30 @@ def force_stop(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
+
+
+def reset_logcat(serial: str, debug=0):
+    """Clear logcat (if possible)
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+    """
+    run_cmd(f"adb -s {serial} logcat -c", debug)
+
+
+def logcat_dump(serial: str, debug=0) -> str:
+    """Capture current logcat buffers
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+
+    Returns:
+      Current logcat dump
+    """
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} logcat -d", debug
+    )
+    assert ret, f"error: failed to dump logcat: {stderr}"
+    return stdout
