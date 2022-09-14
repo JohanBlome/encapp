@@ -18,7 +18,7 @@ public class FileReader {
 
     public boolean openFile(String name) {
         try {
-            Log.e(TAG, "Open file");
+            Log.i(TAG, "Open file: " + name);
             mFile = new File(name);
             mBis = new BufferedInputStream(new FileInputStream(mFile));
         } catch (FileNotFoundException e) {
@@ -32,7 +32,7 @@ public class FileReader {
     public void closeFile() {
         try {
             synchronized (this) {
-                Log.e(TAG, "Close file");
+                Log.i(TAG, "Close file");
                 if (mBis != null) {
                     mBis.close();
                     mBis = null;
