@@ -23,7 +23,7 @@ from encapp_tool.app_utils import (
     install_app, uninstall_app, install_ok)
 from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
-    remove_files_using_regex, get_app_pid)
+    remove_files_using_regex, get_app_pid, reset_logcat, logcat_dump)
 
 SCRIPT_ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
 sys.path.append(SCRIPT_ROOT_DIR)
@@ -147,6 +147,7 @@ def wait_for_exit(serial, debug=0):
 
 def collect_result(workdir, test_name, serial):
     print(f'Collect_result: {test_name}')
+    reset_logcat(serial)
     run_cmd(f'adb -s {serial} shell am start -W -e test '
             f'/sdcard/{test_name} {ACTIVITY}')
     wait_for_exit(serial)
@@ -180,8 +181,26 @@ def collect_result(workdir, test_name, serial):
     adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
     run_cmd(adb_cmd)
     print(f'results collect: {result_json}')
+    log = logcat_dump(serial)
+    parse_log(log, output_dir)
     return result_json
 
+
+def parse_log(log, output_dir):
+    test_reg = re.compile(".*Test failed: ([\w\W]*)")
+    failed = False
+    lfpath = f'{output_dir}/logcat_failure.txt'
+    for line in log.splitlines():
+        match = test_reg.search(line)
+        if match:
+            print('**********\n\nTest case failed:')
+            print(f'\'{match.group(1)}\'\n')
+            print(f'logcat has been saved to \'{lfpath}\'')
+            print('\n\n**********')
+            failed = True
+    if failed:
+        with open(f'{output_dir}/logcat_failure.txt', 'w') as logfile:
+            logfile.write(log)
 
 def verify_video_size(videofile, resolution):
     if not os.path.exists(videofile):
