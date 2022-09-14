@@ -640,7 +640,7 @@ public class MainActivity extends AppCompatActivity {
         t.start();
 
         int waitTime = 10000; //ms
-        while (!coder.initDone()) {
+        while (!coder.initDone() && t.isAlive()) {
             try {
                 // If we do not wait for the init to de done before starting next
                 // transcoder there may be issue in the surface handling on lower levels
@@ -719,6 +719,7 @@ public class MainActivity extends AppCompatActivity {
         if (mLogText != null) {
             runOnUiThread(() -> {
                 mLogText.append(text);
+                Log.d(TAG, text);
             });
         }
     }
