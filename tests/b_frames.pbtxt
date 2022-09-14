@@ -13,7 +13,7 @@ test {
     configure {
         codec: "encoder.avc"
         bitrate: "1000 kbps"
-        bitrate_mode: cbr
+        bitrate_mode: vbr
         i_frame_interval: 2000
         parameter {
             key: "max-bframes"
