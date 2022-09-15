@@ -39,7 +39,7 @@ FUNC_CHOICES = {
     'uninstall': 'uninstall apks',
     'list': 'list codecs and devices supported',
     'run': 'run codec test case',
-    'kill' : 'kill application'
+    'kill': 'kill application'
 }
 
 default_values = {

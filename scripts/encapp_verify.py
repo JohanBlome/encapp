@@ -164,7 +164,8 @@ def check_long_term_ref(resultpath):
                     lt_mark[frame['frame']] = 0  # implicit marking of 0th
                     for ltr in range(0, ltr_count - 1, 1):
                         mark_frame[frame['original_frame'] + ltr] = ltr
-                        use_frame[frame['original_frame'] + ltr_count + 1] = ltr
+                        use_frame[frame['original_frame'] +
+                                  ltr_count + 1] = ltr
 
                 ok_range = 2
                 matching = {}
@@ -507,7 +508,6 @@ def check_mean_bitrate_deviation(resultpath):
     return result_string
 
 
-
 def check_framerate_deviation(resultpath):
     result_string = ''
     framerate_error = []
@@ -590,9 +590,9 @@ def check_framerate_deviation(resultpath):
                                                                  frame2,
                                                                  fps)
                 framerate_error.append([testname, int(round(deviation_perc, 0)),
-                                      fps, actual_framerate,
-                                      codec, encoder_settings.get('height'),
-                                      fps, resultfilename])
+                                        fps, actual_framerate,
+                                        codec, encoder_settings.get('height'),
+                                        fps, resultfilename])
 
                 labels = ['test', 'error', 'framerate', 'real_framerate',
                           'codec', 'height', 'fps', 'file']
@@ -624,11 +624,11 @@ def check_framerate_deviation(resultpath):
 
 
 def calcFrameRate(frame1, frame2, target_rate):
-    time_delta = (frame2['pts'] -  frame1['pts'])/1000000
+    time_delta = (frame2['pts'] - frame1['pts'])/1000000
     frame_delta = frame2['frame'] - frame1['frame']
     framerate = frame_delta/time_delta
-    framerate_error_perc = 100 * (1 - target_rate/framerate);
-    return framerate, framerate_error_perc;
+    framerate_error_perc = 100 * (1 - target_rate/framerate)
+    return framerate, framerate_error_perc
 
 
 def print_partial_result(header, partial_result):

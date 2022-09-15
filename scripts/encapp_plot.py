@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+
 def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({',': '_', ' ': '_'}))
     print(f'{name} -> {ret}')
