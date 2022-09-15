@@ -180,12 +180,14 @@ public class CameraSource {
                 OutputConfiguration outconfig = new OutputConfiguration(data.mSurface);
                 mOutputConfigs.add(outconfig);
             }
-            SessionConfiguration config = new SessionConfiguration(SessionConfiguration.SESSION_REGULAR,
-                    mOutputConfigs,
-                    new CamExec(),
-                    new CamState());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                SessionConfiguration config = new SessionConfiguration(SessionConfiguration.SESSION_REGULAR,
+                        mOutputConfigs,
+                        new CamExec(),
+                        new CamState());
 
-            mCameraDevice.createCaptureSession(config);
+                mCameraDevice.createCaptureSession(config);
+            }
         } catch (CameraAccessException e) {
             e.printStackTrace();
             return false;
@@ -196,11 +198,13 @@ public class CameraSource {
     private void updateParameters() {
         try {
             mSession.abortCaptures();
-            SessionConfiguration config = new SessionConfiguration(SessionConfiguration.SESSION_REGULAR,
-                    mOutputConfigs,
-                    new CamExec(),
-                    new CamState());
-            mCameraDevice.createCaptureSession(config);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                SessionConfiguration config = new SessionConfiguration(SessionConfiguration.SESSION_REGULAR,
+                        mOutputConfigs,
+                        new CamExec(),
+                        new CamState());
+                mCameraDevice.createCaptureSession(config);
+            }
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }

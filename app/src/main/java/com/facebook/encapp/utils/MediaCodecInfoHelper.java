@@ -72,7 +72,9 @@ public class MediaCodecInfoHelper {
         tab = getIndentation(indent);
 
         str.append(tab + "complexity_range: " + encoder_capabilities.getComplexityRange().toString() + "\n");
-        str.append(tab + "quality_range: " + encoder_capabilities.getQualityRange().toString() + "\n");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            str.append(tab + "quality_range: " + encoder_capabilities.getQualityRange().toString() + "\n");
+        }
         for (int bitrate_mode : mBitrateModeList) {
             str.append(tab + bitrateModeToString(bitrate_mode) + ": " + encoder_capabilities.isBitrateModeSupported(bitrate_mode) + "\n");
         }
