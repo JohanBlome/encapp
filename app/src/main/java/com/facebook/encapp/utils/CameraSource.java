@@ -129,11 +129,12 @@ public class CameraSource {
             camera_characteristics_info.append("}\n");
             Log.d(TAG, camera_characteristics_info + "\n");
 
-            // Write info to sdcard
+            // Write info to external storage directory
             FileWriter writer = null;
             try {
-                writer = new FileWriter(Environment.getExternalStorageDirectory().getPath() + "/encapp.CameraCharacteristics.txt");
-                Log.d(TAG, "Write to file");
+                String filename = Environment.getExternalStorageDirectory().getPath() + "/encapp.CameraCharacteristics.txt";
+                writer = new FileWriter(filename);
+                Log.d(TAG, "Write to file " + filename);
                 writer.write(camera_characteristics_info.toString());
                 writer.flush();
                 writer.close();
