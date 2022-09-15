@@ -55,3 +55,13 @@ def uninstall_app(serial: str, debug=0):
         debug (int): Debug level
     """
     adb_cmds.uninstall_apk(serial, APPNAME_MAIN, debug)
+
+
+def force_stop(serial: str, debug=0):
+    """Force stop of application
+
+    Args:
+       serial (str): Android device serial no.
+       debug (int): Debug level
+    """
+    adb_cmds.force_stop(serial, APPNAME_MAIN, debug)
