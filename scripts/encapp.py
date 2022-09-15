@@ -20,7 +20,7 @@ import subprocess
 from encapp_tool import __version__
 from encapp_tool.app_utils import (
     APPNAME_MAIN, SCRIPT_DIR, ACTIVITY,
-    install_app, uninstall_app, install_ok)
+    install_app, uninstall_app, install_ok, force_stop)
 from encapp_tool.adb_cmds import (
     run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
     remove_files_using_regex, get_app_pid, reset_logcat, logcat_dump)
@@ -40,6 +40,7 @@ FUNC_CHOICES = {
     'uninstall': 'uninstall apks',
     'list': 'list codecs and devices supported',
     'run': 'run codec test case',
+    'kill' : 'kill application'
 }
 
 default_values = {
@@ -616,6 +617,11 @@ def main(argv):
     if options.func == 'uninstall':
         uninstall_app(serial, options.debug)
         sys.exit(0)
+
+    if options.func == 'kill':
+        print("Force stop")
+        force_stop(serial, options.debug)
+        return
 
     # ensure the app is correctly installed
     assert install_ok(serial, options.debug), (
