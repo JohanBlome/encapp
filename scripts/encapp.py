@@ -6,7 +6,6 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
-import platform
 import humanfriendly
 import json
 import sys
@@ -191,7 +190,7 @@ def collect_result(workdir, test_name, serial, storage_directory):
 
 
 def parse_log(log, output_dir):
-    test_reg = re.compile(".*Test failed: ([\w\W]*)")
+    test_reg = re.compile(r'.*Test failed: ([\w\W]*)')
     failed = False
     lfpath = f'{output_dir}/logcat_failure.txt'
     for line in log.splitlines():
@@ -205,6 +204,7 @@ def parse_log(log, output_dir):
     if failed:
         with open(f'{output_dir}/logcat_failure.txt', 'w') as logfile:
             logfile.write(log)
+
 
 def verify_video_size(videofile, resolution):
     if not os.path.exists(videofile):
@@ -329,7 +329,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         abort_test(workdir, 'ERROR: no test file name')
 
     test_file = os.path.basename(test_def)
-    testname = f"{test_file[0:test_file.rindex('.')]}.run.bin"
+    testname = f'{test_file[0:test_file.rindex(".")]}.run.bin'
     output = os.path.join(workdir, testname)
     os.makedirs(workdir, exist_ok=True)
     with open(output, 'wb') as binfile:
@@ -416,9 +416,9 @@ def convert_to_frames(value, fps=30):
 
 
 def convert_test(path):
-    output = f"{path[0:path.rindex('.')]}.bin"
+    output = f'{path[0:path.rindex(".")]}.bin'
     root = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
-    proto_file = os.path.join(root, "proto", "tests.proto")
+    proto_file = os.path.join(root, 'proto', 'tests.proto')
     cmd = f'protoc -I  {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
     with open(path, 'rb') as in_f, open(output, 'wb') as out_file:
         subprocess.run(
@@ -445,7 +445,7 @@ def codec_test(settings, model, serial):
     if settings['output'] is not None:
         workdir = settings['output']
     else:
-        workdir = f"{settings['desc'].replace(' ', '_')}_{model}_{dt_string}"
+        workdir = f'{settings["desc"].replace(" ", "_")}_{model}_{dt_string}'
 
     # run the codec test
     return run_codec_tests_file(test_config,
@@ -505,9 +505,9 @@ def get_options(argv):
         '-r', '--bitrate', type=str, dest='bitrate',
         default=default_values['bps'],
         metavar='input-video-bitrate',
-        help='input video bitrate, either as a single number, '
-        '"100 kbps" or a lst 100kbps,200kbps or a range '
-        '100k-1M-100k (start-stop-step)',)
+        help='input video bitrate. Can be a single number '
+        '(e.g. "100 kbps"), a list (e.g. "100kbps,200kbps") or a range '
+        '(e.g. "100k-1M-100k") (start-stop-step)',)
     parser.add_argument(
         'configfile', type=str, nargs='?',
         default=default_values['configfile'],
