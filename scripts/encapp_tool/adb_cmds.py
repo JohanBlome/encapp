@@ -3,7 +3,7 @@ import re
 from subprocess import PIPE, Popen, SubprocessError
 from typing import Dict, List, Optional, Tuple
 
-ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
+ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 
 
 def run_cmd(cmd: str, debug: int = 0) -> Tuple[bool, str, str]:
@@ -19,13 +19,13 @@ def run_cmd(cmd: str, debug: int = 0) -> Tuple[bool, str, str]:
     """
     try:
         if debug > 0:
-            print(cmd, sep=" ")
+            print(cmd, sep=' ')
         with Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE) as process:
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
     except SubprocessError:
-        print("Failed to run command: " + cmd)
-        return False, "", ""
+        print(f'Failed to run command: {cmd}')
+        return False, '', ''
 
     return ret, stdout.decode(), stderr.decode()
 
@@ -47,26 +47,29 @@ def get_device_info(serial_inp: Optional[str], debug=0) -> Tuple[Dict, str]:
         and serial is the serial no. of the device.
     """
     device_info = get_connected_devices(debug)
-    assert len(device_info) > 0, "error: no devices connected"
+    assert len(device_info) > 0, 'error: no devices connected'
     if debug > 2:
-        print(f"available devices: {device_info}")
+        print(f'available devices: {device_info}')
 
     # select output device
     if serial_inp is None:
         # if user did not select a serial_inp, make sure there is only one
         # device available
-        assert len(device_info) == 1, f"error: need to choose a device [{', '.join(device_info.keys())}]"
+        assert len(device_info) == 1, (
+            'error: need to choose a device '
+            f'[{", ".join(device_info.keys())}]')
         serial = list(device_info.keys())[0]
         model = device_info[serial]
 
     else:
         # if user forced a serial number, make sure it is available
-        assert serial_inp in device_info, f"error: device {serial_inp} not available"
+        assert serial_inp in device_info, (
+            f'error: device {serial_inp} not available')
         serial = serial_inp
         model = device_info[serial]
 
     if debug > 0:
-        print(f"selecting device: serial: {serial} model: {model}")
+        print(f'selecting device: serial: {serial} model: {model}')
 
     return model, serial
 
@@ -82,12 +85,12 @@ def remove_files_using_regex(
         location (str): Path/directory to analyze and remove files from
         debug (int): Debug level
     """
-    adb_cmd = "adb -s " + serial + " shell ls " + location
+    adb_cmd = f'adb -s {serial} shell ls {location}'
     _, stdout, _ = run_cmd(adb_cmd, debug)
     output_files = re.findall(regex_str, stdout, re.MULTILINE)
     for file in output_files:
         # remove the output
-        adb_cmd = "adb -s " + serial + " shell rm " + location + file
+        adb_cmd = f'adb -s {serial} shell rm {location}/{file}'
         run_cmd(adb_cmd, debug)
 
 
@@ -104,24 +107,24 @@ def get_connected_devices(debug: int) -> Dict:
         as key.
     """
     # list all available devices
-    adb_cmd = "adb devices -l"
+    adb_cmd = 'adb devices -l'
     ret, stdout, _ = run_cmd(adb_cmd, debug)
-    assert ret, "error: failed to get adb devices"
+    assert ret, 'error: failed to get adb devices'
     # parse list
     device_info = {}
     for line in stdout.splitlines():
-        if line in ["List of devices attached", ""]:
+        if line in ['List of devices attached', '']:
             continue
         serial = line.split()[0]
         item_dict = {}
         for item in line.split()[1:]:
             # ':' used to separate key/values
-            if ":" in item:
-                key, val = item.split(":", 1)
+            if ':' in item:
+                key, val = item.split(':', 1)
                 item_dict[key] = val
         # ensure the 'model' field exists
-        if "model" not in item_dict:
-            item_dict["model"] = "generic"
+        if 'model' not in item_dict:
+            item_dict['model'] = 'generic'
         device_info[serial] = item_dict
     return device_info
 
@@ -139,7 +142,7 @@ def get_app_pid(serial: str, package_name: str, debug=0):
         -1 if process not running; -2 if fail to process.
     """
     pid = -1
-    adb_cmd = f"adb -s {serial} shell pidof {package_name}"
+    adb_cmd = f'adb -s {serial} shell pidof {package_name}'
     ret, stdout, _ = run_cmd(adb_cmd, debug)
     if ret is True and stdout:
         try:
@@ -162,13 +165,13 @@ def install_apk(serial: str, apk_to_install: str, debug=0):
         RuntimeError if unable to install app on device
     """
     r_code, _, err = run_cmd(
-        f"adb -s {serial} install -g {apk_to_install}",
+        f'adb -s {serial} install -g {apk_to_install}',
         debug
     )
     if r_code is False:
         raise RuntimeError(
-            f"Unable to install {apk_to_install} "
-            f"at device {serial} due to {err}"
+            f'Unable to install {apk_to_install} '
+            f'at device {serial} due to {err}'
         )
 
 
@@ -182,9 +185,9 @@ def uninstall_apk(serial: str, apk: str, debug=0):
     """
     package_list = installed_apps(serial, debug)
     if apk in package_list:
-        run_cmd(f"adb -s {serial} uninstall {apk}", debug)
+        run_cmd(f'adb -s {serial} uninstall {apk}', debug)
     else:
-        print(f"warning: {apk} not installed")
+        print(f'warning: {apk} not installed')
 
 
 def installed_apps(serial: str, debug=0) -> List:
@@ -198,9 +201,9 @@ def installed_apps(serial: str, debug=0) -> List:
         List of packages installed at android device.
     """
     ret, stdout, stderr = run_cmd(
-        f"adb -s {serial} shell pm list packages", debug
+        f'adb -s {serial} shell pm list packages', debug
     )
-    assert ret, f"error: failed to get installed app list: {stderr}"
+    assert ret, f'error: failed to get installed app list: {stderr}'
     return _parse_pm_list_packages(stdout)
 
 
@@ -218,8 +221,8 @@ def _parse_pm_list_packages(stdout: str) -> List:
         # ignore blank lines
         if not line:
             continue
-        if line.startswith("package:"):
-            package_list.append(line[len("package:"):])
+        if line.startswith('package:'):
+            package_list.append(line[len('package:'):])
     return package_list
 
 
@@ -232,18 +235,18 @@ def grant_storage_permissions(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} "
-        "android.permission.WRITE_EXTERNAL_STORAGE",
+        f'adb -s {serial} shell pm grant {package} '
+        'android.permission.WRITE_EXTERNAL_STORAGE',
         debug,
     )
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} "
-        "android.permission.READ_EXTERNAL_STORAGE",
+        f'adb -s {serial} shell pm grant {package} '
+        'android.permission.READ_EXTERNAL_STORAGE',
         debug,
     )
     run_cmd(
-        f"adb -s {serial} shell appops set --uid {package} "
-        "MANAGE_EXTERNAL_STORAGE allow",
+        f'adb -s {serial} shell appops set --uid {package} '
+        'MANAGE_EXTERNAL_STORAGE allow',
         debug,
     )
 
@@ -257,8 +260,8 @@ def grant_camera_permission(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} "
-        "android.permission.CAMERA",
+        f'adb -s {serial} shell pm grant {package} '
+        'android.permission.CAMERA',
         debug
     )
 
@@ -271,7 +274,7 @@ def force_stop(serial: str, package: str, debug=0):
         package (str): Android package name
         debug (int): Debug level
     """
-    run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
+    run_cmd(f'adb -s {serial} shell am force-stop {package}', debug)
 
 
 def reset_logcat(serial: str, debug=0):
@@ -281,7 +284,7 @@ def reset_logcat(serial: str, debug=0):
         serial (str): Android device serial no.
         debug (int): Debug level
     """
-    run_cmd(f"adb -s {serial} logcat -c", debug)
+    run_cmd(f'adb -s {serial} logcat -c', debug)
 
 
 def logcat_dump(serial: str, debug=0) -> str:
@@ -295,7 +298,7 @@ def logcat_dump(serial: str, debug=0) -> str:
       Current logcat dump
     """
     ret, stdout, stderr = run_cmd(
-        f"adb -s {serial} logcat -d", debug
+        f'adb -s {serial} logcat -d', debug
     )
-    assert ret, f"error: failed to dump logcat: {stderr}"
+    assert ret, f'error: failed to dump logcat: {stderr}'
     return stdout

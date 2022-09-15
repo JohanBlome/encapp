@@ -5,8 +5,8 @@ from typing import Optional, Tuple
 
 VERSION_FILE = 'app/build.gradle'
 VERSION_TAG = r'versionName "([0-9]*).([0-9]*)"'
-SCRIPT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..")
-ROOT_DIR = os.path.join(SCRIPT_DIR, "..")
+SCRIPT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..')
+ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
 
 
 def _lookup_expected_encapp_version() -> Optional[Tuple[str, str]]:
@@ -16,7 +16,7 @@ def _lookup_expected_encapp_version() -> Optional[Tuple[str, str]]:
         A tuple with apk version (major_version, minor_version)
         if found, else None
     """
-    with open(f"{ROOT_DIR}/{VERSION_FILE}", "r") as fl:
+    with open(f'{ROOT_DIR}/{VERSION_FILE}', 'r') as fl:
         data = fl.read()
 
     m = re.search(VERSION_TAG, data)
