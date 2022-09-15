@@ -46,6 +46,7 @@ FUNC_CHOICES = {
 default_values = {
     'debug': 0,
     'func': 'help',
+    'storage_directory': '/sdcard',
     'install': False,
     'videofile': None,
     'configfile': None,
@@ -125,11 +126,12 @@ R_FRAME_RATE_MAP = {
 }
 
 
-def remove_encapp_gen_files(serial, debug=0):
+def remove_encapp_gen_files(
+        serial, storage_directory=default_values['storage_directory'],
+        debug=0):
     # remove any files that are generated in previous runs
     regex_str = ENCAPP_OUTPUT_FILE_NAME_RE
-    location = '/sdcard/'
-    remove_files_using_regex(serial, regex_str, location, debug)
+    remove_files_using_regex(serial, regex_str, storage_directory, debug)
 
 
 def wait_for_exit(serial, debug=0):
@@ -146,13 +148,13 @@ def wait_for_exit(serial, debug=0):
         print(f'{APPNAME_MAIN} was not active')
 
 
-def collect_result(workdir, test_name, serial):
+def collect_result(workdir, test_name, serial, storage_directory):
     print(f'Collect_result: {test_name}')
     reset_logcat(serial)
     run_cmd(f'adb -s {serial} shell am start -W -e test '
-            f'/sdcard/{test_name} {ACTIVITY}')
+            f'{storage_directory}/{test_name} {ACTIVITY}')
     wait_for_exit(serial)
-    adb_cmd = 'adb -s ' + serial + ' shell ls /sdcard/'
+    adb_cmd = f'adb -s {serial} shell ls {storage_directory}/'
     ret, stdout, stderr = run_cmd(adb_cmd, True)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
@@ -169,17 +171,18 @@ def collect_result(workdir, test_name, serial):
         # pull the output file
         print(f'pull {file} to {output_dir}')
 
-        adb_cmd = f'adb -s {serial} pull /sdcard/{file} {output_dir}'
+        adb_cmd = (f'adb -s {serial} pull {storage_directory}/{file} '
+                   f'{output_dir}')
         run_cmd(adb_cmd)
 
         # remove the json file on the device too
-        adb_cmd = f'adb -s {serial} shell rm /sdcard/{file}'
+        adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{file}'
         run_cmd(adb_cmd)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(output_dir, tmpname))
 
-    adb_cmd = f'adb -s {serial} shell rm /sdcard/{test_name}'
+    adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{test_name}'
     run_cmd(adb_cmd)
     print(f'results collect: {result_json}')
     log = logcat_dump(serial)
@@ -220,10 +223,10 @@ def verify_video_size(videofile, resolution):
         return True
 
 
-def update_file_paths(test, new_name):
+def update_file_paths(test, new_name, storage_directory):
     path = test.input.filepath
     for para in test.parallel.test:
-        update_file_paths(para, new_name)
+        update_file_paths(para, new_name, storage_directory)
 
     if path == 'camera':
         return
@@ -231,7 +234,7 @@ def update_file_paths(test, new_name):
     if new_name is not None:
         path = new_name
 
-    test.input.filepath = f'/sdcard/{os.path.basename(path)}'
+    test.input.filepath = f'{storage_directory}/{os.path.basename(path)}'
     path = test.input.filepath
 
 
@@ -290,7 +293,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
 
-        update_file_paths(test, videofile)
+        update_file_paths(test, videofile, settings['storage_directory'])
 
         print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
@@ -336,7 +339,8 @@ def run_codec_tests(tests, model, serial, workdir, settings):
     ok = True
     for filepath in files_to_push:
         if os.path.exists(filepath):
-            run_cmd(f'adb -s {serial} push {filepath} /sdcard/')
+            run_cmd(f'adb -s {serial} push {filepath} '
+                    f'{settings["storage_directory"]}/')
         else:
             ok = False
             print(f'File: "{filepath}" does not exist, check path')
@@ -344,10 +348,11 @@ def run_codec_tests(tests, model, serial, workdir, settings):
     if not ok:
         abort_test(workdir, 'Check file paths and try again')
 
-    return collect_result(workdir, testname, serial)
+    return collect_result(workdir, testname, serial,
+                          settings['storage_directory'])
 
 
-def list_codecs(serial, model, debug=0):
+def list_codecs(serial, model, storage_directory, debug=0):
     adb_cmd = f'adb -s {serial} shell am start ' \
               f'-e ui_hold_sec 3 ' \
               f'-e list_codecs a {ACTIVITY}'
@@ -355,7 +360,7 @@ def list_codecs(serial, model, debug=0):
     run_cmd(adb_cmd, debug)
     wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
-    adb_cmd = f'adb -s {serial} pull /sdcard/codecs.txt {filename}'
+    adb_cmd = f'adb -s {serial} pull {storage_directory}/codecs.txt {filename}'
     ret, stdout, stderr = run_cmd(adb_cmd, debug)
     assert ret, 'error getting codec list: "%s"' % stdout
 
@@ -487,6 +492,11 @@ def get_options(argv):
         metavar='input-video-file',
         help='input video file',)
     parser.add_argument(
+        '--sdcard', type=str, dest='storage_directory',
+        default=default_values['storage_directory'],
+        metavar='storage-directory',
+        help='storage directory on device',)
+    parser.add_argument(
         '-c', '--codec', type=str, dest='codec',
         default=default_values['encoder'],
         metavar='encoder',
@@ -598,7 +608,7 @@ def main(argv):
 
     # get model and serial number
     model, serial = get_device_info(options.serial, options.debug)
-    remove_encapp_gen_files(serial, options.debug)
+    remove_encapp_gen_files(serial, options.storage_directory, options.debug)
 
     # TODO(chema): fix this
     if type(model) is dict:
@@ -629,7 +639,7 @@ def main(argv):
 
     # run function
     if options.func == 'list':
-        list_codecs(serial, model, options.debug)
+        list_codecs(serial, model, options.storage_directory, options.debug)
 
     elif options.func == 'run':
         # ensure there is an input configuration
@@ -644,6 +654,7 @@ def main(argv):
         settings['output'] = options.output
         settings['bitrate'] = options.bitrate
         settings['desc'] = options.desc
+        settings['storage_directory'] = options.storage_directory
 
         result = codec_test(settings, model, serial)
         verify_app_version(result)
