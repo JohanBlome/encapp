@@ -16,10 +16,9 @@ public class TestDefinitionHelper {
     public static MediaFormat buildMediaFormat(Test test) {
         Configure config = test.getConfigure();
         Input input = test.getInput();
-        Size sourceResolution = SizeUtils.parseXString(input.getResolution());
-
+        Size targetResolution = SizeUtils.parseXString(config.getResolution());
         MediaFormat format = MediaFormat.createVideoFormat(
-                config.getMime(), sourceResolution.getWidth(), sourceResolution.getHeight());
+                config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
 
         format.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(config.getBitrate()));
         format.setFloat(MediaFormat.KEY_FRAME_RATE, input.getFramerate());
