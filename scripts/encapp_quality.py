@@ -281,7 +281,8 @@ def get_options(argv):
         '-ref',
         '--override_reference',
         help=(
-            'Override reference, used when source is downsampled prior to encoding'
+            'Override reference, used when source is downsampled prior to '
+            'encoding'
         ),
         default='',
     )
@@ -316,7 +317,8 @@ def get_options(argv):
         action='store_true',
     )
     parser.add_argument(
-        '--recalc', help='recalculate regardless of status', action='store_true'
+        '--recalc', help='recalculate regardless of status',
+        action='store_true'
     )
 
     options = parser.parse_args()

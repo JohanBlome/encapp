@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import json
 import argparse
 import pandas as pd
 import seaborn as sns
