@@ -3,8 +3,6 @@
 import json
 import argparse
 import pandas as pd
-import seaborn as sb
-import matplotlib.pyplot as plt
 import numpy as np
 import encapp as ep
 

@@ -541,15 +541,14 @@ def check_framerate_deviation(resultpath):
                 for limit in limits:
                     if limit > len(frames):
                         limit_too_high = True
-                    filtered = list(filter(lambda x: (x['original_frame'] >=
-                                                      int(previous_limit) and
-                                                      x['original_frame'] < int(limit)),
-                                           frames))
+                    filtered = list(filter(
+                        lambda x: (x['original_frame'] >= int(previous_limit)
+                                   and x['original_frame'] < int(limit)),
+                        frames))
                     frame1 = filtered[0]
                     frame2 = filtered[-1]
-                    actual_framerate, deviation_perc = calcFrameRate(frame1,
-                                                                     frame2,
-                                                                     target_rate)
+                    actual_framerate, deviation_perc = calcFrameRate(
+                        frame1, frame2, target_rate)
                     if abs(deviation_perc) > ERROR_LIMIT:
                         status = 'failed'
                     dyn_data.append([int(previous_limit), int(limit),
@@ -589,14 +588,16 @@ def check_framerate_deviation(resultpath):
                 actual_framerate, deviation_perc = calcFrameRate(frame1,
                                                                  frame2,
                                                                  fps)
-                framerate_error.append([testname, int(round(deviation_perc, 0)),
+                framerate_error.append([testname,
+                                        int(round(deviation_perc, 0)),
                                         fps, actual_framerate,
                                         codec, encoder_settings.get('height'),
                                         fps, resultfilename])
 
                 labels = ['test', 'error', 'framerate', 'real_framerate',
                           'codec', 'height', 'fps', 'file']
-                data = pd.DataFrame.from_records(framerate_error, columns=labels,
+                data = pd.DataFrame.from_records(framerate_error,
+                                                 columns=labels,
                                                  coerce_float=True)
                 data = data.sort_values(by=['framerate'])
                 print(f'{data}')
@@ -610,7 +611,8 @@ def check_framerate_deviation(resultpath):
                             status = 'failed'
                         result_string += (
                             '\n{:s} "Framerate accuracy" {:3d} % error for '
-                            '{:.2f} fps ({:.2f} fps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}'
+                            '{:.2f} fps ({:.2f} fps), codec: {:s}, '
+                            '{:4d}p @ {:.2f} fps, {:s}'
                             .format(status,
                                     row.error,
                                     row.framerate,
