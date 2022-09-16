@@ -45,7 +45,7 @@ FUNC_CHOICES = {
 default_values = {
     'debug': 0,
     'func': 'help',
-    'storage_directory': '/sdcard',
+    'device_workdir': '/sdcard',
     'install': False,
     'videofile': None,
     'configfile': None,
@@ -126,11 +126,11 @@ R_FRAME_RATE_MAP = {
 
 
 def remove_encapp_gen_files(
-        serial, storage_directory=default_values['storage_directory'],
+        serial, device_workdir=default_values['device_workdir'],
         debug=0):
     # remove any files that are generated in previous runs
     regex_str = ENCAPP_OUTPUT_FILE_NAME_RE
-    remove_files_using_regex(serial, regex_str, storage_directory, debug)
+    remove_files_using_regex(serial, regex_str, device_workdir, debug)
 
 
 def wait_for_exit(serial, debug=0):
@@ -147,19 +147,20 @@ def wait_for_exit(serial, debug=0):
         print(f'{APPNAME_MAIN} was not active')
 
 
-def collect_result(workdir, test_name, serial, storage_directory, debug):
+def collect_result(local_workdir, test_name, serial, device_workdir, debug):
     print(f'Collect_result: {test_name}')
     reset_logcat(serial)
-    run_cmd(f'adb -s {serial} shell am start -W -e test '
-            f'{storage_directory}/{test_name} {ACTIVITY}', debug)
+    run_cmd(f'adb -s {serial} shell am start -W '
+            f'-e workdir {device_workdir} '
+            f'-e test {device_workdir}/{test_name} {ACTIVITY}', debug)
     wait_for_exit(serial)
-    adb_cmd = f'adb -s {serial} shell ls {storage_directory}/'
+    adb_cmd = f'adb -s {serial} shell ls {device_workdir}/'
     ret, stdout, stderr = run_cmd(adb_cmd, debug)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
     base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
     sub_dir = '_'.join([base_file_name, 'files'])
-    output_dir = os.path.join(workdir, sub_dir)
+    output_dir = os.path.join(local_workdir, sub_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     result_json = []
@@ -170,18 +171,18 @@ def collect_result(workdir, test_name, serial, storage_directory, debug):
         # pull the output file
         print(f'pull {file} to {output_dir}')
 
-        adb_cmd = (f'adb -s {serial} pull {storage_directory}/{file} '
+        adb_cmd = (f'adb -s {serial} pull {device_workdir}/{file} '
                    f'{output_dir}')
         run_cmd(adb_cmd, debug)
 
         # remove the json file on the device too
-        adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{file}'
+        adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{file}'
         run_cmd(adb_cmd, debug)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(output_dir, tmpname))
 
-    adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{test_name}'
+    adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{test_name}'
     run_cmd(adb_cmd, debug)
     print(f'results collect: {result_json}')
     log = logcat_dump(serial)
@@ -223,10 +224,10 @@ def verify_video_size(videofile, resolution):
         return True
 
 
-def update_file_paths(test, new_name, storage_directory):
+def update_file_paths(test, new_name, device_workdir):
     path = test.input.filepath
     for para in test.parallel.test:
-        update_file_paths(para, new_name, storage_directory)
+        update_file_paths(para, new_name, device_workdir)
 
     if path == 'camera':
         return
@@ -234,7 +235,7 @@ def update_file_paths(test, new_name, storage_directory):
     if new_name is not None:
         path = new_name
 
-    test.input.filepath = f'{storage_directory}/{os.path.basename(path)}'
+    test.input.filepath = f'{device_workdir}/{os.path.basename(path)}'
     path = test.input.filepath
 
 
@@ -248,22 +249,24 @@ def add_files(test, files_to_push):
     return files_to_push
 
 
-def run_codec_tests_file(test_def, model, serial, workdir, settings, debug):
+def run_codec_tests_file(test_def, model, serial, local_workdir,
+                         settings, debug):
     print(f'reading test: {test_def}')
     tests = tests_definitions.Tests()
     with open(test_def, 'rb') as fd:
         tests.ParseFromString(fd.read())
-    return run_codec_tests(tests, model, serial, workdir, settings, debug)
+    return run_codec_tests(tests, model, serial, local_workdir,
+                           settings, debug)
 
 
-def abort_test(workdir, message):
+def abort_test(local_workdir, message):
     print('\n*** Test failed ***')
     print(message)
-    shutil.rmtree(workdir)
+    shutil.rmtree(local_workdir)
     exit(0)
 
 
-def run_codec_tests(tests, model, serial, workdir, settings, debug):
+def run_codec_tests(tests, model, serial, local_workdir, settings, debug):
     test_def = settings['configfile']  # todo: check
     print(f'running test: {test_def}')
     fresh = tests_definitions.Tests()
@@ -287,13 +290,13 @@ def run_codec_tests(tests, model, serial, workdir, settings, debug):
             files_to_push.append(videofile)
             # verify video and resolution
             if not verify_video_size(videofile, test.input.resolution):
-                abort_test(workdir, 'Video size is not matching the raw '
+                abort_test(local_workdir, 'Video size is not matching the raw '
                            'file size')
         else:
             # check for possible parallel files
             files_to_push = add_files(test, files_to_push)
 
-        update_file_paths(test, videofile, settings['storage_directory'])
+        update_file_paths(test, videofile, settings['device_workdir'])
 
         print(f'files to push: {files_to_push}')
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
@@ -326,12 +329,12 @@ def run_codec_tests(tests, model, serial, workdir, settings, debug):
 
     print(fresh)
     if test_def is None:
-        abort_test(workdir, 'ERROR: no test file name')
+        abort_test(local_workdir, 'ERROR: no test file name')
 
     test_file = os.path.basename(test_def)
     testname = f'{test_file[0:test_file.rindex(".")]}.run.bin'
-    output = os.path.join(workdir, testname)
-    os.makedirs(workdir, exist_ok=True)
+    output = os.path.join(local_workdir, testname)
+    os.makedirs(local_workdir, exist_ok=True)
     with open(output, 'wb') as binfile:
         binfile.write(fresh.SerializeToString())
         files_to_push.append(output)
@@ -340,27 +343,28 @@ def run_codec_tests(tests, model, serial, workdir, settings, debug):
     for filepath in files_to_push:
         if os.path.exists(filepath):
             run_cmd(f'adb -s {serial} push {filepath} '
-                    f'{settings["storage_directory"]}/', debug)
+                    f'{settings["device_workdir"]}/', debug)
         else:
             ok = False
             print(f'File: "{filepath}" does not exist, check path')
 
     if not ok:
-        abort_test(workdir, 'Check file paths and try again')
+        abort_test(local_workdir, 'Check file paths and try again')
 
-    return collect_result(workdir, testname, serial,
-                          settings['storage_directory'], debug)
+    return collect_result(local_workdir, testname, serial,
+                          settings['device_workdir'], debug)
 
 
-def list_codecs(serial, model, storage_directory, debug=0):
-    adb_cmd = f'adb -s {serial} shell am start ' \
-              f'-e ui_hold_sec 3 ' \
-              f'-e list_codecs a {ACTIVITY}'
+def list_codecs(serial, model, device_workdir, debug=0):
+    adb_cmd = (f'adb -s {serial} shell am start '
+               f'-e workdir {device_workdir} '
+               '-e ui_hold_sec 3 '
+               f'-e list_codecs a {ACTIVITY}')
 
     run_cmd(adb_cmd, debug)
     wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
-    adb_cmd = f'adb -s {serial} pull {storage_directory}/codecs.txt {filename}'
+    adb_cmd = f'adb -s {serial} pull {device_workdir}/codecs.txt {filename}'
     ret, stdout, stderr = run_cmd(adb_cmd, debug)
     assert ret, 'error getting codec list: "%s"' % stdout
 
@@ -419,7 +423,7 @@ def convert_test(path):
     output = f'{path[0:path.rindex(".")]}.bin'
     root = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
     proto_file = os.path.join(root, 'proto', 'tests.proto')
-    cmd = f'protoc -I  {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
+    cmd = f'protoc -I {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
     with open(path, 'rb') as in_f, open(output, 'wb') as out_file:
         subprocess.run(
             cmd,
@@ -443,15 +447,15 @@ def codec_test(settings, model, serial, debug):
 
     # get working directory at the host
     if settings['output'] is not None:
-        workdir = settings['output']
+        local_workdir = settings['output']
     else:
-        workdir = f'{settings["desc"].replace(" ", "_")}_{model}_{dt_string}'
+        local_workdir = f'{settings["desc"].replace(" ", "_")}_{model}_{dt_string}'
 
     # run the codec test
     return run_codec_tests_file(test_config,
                                 model,
                                 serial,
-                                workdir,
+                                local_workdir,
                                 settings,
                                 debug)
 
@@ -493,10 +497,10 @@ def get_options(argv):
         metavar='input-video-file',
         help='input video file',)
     parser.add_argument(
-        '--sdcard', type=str, dest='storage_directory',
-        default=default_values['storage_directory'],
-        metavar='storage-directory',
-        help='storage directory on device',)
+        '--device-workdir', type=str, dest='device_workdir',
+        default=default_values['device_workdir'],
+        metavar='device_workdir',
+        help='work (storage) directory on device',)
     parser.add_argument(
         '-c', '--codec', type=str, dest='codec',
         default=default_values['encoder'],
@@ -609,7 +613,7 @@ def main(argv):
 
     # get model and serial number
     model, serial = get_device_info(options.serial, options.debug)
-    remove_encapp_gen_files(serial, options.storage_directory, options.debug)
+    remove_encapp_gen_files(serial, options.device_workdir, options.debug)
 
     # TODO(chema): fix this
     if type(model) is dict:
@@ -640,7 +644,7 @@ def main(argv):
 
     # run function
     if options.func == 'list':
-        list_codecs(serial, model, options.storage_directory, options.debug)
+        list_codecs(serial, model, options.device_workdir, options.debug)
 
     elif options.func == 'run':
         # ensure there is an input configuration
@@ -655,7 +659,7 @@ def main(argv):
         settings['output'] = options.output
         settings['bitrate'] = options.bitrate
         settings['desc'] = options.desc
-        settings['storage_directory'] = options.storage_directory
+        settings['device_workdir'] = options.device_workdir
 
         result = codec_test(settings, model, serial, options.debug)
         verify_app_version(result)

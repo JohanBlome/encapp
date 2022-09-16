@@ -31,10 +31,10 @@ import androidx.core.app.ActivityCompat;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.Tests;
 import com.facebook.encapp.utils.CameraSource;
+import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.OutputMultiplier;
-import com.facebook.encapp.utils.ParseData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
@@ -132,9 +132,10 @@ public class MainActivity extends AppCompatActivity {
         }
         // Need to check permission strategy
         getTestSettings();
+        CliSettings.setWorkDir(this, mExtraData);
         boolean useNewMethod = true;
         if (mExtraData != null && mExtraData.size() > 0) {
-            useNewMethod = !mExtraData.getBoolean(ParseData.OLD_AUTH_METHOD, false);
+            useNewMethod = !mExtraData.getBoolean(CliSettings.OLD_AUTH_METHOD, false);
         }
 
         if (Build.VERSION.SDK_INT >= 30 && useNewMethod && !Environment.isExternalStorageManager()) {
@@ -200,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
 
         FileWriter writer = null;
         try {
-            writer = new FileWriter(Environment.getExternalStorageDirectory().getPath() + "/codecs.txt");
+            writer = new FileWriter(CliSettings.getWorkDir() + "/codecs.txt");
             Log.d(TAG, "Write to file");
             writer.write(encoders.toString());
             writer.write(decoders.toString());
@@ -255,11 +256,11 @@ public class MainActivity extends AppCompatActivity {
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
         mMemLoad.start();
-        if (mExtraData.containsKey(ParseData.TEST_UI_HOLD_TIME_SEC)) {
-            mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(ParseData.TEST_UI_HOLD_TIME_SEC, "0"));
+        if (mExtraData.containsKey(CliSettings.TEST_UI_HOLD_TIME_SEC)) {
+            mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(CliSettings.TEST_UI_HOLD_TIME_SEC, "0"));
         }
 
-        if (mExtraData.containsKey(ParseData.LIST_CODECS)) {
+        if (mExtraData.containsKey(CliSettings.LIST_CODECS)) {
             listCodecs();
             try {
                 Log.d(TAG, "codecs listed, hold time: " + mUIHoldtimeSec);
@@ -276,12 +277,13 @@ public class MainActivity extends AppCompatActivity {
 
         Tests testcases = null;
         try {
-            if (mExtraData.containsKey(ParseData.TEST_CONFIG)) {
-                Path path = FileSystems.getDefault().getPath("", mExtraData.getString(ParseData.TEST_CONFIG));
-                FileInputStream fis = new FileInputStream(path.toFile());
-                Log.d(TAG, "Test path = " + path.getFileName());
+            if (mExtraData.containsKey(CliSettings.TEST_CONFIG)) {
+                Log.d(TAG, "test_path: " + mExtraData.getString(CliSettings.TEST_CONFIG));
+                // get the basename
+                Path basename = FileSystems.getDefault().getPath("", mExtraData.getString(CliSettings.TEST_CONFIG));
+                FileInputStream fis = new FileInputStream(basename.toFile());
                 testcases = Tests.parseFrom(fis);
-                Log.d(TAG, "Data: " + Files.readAllBytes(path));
+                // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
                 if (testcases.getTestList().size() <= 0) {
                     Log.e(TAG, "Failed to read test");
@@ -333,7 +335,7 @@ public class MainActivity extends AppCompatActivity {
                         if (pursuit > 0) pursuit -= 1;
                         pursuit = test.getInput().getPursuit();
                         mPursuitOver = false;
-                        Log.d(TAG, "Pursuit = " + pursuit);
+                        Log.d(TAG, "pursuit: " + pursuit);
                         while (!mPursuitOver) {
                             if (pursuit > 0) pursuit -= 1;
 
@@ -598,7 +600,7 @@ public class MainActivity extends AppCompatActivity {
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
-                        String fullFilename = Environment.getExternalStorageDirectory().getPath() + "/" + stats.getId() + ".json";
+                        String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, false);
                         stats.writeJSON(fw);

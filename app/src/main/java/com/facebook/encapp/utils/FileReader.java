@@ -22,7 +22,7 @@ public class FileReader {
             mFile = new File(name);
             mBis = new BufferedInputStream(new FileInputStream(mFile));
         } catch (FileNotFoundException e) {
-            Log.e(TAG, "Failed to open file: "+name + ", "+ e.getMessage());
+            Log.e(TAG, "Failed to open file: " + name + ", " + e.getMessage());
             e.printStackTrace();
             return false;
         }
