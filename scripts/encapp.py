@@ -147,14 +147,14 @@ def wait_for_exit(serial, debug=0):
         print(f'{APPNAME_MAIN} was not active')
 
 
-def collect_result(workdir, test_name, serial, storage_directory):
+def collect_result(workdir, test_name, serial, storage_directory, debug):
     print(f'Collect_result: {test_name}')
     reset_logcat(serial)
     run_cmd(f'adb -s {serial} shell am start -W -e test '
-            f'{storage_directory}/{test_name} {ACTIVITY}')
+            f'{storage_directory}/{test_name} {ACTIVITY}', debug)
     wait_for_exit(serial)
     adb_cmd = f'adb -s {serial} shell ls {storage_directory}/'
-    ret, stdout, stderr = run_cmd(adb_cmd, True)
+    ret, stdout, stderr = run_cmd(adb_cmd, debug)
     output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
                               re.MULTILINE)
     base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
@@ -172,17 +172,17 @@ def collect_result(workdir, test_name, serial, storage_directory):
 
         adb_cmd = (f'adb -s {serial} pull {storage_directory}/{file} '
                    f'{output_dir}')
-        run_cmd(adb_cmd)
+        run_cmd(adb_cmd, debug)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{file}'
-        run_cmd(adb_cmd)
+        run_cmd(adb_cmd, debug)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(output_dir, tmpname))
 
     adb_cmd = f'adb -s {serial} shell rm {storage_directory}/{test_name}'
-    run_cmd(adb_cmd)
+    run_cmd(adb_cmd, debug)
     print(f'results collect: {result_json}')
     log = logcat_dump(serial)
     parse_log(log, output_dir)
@@ -248,12 +248,12 @@ def add_files(test, files_to_push):
     return files_to_push
 
 
-def run_codec_tests_file(test_def, model, serial, workdir, settings):
-    print(f'run test: {test_def}')
+def run_codec_tests_file(test_def, model, serial, workdir, settings, debug):
+    print(f'reading test: {test_def}')
     tests = tests_definitions.Tests()
     with open(test_def, 'rb') as fd:
         tests.ParseFromString(fd.read())
-    return run_codec_tests(tests, model, serial, workdir, settings)
+    return run_codec_tests(tests, model, serial, workdir, settings, debug)
 
 
 def abort_test(workdir, message):
@@ -263,9 +263,9 @@ def abort_test(workdir, message):
     exit(0)
 
 
-def run_codec_tests(tests, model, serial, workdir, settings):
+def run_codec_tests(tests, model, serial, workdir, settings, debug):
     test_def = settings['configfile']  # todo: check
-    print(f'Run test: {test_def}')
+    print(f'running test: {test_def}')
     fresh = tests_definitions.Tests()
     files_to_push = []
     for test in tests.test:
@@ -340,7 +340,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
     for filepath in files_to_push:
         if os.path.exists(filepath):
             run_cmd(f'adb -s {serial} push {filepath} '
-                    f'{settings["storage_directory"]}/')
+                    f'{settings["storage_directory"]}/', debug)
         else:
             ok = False
             print(f'File: "{filepath}" does not exist, check path')
@@ -349,7 +349,7 @@ def run_codec_tests(tests, model, serial, workdir, settings):
         abort_test(workdir, 'Check file paths and try again')
 
     return collect_result(workdir, testname, serial,
-                          settings['storage_directory'])
+                          settings['storage_directory'], debug)
 
 
 def list_codecs(serial, model, storage_directory, debug=0):
@@ -432,7 +432,7 @@ def convert_test(path):
     return output
 
 
-def codec_test(settings, model, serial):
+def codec_test(settings, model, serial, debug):
     print(f'codec test: {settings}')
     # convert the human-friendly input into a valid apk input
     test_config = convert_test(settings['configfile'])
@@ -452,7 +452,8 @@ def codec_test(settings, model, serial):
                                 model,
                                 serial,
                                 workdir,
-                                settings)
+                                settings,
+                                debug)
 
 
 def get_options(argv):
@@ -656,7 +657,7 @@ def main(argv):
         settings['desc'] = options.desc
         settings['storage_directory'] = options.storage_directory
 
-        result = codec_test(settings, model, serial)
+        result = codec_test(settings, model, serial, options.debug)
         verify_app_version(result)
 
 
