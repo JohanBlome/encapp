@@ -30,6 +30,7 @@ import android.view.Surface;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import com.facebook.encapp.utils.CameraCharacteristicsHelper;
+import com.facebook.encapp.utils.CliSettings;
 import java.io.IOException;
 import java.io.FileWriter;
 import java.util.Iterator;
@@ -132,7 +133,7 @@ public class CameraSource {
             // Write info to external storage directory
             FileWriter writer = null;
             try {
-                String filename = Environment.getExternalStorageDirectory().getPath() + "/encapp.CameraCharacteristics.txt";
+                String filename = CliSettings.getWorkDir() + "/encapp.CameraCharacteristics.txt";
                 writer = new FileWriter(filename);
                 Log.d(TAG, "Write to file " + filename);
                 writer.write(camera_characteristics_info.toString());
