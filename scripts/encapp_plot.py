@@ -40,15 +40,15 @@ def plotAverageBitrate(data, options):
         style='codec',
         hue='height',
         data=bitrates,
-        marker="o",
+        marker='o',
         ax=axs)
     p.set_xlabel('Target bitrate (kbps)')
     p.set_ylabel('Bitrate ratio')
     plt.ticklabel_format(style='plain', axis='x')
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Bitrate in kbps")
+        axs.set_title(f'{options.label} Bitrate in kbps')
     else:
-        axs.set_title(f"{options.label} Bitrate in kbps")
+        axs.set_title(f'{options.label} Bitrate in kbps')
     name = f'{options.output}.av_bitrate.png'
     plt.savefig(name.replace(' ', '_'), format='png')
 
@@ -65,9 +65,9 @@ def plotFrameRate(data, options):
         ax=axs)
     # p.set_ylim(0, 90)
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Framerate ( {mean_input_fps} fps )")
+        axs.set_title(f'{options.label} Framerate ( {mean_input_fps} fps )')
     else:
-        axs.set_title(f"{options.label} Framerate")
+        axs.set_title(f'{options.label} Framerate')
     axs.legend(loc='best', fancybox=True, framealpha=0.5)
     name = f'{options.output}.framerate.png'
     plt.savefig(name.replace(' ', '_'), format='png')
@@ -86,9 +86,9 @@ def plotFrameSize(data, options):
     p.set_xlabel('time (sec)')
     p.set_ylabel('size (kb)')
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Framesize in kb ( {mean_fr} kb )")
+        axs.set_title(f'{options.label} Framesize in kb ( {mean_fr} kb )')
     else:
-        axs.set_title(f"{options.label} Framesize in kb )")
+        axs.set_title(f'{options.label} Framesize in kb )')
     name = f'{options.output}.framesizes.png'
     plt.savefig(name.replace(' ', '_'), format='png')
 
@@ -113,9 +113,9 @@ def plotBitrate(data, options):
     p.set_xlabel('time (sec)')
     p.set_ylabel('size (kbps)')
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Bitrate in kbps ( {mean_br} kbps )")
+        axs.set_title(f'{options.label} Bitrate in kbps ( {mean_br} kbps )')
     else:
-        axs.set_title(f"{options.label} Bitrate in kbps )")
+        axs.set_title(f'{options.label} Bitrate in kbps )')
     name = f'{options.output}.bitrate.png'
     plt.savefig(name.replace(' ', '_'), format='png')
 
@@ -173,14 +173,14 @@ def main():
         else:
             data = input_data
 
-    sns.set_style("whitegrid")
+    sns.set_style('whitegrid')
     # `fps` column contains the framerate calculated from the
     # input-reported timings (the input/camera framerate)
     mean_input_fps = round(np.mean(data['fps']), 2)
     # `proc_fps` column contains the framerate calculated from the
     # system-reported timings (the gettimeofday framerate)
     mean_sys_fps = round(np.mean(data['proc_fps']), 2)
-    print(f"mean fps: {mean_input_fps}")
+    print(f'mean fps: {mean_input_fps}')
     print(f'mean system fps: {mean_sys_fps}')
 
     # Average proc time

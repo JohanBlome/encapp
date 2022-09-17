@@ -17,13 +17,13 @@ The output can either be the video source files or the json result.
 """
 
 import argparse
-from argparse import RawTextHelpFormatter
 import sys
 import json
 import os
 import pandas as pd
 import re
-from encapp import convert_to_bps
+
+import encapp
 
 INDEX_FILE_NAME = '.encapp_index'
 
@@ -93,14 +93,14 @@ def getData(options, recursive):
 
 def search(options):
     data = getData(options, not options.no_rec)
-    data['bitrate'] = data['bitrate'].apply(lambda x: convert_to_bps(x))
+    data['bitrate'] = data['bitrate'].apply(lambda x: encapp.convert_to_bps(x))
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
     if options.bitrate:
         ranges = options.bitrate.split('-')
         vals = []
         for val in ranges:
-            bitrate = convert_to_bps(val)
+            bitrate = encapp.convert_to_bps(val)
             vals.append(int(bitrate))
 
         if len(vals) == 2:
@@ -125,8 +125,9 @@ def search(options):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('path',
                         nargs='?',
                         help='Search path, default current')

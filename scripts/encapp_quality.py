@@ -9,12 +9,10 @@ import os
 import json
 import sys
 import argparse
-from argparse import RawTextHelpFormatter
 import re
 
-from os.path import exists
-from encapp_tool.adb_cmds import run_cmd
-from encapp import convert_to_bps
+import encapp_tool.adb_cmds
+import encapp
 
 PSNR_RE = 'average:([0-9.]*)'
 SSIM_RE = 'SSIM Y:([0-9.]*)'
@@ -68,7 +66,8 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
 
 
 def get_media_props(mediapath):
-    status, std_out, std_err = run_cmd(f'ffprobe {mediapath}')
+    status, std_out, std_err = encapp_tool.adb_cmds.run_cmd(
+        f'ffprobe {mediapath}')
     resolution = None
     if status:
         print(f'std_out = {std_out}, err = {std_err}')
@@ -104,9 +103,9 @@ def run_quality(test_file, optionals):
     settings = test.get('settings')
     fps = settings.get('fps')
     if (
-        exists(vmaf_file)
-        and exists(ssim_file)
-        and exists(psnr_file)
+        os.path.exists(vmaf_file)
+        and os.path.exists(ssim_file)
+        and os.path.exists(psnr_file)
         and not optionals['recalc']
     ):
         print(
@@ -148,8 +147,8 @@ def run_quality(test_file, optionals):
                 # If we did not get aything here use the encoded size
             except BaseException:
                 print('Warning. Input size if wrong.')
-                print(f"Json {input_media_format.get('width')}x"
-                      f"{input_media_format.get('height')}")
+                print(f'Json {input_media_format.get("width")}x'
+                      f'{input_media_format.get("height")}')
                 input_res = output_res
             else:
                 input_res = f'{input_width}x{input_height}'
@@ -184,7 +183,7 @@ def run_quality(test_file, optionals):
                 f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
             )
 
-            run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd)
         if raw:
             ref_part = (
                 f'-f rawvideo -pix_fmt {pix_fmt} -s {input_res} '
@@ -203,7 +202,7 @@ def run_quality(test_file, optionals):
             dist_part = f'-r {fps} -i {distorted} '
 
         # Do calculations
-        if optionals['recalc'] or not exists(vmaf_file):
+        if optionals['recalc'] or not os.path.exists(vmaf_file):
             # important: vmaf must be called with videos in the right order
             # <distorted_video> <reference_video>
             # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
@@ -213,48 +212,48 @@ def run_quality(test_file, optionals):
                 f'"{force_scale}libvmaf=log_path={vmaf_file}:'
                 'n_threads=16:log_fmt=json" -report -f null - 2>&1 '
             )
-            run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd)
         else:
             print(f'vmaf already calculated for media, {vmaf_file}')
 
-        if optionals['recalc'] or not exists(ssim_file):
+        if optionals['recalc'] or not os.path.exists(ssim_file):
             shell_cmd = (
                 f'ffmpeg {dist_part} {ref_part} '
                 '-filter_complex '
                 f'"{force_scale}ssim=stats_file={ssim_file}.all" '
                 f'-f null - 2>&1 | grep SSIM > {ssim_file}'
             )
-            run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd)
         else:
             print(f'ssim already calculated for media, {ssim_file}')
 
-        if optionals['recalc'] or not exists(psnr_file):
+        if optionals['recalc'] or not os.path.exists(psnr_file):
             shell_cmd = (
                 f'ffmpeg {dist_part} {ref_part} '
                 '-filter_complex '
                 f'"{force_scale}psnr=stats_file={psnr_file}.all" '
                 f'-f null - 2>&1 | grep PSNR > {psnr_file}'
             )
-            run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd)
         else:
             print(f'psnr already calculated for media, {psnr_file}')
 
         if distorted != encodedfile:
             os.remove(distorted)
 
-    if exists(vmaf_file):
+    if os.path.exists(vmaf_file):
         vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
 
         # media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,
         # ssim,psnr,file
         file_size = os.stat(encodedfile).st_size
         data = (
-            f"{encodedfile}, {settings.get('codec')}, "
-            f"{settings.get('gop')}, "
-            f"{settings.get('fps')}, {settings.get('width')}, "
-            f"{settings.get('height')}, "
-            f"{convert_to_bps(settings.get('bitrate'))}, "
-            f"{settings.get('meanbitrate')}, "
+            f'{encodedfile}, {settings.get("codec")}, '
+            f'{settings.get("gop")}, '
+            f'{settings.get("fps")}, {settings.get("width")}, '
+            f'{settings.get("height")}, '
+            f'{encapp.convert_to_bps(settings.get("bitrate"))}, '
+            f'{settings.get("meanbitrate")}, '
             f'{file_size}, {vmaf}, {ssim}, {psnr}, {test_file}\n'
         )
         return data
@@ -264,7 +263,7 @@ def run_quality(test_file, optionals):
 def get_options(argv):
     """ Parse cli args """
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=RawTextHelpFormatter
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
 
     parser.add_argument('test', nargs='*', help='Test result in JSON format.')
@@ -275,7 +274,7 @@ def get_options(argv):
         default='quality.csv')
     parser.add_argument('--media', help='Media directory', default='')
     parser.add_argument(
-        '--pix_fmt', help='pixel format i.e. nv12 or yuv420p', default=''
+        '--pix_fmt', help=f'pixel format ({encapp.PIX_FMT_TYPES})', default=''
     )
     parser.add_argument(
         '-ref',
