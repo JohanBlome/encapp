@@ -53,7 +53,7 @@ def parse_encoding_data(json, inputfile, debug=0):
         data['codec'] = json['settings']['codec']
         data['description'] = json['description']
         data['camera'] = (json['testdefinition'].find(
-            "filepath: \"camera\"")) > 0
+            'filepath: "camera"')) > 0
         data['test'] = json['test']
         data['bitrate'] = ep.convert_to_bps(json['settings']['bitrate'])
         data['height'] = json['settings']['height']

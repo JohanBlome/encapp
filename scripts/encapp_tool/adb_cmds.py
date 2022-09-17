@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+
 import re
-from subprocess import PIPE, Popen, SubprocessError
-from typing import Dict, List, Optional, Tuple
+import subprocess
+import typing
+
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r'encapp_.*'
 
 
-def run_cmd(cmd: str, debug: int = 0) -> Tuple[bool, str, str]:
+def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
     """Run sh command
 
     Args:
@@ -20,17 +22,20 @@ def run_cmd(cmd: str, debug: int = 0) -> Tuple[bool, str, str]:
     try:
         if debug > 0:
             print(cmd, sep=' ')
-        with Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE) as process:
+        with subprocess.Popen(cmd, shell=True,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE) as process:
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
-    except SubprocessError:
+    except subprocess.SubprocessError:
         print(f'Failed to run command: {cmd}')
         return False, '', ''
 
     return ret, stdout.decode(), stderr.decode()
 
 
-def get_device_info(serial_inp: Optional[str], debug=0) -> Tuple[Dict, str]:
+def get_device_info(serial_inp: typing.Optional[str],
+                    debug=0) -> typing.Tuple[typing.Dict, str]:
     """Get android device information for an specific device
 
     Get device information by executing and parsing command adb devices -l,
@@ -94,7 +99,7 @@ def remove_files_using_regex(
         run_cmd(adb_cmd, debug)
 
 
-def get_connected_devices(debug: int) -> Dict:
+def get_connected_devices(debug: int) -> typing.Dict:
     """Get adb connected devices
 
     Get adb connected devices info by running adb devices -l
@@ -190,7 +195,7 @@ def uninstall_apk(serial: str, apk: str, debug=0):
         print(f'warning: {apk} not installed')
 
 
-def installed_apps(serial: str, debug=0) -> List:
+def installed_apps(serial: str, debug=0) -> typing.List:
     """Get installed apps at android device using pm list
 
     Args:
@@ -207,7 +212,7 @@ def installed_apps(serial: str, debug=0) -> List:
     return _parse_pm_list_packages(stdout)
 
 
-def _parse_pm_list_packages(stdout: str) -> List:
+def _parse_pm_list_packages(stdout: str) -> typing.List:
     """Parse pm list output to get packages list
 
     Args:

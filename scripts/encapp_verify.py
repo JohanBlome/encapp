@@ -4,21 +4,20 @@
     Verify tests
 """
 import argparse
-import sys
+import datetime
 import json
 import os
 import re
 import shutil
-from datetime import datetime
+import sys
 import pandas as pd
 import numpy as np
 
-import encapp as ep
-import encapp_search as es
-from encapp_tool.adb_cmds import run_cmd, get_device_info
-from encapp import convert_to_bps
-from google.protobuf import text_format
-import proto.tests_pb2 as proto
+import google.protobuf
+import proto.tests_pb2
+import encapp
+import encapp_search
+import encapp_tool.adb_cmds
 
 DEFAULT_TESTS = ['bitrate_buffer.pbtxt',
                  'bitrate_surface.pbtxt',
@@ -52,16 +51,16 @@ def get_nal_data(videopath, codec):
             if ending == '264':
                 cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v h264_mp4toannexb'
                        f' {filename}.{ending}')
-                run_cmd(cmd, True)
+                encapp_tool.adb_cmds.run_cmd(cmd, True)
                 cmd = f'h264nal {filename}.{ending} > {filename}.{ending}.nal'
             else:
                 cmd = (f'ffmpeg -i {videopath} -c copy -bsf:v hevc_mp4toannexb'
                        f' {filename}.{ending}')
-                run_cmd(cmd, True)
+                encapp_tool.adb_cmds.run_cmd(cmd, True)
                 cmd = f'h265nal {filename}.{ending} > {filename}.{ending}.nal'
 
             print(f'cmd = {cmd}')
-            run_cmd(cmd)
+            encapp_tool.adb_cmds.run_cmd(cmd)
         return f'{filename}.{ending}.nal'
 
     return ''
@@ -107,7 +106,8 @@ def check_long_term_ref(resultpath):
             use_frame = None
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test())
+            test = google.protobuf.text_format.Parse(
+                test_def, proto.tests_pb2.Test())
 
             dynamics = parse_dynamic_settings(test.runtime)['params']
 
@@ -122,7 +122,7 @@ def check_long_term_ref(resultpath):
             lt_use = {}
             if mark_frame is not None and use_frame is not None:
                 nal_file = get_nal_data(f'{directory}/'
-                                        f"{result.get('encodedfile')}",
+                                        f'{result.get("encodedfile")}',
                                         encoder_settings.get('codec'))
                 ltr_count = -1
                 frame = 0
@@ -238,7 +238,7 @@ def check_long_term_ref(resultpath):
                 if len(iframes) > 0:
                     result_string += '\nKey frames:\n'
                     for frame in iframes:
-                        result_string += f"{frame['frame']}\n"
+                        result_string += f'{frame["frame"]}\n'
     return result_string
 
 
@@ -260,7 +260,8 @@ def check_temporal_layer(resultpath):
             schema = encoder_settings.get('ts-schema')
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test())
+            test = google.protobuf.text_format.Parse(
+                test_def, proto.tests_pb2.Test())
             schema = get_config_param(test.configure, 'ts-schema')
             if not isinstance(schema, type(None)) and len(schema) > 0:
                 frames = result.get('frames')
@@ -317,7 +318,8 @@ def check_idr_placement(resultpath):
                 idr_ids.append(frame['frame'])
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test())
+            test = google.protobuf.text_format.Parse(
+                test_def, proto.tests_pb2.Test())
 
             dynamic_sync = parse_dynamic_settings(test.runtime)['syncs']
             if dynamic_sync is not None:
@@ -368,16 +370,16 @@ def parse_dynamic_settings(settings):
             serie = {}
             params[param.key] = serie
 
-        if param.type == proto.DataValueType.Value('intType'):
+        if param.type == proto.tests_pb2.DataValueType.Value('intType'):
             serie[param.framenum] = int(param.value)
-        if param.type == proto.DataValueType.Value('floatType'):
+        if param.type == proto.tests_pb2.DataValueType.Value('floatType'):
             serie[param.framenum] = float(param.value)
-        if param.type == proto.DataValueType.Value('longType'):
+        if param.type == proto.tests_pb2.DataValueType.Value('longType'):
             serie[param.framenum] = param.value
         else:
             serie[param.framenum] = param.value
     for param in settings.video_bitrate:
-        bitrates[param.framenum] = convert_to_bps(param.bitrate)
+        bitrates[param.framenum] = encapp.convert_to_bps(param.bitrate)
     for param in settings.dynamic_framerate:
         framerates[param.framenum] = param.framerate
     for param in settings.request_sync:
@@ -406,11 +408,12 @@ def check_mean_bitrate_deviation(resultpath):
             encoder_settings = result.get('settings')
             codec = encoder_settings.get('codec')
             testname = result.get('test')
-            bitrate = convert_to_bps(encoder_settings.get('bitrate'))
+            bitrate = encapp.convert_to_bps(encoder_settings.get('bitrate'))
             fps = encoder_settings.get('fps')
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test())
+            test = google.protobuf.text_format.Parse(
+                test_def, proto.tests_pb2.Test())
             parse_dynamic_settings(test.runtime)
             dynamic_video_bitrate = parse_dynamic_settings(test.runtime)[
                 'bitrates']
@@ -449,14 +452,14 @@ def check_mean_bitrate_deviation(resultpath):
                                      int(target_bitrate), int(round(mean, 0)),
                                      int(round(bitrate_error_perc, 0))])
                     if limit in dynamic_video_bitrate:
-                        target_bitrate = convert_to_bps(
+                        target_bitrate = encapp.convert_to_bps(
                             dynamic_video_bitrate[limit])
                     previous_limit = limit
                 result_string += f'\n\n----- test case: [{testname}] -----'
 
                 result_string += (f'\n{status} "Dynamic bitrate", ')
-                result_string += (f" codec: {encoder_settings.get('codec')}"
-                                  f", {encoder_settings.get('height')}"
+                result_string += (f' codec: {encoder_settings.get("codec")}'
+                                  f', {encoder_settings.get("height")}'
                                   f'p @ {fps}fps'
                                   f', {resultfilename}')
 
@@ -519,16 +522,17 @@ def check_framerate_deviation(resultpath):
             encoder_settings = result.get('settings')
             codec = encoder_settings.get('codec')
             testname = result.get('test')
-            bitrate = convert_to_bps(encoder_settings.get('bitrate'))
+            bitrate = encapp.convert_to_bps(encoder_settings.get('bitrate'))
             fps = encoder_settings.get('fps')
 
             test_def = result.get('testdefinition')
-            test = text_format.Parse(test_def, proto.Test())
+            test = google.protobuf.text_format.Parse(
+                test_def, proto.tests_pb2.Test())
             parse_dynamic_settings(test.runtime)
             dynamic_video_framerates = parse_dynamic_settings(test.runtime)[
                 'framerates']
             frames = result.get('frames')
-            print(f"dyn frmrate: {dynamic_video_framerates}")
+            print(f'dyn frmrate: {dynamic_video_framerates}')
             if (dynamic_video_framerates is not None
                and len(dynamic_video_framerates) > 0):
                 previous_limit = 0
@@ -559,12 +563,12 @@ def check_framerate_deviation(resultpath):
                     if limit in dynamic_video_framerates:
                         target_rate = dynamic_video_framerates[limit]
 
-                print(f"Dyn data = {dyn_data}")
+                print(f'Dyn data = {dyn_data}')
                 result_string += f'\n\n----- test case: [{testname}] -----'
 
                 result_string += (f'\n{status} "Dynamic framerate", ')
-                result_string += (f" codec: {encoder_settings.get('codec')}"
-                                  f", {encoder_settings.get('height')}"
+                result_string += (f' codec: {encoder_settings.get("codec")}'
+                                  f', {encoder_settings.get("height")}'
                                   f'p @ {fps}fps'
                                   f', {resultfilename}')
 
@@ -698,8 +702,8 @@ def main(argv):
             shutil.rmtree(workdir)
 
         os.mkdir(workdir)
-        model, serial = get_device_info(options.serial)
-        ep.remove_encapp_gen_files(serial)
+        model, serial = encapp_tool.adb_cmds.get_device_info(options.serial)
+        encapp.remove_encapp_gen_files(serial)
 
         if isinstance(model, dict):
             if 'model' in model:
@@ -723,9 +727,9 @@ def main(argv):
             else:
                 test_path = test
 
-            if os.path.exists(es.INDEX_FILE_NAME):
-                os.remove(es.INDEX_FILE_NAME)
-                print(f'removed path: {es.INDEX_FILE_NAME}')
+            if os.path.exists(encapp_search.INDEX_FILE_NAME):
+                os.remove(encapp_search.INDEX_FILE_NAME)
+                print(f'removed path: {encapp_search.INDEX_FILE_NAME}')
             '''
             args = []
             args.append(__file__)
@@ -744,7 +748,7 @@ def main(argv):
             args.append('--configfile')
             args.append(configfile)
             '''
-            settings = ep.extra_settings
+            settings = encapp.extra_settings
             settings['configfile'] = test_path
             settings['videofile'] = options.videofile
             settings['encoder'] = options.codec
@@ -754,7 +758,7 @@ def main(argv):
             settings['out_framerate'] = options.output_fps
             settings['output'] = workdir
 
-            result = ep.codec_test(settings, model, serial)
+            result = encapp.codec_test(settings, model, serial)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
@@ -778,13 +782,13 @@ def main(argv):
         extra = ''
         if model is not None and serial is not None:
             with open(f'{workdir}/dut.txt', 'w') as dut:
-                now = datetime.now()
+                now = datetime.datetime.now()
                 dt_string = now.strftime('%Y-%m-%d_%H_%M')
                 dut.write(f'\nTest performed: {dt_string}')
                 if isinstance(model, str):
                     dut.write(f'\nDUT: {model}, serial: {serial}')
                 else:
-                    dut.write(f"\nDUT: {model['product']}, serial: {serial}")
+                    dut.write(f'\nDUT: {model["product"]}, serial: {serial}')
 
         if os.path.exists(f'{workdir}/dut.txt'):
             with open(f'{workdir}/dut.txt', 'r') as dut:

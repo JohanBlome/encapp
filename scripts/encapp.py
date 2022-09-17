@@ -16,15 +16,12 @@ import datetime
 import shutil
 import subprocess
 
-from encapp_tool import __version__
-from encapp_tool.app_utils import (
-    APPNAME_MAIN, SCRIPT_DIR, ACTIVITY,
-    install_app, uninstall_app, install_ok, force_stop)
-from encapp_tool.adb_cmds import (
-    run_cmd, ENCAPP_OUTPUT_FILE_NAME_RE, get_device_info,
-    remove_files_using_regex, get_app_pid, reset_logcat, logcat_dump)
+import encapp_tool
+import encapp_tool.app_utils
+import encapp_tool.adb_cmds
 
-SCRIPT_ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
+SCRIPT_ROOT_DIR = os.path.abspath(os.path.join(
+    encapp_tool.app_utils.SCRIPT_DIR, os.pardir))
 sys.path.append(SCRIPT_ROOT_DIR)
 import proto.tests_pb2 as tests_definitions  # noqa: E402
 
@@ -129,35 +126,40 @@ def remove_encapp_gen_files(
         serial, device_workdir=default_values['device_workdir'],
         debug=0):
     # remove any files that are generated in previous runs
-    regex_str = ENCAPP_OUTPUT_FILE_NAME_RE
-    remove_files_using_regex(serial, regex_str, device_workdir, debug)
+    regex_str = encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE
+    encapp_tool.adb_cmds.remove_files_using_regex(
+        serial, regex_str, device_workdir, debug)
 
 
 def wait_for_exit(serial, debug=0):
     pid = -1
     current = 1
     while current != -1:
-        current = get_app_pid(serial, APPNAME_MAIN, debug)
+        current = encapp_tool.adb_cmds.get_app_pid(
+            serial, encapp_tool.app_utils.APPNAME_MAIN, debug)
         if current > 0:
             pid = current
         time.sleep(1)
     if pid != -1:
         print(f'Exit from {pid}')
     else:
-        print(f'{APPNAME_MAIN} was not active')
+        print(f'{encapp_tool.app_utils.APPNAME_MAIN} was not active')
 
 
 def collect_result(local_workdir, test_name, serial, device_workdir, debug):
     print(f'Collect_result: {test_name}')
-    reset_logcat(serial)
-    run_cmd(f'adb -s {serial} shell am start -W '
-            f'-e workdir {device_workdir} '
-            f'-e test {device_workdir}/{test_name} {ACTIVITY}', debug)
+    encapp_tool.adb_cmds.reset_logcat(serial)
+    encapp_tool.adb_cmds.run_cmd(
+        f'adb -s {serial} shell am start -W '
+        f'-e workdir {device_workdir} '
+        f'-e test {device_workdir}/{test_name} '
+        f'{encapp_tool.app_utils.ACTIVITY}', debug)
     wait_for_exit(serial)
     adb_cmd = f'adb -s {serial} shell ls {device_workdir}/'
-    ret, stdout, stderr = run_cmd(adb_cmd, debug)
-    output_files = re.findall(ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
-                              re.MULTILINE)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
+    output_files = re.findall(
+        encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
+        re.MULTILINE)
     base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
     sub_dir = '_'.join([base_file_name, 'files'])
     output_dir = os.path.join(local_workdir, sub_dir)
@@ -173,19 +175,19 @@ def collect_result(local_workdir, test_name, serial, device_workdir, debug):
 
         adb_cmd = (f'adb -s {serial} pull {device_workdir}/{file} '
                    f'{output_dir}')
-        run_cmd(adb_cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
 
         # remove the json file on the device too
         adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{file}'
-        run_cmd(adb_cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(output_dir, tmpname))
 
     adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{test_name}'
-    run_cmd(adb_cmd, debug)
+    encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     print(f'results collect: {result_json}')
-    log = logcat_dump(serial)
+    log = encapp_tool.adb_cmds.logcat_dump(serial)
     parse_log(log, output_dir)
     return result_json
 
@@ -342,8 +344,9 @@ def run_codec_tests(tests, model, serial, local_workdir, settings, debug):
     ok = True
     for filepath in files_to_push:
         if os.path.exists(filepath):
-            run_cmd(f'adb -s {serial} push {filepath} '
-                    f'{settings["device_workdir"]}/', debug)
+            encapp_tool.adb_cmds.run_cmd(
+                f'adb -s {serial} push {filepath} '
+                f'{settings["device_workdir"]}/', debug)
         else:
             ok = False
             print(f'File: "{filepath}" does not exist, check path')
@@ -359,13 +362,13 @@ def list_codecs(serial, model, device_workdir, debug=0):
     adb_cmd = (f'adb -s {serial} shell am start '
                f'-e workdir {device_workdir} '
                '-e ui_hold_sec 3 '
-               f'-e list_codecs a {ACTIVITY}')
+               f'-e list_codecs a {encapp_tool.app_utils.ACTIVITY}')
 
-    run_cmd(adb_cmd, debug)
+    encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     wait_for_exit(serial, debug)
     filename = f'codecs_{model}.txt'
     adb_cmd = f'adb -s {serial} pull {device_workdir}/codecs.txt {filename}'
-    ret, stdout, stderr = run_cmd(adb_cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     assert ret, 'error getting codec list: "%s"' % stdout
 
     with open(filename, 'r') as codec_file:
@@ -421,7 +424,8 @@ def convert_to_frames(value, fps=30):
 
 def convert_test(path):
     output = f'{path[0:path.rindex(".")]}.bin'
-    root = os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir))
+    root = os.path.abspath(os.path.join(
+        encapp_tool.app_utils.SCRIPT_DIR, os.pardir))
     proto_file = os.path.join(root, 'proto', 'tests.proto')
     cmd = f'protoc -I {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
     with open(path, 'rb') as in_f, open(output, 'wb') as out_file:
@@ -449,7 +453,8 @@ def codec_test(settings, model, serial, debug):
     if settings['output'] is not None:
         local_workdir = settings['output']
     else:
-        local_workdir = f'{settings["desc"].replace(" ", "_")}_{model}_{dt_string}'
+        local_workdir = (f'{settings["desc"].replace(" ", "_")}'
+                         f'_{model}_{dt_string}')
 
     # run the codec test
     return run_codec_tests_file(test_config,
@@ -583,7 +588,7 @@ def get_video_info(videofile, debug=0):
         return {}
     # check using ffprobe
     cmd = f'ffprobe -v quiet -select_streams v -show_streams {videofile}'
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret, f'error: failed to analyze file {videofile}'
     videofile_config = parse_ffprobe_output(stdout)
     videofile_config['filepath'] = videofile
@@ -595,15 +600,16 @@ def verify_app_version(json_files):
         with open(fl) as f:
             data = json.load(f)
             version = data['encapp_version']
-            if __version__ != version:
+            if encapp_tool.__version__ != version:
                 print(f'Warning, version missmatch between script '
-                      f'({__version__}) and application ({version})')
+                      f'({encapp_tool.__version__}) '
+                      f'and application ({version})')
 
 
 def main(argv):
     options = get_options(argv)
     if options.version:
-        print('version: %s' % __version__)
+        print('version: %s' % encapp_tool.__version__)
         sys.exit(0)
 
     videofile_config = {}
@@ -612,7 +618,8 @@ def main(argv):
         videofile_config = get_video_info(options.videofile)  # noqa: F841
 
     # get model and serial number
-    model, serial = get_device_info(options.serial, options.debug)
+    model, serial = encapp_tool.adb_cmds.get_device_info(
+        options.serial, options.debug)
     remove_encapp_gen_files(serial, options.device_workdir, options.debug)
 
     # TODO(chema): fix this
@@ -626,20 +633,20 @@ def main(argv):
 
     # install app
     if options.func == 'install' or options.install:
-        install_app(serial, options.debug)
+        encapp_tool.app_utils.install_app(serial, options.debug)
 
     # uninstall app
     if options.func == 'uninstall':
-        uninstall_app(serial, options.debug)
+        encapp_tool.app_utils.uninstall_app(serial, options.debug)
         sys.exit(0)
 
     if options.func == 'kill':
-        print("Force stop")
-        force_stop(serial, options.debug)
+        print('Force stop')
+        encapp_tool.app_utils.force_stop(serial, options.debug)
         return
 
     # ensure the app is correctly installed
-    assert install_ok(serial, options.debug), (
+    assert encapp_tool.app_utils.install_ok(serial, options.debug), (
         'Apps not installed in %s' % serial)
 
     # run function
