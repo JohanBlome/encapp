@@ -66,7 +66,7 @@ extra_settings = {
 
 RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.raw')
 OPERATION_TYPES = ('batch', 'realtime')
-PIX_FMT_TYPES = ('yuv420p', 'nv12')
+PIX_FMT_TYPES = ('yuv420p', 'nv12', 'rgba')
 KNOWN_CONFIGURE_TYPES = {
     'codec': str,
     'encode': bool,
