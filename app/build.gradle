@@ -38,26 +38,18 @@ android {
 dependencies {
     api fileTree(include: ['*.jar'], dir: 'libs')
     api 'androidx.appcompat:appcompat:1.0.0'
-    implementation 'com.google.protobuf:protobuf-lite:3.0.0'
+    implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.12.0'
 }
 
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.0.0'
-    }
-    plugins {
-        javalite {
-            artifact = 'com.google.protobuf:protoc-gen-javalite:3.0.0'
-        }
+        artifact = 'com.google.protobuf:protoc:3.11.0'
     }
     generateProtoTasks {
         all().each { task ->
-            task.builtins {
-                remove java
-            }
             task.plugins {
-                javalite {}
+                java {}
             }
         }
     }
