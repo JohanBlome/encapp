@@ -10,11 +10,14 @@ import humanfriendly
 import json
 import sys
 import argparse
+import itertools
 import re
+import tempfile
 import time
 import datetime
 import shutil
-import subprocess
+from google.protobuf import text_format
+
 
 import encapp_tool
 import encapp_tool.app_utils
@@ -140,140 +143,172 @@ def wait_for_exit(serial, debug=0):
         if current > 0:
             pid = current
         time.sleep(1)
-    if pid != -1:
-        print(f'Exit from {pid}')
+    if pid != -1 and debug > 0:
+        print(f'exit from {pid}')
     else:
         print(f'{encapp_tool.app_utils.APPNAME_MAIN} was not active')
 
 
-def collect_result(local_workdir, test_name, serial, device_workdir, debug):
-    print(f'Collect_result: {test_name}')
+def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
+    print(f'running test: {protobuf_txt_filepath}')
+    # clean the logcat first
     encapp_tool.adb_cmds.reset_logcat(serial)
-    encapp_tool.adb_cmds.run_cmd(
+    ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
         f'adb -s {serial} shell am start -W '
         f'-e workdir {device_workdir} '
-        f'-e test {device_workdir}/{test_name} '
+        f'-e test {protobuf_txt_filepath} '
         f'{encapp_tool.app_utils.ACTIVITY}', debug)
+    assert ret, f'ERROR: {stderr}'
     wait_for_exit(serial)
+
+
+def collect_results(local_workdir, protobuf_txt_filepath, serial,
+                    device_workdir, debug):
+    print(f'collecting result: {protobuf_txt_filepath}')
     adb_cmd = f'adb -s {serial} shell ls {device_workdir}/'
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     output_files = re.findall(
         encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE, stdout,
         re.MULTILINE)
-    base_file_name = os.path.basename(test_name).rsplit('.run.bin', 1)[0]
-    sub_dir = '_'.join([base_file_name, 'files'])
-    output_dir = os.path.join(local_workdir, sub_dir)
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+    # prepare the local working directory to pull the files in
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
     result_json = []
     for file in output_files:
         if file == '':
             print('No file found')
             continue
         # pull the output file
-        print(f'pull {file} to {output_dir}')
-
         adb_cmd = (f'adb -s {serial} pull {device_workdir}/{file} '
-                   f'{output_dir}')
+                   f'{local_workdir}')
         encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
-
-        # remove the json file on the device too
+        # remove the file on the device
         adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{file}'
         encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
+        # append results file (json files) to final results
         if file.endswith('.json'):
             path, tmpname = os.path.split(file)
-            result_json.append(os.path.join(output_dir, tmpname))
-
-    adb_cmd = f'adb -s {serial} shell rm {device_workdir}/{test_name}'
+            result_json.append(os.path.join(local_workdir, tmpname))
+    # remove the test file
+    adb_cmd = (f'adb -s {serial} shell rm '
+               f'{device_workdir}/{protobuf_txt_filepath}')
     encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
-    print(f'results collect: {result_json}')
+    if debug > 0:
+        print(f'results collect: {result_json}')
+    # get logcat
     log = encapp_tool.adb_cmds.logcat_dump(serial)
-    parse_log(log, output_dir)
+    parse_log(log, local_workdir)
     return result_json
 
 
-def parse_log(log, output_dir):
+def parse_log(log, local_workdir):
     test_reg = re.compile(r'.*Test failed: ([\w\W]*)')
     failed = False
-    lfpath = f'{output_dir}/logcat_failure.txt'
     for line in log.splitlines():
         match = test_reg.search(line)
         if match:
             print('**********\n\nTest case failed:')
-            print(f'\'{match.group(1)}\'\n')
-            print(f'logcat has been saved to \'{lfpath}\'')
+            print(f'"{match.group(1)}"\n')
             print('\n\n**********')
             failed = True
+    logcat_filepath = f'{local_workdir}/logcat.txt'
+    with open(logcat_filepath, 'w') as fd:
+        fd.write(log)
     if failed:
-        with open(f'{output_dir}/logcat_failure.txt', 'w') as logfile:
-            logfile.write(log)
+        print(f'logcat has been saved to "{logcat_filepath}"')
 
 
 def verify_video_size(videofile, resolution):
-    if not os.path.exists(videofile):
-        return False
-
-    if video_is_raw(videofile):
-        file_size = os.path.getsize(videofile)
-        if resolution is not None:
-            framesize = (int(resolution.split('x')[0]) *
-                         int(resolution.split('x')[1]) * 1.5)
-            if file_size % framesize == 0:
-                return True
-        return False
-    else:
-        # in this case the actual encoded size is used.
+    assert os.path.exists(videofile) and os.access(videofile, os.R_OK)
+    if not video_is_raw(videofile):
+        # in this case the actual encoded size is used
         return True
+    # video is raw
+    file_size = os.path.getsize(videofile)
+    if resolution is not None:
+        framesize = (int(resolution.split('x')[0]) *
+                     int(resolution.split('x')[1]) * 1.5)
+        if file_size % framesize == 0:
+            return True
+    return False
 
 
-def update_file_paths(test, new_name, device_workdir):
-    path = test.input.filepath
-    for para in test.parallel.test:
-        update_file_paths(para, new_name, device_workdir)
-
-    if path == 'camera':
+def update_file_paths(test, device_workdir):
+    # update subtests
+    for subtest in test.parallel.test:
+        update_file_paths(subtest, device_workdir)
+    # camera tests do not need any input file paths
+    if test.input.filepath == 'camera':
         return
-
-    if new_name is not None:
-        path = new_name
-
-    test.input.filepath = f'{device_workdir}/{os.path.basename(path)}'
-    path = test.input.filepath
+    # update main test
+    basename = os.path.basename(test.input.filepath)
+    test.input.filepath = f'{device_workdir}/{basename}'
 
 
-def add_files(test, files_to_push):
+def add_media_files(test):
+    files_to_push = set()
     if test.input.filepath != 'camera':
-        if not (test.input.filepath in files_to_push):
-            files_to_push.append(test.input.filepath)
-    for para in test.parallel.test:
-        if para.input.filepath != 'camera':
-            files_to_push = add_files(para, files_to_push)
+        files_to_push.add(test.input.filepath)
+    for subtest in test.parallel.test:
+        if subtest.input.filepath != 'camera':
+            files_to_push |= add_media_files(subtest)
     return files_to_push
 
 
-def run_codec_tests_file(test_def, model, serial, local_workdir,
+def run_codec_tests_file(protobuf_txt_file, model, serial, local_workdir,
                          settings, debug):
-    print(f'reading test: {test_def}')
+    print(f'reading test: {protobuf_txt_file}')
     tests = tests_definitions.Tests()
-    with open(test_def, 'rb') as fd:
-        tests.ParseFromString(fd.read())
-    return run_codec_tests(tests, model, serial, local_workdir,
-                           settings, debug)
+    with open(protobuf_txt_file, 'rb') as fd:
+        text_format.Merge(fd.read(), tests)
+        # tests.ParseFromString(fd.read())
+    print(f'updating test: {protobuf_txt_file}')
+    tests, files_to_push, protobuf_txt_filepath = update_codec_tests(
+        tests, local_workdir, settings)
+    return run_codec_tests(tests, files_to_push, protobuf_txt_filepath,
+                           model, serial, local_workdir, settings, debug)
 
 
 def abort_test(local_workdir, message):
     print('\n*** Test failed ***')
     print(message)
     shutil.rmtree(local_workdir)
-    exit(0)
+    sys.exit(-1)
 
 
-def run_codec_tests(tests, model, serial, local_workdir, settings, debug):
-    test_def = settings['configfile']  # todo: check
-    print(f'running test: {test_def}')
-    fresh = tests_definitions.Tests()
-    files_to_push = []
+# produce a list of bitrates from a CLI spec. Options are:
+# * (1) a single number (e.g. "100 kbps")
+# * (2) a range (e.g. "100k-1M-100k") (start-stop-step)
+# * (3) a list of single numbers or ranges (e.g. "100kbps,200kbps")
+def parse_bitrate_field(bitrate):
+    # parse lists
+    if ',' in bitrate:
+        bitrate_list = [parse_bitrate_field(it) for it in bitrate.split(',')]
+        # append the produced lists
+        return list(itertools.chain(*bitrate_list))
+    # parse ranges
+    if '-' in bitrate:
+        bitrate_spec = bitrate.split('-')
+        assert len(bitrate_spec) == 3, (
+            f'error: invalid bitrate spec: "{bitrate}"')
+        start, stop, step = [convert_to_bps(it) for it in bitrate_spec]
+        return list(range(start, stop, step))
+    # parse single elements
+    return [convert_to_bps(bitrate)]
+
+
+# Update a set of tests with the CLI arguments.
+# Note that update may include adding new tests (e.g. if bitrate is
+# defined as a (from, to, step) tuple instead of a single value).
+def update_codec_tests(tests, local_workdir, settings):
+    # 1. update the tests with the CLI parameters
+    updated_tests = tests_definitions.Tests()
+    tests_id = None
     for test in tests.test:
+        # save the main test id
+        if tests_id is None:
+            tests_id = test.common.id
+        # update values from CLI options
         if settings['encoder'] is not None and len(settings['encoder']) > 0:
             test.configure.codec = settings['encoder']
         if (settings['inp_resolution'] is not None and
@@ -286,76 +321,96 @@ def run_codec_tests(tests, model, serial, local_workdir, settings, debug):
             test.input.framerate = settings['inp_framerate']
         if settings['out_framerate'] is not None:
             test.configure.framerate = settings['out_framerate']
-
+        # update the video file
         videofile = settings['videofile']
         if videofile is not None and len(videofile) > 0:
-            files_to_push.append(videofile)
-            # verify video and resolution
+            # we want to replace the video (input.filepath) everywhere
+            if (not os.path.exists(videofile) or
+                    not os.access(videofile, os.R_OK)):
+                abort_test(local_workdir,
+                           f'file {videofile} does not exist/is not readable')
+            # verify video resolution
             if not verify_video_size(videofile, test.input.resolution):
-                abort_test(local_workdir, 'Video size is not matching the raw '
-                           'file size')
-        else:
-            # check for possible parallel files
-            files_to_push = add_files(test, files_to_push)
-
-        update_file_paths(test, videofile, settings['device_workdir'])
-
-        print(f'files to push: {files_to_push}')
+                abort_test(local_workdir,
+                           f'file {videofile} does not match '
+                           f'{test.input.resolution}')
+        # update the bitrate
         if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
-            # defult is serial calls
-            split = settings['bitrate'].split('-')
-            if len(split) != 3:
-                split = settings['bitrate'].split(',')
-                if len(split) != 3:
-                    # Single bitrate
-                    test.configure.bitrate = str(
-                        convert_to_bps(settings['bitrate']))
-                    fresh.test.extend([test])
-                else:
-                    for bitrate in split:
-                        ntest = tests_definitions.Test()
-                        ntest.CopyFrom(test)
-                        ntest.configure.bitrate = str(convert_to_bps(bitrate))
-                        fresh.test.extend([ntest])
-            else:
-                fval = convert_to_bps(split[0])
-                tval = convert_to_bps(split[1])
-                sval = convert_to_bps(split[2])
-                for bitrate in range(fval, tval, sval):
-                    ntest = tests_definitions.Test()
-                    ntest.CopyFrom(test)
-                    ntest.configure.bitrate = str(bitrate)
-                    fresh.test.extend([ntest])
-        else:
-            fresh.test.extend([test])
+            bitrate_list = parse_bitrate_field(settings['bitrate'])
+            for bitrate in bitrate_list:
+                # create a new test with the new bitrate
+                ntest = tests_definitions.Test()
+                ntest.CopyFrom(test)
+                ntest.common.id = test.common.id + f'.{bitrate}'
+                ntest.configure.bitrate = str(bitrate)
+                updated_tests.test.extend([ntest])
 
-    print(fresh)
-    if test_def is None:
-        abort_test(local_workdir, 'ERROR: no test file name')
+    # 2. get a list of all the media files that will need to be pushed
+    files_to_push = set()
+    for test in updated_tests.test:
+        files_to_push |= add_media_files(test)
 
-    test_file = os.path.basename(test_def)
-    testname = f'{test_file[0:test_file.rindex(".")]}.run.bin'
-    output = os.path.join(local_workdir, testname)
+    # 3. update all the file paths to the remote workdir
+    for test in updated_tests.test:
+        update_file_paths(test, settings['device_workdir'])
+
+    # 4. save the full protobuf text file(s)
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
+    if False:  # one pbtxt file per subtest
+        for test in updated_tests.test:
+            output_dir = f'{local_workdir}/{test.common.id}'
+            if not os.path.exists(output_dir):
+                os.mkdir(output_dir)
+            filename = f'{output_dir}/{test.common.id}.pbtxt'
+            with open(filename, 'w') as f:
+                f.write(text_format.MessageToString(test))
+            files_to_push |= {filename}
+    else:  # one pbtxt for all tests
+        protobuf_txt_filepath = f'{local_workdir}/{tests_id}.pbtxt'
+        with open(protobuf_txt_filepath, 'w') as f:
+            f.write(text_format.MessageToString(updated_tests))
+        files_to_push |= {protobuf_txt_filepath}
+
+    # print(f'files to push: {files_to_push}')
+    return updated_tests, files_to_push, protobuf_txt_filepath
+
+
+def push_file_to_device(filepath, serial, device_workdir, debug):
+    if not os.path.exists(filepath):
+        print(f'ERROR: file "{filepath}" does not exist, check path')
+        return False
+    encapp_tool.adb_cmds.run_cmd(
+        f'adb -s {serial} push {filepath} {device_workdir}/', debug)
+    return True
+
+
+def run_codec_tests(tests, files_to_push, protobuf_txt_filepath, model,
+                    serial, local_workdir, settings, debug):
+    print(f'running {protobuf_txt_filepath} ({len(tests.test)} test(s))')
     os.makedirs(local_workdir, exist_ok=True)
-    with open(output, 'wb') as binfile:
-        binfile.write(fresh.SerializeToString())
-        files_to_push.append(output)
 
-    ok = True
+    # push all the files to the device workdir
+    device_workdir = settings['device_workdir']
     for filepath in files_to_push:
-        if os.path.exists(filepath):
-            encapp_tool.adb_cmds.run_cmd(
-                f'adb -s {serial} push {filepath} '
-                f'{settings["device_workdir"]}/', debug)
-        else:
-            ok = False
-            print(f'File: "{filepath}" does not exist, check path')
+        if not push_file_to_device(filepath, serial, device_workdir, debug):
+            abort_test(local_workdir, 'Check file paths and try again')
 
-    if not ok:
-        abort_test(local_workdir, 'Check file paths and try again')
+    # run the test(s)
+    if False:  # one pbtxt file per subtest
+        for test in tests.test:
+            protobuf_txt_filepath = f'{device_workdir}/{test.common.id}.pbtxt'
+            run_encapp_test(protobuf_txt_filepath, serial, device_workdir,
+                            debug)
+    else:  # one pbtxt for all tests
+        basename = os.path.basename(protobuf_txt_filepath)
+        protobuf_txt_filepath = f'{device_workdir}/{basename}'
+        run_encapp_test(protobuf_txt_filepath, serial, device_workdir,
+                        debug)
 
-    return collect_result(local_workdir, testname, serial,
-                          settings['device_workdir'], debug)
+    # collect the test results
+    return collect_results(local_workdir, protobuf_txt_filepath, serial,
+                           settings['device_workdir'], debug)
 
 
 def list_codecs(serial, model, device_workdir, debug=0):
@@ -394,18 +449,24 @@ def is_int(s):
 
 
 def convert_to_bps(value):
-    if isinstance(value, str):
-        mul = 1
-        index = value.rfind('k')
-        if index == -1:
-            index = value.rfind('M')
-            if index > 0:
-                mul = 1000000
-        elif index > 0:
-            mul = 1000
-        return int(value[0:index]) * mul
-    else:
+    # support for only integers
+    if value.isnumeric():
         return int(value)
+    # remove spaces
+    val = value.replace(' ', '')
+    # support for SI units (at least 'k' and 'M')
+    mul = 1
+    index = val.rfind('k')
+    if index > 0:
+        mul = int(1e3)
+    else:
+        index = val.rfind('M')
+        if index > 0:
+            mul = int(1e6)
+        else:
+            # not a valid number
+            raise AssertionError(f'invalid bitrate: {value}')
+    return int(value[0:index]) * mul
 
 
 # convert a value (in either time or frame units) into frame units
@@ -422,42 +483,39 @@ def convert_to_frames(value, fps=30):
     return int(sec * fps)
 
 
-def convert_test(path):
-    output = f'{path[0:path.rindex(".")]}.bin'
-    root = os.path.abspath(os.path.join(
-        encapp_tool.app_utils.SCRIPT_DIR, os.pardir))
-    proto_file = os.path.join(root, 'proto', 'tests.proto')
-    cmd = f'protoc -I {SCRIPT_ROOT_DIR} --encode="Tests" {proto_file}'
-    with open(path, 'rb') as in_f, open(output, 'wb') as out_file:
-        subprocess.run(
-            cmd,
-            shell=True,
-            stdout=out_file,
-            stderr=subprocess.PIPE,
-            input=in_f.read(),
-            check=True
-        )
-    return output
+def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
+    # ensure the protobuf text file exists and is readable
+    if protobuf_txt_file is None:
+        abort_test(local_workdir, 'ERROR: need a test file name')
+    if (not os.path.exists(protobuf_txt_file) or
+            not os.path.isfile(protobuf_txt_file) or
+            not os.access(protobuf_txt_file, os.R_OK)):
+        abort_test(local_workdir, 'ERROR: invalid test file name')
+    # use a temp file for the binary output
+    _, protobuf_bin_file = tempfile.mkstemp(dir='/tmp')
+    cmd = (f'protoc -I {protobuf_txt_file} --encode="Tests" '
+           f'{protobuf_bin_file}')
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    assert ret == 0, f'ERROR: {stderr}'
 
 
 def codec_test(settings, model, serial, debug):
     print(f'codec test: {settings}')
-    # convert the human-friendly input into a valid apk input
-    test_config = convert_test(settings['configfile'])
-
-    # get date and time and format it
-    now = datetime.datetime.now()
-    dt_string = now.strftime('%Y-%m-%d_%H_%M')
-
-    # get working directory at the host
+    # get the local working directory (at the host)
     if settings['output'] is not None:
         local_workdir = settings['output']
     else:
+        now = datetime.datetime.now()
+        dt_string = now.strftime('%Y%m%d_%H%M%S')
         local_workdir = (f'{settings["desc"].replace(" ", "_")}'
                          f'_{model}_{dt_string}')
 
+    # check the protobuf text is correct
+    protobuf_txt_file = settings['configfile']
+    check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug)
+
     # run the codec test
-    return run_codec_tests_file(test_config,
+    return run_codec_tests_file(protobuf_txt_file,
                                 model,
                                 serial,
                                 local_workdir,
@@ -638,7 +696,7 @@ def main(argv):
     # uninstall app
     if options.func == 'uninstall':
         encapp_tool.app_utils.uninstall_app(serial, options.debug)
-        sys.exit(0)
+        return
 
     if options.func == 'kill':
         print('Force stop')

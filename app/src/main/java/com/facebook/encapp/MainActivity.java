@@ -39,6 +39,8 @@ import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
+import com.google.protobuf.TextFormat;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -278,11 +280,33 @@ public class MainActivity extends AppCompatActivity {
         Tests testcases = null;
         try {
             if (mExtraData.containsKey(CliSettings.TEST_CONFIG)) {
-                Log.d(TAG, "test_path: " + mExtraData.getString(CliSettings.TEST_CONFIG));
+                String test_path = mExtraData.getString(CliSettings.TEST_CONFIG);
+                Log.d(TAG, "test_path: " + test_path);
+                // read the test file
+                // https://stackoverflow.com/a/22092971
+                File file = new File(test_path);
+                int length = (int) file.length();
+                FileInputStream fis = new FileInputStream(file);
+                byte[] bytes = new byte[length];
+                fis.read(bytes);
+                String test_path_contents = new String(bytes);
+
+
+/*
+                String test_path_contents = Files.readString(Path.of(test_path));
+*/
+
+                Tests.Builder tests_builder = Tests.newBuilder();
+                TextFormat.getParser().merge(test_path_contents, tests_builder);
+                testcases = tests_builder.build();
+
+
+/*
                 // get the basename
-                Path basename = FileSystems.getDefault().getPath("", mExtraData.getString(CliSettings.TEST_CONFIG));
+                Path basename = FileSystems.getDefault().getPath("", test_path);
                 FileInputStream fis = new FileInputStream(basename.toFile());
                 testcases = Tests.parseFrom(fis);
+*/
                 // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
                 if (testcases.getTestList().size() <= 0) {
