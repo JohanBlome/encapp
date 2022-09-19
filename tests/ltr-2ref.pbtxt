@@ -1,7 +1,7 @@
 test {
     common {
-        id: "qcom_ltr2"
-        description: "Dynamic LTR - 2 Frame Refs Test"
+        id: "qcom.ltr-2ref"
+        description: "[QCOM] Dynamic LTR (Long-Term Reference) - 2 Frame Refs Test"
     }
     input {
         filepath: "/tmp/akiyo_qcif.yuv"

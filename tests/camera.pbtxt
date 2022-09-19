@@ -1,6 +1,6 @@
 test {
     common {
-        id: "Camera"
+        id: "camera"
         description: "Camera source encoding"
     }
     input {

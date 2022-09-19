@@ -1,6 +1,6 @@
 test {
     common {
-        id: "Bitrate"
+        id: "dynamic_bitrate"
         description: "Verify encoding bitrate"
     }
     input {

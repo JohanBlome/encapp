@@ -1,6 +1,6 @@
 test {
     common {
-        id: "Bitrate"
+        id: "bitrate_surface_rgba"
         description: "Verify encoding bitrate - surface - rgba"
     }
     input {

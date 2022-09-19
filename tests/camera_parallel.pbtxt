@@ -1,6 +1,6 @@
 test {
     common {
-        id: "Camera"
+        id: "camera_parallel"
         description: "Camera source encoding"
     }
     input {
@@ -18,7 +18,7 @@ test {
     parallel {
         test {
             common {
-                id: "Camera"
+                id: "camera_parallel"
                 description: "Camera source encoding"
             }
             input {
