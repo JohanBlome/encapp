@@ -1,7 +1,7 @@
 test {
     common {
-        id: "Dynamic Sync Frame"
-        description: "Verify encoding bitrate"
+        id: "dynamic_idr"
+        description: "Verify encoding bitrate on dynamic sync frame"
     }
     input {
         filepath: "/tmp/akiyo_qcif.yuv"
