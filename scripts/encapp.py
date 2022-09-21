@@ -454,7 +454,10 @@ def is_int(s):
 
 
 def convert_to_bps(value):
-    # support for only integers
+    # support for integers
+    if isinstance(value, int):
+        return value
+    # support for strings containing only integers
     if value.isnumeric():
         return int(value)
     # remove spaces
