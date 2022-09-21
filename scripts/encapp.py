@@ -12,10 +12,10 @@ import sys
 import argparse
 import itertools
 import re
+import shutil
 import tempfile
 import time
 import datetime
-import shutil
 from google.protobuf import text_format
 
 
@@ -350,13 +350,18 @@ def update_codec_tests(test_suite, local_workdir, settings):
     for test in updated_test_suite.test:
         files_to_push |= add_media_files(test)
 
-    # 3. update all the file paths to the remote workdir
+    # 3. save the media files
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
+    for filepath in files_to_push:
+        # https://stackoverflow.com/a/30359308
+        shutil.copy2(filepath, local_workdir + '/')
+
+    # 4. update all the file paths to the remote workdir
     for test in updated_test_suite.test:
         update_file_paths(test, settings['device_workdir'])
 
-    # 4. save the full protobuf text file(s)
-    if not os.path.exists(local_workdir):
-        os.mkdir(local_workdir)
+    # 5. save the full protobuf text file(s)
     if False:  # one pbtxt file per subtest
         for test in updated_test_suite.test:
             output_dir = f'{local_workdir}/{test.common.id}'
