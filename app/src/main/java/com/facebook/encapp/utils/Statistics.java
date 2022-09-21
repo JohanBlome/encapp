@@ -267,31 +267,31 @@ public class Statistics {
 
 
     private JSONObject getConfigSettings(Configure config) throws JSONException {
-        JSONObject settings = new JSONObject();
-        settings.put("codec", mCodec);
+        JSONObject json = new JSONObject();
+        json.put("codec", mCodec);
         if (config.hasIFrameInterval()) {
-            settings.put("gop", config.getIFrameInterval());
+            json.put("gop", config.getIFrameInterval());
         }
-        settings.put("fps", config.getFramerate());
-        settings.put("bitrate", config.getBitrate());
-        settings.put("meanbitrate", getAverageBitrate());
+        json.put("fps", config.getFramerate());
+        json.put("bitrate", config.getBitrate());
+        json.put("meanbitrate", getAverageBitrate());
         if (config.hasResolution()) {
             Size s = Size.parseSize(mTest.getConfigure().getResolution());
-            settings.put("width", s.getWidth());
-            settings.put("height", s.getHeight());
+            json.put("width", s.getWidth());
+            json.put("height", s.getHeight());
         }
         if (mTest.getConfigure().hasBitrateMode()) {
-            settings.put("encmode", mTest.getConfigure().getBitrateMode());
+            json.put("encmode", mTest.getConfigure().getBitrateMode());
         }
         if (config.hasColorRange())
-            settings.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
+            json.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
         if (config.hasColorStandard())
-            settings.put(MediaFormat.KEY_COLOR_STANDARD, config.getColorStandard());
+            json.put(MediaFormat.KEY_COLOR_STANDARD, config.getColorStandard());
         if (config.hasColorTransfer())
-            settings.put(MediaFormat.KEY_COLOR_TRANSFER, config.getColorTransfer());
+            json.put(MediaFormat.KEY_COLOR_TRANSFER, config.getColorTransfer());
         //TODO: more settings
 
-        return settings;
+        return json;
     }
 
 
@@ -375,7 +375,7 @@ public class Statistics {
 
             }
 
-            //GPU info
+            // GPU info
             JSONObject gpuData = new JSONObject();
             HashMap<String, String> gpuInfo = mLoad.getGPUInfo();
 
