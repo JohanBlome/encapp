@@ -149,7 +149,7 @@ message Test {
   optional Parallel parallel = 7;
 }
 
-message Tests {
+message TestSuite {
   // Tests are serial unless included in another test as parallel
   repeated Test test = 1;
 }

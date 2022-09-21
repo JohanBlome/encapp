@@ -29,7 +29,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.proto.Tests;
+import com.facebook.encapp.proto.TestSuite;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
@@ -277,7 +277,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        Tests testcases = null;
+        TestSuite test_suite = null;
         try {
             if (mExtraData.containsKey(CliSettings.TEST_CONFIG)) {
                 String test_path = mExtraData.getString(CliSettings.TEST_CONFIG);
@@ -296,24 +296,24 @@ public class MainActivity extends AppCompatActivity {
                 String test_path_contents = Files.readString(Path.of(test_path));
 */
 
-                Tests.Builder tests_builder = Tests.newBuilder();
+                TestSuite.Builder tests_builder = TestSuite.newBuilder();
                 TextFormat.getParser().merge(test_path_contents, tests_builder);
-                testcases = tests_builder.build();
+                test_suite = tests_builder.build();
 
 
 /*
                 // get the basename
                 Path basename = FileSystems.getDefault().getPath("", test_path);
                 FileInputStream fis = new FileInputStream(basename.toFile());
-                testcases = Tests.parseFrom(fis);
+                test_suite = TestSuite.parseFrom(fis);
 */
                 // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
-                if (testcases.getTestList().size() <= 0) {
+                if (test_suite.getTestList().size() <= 0) {
                     Log.e(TAG, "Failed to read test");
                     return;
                 }
-                if (testcases == null) {
+                if (test_suite == null) {
                     Log.d(TAG, "No test case");
                     return;
                 }
@@ -321,7 +321,7 @@ public class MainActivity extends AppCompatActivity {
                 int nbrViews = 0;
                 boolean hasCameraPreview = false;
                 // Prepare views for visualization
-                for (Test test : testcases.getTestList()) {
+                for (Test test : test_suite.getTestList()) {
                     nbrViews += countInputPreviews(test);
                     showCameraPreview(test);
                 }
@@ -352,9 +352,9 @@ public class MainActivity extends AppCompatActivity {
                 boolean cameraStarted = false;
                 int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
-                    Log.d(TAG, "** Starting tests, " + testcases.getTestCount() +
+                    Log.d(TAG, "** Starting tests, " + test_suite.getTestCount() +
                             " number of combinations (parallels not counted) **");
-                    for (Test test : testcases.getTestList()) {
+                    for (Test test : test_suite.getTestList()) {
                         mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;
                         pursuit = test.getInput().getPursuit();

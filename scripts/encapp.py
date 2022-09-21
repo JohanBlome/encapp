@@ -258,14 +258,14 @@ def add_media_files(test):
 def run_codec_tests_file(protobuf_txt_file, model, serial, local_workdir,
                          settings, debug):
     print(f'reading test: {protobuf_txt_file}')
-    tests = tests_definitions.Tests()
+    test_suite = tests_definitions.TestSuite()
     with open(protobuf_txt_file, 'rb') as fd:
-        text_format.Merge(fd.read(), tests)
-        # tests.ParseFromString(fd.read())
+        text_format.Merge(fd.read(), test_suite)
+        # test_suite.ParseFromString(fd.read())
     print(f'updating test: {protobuf_txt_file}')
-    tests, files_to_push, protobuf_txt_filepath = update_codec_tests(
-        tests, local_workdir, settings)
-    return run_codec_tests(tests, files_to_push, protobuf_txt_filepath,
+    test_suite, files_to_push, protobuf_txt_filepath = update_codec_tests(
+        test_suite, local_workdir, settings)
+    return run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath,
                            model, serial, local_workdir, settings, debug)
 
 
@@ -300,11 +300,11 @@ def parse_bitrate_field(bitrate):
 # Update a set of tests with the CLI arguments.
 # Note that update may include adding new tests (e.g. if bitrate is
 # defined as a (from, to, step) tuple instead of a single value).
-def update_codec_tests(tests, local_workdir, settings):
+def update_codec_tests(test_suite, local_workdir, settings):
     # 1. update the tests with the CLI parameters
-    updated_tests = tests_definitions.Tests()
+    updated_test_suite = tests_definitions.TestSuite()
     tests_id = None
-    for test in tests.test:
+    for test in test_suite.test:
         # save the main test id
         if tests_id is None:
             tests_id = test.common.id
@@ -343,22 +343,22 @@ def update_codec_tests(tests, local_workdir, settings):
                 ntest.CopyFrom(test)
                 ntest.common.id = test.common.id + f'.{bitrate}'
                 ntest.configure.bitrate = str(bitrate)
-                updated_tests.test.extend([ntest])
+                updated_test_suite.test.extend([ntest])
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
-    for test in updated_tests.test:
+    for test in updated_test_suite.test:
         files_to_push |= add_media_files(test)
 
     # 3. update all the file paths to the remote workdir
-    for test in updated_tests.test:
+    for test in updated_test_suite.test:
         update_file_paths(test, settings['device_workdir'])
 
     # 4. save the full protobuf text file(s)
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
     if False:  # one pbtxt file per subtest
-        for test in updated_tests.test:
+        for test in updated_test_suite.test:
             output_dir = f'{local_workdir}/{test.common.id}'
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
@@ -369,11 +369,11 @@ def update_codec_tests(tests, local_workdir, settings):
     else:  # one pbtxt for all tests
         protobuf_txt_filepath = f'{local_workdir}/{tests_id}.pbtxt'
         with open(protobuf_txt_filepath, 'w') as f:
-            f.write(text_format.MessageToString(updated_tests))
+            f.write(text_format.MessageToString(updated_test_suite))
         files_to_push |= {protobuf_txt_filepath}
 
     # print(f'files to push: {files_to_push}')
-    return updated_tests, files_to_push, protobuf_txt_filepath
+    return updated_test_suite, files_to_push, protobuf_txt_filepath
 
 
 def push_file_to_device(filepath, serial, device_workdir, debug):
@@ -385,9 +385,9 @@ def push_file_to_device(filepath, serial, device_workdir, debug):
     return True
 
 
-def run_codec_tests(tests, files_to_push, protobuf_txt_filepath, model,
+def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
                     serial, local_workdir, settings, debug):
-    print(f'running {protobuf_txt_filepath} ({len(tests.test)} test(s))')
+    print(f'running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))')
     os.makedirs(local_workdir, exist_ok=True)
 
     # push all the files to the device workdir
@@ -398,7 +398,7 @@ def run_codec_tests(tests, files_to_push, protobuf_txt_filepath, model,
 
     # run the test(s)
     if False:  # one pbtxt file per subtest
-        for test in tests.test:
+        for test in test_suite.test:
             protobuf_txt_filepath = f'{device_workdir}/{test.common.id}.pbtxt'
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir,
                             debug)
@@ -493,7 +493,7 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
         abort_test(local_workdir, 'ERROR: invalid test file name')
     # use a temp file for the binary output
     _, protobuf_bin_file = tempfile.mkstemp(dir='/tmp')
-    cmd = (f'protoc -I {protobuf_txt_file} --encode="Tests" '
+    cmd = (f'protoc -I {protobuf_txt_file} --encode="TestSuite" '
            f'{protobuf_bin_file}')
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret == 0, f'ERROR: {stderr}'
