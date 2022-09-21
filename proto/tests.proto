@@ -18,7 +18,6 @@ enum DataValueType {
     longType = 3;
 }
 
-
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -151,6 +150,6 @@ message Test {
 }
 
 message Tests {
-  //Tests are serial unless included in another test as parallell
+  // Tests are serial unless included in another test as parallel
   repeated Test test = 1;
 }
