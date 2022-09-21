@@ -7,6 +7,7 @@ import android.util.Size;
 
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.Test;
+import com.google.protobuf.util.JsonFormat;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -19,10 +20,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.Vector;
 
 public class Statistics {
     final static String TAG = "encapp.statistics";
@@ -265,36 +264,6 @@ public class Statistics {
         return val;
     }
 
-
-    private JSONObject getConfigSettings(Configure config) throws JSONException {
-        JSONObject json = new JSONObject();
-        json.put("codec", mCodec);
-        if (config.hasIFrameInterval()) {
-            json.put("gop", config.getIFrameInterval());
-        }
-        json.put("fps", config.getFramerate());
-        json.put("bitrate", config.getBitrate());
-        json.put("meanbitrate", getAverageBitrate());
-        if (config.hasResolution()) {
-            Size s = Size.parseSize(mTest.getConfigure().getResolution());
-            json.put("width", s.getWidth());
-            json.put("height", s.getHeight());
-        }
-        if (mTest.getConfigure().hasBitrateMode()) {
-            json.put("encmode", mTest.getConfigure().getBitrateMode());
-        }
-        if (config.hasColorRange())
-            json.put(MediaFormat.KEY_COLOR_RANGE, config.getColorRange());
-        if (config.hasColorStandard())
-            json.put(MediaFormat.KEY_COLOR_STANDARD, config.getColorStandard());
-        if (config.hasColorTransfer())
-            json.put(MediaFormat.KEY_COLOR_TRANSFER, config.getColorTransfer());
-        //TODO: more settings
-
-        return json;
-    }
-
-
     public void writeJSON(Writer writer) throws IOException {
         Log.d(TAG, "Write stats for " + mId);
         try {
@@ -302,8 +271,13 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
-            json.put("test", mTest.getCommon().getDescription());
-            json.put("testdefinition", mTest.toString());
+            // convert the test configuration to json
+            //json.put("test", mTest.getCommon().getDescription());
+            String jsonStr = JsonFormat.printer().includingDefaultValueFields().print(mTest);
+            json.put("test", new JSONObject(jsonStr));
+            // derived test configuration items
+            json.put("codec", mCodec);
+            json.put("meanbitrate", getAverageBitrate());
             json.put("date", mStartDate.toString());
             Log.d(TAG, "log app version: " + mAppVersion);
             json.put("encapp_version", mAppVersion);
@@ -313,7 +287,6 @@ public class Statistics {
             String[] tmp = mTest.getInput().getFilepath().split("/");
             json.put("sourcefile", tmp[tmp.length - 1]);
 
-            json.put("settings", getConfigSettings(mTest.getConfigure()));
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder", mDecoderName);
