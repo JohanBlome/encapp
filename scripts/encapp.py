@@ -109,6 +109,7 @@ FFPROBE_FIELDS = {
 }
 R_FRAME_RATE_MAP = {
     '30/1': 30,
+    '60/1': 60,
 }
 
 
