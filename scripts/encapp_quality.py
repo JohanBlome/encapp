@@ -69,14 +69,20 @@ def get_media_props(mediapath, debug):
 
 def run_quality(test_file, override_settings, debug):
     """Compare the output found in test_file with the source/reference
-       found in options.media directory or overriden
+       found in options.media_path directory or overriden
     """
     with open(test_file, 'r') as input_file:
         results = json.load(input_file)
 
-    source = override_settings['media_path'] + '/' + results.get('sourcefile')
+    # find the reference source
+    reference_dirname = override_settings['media_path']
+    if reference_dirname is None:
+        # get the reference dirname from the test path
+        reference_dirname = os.path.dirname(test_file)
+    reference_pathname = os.path.join(
+        reference_dirname, results.get('sourcefile'))
     if override_settings['override_reference'] is not None:
-        source = override_settings['override_reference']
+        reference_pathname = override_settings['override_reference']
 
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
@@ -114,7 +120,7 @@ def run_quality(test_file, override_settings, debug):
         if len(pix_fmt) == 0:
             # See if source contains a clue
             pix_fmt = 'yuv420p'
-            if source.find('nv12') > -1:
+            if reference_pathname.find('nv12') > -1:
                 pix_fmt = 'nv12'
 
         output_media_format = results.get('encoder_media_format')
@@ -143,13 +149,12 @@ def run_quality(test_file, override_settings, debug):
             else:
                 input_res = f'{input_width}x{input_height}'
 
-        reference = source
-        if not os.path.exists(reference):
-            print(f'Reference {reference} is unavailable')
+        if not os.path.exists(reference_pathname):
+            print(f'Reference {reference_pathname} is unavailable')
             exit(-1)
         distorted = encodedfile
-        if not os.path.exists(source):
-            print(f'Source {source} is unavailable')
+        if not os.path.exists(distorted):
+            print(f'Distorted {distorted} is unavailable')
             exit(-1)
 
         shell_cmd = ''
@@ -177,10 +182,10 @@ def run_quality(test_file, override_settings, debug):
         if raw:
             ref_part = (
                 f'-f rawvideo -pix_fmt {pix_fmt} -s {input_res} '
-                f'-r {fps} -i {reference} '
+                f'-r {fps} -i {reference_pathname} '
             )
         else:
-            ref_part = f'-r {fps} -i {reference} '
+            ref_part = f'-r {fps} -i {reference_pathname} '
 
         print(f'input res = {input_res} vs {output_res}')
         if input_res != output_res:
@@ -280,7 +285,7 @@ def get_options(argv):
     parser.add_argument(
         '--media',
         dest='media_path',
-        help='Media directory',
+        help='Directory where to locate the reference video file',
         default=None)
     parser.add_argument(
         '--pix_fmt', help=f'pixel format ({encapp.PIX_FMT_TYPES})',
@@ -296,7 +301,7 @@ def get_options(argv):
     parser.add_argument(
         '-ref_res',
         '--reference_resolution',
-        help='Overriden reference resolution WxH',
+        help='Override reference resolution WxH',
         default=None)
     parser.add_argument(
         '--header',
@@ -334,11 +339,12 @@ def get_options(argv):
         parser.print_help()
         sys.exit()
 
-    # make sure media_path holds a valid directory
-    assert os.path.isdir(options.media_path), (
-        f'Error: {options.media_path} not a valid directory')
-    assert os.access(options.media_path, os.R_OK), (
-        f'Error: {options.media_path} not a readable directory')
+    if options.media_path is not None:
+        # make sure media_path holds a valid directory
+        assert os.path.isdir(options.media_path), (
+            f'Error: {options.media_path} not a valid directory')
+        assert os.access(options.media_path, os.R_OK), (
+            f'Error: {options.media_path} not a readable directory')
 
     return options
 
