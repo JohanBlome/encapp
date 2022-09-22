@@ -25,6 +25,7 @@ R_FRAME_RATE_MAP = {
     "60/1": 60,
     "30000/1001": 29.97,
 }
+FFMPEG_SILENT = ["ffmpeg", "-hide_banner", "-y"]
 
 
 def ffprobe_parse_output(stdout):
@@ -56,6 +57,11 @@ def video_is_raw(videofile):
     return extension in RAW_EXTENSION_LIST
 
 
+def video_is_y4m(videofile):
+    extension = os.path.splitext(videofile)[1]
+    return extension == ".y4m"
+
+
 def get_video_info(videofile, debug=0):
     assert os.path.exists(videofile), "input video file (%s) does not exist" % videofile
     assert os.path.isfile(videofile), "input video file (%s) is not a file" % videofile
@@ -71,3 +77,25 @@ def get_video_info(videofile, debug=0):
     videofile_config = ffprobe_parse_output(stdout)
     videofile_config["filepath"] = videofile
     return videofile_config
+
+
+def ffmpeg_convert_to_raw(
+    input_filepath, output_filepath, pix_fmt, video_size, framerate, debug
+):
+    cmd = FFMPEG_SILENT + [
+        "-i",
+        input_filepath,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        pix_fmt,
+        "-video_size",
+        video_size,
+        "-framerate",
+        str(framerate),
+        output_filepath,
+    ]
+    # TODO(chema): run_cmd() should accept list of parameters
+    cmd = " ".join(cmd)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    assert ret, f"error: ffmpeg returned {stderr}"

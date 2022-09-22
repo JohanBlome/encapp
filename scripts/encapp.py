@@ -60,6 +60,12 @@ default_values = {
 
 OPERATION_TYPES = ("batch", "realtime")
 PIX_FMT_TYPES = ("yuv420p", "nv12", "rgba")
+PIX_FMT_TYPES = {
+    "yuv420p": "yuv",
+    "nv12": "yuv",
+    "rgba": "rgba",
+}
+PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
     "codec": str,
     "encode": bool,
@@ -768,6 +774,39 @@ def verify_app_version(json_files):
                 print(f"File {fl} failed to be read")
 
 
+def process_input_path(input_filepath, replace, debug):
+    # decode encoded video (the encoder wants raw video)
+    videofile_config = encapp_tool.ffutils.get_video_info(input_filepath)
+    # check whether the user has a preferred raw format
+    pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
+    resolution = f'{videofile_config["width"]}x{videofile_config["height"]}'
+    framerate = videofile_config["framerate"]
+    extension = PIX_FMT_TYPES[pix_fmt]
+    # get raw filepath
+    input_filepath_raw = os.path.join(
+        tempfile.gettempdir(), os.path.basename(input_filepath)
+    )
+    input_filepath_raw += f".{resolution}"
+    input_filepath_raw += f".{framerate}"
+    input_filepath_raw += f".{pix_fmt}"
+    input_filepath_raw += f".{extension}"
+    encapp_tool.ffutils.ffmpeg_convert_to_raw(
+        input_filepath,
+        input_filepath_raw,
+        pix_fmt,
+        resolution,
+        videofile_config["framerate"],
+        debug,
+    )
+    # replace input and other derived values
+    return {
+        "filepath": input_filepath_raw,
+        "resolution": resolution,
+        "pix_fmt": pix_fmt,
+        "framerate": framerate,
+    }
+
+
 def main(argv):
     options = get_options(argv)
     if options.version:
@@ -777,12 +816,13 @@ def main(argv):
     # derived replace values
     if "input" in options.replace and "filepath" in options.replace["input"]:
         input_filepath = options.replace["input"]["filepath"]
-        if input_filepath != "camera" and not encapp_tool.ffutils.video_is_raw(
+        # convert y4m (raw) files into yuv/rgba (raw) files
+        if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
             input_filepath
         ):
-            # TODO(chema): process compressed video
-            # videofile_config = get_video_info(input_filepath)
-            pass
+            # replace input and other derived values
+            d = process_input_path(input_filepath, options.replace, options.debug)
+            options.replace["input"].update(d)
 
     # get model and serial number
     model, serial = encapp_tool.adb_cmds.get_device_info(options.serial, options.debug)
