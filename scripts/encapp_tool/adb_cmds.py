@@ -34,7 +34,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
     return ret, stdout.decode(), stderr.decode()
 
 
-def get_device_info(serial_inp: typing.Optional[str],
+def get_device_info(serial: typing.Optional[str],
                     debug=0) -> typing.Tuple[typing.Dict, str]:
     """Get android device information for an specific device
 
@@ -44,12 +44,12 @@ def get_device_info(serial_inp: typing.Optional[str],
     is connected, it fails.
 
     Args:
-        serial_inp (str): Expected serial number to analyze.
+        serial (str): Expected serial number to analyze.
         debug (): Debug level
 
     Returns:
-        device_info, serial; Where device info is a map with device info
-        and serial is the serial no. of the device.
+        model, serial; Where model is the model and serial is the serial
+            number of the device.
     """
     device_info = get_connected_devices(debug)
     assert len(device_info) > 0, 'error: no devices connected'
@@ -57,22 +57,18 @@ def get_device_info(serial_inp: typing.Optional[str],
         print(f'available devices: {device_info}')
 
     # select output device
-    if serial_inp is None:
-        # if user did not select a serial_inp, make sure there is only one
+    if serial is None:
+        # if user did not select a serial, make sure there is only one
         # device available
+        assert len(device_info) > 0, 'error: no devices available'
         assert len(device_info) == 1, (
             'error: need to choose a device '
             f'[{", ".join(device_info.keys())}]')
         serial = list(device_info.keys())[0]
-        model = device_info[serial]
-
-    else:
-        # if user forced a serial number, make sure it is available
-        assert serial_inp in device_info, (
-            f'error: device {serial_inp} not available')
-        serial = serial_inp
-        model = device_info[serial]
-
+    # ensure the serial number is available
+    assert serial in device_info, f'error: device {serial} not available'
+    # get the model id
+    model = device_info[serial]['model'].lower()
     if debug > 0:
         print(f'selecting device: serial: {serial} model: {model}')
 
