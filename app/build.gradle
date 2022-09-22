@@ -10,7 +10,7 @@ android {
         minSdkVersion 28
         targetSdkVersion 30
         versionCode 1
-        versionName "1.7"
+        versionName "1.8"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)
     }
     buildTypes {
