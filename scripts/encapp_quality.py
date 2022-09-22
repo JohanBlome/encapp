@@ -13,6 +13,7 @@ import argparse
 import re
 
 import encapp_tool.adb_cmds
+import encapp_tool.ffutils
 import encapp
 
 PSNR_RE = 'average:([0-9.]*)'
@@ -52,19 +53,6 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
                 break
 
     return vmaf, ssim, psnr
-
-
-def get_media_props(mediapath, debug):
-    status, std_out, std_err = encapp_tool.adb_cmds.run_cmd(
-        f'ffprobe {mediapath}', debug)
-    resolution = None
-    if status:
-        print(f'std_out = {std_out}, err = {std_err}')
-
-    m = re.search('([0-9]{2,4})x([0-9]{2,4})', std_err)
-    if m:
-        resolution = m.group(0)
-    return resolution
 
 
 def run_quality(test_file, override_settings, debug):
@@ -128,7 +116,9 @@ def run_quality(test_file, override_settings, debug):
         output_height = output_media_format.get('height')
 
         output_res = f'{output_width}x{output_height}'
-        media_res = get_media_props(encodedfile, debug)
+        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
+        media_res = f'{video_info["width"]}x{video_info["height"]}'
+
         if output_res != media_res:
             print('Warning. Discrepancy in resolutions for output')
             print(f'Json {output_res}, media {media_res}')
