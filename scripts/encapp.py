@@ -357,15 +357,6 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
     return test_suite, files_to_push, protobuf_txt_filepath
 
 
-def push_file_to_device(filepath, serial, device_workdir, debug):
-    if not os.path.exists(filepath):
-        print(f'ERROR: file "{filepath}" does not exist, check path')
-        return False
-    encapp_tool.adb_cmds.run_cmd(
-        f'adb -s {serial} push {filepath} {device_workdir}/', debug)
-    return True
-
-
 def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
                     serial, local_workdir, device_workdir, debug):
     print(f'running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))')
@@ -373,7 +364,8 @@ def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
 
     # push all the files to the device workdir
     for filepath in files_to_push:
-        if not push_file_to_device(filepath, serial, device_workdir, debug):
+        if not encapp_tool.adb_cmds.push_file_to_device(
+                filepath, serial, device_workdir, debug):
             abort_test(local_workdir, 'Check file paths and try again')
 
     # run the test(s)
