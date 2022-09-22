@@ -141,8 +141,8 @@ def run_quality(test_file, override_settings, debug):
                 input_height = int(input_media_format.get('height'))
                 # If we did not get aything here use the encoded size
             except BaseException:
-                print('Warning. Input size if wrong.')
-                print(f'Json {input_media_format.get("width")}x'
+                print('Warning. Input size is wrong.')
+                print(f'json {input_media_format.get("width")}x'
                       f'{input_media_format.get("height")}')
                 input_res = output_res
             else:
