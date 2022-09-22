@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import re
+import os
 import subprocess
 import typing
 
@@ -303,3 +304,14 @@ def logcat_dump(serial: str, debug=0) -> str:
     )
     assert ret, f'error: failed to dump logcat: {stderr}'
     return stdout
+
+
+def push_file_to_device(filepath, serial, device_workdir, debug):
+    if not os.path.exists(filepath):
+        print(f'error: file "{filepath}" does not exist, check path')
+        return False
+    if not os.access(filepath, os.R_OK):
+        print(f'error: file "{filepath}" is not readable')
+        return False
+    run_cmd(f'adb -s {serial} push {filepath} {device_workdir}/', debug)
+    return True
