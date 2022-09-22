@@ -625,6 +625,8 @@ def get_options(argv):
             # remove the old value
             delattr(options, key)
     # check the validity of some parameters
+    if not options.replace:
+        options.replace = {}
     if options.replace.get('input', {}).get('filepath', ''):
         videofile = options.replace.get('input', {}).get('filepath', '')
         assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
