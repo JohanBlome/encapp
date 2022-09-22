@@ -283,7 +283,6 @@ public class MainActivity extends AppCompatActivity {
                 String test_path = mExtraData.getString(CliSettings.TEST_CONFIG);
                 Log.d(TAG, "test_path: " + test_path);
                 // read the test file
-                // https://stackoverflow.com/a/22092971
                 File file = new File(test_path);
                 int length = (int) file.length();
                 FileInputStream fis = new FileInputStream(file);
@@ -291,22 +290,10 @@ public class MainActivity extends AppCompatActivity {
                 fis.read(bytes);
                 String test_path_contents = new String(bytes);
 
-
-/*
-                String test_path_contents = Files.readString(Path.of(test_path));
-*/
-
                 TestSuite.Builder tests_builder = TestSuite.newBuilder();
                 TextFormat.getParser().merge(test_path_contents, tests_builder);
                 test_suite = tests_builder.build();
 
-
-/*
-                // get the basename
-                Path basename = FileSystems.getDefault().getPath("", test_path);
-                FileInputStream fis = new FileInputStream(basename.toFile());
-                test_suite = TestSuite.parseFrom(fis);
-*/
                 // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
                 if (test_suite.getTestList().size() <= 0) {
