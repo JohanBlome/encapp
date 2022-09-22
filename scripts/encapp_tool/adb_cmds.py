@@ -306,6 +306,68 @@ def logcat_dump(serial: str, debug=0) -> str:
     return stdout
 
 
+def parse_getprop(stdout: str) -> dict:
+    """Parse the output of getprop
+
+    Args:
+        stdout (str): getprop stdout
+
+    Returns:
+      Current props dump
+    """
+    # [persist.sys.boot.reason]: []
+    # [persist.sys.boot.reason.history]: [reboot,powerloss,1659352492
+    # reboot,adb,1663120966
+    # reboot,`db,1661299722]
+    # [persist.sys.call_debug_v2]: [true]
+    props_dict = {}
+    reading_val = False
+    key = ''
+    val = ''
+    for line in stdout.splitlines():
+        if not line:
+            continue
+        if not reading_val:
+            key, val = line.split(': ')
+            key = key.lstrip('[').rstrip(']')
+            val = val.lstrip('[')
+            if val[-1] == ']':
+                val = val.lstrip('[').rstrip(']')
+                # single-line pair
+                props_dict[key] = val
+            else:
+                # multiple-line value
+                reading_val = True
+            val = val.lstrip('[').rstrip(']')
+        else:
+            if line[-1] != ']':
+                # continued multiple-line value
+                val += '\n' + line
+            else:
+                # end of multiple-line value
+                val += '\n' + line.rstrip(']')
+                props_dict[key] = val
+                reading_val = False
+    return props_dict
+
+
+def getprop(serial: str, debug=0) -> dict:
+    """Capture current props
+
+    Args:
+        serial (str): Android device serial no.
+        debug (int): Debug level
+
+    Returns:
+      Current props dump
+    """
+    ret, stdout, stderr = run_cmd(
+        f'adb -s {serial} shell getprop', debug
+    )
+    assert ret, f'error: failed to getprop: {stderr}'
+    return parse_getprop(stdout)
+
+
 def push_file_to_device(filepath, serial, device_workdir, debug):
     if not os.path.exists(filepath):
         print(f'error: file "{filepath}" does not exist, check path')

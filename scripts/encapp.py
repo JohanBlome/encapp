@@ -179,10 +179,22 @@ def collect_results(local_workdir, protobuf_txt_filepath, serial,
     encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     if debug > 0:
         print(f'results collect: {result_json}')
+    # dump device information
+    dump_device_info(serial, local_workdir, debug)
     # get logcat
     log = encapp_tool.adb_cmds.logcat_dump(serial)
     parse_log(log, local_workdir)
     return result_json
+
+
+def dump_device_info(serial, local_workdir, debug):
+    props_dict = encapp_tool.adb_cmds.getprop(serial, debug)
+    device_info = {
+        'props': props_dict,
+    }
+    device_info_path = os.path.join(local_workdir, 'device.json')
+    with open(device_info_path, 'w') as fd:
+        fd.write(json.dumps(device_info, sort_keys=True, indent=4))
 
 
 def parse_log(log, local_workdir):
