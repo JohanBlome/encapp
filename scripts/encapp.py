@@ -22,6 +22,7 @@ from google.protobuf import text_format
 import encapp_tool
 import encapp_tool.app_utils
 import encapp_tool.adb_cmds
+import encapp_tool.ffutils
 
 SCRIPT_ROOT_DIR = os.path.abspath(os.path.join(
     encapp_tool.app_utils.SCRIPT_DIR, os.pardir))
@@ -54,7 +55,6 @@ default_values = {
     'bps': None,
 }
 
-RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.rgba', '.raw')
 OPERATION_TYPES = ('batch', 'realtime')
 PIX_FMT_TYPES = ('yuv420p', 'nv12', 'rgba')
 KNOWN_CONFIGURE_TYPES = {
@@ -106,10 +106,6 @@ FFPROBE_FIELDS = {
     'color_primaries': 'color-primaries',
     'r_frame_rate': 'framerate',
     'duration': 'duration',
-}
-R_FRAME_RATE_MAP = {
-    '30/1': 30,
-    '60/1': 60,
 }
 
 
@@ -208,7 +204,7 @@ def parse_log(log, local_workdir):
 
 def verify_video_size(videofile, resolution):
     assert os.path.exists(videofile) and os.access(videofile, os.R_OK)
-    if not video_is_raw(videofile):
+    if not encapp_tool.ffutils.video_is_raw(videofile):
         # in this case the actual encoded size is used
         return True
     # video is raw
@@ -638,53 +634,6 @@ def get_options(argv):
     return options
 
 
-def video_is_raw(videofile):
-    extension = os.path.splitext(videofile)[1]
-    return extension in RAW_EXTENSION_LIST
-
-
-def parse_ffprobe_output(stdout):
-    videofile_config = {}
-    for line in stdout.split('\n'):
-        if not line:
-            # ignore empty lines
-            continue
-        if line in ('[STREAM]', '[/STREAM]'):
-            # ignore start/end of stream
-            continue
-        key, value = line.split('=')
-        # store interesting fields
-        if key in FFPROBE_FIELDS.keys():
-            # process some values
-            if key == 'r_frame_rate':
-                value = R_FRAME_RATE_MAP[value]
-            elif key == 'width' or key == 'height':
-                value = int(value)
-            elif key == 'duration':
-                value = float(value)
-            key = FFPROBE_FIELDS[key]
-            videofile_config[key] = value
-    return videofile_config
-
-
-def get_video_info(videofile, debug=0):
-    assert os.path.exists(videofile), (
-        'input video file (%s) does not exist' % videofile)
-    assert os.path.isfile(videofile), (
-        'input video file (%s) is not a file' % videofile)
-    assert os.access(videofile, os.R_OK), (
-        'input video file (%s) is not readable' % videofile)
-    if video_is_raw(videofile):
-        return {}
-    # check using ffprobe
-    cmd = f'ffprobe -v quiet -select_streams v -show_streams {videofile}'
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
-    assert ret, f'error: failed to analyze file {videofile}'
-    videofile_config = parse_ffprobe_output(stdout)
-    videofile_config['filepath'] = videofile
-    return videofile_config
-
-
 def verify_app_version(json_files):
     for fl in json_files:
         with open(fl) as f:
@@ -705,7 +654,8 @@ def main(argv):
     # derived replace values
     if 'input' in options.replace and 'filepath' in options.replace['input']:
         input_filepath = options.replace['input']['filepath']
-        if input_filepath != 'camera' and not video_is_raw(input_filepath):
+        if (input_filepath != 'camera' and
+                not encapp_tool.ffutils.video_is_raw(input_filepath)):
             # TODO(chema): process compressed video
             # videofile_config = get_video_info(input_filepath)
             pass
