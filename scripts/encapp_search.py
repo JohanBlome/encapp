@@ -31,7 +31,7 @@ INDEX_FILE_NAME = '.encapp_index'
 def getProperties(options, json):
     data = getData(options, True)
     _, filename = os.path.split(json)
-    row = data.loc[data['file'].str.contains(filename)]
+    row = data.loc[data['filename'].str.contains(filename)]
     return row
 
 
@@ -49,51 +49,68 @@ def getFilesInDir(directory, recursive):
     return files
 
 
+def dict_flatten(test):
+    key_list = []
+    val_list = []
+    for k1, v1 in test.items():
+        for k2, v2 in v1.items():
+            if k2 == 'resolution':
+                sizes = v2.split('x')
+                key_list.append(f'{k1}.width')
+                key_list.append(f'{k1}.height')
+                val_list.append(int(sizes[0]))
+                val_list.append(int(sizes[1]))
+                continue
+            key_list.append(f'{k1}.{k2}')
+            val_list.append(v2)
+    return key_list, val_list
+
+
 def indexDirectory(options, recursive):
     files = getFilesInDir(f'{options.path}', recursive)
     settings = []
 
-    for df in files:
+    key_list = []
+    for filename in files:
         try:
-            with open(df) as f:
+            with open(filename) as f:
                 data = json.load(f)
-                settings.append([df,
+                key_list, val_list = dict_flatten(data['test'])
+                settings.append([filename,
                                  data['encodedfile'],
-                                 data['settings']['codec'],
-                                 data['settings']['gop'],
-                                 data['settings']['fps'],
-                                 data['settings']['width'],
-                                 data['settings']['height'],
-                                 data['settings']['bitrate'],
-                                 data['settings']['meanbitrate']])
+                                 *val_list,
+                                 data['meanbitrate']])
         except Exception as exc:
-            print('json ' + df + ', load failed: ' + str(exc))
+            print('json ' + filename + ', load failed: ' + str(exc))
 
-    labels = ['file', 'media', 'codec', 'gop', 'fps', 'width', 'height',
-              'bitrate', 'real_bitrate']
+    labels = ['filename', 'encodedfile'] + key_list + ['meanbitrate']
     pdata = pd.DataFrame.from_records(settings, columns=labels,
                                       coerce_float=True)
     pdata.to_csv(f'{options.path}/{INDEX_FILE_NAME}', index=False)
 
 
 def getData(options, recursive):
+    index_filename = f'{options.path}/{INDEX_FILE_NAME}'
     try:
-        data = pd.read_csv(f'{options.path}/{INDEX_FILE_NAME}')
+        data = pd.read_csv(index_filename)
     except Exception:
-        sys.stderr.write('Error when reading index, reindex\n')
+        if not os.path.exists(index_filename):
+            sys.stderr.write(f'Warning: Recreating {index_filename}\n')
+        else:
+            sys.stderr.write(f'Error when reading {index_filename}, reindex\n')
         indexDirectory(options, recursive)
         try:
-            data = pd.read_csv(f'{options.path}/{INDEX_FILE_NAME}')
+            data = pd.read_csv(index_filename)
         except Exception:
-            sys.stderr.write('Failed to read index file: '
-                             f'{options.path}/{INDEX_FILE_NAME}')
+            sys.stderr.write(f'Failed to read index file: {index_filename}')
             exit(-1)
     return data
 
 
 def search(options):
     data = getData(options, not options.no_rec)
-    data['bitrate'] = data['bitrate'].apply(lambda x: encapp.convert_to_bps(x))
+    data['configure.bitrate'] = data['configure.bitrate'].apply(
+        lambda x: encapp.convert_to_bps(x))
     if options.codec:
         data = data.loc[data['codec'].str.contains(options.codec)]
     if options.bitrate:
@@ -104,22 +121,22 @@ def search(options):
             vals.append(int(bitrate))
 
         if len(vals) == 2:
-            data = data.loc[(data['bitrate'] >= vals[0]) &
-                            (data['bitrate'] <= vals[1])]
+            data = data.loc[(data['configure.bitrate'] >= vals[0]) &
+                            (data['configure.bitrate'] <= vals[1])]
         else:
-            data = data.loc[data['bitrate'] == vals[0]]
+            data = data.loc[data['configure.bitrate'] == vals[0]]
     if options.gop:
-        data = data.loc[data['gop'] == options.gop]
+        data = data.loc[data['configure.iFrameInterval'] == options.gop]
     if options.fps:
-        data = data.loc[data['fps'] == options.fps]
+        data = data.loc[data['configure.framerate'] == options.fps]
     if options.size:
         sizes = options.size.split('x')
         if len(sizes) == 2:
-            data = data.loc[(data['width'] == int(sizes[0])) &
-                            (data['height'] == int(sizes[1]))]
+            data = data.loc[(data['configure.width'] == int(sizes[0])) &
+                            (data['configure.height'] == int(sizes[1]))]
         else:
-            data = data.loc[(data['width'] == int(sizes[0])) |
-                            (data['height'] == int(sizes[0]))]
+            data = data.loc[(data['configure.width'] == int(sizes[0])) |
+                            (data['configure.height'] == int(sizes[0]))]
 
     return data
 
@@ -149,26 +166,31 @@ def main():
         indexDirectory(options, not options.no_rec)
 
     data = search(options)
-
-    data = data.sort_values(by=['codec', 'gop', 'fps', 'height', 'bitrate'])
+    data = data.sort_values(by=[
+        'configure.codec',
+        'configure.iFrameInterval',
+        'configure.framerate',
+        'configure.height',
+        'configure.bitrate',
+    ])
     if options.print_data:
         for _index, row in data.iterrows():
             print('{:s},{:s},{:s},{:d},{:d},{:d},{:d},{:d},{:d}'.format(
-                  row['file'],
-                  row['media'],
-                  row['codec'],
-                  row['gop'],
-                  row['fps'],
-                  row['width'],
-                  row['height'],
-                  row['bitrate'],
-                  row['real_bitrate']))
+                  row['filename'],
+                  row['encodedfile'],
+                  row['configure.codec'],
+                  row['configure.iFrameInterval'],
+                  row['configure.framerate'],
+                  row['configure.width'],
+                  row['configure.height'],
+                  row['configure.bitrate'],
+                  row['meanbitrate']))
     else:
-        files = data['file'].values
+        files = data['filename'].values
         for fl in files:
             directory, filename = os.path.split(fl)
             if options.video:
-                video = data.loc[data['file'] == fl]
+                video = data.loc[data['filename'] == fl]
                 name = directory + '/' + video['media'].values[0]
             else:
                 name = fl

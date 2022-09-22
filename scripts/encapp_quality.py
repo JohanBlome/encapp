@@ -6,6 +6,7 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
+import csv
 import json
 import sys
 import argparse
@@ -16,19 +17,7 @@ import encapp
 
 PSNR_RE = 'average:([0-9.]*)'
 SSIM_RE = 'SSIM Y:([0-9.]*)'
-FFMPEG_SILENT = 'ffmpeg  -hide_banner -loglevel error -y '
-
-extra_settings = {
-    'media_path': None,
-    'override_reference': None,
-    'pix_fmt': None,
-    'reference_resolution': None,
-    'fr_fr': False,
-    'fr_lr': False,
-    'lr_lr': False,
-    'lr_fr': False,
-    'recalc': False,
-}
+FFMPEG_SILENT = 'ffmpeg -hide_banner -y '
 
 
 def parse_quality(vmaf_file, ssim_file, psnr_file):
@@ -65,9 +54,9 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
     return vmaf, ssim, psnr
 
 
-def get_media_props(mediapath):
+def get_media_props(mediapath, debug):
     status, std_out, std_err = encapp_tool.adb_cmds.run_cmd(
-        f'ffprobe {mediapath}')
+        f'ffprobe {mediapath}', debug)
     resolution = None
     if status:
         print(f'std_out = {std_out}, err = {std_err}')
@@ -78,68 +67,69 @@ def get_media_props(mediapath):
     return resolution
 
 
-def run_quality(test_file, optionals):
+def run_quality(test_file, override_settings, debug):
     """Compare the output found in test_file with the source/reference
        found in options.media directory or overriden
     """
     with open(test_file, 'r') as input_file:
-        test = json.load(input_file)
+        results = json.load(input_file)
 
-    source = optionals['media_path'] + '/' + test.get('sourcefile')
-    if len(optionals['override_reference']) > 0:
-        source = optionals['override_reference']
+    source = override_settings['media_path'] + '/' + results.get('sourcefile')
+    if override_settings['override_reference'] is not None:
+        source = override_settings['override_reference']
 
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 
     # Assume encoded file in same directory as test result json file
     directory, _ = os.path.split(test_file)
-    encodedfile = directory + '/' + test.get('encodedfile')
+    encodedfile = directory + '/' + results.get('encodedfile')
 
     vmaf_file = f'{encodedfile}.vmaf'
     ssim_file = f'{encodedfile}.ssim'
     psnr_file = f'{encodedfile}.psnr'
 
-    settings = test.get('settings')
-    fps = settings.get('fps')
-    if (
-        os.path.exists(vmaf_file)
-        and os.path.exists(ssim_file)
-        and os.path.exists(psnr_file)
-        and not optionals['recalc']
-    ):
+    test = results.get('test')
+    fps = test.get('configure').get('framerate')
+    if (os.path.exists(vmaf_file)
+            and os.path.exists(ssim_file)
+            and os.path.exists(psnr_file)
+            and not override_settings['recalc']):
         print(
             'All quality indicators already calculated for media, '
             f'{vmaf_file}')
     else:
-        input_media_format = test.get('decoder_media_format')
+        input_media_format = results.get('decoder_media_format')
         raw = True
-        pix_fmt = optionals['pix_fmt']
+
+        pix_fmt = test['input']['pixFmt']
+        if override_settings['pix_fmt'] is not None:
+            pix_fmt = override_settings['pix_fmt']
 
         if isinstance(input_media_format, str):
             # surface mode
             raw = False
         else:
-            input_media_format = test.get('encoder_media_format')
+            input_media_format = results.get('encoder_media_format')
         if len(pix_fmt) == 0:
             # See if source contains a clue
             pix_fmt = 'yuv420p'
             if source.find('nv12') > -1:
                 pix_fmt = 'nv12'
 
-        output_media_format = test.get('encoder_media_format')
+        output_media_format = results.get('encoder_media_format')
         output_width = output_media_format.get('width')
         output_height = output_media_format.get('height')
 
         output_res = f'{output_width}x{output_height}'
-        media_res = get_media_props(encodedfile)
+        media_res = get_media_props(encodedfile, debug)
         if output_res != media_res:
             print('Warning. Discrepancy in resolutions for output')
             print(f'Json {output_res}, media {media_res}')
             output_res = media_res
 
-        if len(optionals['reference_resolution']) > 0:
-            input_res = optionals['reference_resolution']
+        if override_settings['reference_resolution'] is not None:
+            input_res = override_settings['reference_resolution']
         else:
             try:
                 input_width = int(input_media_format.get('width'))
@@ -165,13 +155,13 @@ def run_quality(test_file, optionals):
         shell_cmd = ''
 
         force_scale = ''
-        if optionals['fr_fr']:
+        if override_settings['fr_fr']:
             force_scale = 'scale=in_range=full:out_range=full[o];[o]'
-        if optionals['fr_lr']:
+        if override_settings['fr_lr']:
             force_scale = 'scale=in_range=full:out_range=limited[o];[o]'
-        if optionals['lr_lr']:
+        if override_settings['lr_lr']:
             force_scale = 'scale=in_range=limited:out_range=limited[o];[o]'
-        if optionals['lr_fr']:
+        if override_settings['lr_fr']:
             force_scale = 'scale=in_range=limited:out_range=full[o];[o]'
 
         if input_res != output_res:
@@ -183,7 +173,7 @@ def run_quality(test_file, optionals):
                 f'-pix_fmt {pix_fmt} -s {input_res} {distorted}'
             )
 
-            encapp_tool.adb_cmds.run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         if raw:
             ref_part = (
                 f'-f rawvideo -pix_fmt {pix_fmt} -s {input_res} '
@@ -202,7 +192,8 @@ def run_quality(test_file, optionals):
             dist_part = f'-r {fps} -i {distorted} '
 
         # Do calculations
-        if optionals['recalc'] or not os.path.exists(vmaf_file):
+        if override_settings['recalc'] or not os.path.exists(vmaf_file):
+
             # important: vmaf must be called with videos in the right order
             # <distorted_video> <reference_video>
             # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
@@ -212,29 +203,29 @@ def run_quality(test_file, optionals):
                 f'"{force_scale}libvmaf=log_path={vmaf_file}:'
                 'n_threads=16:log_fmt=json" -report -f null - 2>&1 '
             )
-            encapp_tool.adb_cmds.run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f'vmaf already calculated for media, {vmaf_file}')
 
-        if optionals['recalc'] or not os.path.exists(ssim_file):
+        if override_settings['recalc'] or not os.path.exists(ssim_file):
             shell_cmd = (
                 f'ffmpeg {dist_part} {ref_part} '
                 '-filter_complex '
                 f'"{force_scale}ssim=stats_file={ssim_file}.all" '
                 f'-f null - 2>&1 | grep SSIM > {ssim_file}'
             )
-            encapp_tool.adb_cmds.run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f'ssim already calculated for media, {ssim_file}')
 
-        if optionals['recalc'] or not os.path.exists(psnr_file):
+        if override_settings['recalc'] or not os.path.exists(psnr_file):
             shell_cmd = (
                 f'ffmpeg {dist_part} {ref_part} '
                 '-filter_complex '
                 f'"{force_scale}psnr=stats_file={psnr_file}.all" '
                 f'-f null - 2>&1 | grep PSNR > {psnr_file}'
             )
-            encapp_tool.adb_cmds.run_cmd(shell_cmd)
+            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f'psnr already calculated for media, {psnr_file}')
 
@@ -248,16 +239,22 @@ def run_quality(test_file, optionals):
         # ssim,psnr,file
         file_size = os.stat(encodedfile).st_size
         data = (
-            f'{encodedfile}, {settings.get("codec")}, '
-            f'{settings.get("gop")}, '
-            f'{settings.get("fps")}, {settings.get("width")}, '
-            f'{settings.get("height")}, '
-            f'{encapp.convert_to_bps(settings.get("bitrate"))}, '
-            f'{settings.get("meanbitrate")}, '
-            f'{file_size}, {vmaf}, {ssim}, {psnr}, {test_file}\n'
+            f'{encodedfile}',
+            f'{test.get("configure").get("codec")}',
+            f'{test.get("configure").get("iFrameInterval")}',
+            f'{test.get("configure").get("framerate")}',
+            f'{test.get("configure").get("resolution").split("x")[0]}',
+            f'{test.get("configure").get("resolution").split("x")[1]}',
+            f'{encapp.convert_to_bps(test.get("configure").get("bitrate"))}',
+            f'{results.get("meanbitrate")}',
+            f'{file_size}',
+            f'{vmaf}',
+            f'{ssim}',
+            f'{psnr}',
+            f'{test_file}',
         )
         return data
-    return None
+    return []
 
 
 def get_options(argv):
@@ -265,17 +262,29 @@ def get_options(argv):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
-
-    parser.add_argument('test', nargs='*', help='Test result in JSON format.')
+    parser.add_argument(
+        '-d', '--debug', action='count',
+        dest='debug', default=0,
+        help='Increase verbosity (use multiple times for more)',)
+    parser.add_argument(
+        '--quiet', action='store_const',
+        dest='debug', const=-1,
+        help='Zero verbosity',)
+    parser.add_argument(
+        'test', nargs='*', help='Test result in JSON format.')
     parser.add_argument(
         '-o',
         '--output',
         help='csv output',
         default='quality.csv')
-    parser.add_argument('--media', help='Media directory', default='')
     parser.add_argument(
-        '--pix_fmt', help=f'pixel format ({encapp.PIX_FMT_TYPES})', default=''
-    )
+        '--media',
+        dest='media_path',
+        help='Media directory',
+        default=None)
+    parser.add_argument(
+        '--pix_fmt', help=f'pixel format ({encapp.PIX_FMT_TYPES})',
+        default=None)
     parser.add_argument(
         '-ref',
         '--override_reference',
@@ -283,48 +292,53 @@ def get_options(argv):
             'Override reference, used when source is downsampled prior to '
             'encoding'
         ),
-        default='',
-    )
+        default=None)
     parser.add_argument(
         '-ref_res',
         '--reference_resolution',
         help='Overriden reference resolution WxH',
-        default='',
-    )
+        default=None)
     parser.add_argument(
         '--header',
         help='print header to output',
-        action='store_true')
+        action='store_true',
+        default=False)
     parser.add_argument(
         '--fr_fr',
         help=('force full range to full range on distorted file'),
         action='store_true',
-    )
+        default=False)
     parser.add_argument(
         '--lr_fr',
         help='force lr range to full range on distorted file',
         action='store_true',
-    )
+        default=False)
     parser.add_argument(
         '--lr_lr',
         help=('force limited range to limited range on distorted file'),
         action='store_true',
-    )
+        default=False)
     parser.add_argument(
         '--fr_lr',
         help=('force full range to limited range on distorted file'),
         action='store_true',
-    )
+        default=False)
     parser.add_argument(
         '--recalc', help='recalculate regardless of status',
-        action='store_true'
-    )
+        action='store_true',
+        default=False)
 
     options = parser.parse_args()
 
     if len(argv) == 1:
         parser.print_help()
         sys.exit()
+
+    # make sure media_path holds a valid directory
+    assert os.path.isdir(options.media_path), (
+        f'Error: {options.media_path} not a valid directory')
+    assert os.access(options.media_path, os.R_OK), (
+        f'Error: {options.media_path} not a readable directory')
 
     return options
 
@@ -335,28 +349,41 @@ def main(argv):
     """
     options = get_options(argv)
 
-    with open(options.output, 'a') as output:
-        if options.header:
-            output.write(
-                'media,codec,gop,fps,width,height,'
-                'bitrate,real_bitrate,size,vmaf,ssim,'
-                'psnr,file\n'
-            )
-        settings = extra_settings
-        settings['media_path'] = options.media
-        settings['override_reference'] = options.override_reference
-        settings['pix_fmt'] = options.pix_fmt
-        settings['reference_resolution'] = options.reference_resolution
-        settings['fr_fr'] = options.fr_fr
-        settings['fr_lr'] = options.fr_lr
-        settings['lr_lr'] = options.lr_lr
-        settings['lr_fr'] = options.lr_fr
-        settings['recalc'] = options.recalc
+    FIELD_LIST = [
+        'media',
+        'codec',
+        'gop',
+        'fps',
+        'width',
+        'height',
+        'bitrate',
+        'real_bitrate',
+        'size',
+        'vmaf',
+        'ssim',
+        'psnr',
+        'file'
+    ]
 
+    with open(options.output, 'a') as fd:
+        writer = csv.writer(fd)
+        if options.header:
+            writer.writerow(FIELD_LIST)
+        override_settings = {
+            'media_path': options.media_path,
+            'override_reference': options.override_reference,
+            'pix_fmt': options.pix_fmt,
+            'reference_resolution': options.reference_resolution,
+            'fr_fr': options.fr_fr,
+            'fr_lr': options.fr_lr,
+            'lr_lr': options.lr_lr,
+            'lr_fr': options.lr_fr,
+            'recalc': options.recalc,
+        }
         for test in options.test:
-            data = run_quality(test, settings)
-            if data is not None:
-                output.write(data)
+            data_list = run_quality(test, override_settings, options.debug)
+            if data_list is not None:
+                writer.writerow(data_list)
 
 
 if __name__ == '__main__':
