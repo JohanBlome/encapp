@@ -196,8 +196,8 @@ def parse_log(log, local_workdir):
             print('\n\n**********')
             failed = True
     logcat_filepath = f'{local_workdir}/logcat.txt'
-    with open(logcat_filepath, 'w') as fd:
-        fd.write(log)
+    with open(logcat_filepath, 'wb') as fd:
+        fd.write(log.encode('utf8'))
     if failed:
         print(f'logcat has been saved to "{logcat_filepath}"')
 
