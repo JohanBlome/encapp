@@ -59,8 +59,17 @@ def run_quality(test_file, override_settings, debug):
     """Compare the output found in test_file with the source/reference
        found in options.media_path directory or overriden
     """
+    # read test file results
     with open(test_file, 'r') as input_file:
         results = json.load(input_file)
+
+    # read device info results
+    device_info_file = os.path.join(os.path.dirname(test_file), 'device.json')
+    if os.path.exists(device_info_file):
+        with open(device_info_file, 'r') as input_file:
+            device_info = json.load(input_file)
+    else:
+        device_info = {}
 
     # find the reference source
     reference_dirname = override_settings['media_path']
@@ -233,8 +242,14 @@ def run_quality(test_file, override_settings, debug):
         # media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,
         # ssim,psnr,file
         file_size = os.stat(encodedfile).st_size
+        model = device_info.get('props', {}).get('ro.product.model', '')
+        platform = device_info.get('props', {}).get('ro.board.platform', '')
+        serial = device_info.get('props', {}).get('ro.serialno', '')
         data = (
             f'{encodedfile}',
+            f'{model}',
+            f'{platform}',
+            f'{serial}',
             f'{test.get("configure").get("codec")}',
             f'{test.get("configure").get("iFrameInterval")}',
             f'{test.get("configure").get("framerate")}',
@@ -347,6 +362,9 @@ def main(argv):
 
     FIELD_LIST = [
         'media',
+        'model',
+        'platform',
+        'serial',
         'codec',
         'gop',
         'fps',
