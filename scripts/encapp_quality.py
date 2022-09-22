@@ -201,7 +201,7 @@ def run_quality(test_file, override_settings, debug):
                 f'{FFMPEG_SILENT} {dist_part} {ref_part} '
                 '-filter_complex '
                 f'"{force_scale}libvmaf=log_path={vmaf_file}:'
-                'n_threads=16:log_fmt=json" -report -f null - 2>&1 '
+                'n_threads=16:log_fmt=json" -f null - 2>&1 '
             )
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
