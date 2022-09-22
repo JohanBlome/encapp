@@ -47,11 +47,11 @@ default_values = {
     'debug': 0,
     'func': 'help',
     'device_workdir': '/sdcard',
+    'local_workdir': None,
     'install': False,
     'videofile': None,
     'configfile': None,
     'encoder': None,
-    'output': None,
     'bps': None,
 }
 
@@ -477,9 +477,8 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
 def codec_test(options, model, serial, debug):
     print(f'codec test: {options}')
     # get the local working directory (at the host)
-    if options.output is not None:
-        local_workdir = options.output
-    else:
+    local_workdir = options.local_workdir
+    if local_workdir is None:
         now = datetime.datetime.now()
         dt_string = now.strftime('%Y%m%d_%H%M%S')
         local_workdir = (f'{options.desc.replace(" ", "_")}'
@@ -571,15 +570,15 @@ def get_options(argv):
         metavar='device_workdir',
         help='work (storage) directory on device',)
     parser.add_argument(
+        '--local-workdir', type=str, dest='local_workdir',
+        default=default_values['local_workdir'],
+        metavar='local_workdir',
+        help='work (storage) directory on local host',)
+    parser.add_argument(
         'configfile', type=str, nargs='?',
         default=default_values['configfile'],
         metavar='input-config-file',
         help='input configuration file',)
-    parser.add_argument(
-        'output', type=str, nargs='?',
-        default=default_values['output'],
-        metavar='output',
-        help='output dir or file',)
 
     options = parser.parse_args(argv[1:])
     options.desc = 'testing'
