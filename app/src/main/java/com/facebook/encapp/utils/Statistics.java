@@ -275,6 +275,8 @@ public class Statistics {
             //json.put("test", mTest.getCommon().getDescription());
             String jsonStr = JsonFormat.printer().includingDefaultValueFields().print(mTest);
             json.put("test", new JSONObject(jsonStr));
+            // add environment
+            json.put("environment", new JSONObject(System.getenv()));
             // derived test configuration items
             json.put("codec", mCodec);
             json.put("meanbitrate", getAverageBitrate());
