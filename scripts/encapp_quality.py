@@ -312,7 +312,7 @@ def get_options(argv):
         default=None,
     )
     parser.add_argument(
-        "--pix_fmt", help=f"pixel format ({encapp.PIX_FMT_TYPES})", default=None
+        "--pix_fmt", help=f"pixel format ({encapp.PIX_FMT_TYPES.keys()})", default=None
     )
     parser.add_argument(
         "-ref",
