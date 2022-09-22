@@ -54,20 +54,7 @@ default_values = {
     'bps': None,
 }
 
-extra_settings = {
-    'videofile': None,
-    'configfile': None,
-    'encoder': None,
-    'output': None,
-    'bitrate': None,
-    'desc': 'encapp',
-    'inp_resolution': None,
-    'out_resolution': None,
-    'inp_framerate': None,
-    'out_framerate': None,
-}
-
-RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.raw')
+RAW_EXTENSION_LIST = ('.yuv', '.rgb', '.rgba', '.raw')
 OPERATION_TYPES = ('batch', 'realtime')
 PIX_FMT_TYPES = ('yuv420p', 'nv12', 'rgba')
 KNOWN_CONFIGURE_TYPES = {
@@ -256,7 +243,7 @@ def add_media_files(test):
 
 
 def run_codec_tests_file(protobuf_txt_file, model, serial, local_workdir,
-                         settings, debug):
+                         options, debug):
     print(f'reading test: {protobuf_txt_file}')
     test_suite = tests_definitions.TestSuite()
     with open(protobuf_txt_file, 'rb') as fd:
@@ -264,9 +251,10 @@ def run_codec_tests_file(protobuf_txt_file, model, serial, local_workdir,
         # test_suite.ParseFromString(fd.read())
     print(f'updating test: {protobuf_txt_file}')
     test_suite, files_to_push, protobuf_txt_filepath = update_codec_tests(
-        test_suite, local_workdir, settings)
+        test_suite, local_workdir, options.device_workdir, options.replace)
     return run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath,
-                           model, serial, local_workdir, settings, debug)
+                           model, serial, local_workdir,
+                           options.device_workdir, debug)
 
 
 def abort_test(local_workdir, message):
@@ -300,43 +288,21 @@ def parse_bitrate_field(bitrate):
 # Update a set of tests with the CLI arguments.
 # Note that update may include adding new tests (e.g. if bitrate is
 # defined as a (from, to, step) tuple instead of a single value).
-def update_codec_tests(test_suite, local_workdir, settings):
+def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
     # 1. update the tests with the CLI parameters
     updated_test_suite = tests_definitions.TestSuite()
     tests_id = None
+    # 1.1. replace the parameters that create multiple tests
+    # 1.1.1. process configure.bitrate
     for test in test_suite.test:
         # save the main test id
         if tests_id is None:
             tests_id = test.common.id
-        # update values from CLI options
-        if settings['encoder'] is not None and len(settings['encoder']) > 0:
-            test.configure.codec = settings['encoder']
-        if (settings['inp_resolution'] is not None and
-                len(settings['inp_resolution']) > 0):
-            test.input.resolution = settings['inp_resolution']
-        if (settings['out_resolution'] is not None and
-                len(settings['out_resolution']) > 0):
-            test.configure.resolution = settings['out_resolution']
-        if settings['inp_framerate'] is not None:
-            test.input.framerate = settings['inp_framerate']
-        if settings['out_framerate'] is not None:
-            test.configure.framerate = settings['out_framerate']
-        # update the video file
-        videofile = settings['videofile']
-        if videofile is not None and len(videofile) > 0:
-            # we want to replace the video (input.filepath) everywhere
-            if (not os.path.exists(videofile) or
-                    not os.access(videofile, os.R_OK)):
-                abort_test(local_workdir,
-                           f'file {videofile} does not exist/is not readable')
-            # verify video resolution
-            if not verify_video_size(videofile, test.input.resolution):
-                abort_test(local_workdir,
-                           f'file {videofile} does not match '
-                           f'{test.input.resolution}')
-        # update the bitrate
-        if settings['bitrate'] is not None and len(settings['bitrate']) > 0:
-            bitrate_list = parse_bitrate_field(settings['bitrate'])
+        # replace values from CLI options
+        bitrate_str = replace.get('configure', {}).get('bitrate', '')
+        if bitrate_str:
+            # update the bitrate
+            bitrate_list = parse_bitrate_field(bitrate_str)
             for bitrate in bitrate_list:
                 # create a new test with the new bitrate
                 ntest = tests_definitions.Test()
@@ -344,10 +310,23 @@ def update_codec_tests(test_suite, local_workdir, settings):
                 ntest.common.id = test.common.id + f'.{bitrate}'
                 ntest.configure.bitrate = str(bitrate)
                 updated_test_suite.test.extend([ntest])
+    test_suite = updated_test_suite
+
+    # 1.2. replace the parameters that do not create multiple tests
+    for test in test_suite.test:
+        for k1 in replace:
+            for k2, val in replace[k1].items():
+                if (k1, k2) == ('configure', 'bitrate'):
+                    # already processed
+                    continue
+                if not test.HasField(k1):
+                    # create the Message field
+                    getattr(test, k1).SetInParent()
+                setattr(getattr(test, k1), k2, val)
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
-    for test in updated_test_suite.test:
+    for test in test_suite.test:
         files_to_push |= add_media_files(test)
 
     # 3. save the media files
@@ -358,12 +337,12 @@ def update_codec_tests(test_suite, local_workdir, settings):
         shutil.copy2(filepath, local_workdir + '/')
 
     # 4. update all the file paths to the remote workdir
-    for test in updated_test_suite.test:
-        update_file_paths(test, settings['device_workdir'])
+    for test in test_suite.test:
+        update_file_paths(test, device_workdir)
 
     # 5. save the full protobuf text file(s)
     if False:  # one pbtxt file per subtest
-        for test in updated_test_suite.test:
+        for test in test_suite.test:
             output_dir = f'{local_workdir}/{test.common.id}'
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
@@ -374,11 +353,11 @@ def update_codec_tests(test_suite, local_workdir, settings):
     else:  # one pbtxt for all tests
         protobuf_txt_filepath = f'{local_workdir}/{tests_id}.pbtxt'
         with open(protobuf_txt_filepath, 'w') as f:
-            f.write(text_format.MessageToString(updated_test_suite))
+            f.write(text_format.MessageToString(test_suite))
         files_to_push |= {protobuf_txt_filepath}
 
     # print(f'files to push: {files_to_push}')
-    return updated_test_suite, files_to_push, protobuf_txt_filepath
+    return test_suite, files_to_push, protobuf_txt_filepath
 
 
 def push_file_to_device(filepath, serial, device_workdir, debug):
@@ -391,12 +370,11 @@ def push_file_to_device(filepath, serial, device_workdir, debug):
 
 
 def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
-                    serial, local_workdir, settings, debug):
+                    serial, local_workdir, device_workdir, debug):
     print(f'running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))')
     os.makedirs(local_workdir, exist_ok=True)
 
     # push all the files to the device workdir
-    device_workdir = settings['device_workdir']
     for filepath in files_to_push:
         if not push_file_to_device(filepath, serial, device_workdir, debug):
             abort_test(local_workdir, 'Check file paths and try again')
@@ -415,7 +393,7 @@ def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
 
     # collect the test results
     return collect_results(local_workdir, protobuf_txt_filepath, serial,
-                           settings['device_workdir'], debug)
+                           device_workdir, debug)
 
 
 def list_codecs(serial, model, device_workdir, debug=0):
@@ -507,19 +485,19 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
     assert ret == 0, f'ERROR: {stderr}'
 
 
-def codec_test(settings, model, serial, debug):
-    print(f'codec test: {settings}')
+def codec_test(options, model, serial, debug):
+    print(f'codec test: {options}')
     # get the local working directory (at the host)
-    if settings['output'] is not None:
-        local_workdir = settings['output']
+    if options.output is not None:
+        local_workdir = options.output
     else:
         now = datetime.datetime.now()
         dt_string = now.strftime('%Y%m%d_%H%M%S')
-        local_workdir = (f'{settings["desc"].replace(" ", "_")}'
+        local_workdir = (f'{options.desc.replace(" ", "_")}'
                          f'_{model}_{dt_string}')
 
     # check the protobuf text is correct
-    protobuf_txt_file = settings['configfile']
+    protobuf_txt_file = options.configfile
     check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug)
 
     # run the codec test
@@ -527,7 +505,7 @@ def codec_test(settings, model, serial, debug):
                                 model,
                                 serial,
                                 local_workdir,
-                                settings,
+                                options,
                                 debug)
 
 
@@ -562,16 +540,29 @@ def get_options(argv):
         metavar='%s' % (' | '.join('{}: {}'.format(k, v) for k, v in
                                    FUNC_CHOICES.items())),
         help='function arg',)
+
+    # generic replacement mechanism
+    class ReplaceAction(argparse.Action):
+        def __call__(self, parser, options, values, option_string=None):
+            if options.replace is None:
+                options.replace = {}
+            # make sure there is 1 and only 1 separator
+            assert values[0].count('.') == 1, (
+                f'invalid replace key: {values[0]}')
+            k1, k2 = values[0].split('.')
+            if k1 not in options.replace:
+                options.replace[k1] = {}
+            options.replace[k1][k2] = values[1]
+    parser.add_argument(
+        '-e', '--replace', action=ReplaceAction, nargs=2,
+        help='use <key> <value>',)
+
+    # replacement shortcuts
     parser.add_argument(
         '-i', type=str, dest='videofile',
         default=default_values['videofile'],
         metavar='input-video-file',
         help='input video file',)
-    parser.add_argument(
-        '--device-workdir', type=str, dest='device_workdir',
-        default=default_values['device_workdir'],
-        metavar='device_workdir',
-        help='work (storage) directory on device',)
     parser.add_argument(
         '-c', '--codec', type=str, dest='codec',
         default=default_values['encoder'],
@@ -584,6 +575,12 @@ def get_options(argv):
         help='input video bitrate. Can be a single number '
         '(e.g. "100 kbps"), a list (e.g. "100kbps,200kbps") or a range '
         '(e.g. "100k-1M-100k") (start-stop-step)',)
+    # other parameters
+    parser.add_argument(
+        '--device-workdir', type=str, dest='device_workdir',
+        default=default_values['device_workdir'],
+        metavar='device_workdir',
+        help='work (storage) directory on device',)
     parser.add_argument(
         'configfile', type=str, nargs='?',
         default=default_values['configfile'],
@@ -608,6 +605,32 @@ def get_options(argv):
     if options.serial is None and 'ANDROID_SERIAL' in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ['ANDROID_SERIAL']
+
+    # process replacement shortcuts
+    SHORTCUT_LIST = {
+        # '-i', type=str, dest='videofile',
+        'videofile': 'input.filepath',
+        # '-c', '--codec', type=str, dest='codec',
+        'codec': 'configure.codec',
+        # '-r', '--bitrate', type=str, dest='bitrate',
+        'bitrate': 'configure.bitrate',
+    }
+    for key, val in SHORTCUT_LIST.items():
+        if vars(options)[key] is not None:
+            # shortcut was defined
+            k1, k2 = val.split('.')
+            if k1 not in options.replace:
+                options.replace[k1] = {}
+            options.replace[k1][k2] = vars(options)[key]
+            # remove the old value
+            delattr(options, key)
+    # check the validity of some parameters
+    if options.replace.get('input', {}).get('filepath', ''):
+        videofile = options.replace.get('input', {}).get('filepath', '')
+        assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
+            f'file {videofile} does not exist'
+            if os.path.exists(videofile) else
+            f'file {videofile} is not readable')
 
     global DEBUG
     DEBUG = options.debug > 0
@@ -678,24 +701,18 @@ def main(argv):
         print('version: %s' % encapp_tool.__version__)
         sys.exit(0)
 
-    videofile_config = {}
-    if (options.videofile is not None and
-            options.videofile != 'camera'):
-        videofile_config = get_video_info(options.videofile)  # noqa: F841
+    # derived replace values
+    if 'input' in options.replace and 'filepath' in options.replace['input']:
+        input_filepath = options.replace['input']['filepath']
+        if input_filepath != 'camera' and not video_is_raw(input_filepath):
+            # TODO(chema): process compressed video
+            # videofile_config = get_video_info(input_filepath)
+            pass
 
     # get model and serial number
     model, serial = encapp_tool.adb_cmds.get_device_info(
         options.serial, options.debug)
     remove_encapp_gen_files(serial, options.device_workdir, options.debug)
-
-    # TODO(chema): fix this
-    if type(model) is dict:
-        if 'model' in model:
-            model = model.get('model')
-        else:
-            model = list(model.values())[0]
-    if options.debug > 0:
-        print(f'model = {model}')
 
     # install app
     if options.func == 'install' or options.install:
@@ -723,18 +740,7 @@ def main(argv):
         # ensure there is an input configuration
         assert options.configfile is not None, (
             'error: need a valid input configuration file')
-
-        settings = extra_settings
-        settings['configfile'] = options.configfile
-        settings['videofile'] = options.videofile
-        settings['encoder'] = options.codec
-        settings['encoder'] = options.codec
-        settings['output'] = options.output
-        settings['bitrate'] = options.bitrate
-        settings['desc'] = options.desc
-        settings['device_workdir'] = options.device_workdir
-
-        result = codec_test(settings, model, serial, options.debug)
+        result = codec_test(options, model, serial, options.debug)
         verify_app_version(result)
 
 
