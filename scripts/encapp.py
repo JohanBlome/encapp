@@ -475,7 +475,7 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
             not os.access(protobuf_txt_file, os.R_OK)):
         abort_test(local_workdir, 'ERROR: invalid test file name')
     # use a temp file for the binary output
-    _, protobuf_bin_file = tempfile.mkstemp(dir='/tmp')
+    _, protobuf_bin_file = tempfile.mkstemp(dir=tempfile.gettempdir())
     cmd = (f'protoc -I {protobuf_txt_file} --encode="TestSuite" '
            f'{protobuf_bin_file}')
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
