@@ -12,7 +12,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
     """Run sh command
 
     Args:
-        cmd (str): Command string to be executed by subprocess
+        cmd (str/list): Command string/list to be executed by subprocess
         debug (int): Debug level from 0 (No debug)
 
     Returns:
