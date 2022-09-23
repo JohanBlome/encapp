@@ -73,17 +73,29 @@ def indexDirectory(options, recursive):
     key_list = []
     for filename in files:
         try:
+            # get device data
+            device_filename = os.path.join(
+                os.path.dirname(filename), 'device.json')
+            with open(device_filename) as f:
+                device_info = json.load(f)
+            model = device_info.get('props', {}).get('ro.product.model', '')
+            platform = device_info.get('props', {}).get(
+                'ro.board.platform', '')
+            serial = device_info.get('props', {}).get('ro.serialno', '')
+            # get experiment data
             with open(filename) as f:
                 data = json.load(f)
                 key_list, val_list = dict_flatten(data['test'])
-                settings.append([filename,
+                settings.append([model, platform, serial,
+                                 filename,
                                  data['encodedfile'],
                                  *val_list,
                                  data['meanbitrate']])
         except Exception as exc:
             print('json ' + filename + ', load failed: ' + str(exc))
 
-    labels = ['filename', 'encodedfile'] + key_list + ['meanbitrate']
+    labels = (['model', 'platform', 'serial', 'filename', 'encodedfile'] +
+              key_list + ['meanbitrate'])
     pdata = pd.DataFrame.from_records(settings, columns=labels,
                                       coerce_float=True)
     pdata.to_csv(f'{options.path}/{INDEX_FILE_NAME}', index=False)
@@ -167,6 +179,7 @@ def main():
 
     data = search(options)
     data = data.sort_values(by=[
+        'model',
         'configure.codec',
         'configure.iFrameInterval',
         'configure.framerate',
