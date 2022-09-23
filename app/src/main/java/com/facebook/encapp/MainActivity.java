@@ -47,7 +47,9 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
@@ -74,9 +76,16 @@ public class MainActivity extends AppCompatActivity {
     private int mInstancesRunning = 0;
     VsyncHandler mVsyncHandler;
     final static int WAIT_TIME_MS = 5000;  // 5 secs
+    private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
 
     public static boolean isStable() {
         return mStable;
+    }
+
+    public static String getFilenameExtension(String filename) {
+        int last_dot_location = filename.lastIndexOf('.');
+        String extension = (last_dot_location == -1) ? "" : filename.substring(last_dot_location+1);
+        return extension;
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -556,8 +565,8 @@ public class MainActivity extends AppCompatActivity {
                 setupCamera(ot);
             }
 
-            if (filePath.toLowerCase(Locale.US).contains(".mp4") ||
-                    filePath.toLowerCase(Locale.US).contains(".webm")) {
+            String extension = getFilenameExtension(filePath);
+            if (VIDEO_ENCODED_EXTENSIONS.contains(extension)) {
                 // A decoder is needed
                 if (ot != null) {
                     ot.mMult = new OutputMultiplier(mVsyncHandler);
