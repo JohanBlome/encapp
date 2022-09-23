@@ -334,6 +334,10 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                     # create the Message field
                     getattr(test, k1).SetInParent()
                 setattr(getattr(test, k1), k2, val)
+        # If no surface decode and no raw input, decode to raw
+        if not test.configure.surface and test.input.filepath[-3:] != 'yuv':
+            # Placeholder for ffmpeg decode call
+            print(f'// decode {test.input.filepath}//')
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
