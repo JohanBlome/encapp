@@ -319,6 +319,8 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                 ntest.common.id = test.common.id + f'.{bitrate}'
                 ntest.configure.bitrate = str(bitrate)
                 updated_test_suite.test.extend([ntest])
+        else:
+            updated_test_suite.test.extend([test])
     test_suite = updated_test_suite
 
     # 1.2. replace the parameters that do not create multiple tests
@@ -555,7 +557,8 @@ def get_options(argv):
             options.replace[k1][k2] = values[1]
     parser.add_argument(
         '-e', '--replace', action=ReplaceAction, nargs=2,
-        help='use <key> <value>',)
+        help='use <key> <value>',
+        default={})
 
     # replacement shortcuts
     parser.add_argument(
