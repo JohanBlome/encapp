@@ -16,10 +16,12 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -43,6 +45,71 @@ public class Statistics {
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
     private String mAppVersion = "";
+
+    private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
+        MediaFormat.KEY_FRAME_RATE,
+        MediaFormat.KEY_CODECS_STRING,
+        MediaFormat.KEY_MIME,
+        MediaFormat.KEY_TEMPORAL_LAYERING
+    );
+
+    private static List<String> MEDIAFORMAT_KEY_INT_LIST = Arrays.asList(
+        MediaFormat.KEY_BITRATE_MODE,
+        MediaFormat.KEY_BIT_RATE,
+        MediaFormat.KEY_COLOR_FORMAT,
+        MediaFormat.KEY_COLOR_RANGE,
+        MediaFormat.KEY_COLOR_STANDARD,
+        MediaFormat.KEY_COLOR_TRANSFER,
+        // MediaFormat.KEY_COLOR_TRANSFER_REQUEST,  // api 31
+        MediaFormat.KEY_COMPLEXITY,
+        // MediaFormat.KEY_CROP_BOTTOM,  // api 33
+        // MediaFormat.KEY_CROP_LEFT,  // api 33
+        // MediaFormat.KEY_CROP_RIGHT,  // api 33
+        // MediaFormat.KEY_CROP_TOP,  // api 33
+        MediaFormat.KEY_ENCODER_DELAY,
+        MediaFormat.KEY_ENCODER_PADDING,
+        MediaFormat.KEY_HEIGHT,
+        MediaFormat.KEY_INTRA_REFRESH_PERIOD,
+        MediaFormat.KEY_I_FRAME_INTERVAL,
+        MediaFormat.KEY_LATENCY,
+        MediaFormat.KEY_LEVEL,
+        MediaFormat.KEY_LOW_LATENCY,
+        MediaFormat.KEY_MAX_B_FRAMES,
+        MediaFormat.KEY_MAX_HEIGHT,
+        MediaFormat.KEY_MAX_INPUT_SIZE,
+        MediaFormat.KEY_MAX_WIDTH,
+        MediaFormat.KEY_PIXEL_ASPECT_RATIO_HEIGHT,
+        MediaFormat.KEY_PIXEL_ASPECT_RATIO_WIDTH,
+        MediaFormat.KEY_PREPEND_HEADER_TO_SYNC_FRAMES,
+        MediaFormat.KEY_PRIORITY,
+        MediaFormat.KEY_PROFILE,
+        MediaFormat.KEY_QUALITY,
+        MediaFormat.KEY_ROTATION,
+        MediaFormat.KEY_SLICE_HEIGHT,
+        MediaFormat.KEY_STRIDE,
+        MediaFormat.KEY_TILE_HEIGHT,
+        MediaFormat.KEY_TILE_WIDTH,
+        // MediaFormat.KEY_VIDEO_ENCODING_STATISTICS_LEVEL,  // api 33
+        // MediaFormat.KEY_VIDEO_QP_AVERAGE,  // api 33
+        // MediaFormat.KEY_VIDEO_QP_B_MAX,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_B_MIN,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_I_MAX,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_I_MIN,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_MAX,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_MIN,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_P_MAX,  // api 31
+        // MediaFormat.KEY_VIDEO_QP_B_MIN,  // api 31
+        MediaFormat.KEY_WIDTH
+    );
+    private static List<String> MEDIAFORMAT_KEY_LONG_LIST = Arrays.asList(
+        MediaFormat.KEY_DURATION,
+        MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER
+    );
+    private static List<String> MEDIAFORMAT_KEY_FLOAT_LIST = Arrays.asList(
+        MediaFormat.KEY_CAPTURE_RATE,
+        MediaFormat.KEY_FRAME_RATE,
+        MediaFormat.KEY_MAX_FPS_TO_ENCODER
+    );
 
     public Statistics(String desc, Test test) {
         mDesc = desc;
@@ -200,42 +267,41 @@ public class Statistics {
     }
 
 
-    private JSONObject getSettingsFromMediaFormat(MediaFormat format) {
-        JSONObject mediaformat = new JSONObject();
-        if (format == null) {
-            return mediaformat;
+    private JSONObject getSettingsFromMediaFormat(MediaFormat mediaFormat) {
+        // Log.d(TAG, "mediaFormat: " + mediaFormat);
+        JSONObject json = new JSONObject();
+        if (mediaFormat == null) {
+            return json;
         }
 
         if (Build.VERSION.SDK_INT >= 29) {
-            Set<String> features = format.getFeatures();
+            Set<String> features = mediaFormat.getFeatures();
             for (String feature : features) {
                 Log.d(TAG, "MediaFormat: " + feature);
             }
 
-            Set<String> keys = format.getKeys();
-
-
+            Set<String> keys = mediaFormat.getKeys();
             for (String key : keys) {
-                int type = format.getValueTypeForKey(key);
+                int type = mediaFormat.getValueTypeForKey(key);
                 try {
                     switch (type) {
                         case MediaFormat.TYPE_BYTE_BUFFER:
-                            mediaformat.put(key, "bytebuffer");
+                            json.put(key, "bytebuffer");
                             break;
                         case MediaFormat.TYPE_FLOAT:
-                            mediaformat.put(key, format.getFloat(key));
+                            json.put(key, mediaFormat.getFloat(key));
                             break;
                         case MediaFormat.TYPE_INTEGER:
-                            mediaformat.put(key, format.getInteger(key));
+                            json.put(key, mediaFormat.getInteger(key));
                             break;
                         case MediaFormat.TYPE_LONG:
-                            mediaformat.put(key, format.getLong(key));
+                            json.put(key, mediaFormat.getLong(key));
                             break;
                         case MediaFormat.TYPE_NULL:
-                            mediaformat.put(key, "");
+                            json.put(key, "");
                             break;
                         case MediaFormat.TYPE_STRING:
-                            mediaformat.put(key, format.getString(key));
+                            json.put(key, mediaFormat.getString(key));
                             break;
                     }
                 } catch (JSONException jex) {
@@ -243,15 +309,41 @@ public class Statistics {
                 }
             }
         } else {
-            // TODO: Go through the settings
+            // go through some settings (API 28 or lower)
             try {
-                mediaformat.put(MediaFormat.KEY_FRAME_RATE, getVal(format, MediaFormat.KEY_FRAME_RATE, "unknown"));
-                mediaformat.put(MediaFormat.KEY_BITRATE_MODE, getVal(format, MediaFormat.KEY_BITRATE_MODE, "unknown"));
+                // keys containing different types
+                for (String key : MEDIAFORMAT_KEY_STRING_LIST) {
+                    if (mediaFormat.getString(key) != null) {
+                        json.put(key, mediaFormat.getString(key));
+                    }
+                }
+                for (String key : MEDIAFORMAT_KEY_INT_LIST) {
+                    try {
+                        json.put(key, mediaFormat.getInteger(key));
+                    } catch (NullPointerException e) {
+                        // key does not exist or the stored value for the key is null
+                    }
+                }
+                for (String key : MEDIAFORMAT_KEY_LONG_LIST) {
+                    try {
+                        json.put(key, mediaFormat.getLong(key));
+                    } catch (NullPointerException e) {
+                        // key does not exist or the stored value for the key is null
+                    }
+                }
+                for (String key : MEDIAFORMAT_KEY_FLOAT_LIST) {
+                    try {
+                        json.put(key, mediaFormat.getInteger(key));
+                        json.put(key, mediaFormat.getFloat(key));
+                    } catch (NullPointerException e) {
+                        // key does not exist or the stored value for the key is null
+                    }
+                }
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
-        return mediaformat;
+        return json;
     }
 
     private String getVal(MediaFormat format, String key, String val) {
