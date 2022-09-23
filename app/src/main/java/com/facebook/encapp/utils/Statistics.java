@@ -118,7 +118,6 @@ public class Statistics {
         mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();
-
     }
 
     public void setAppVersion(String mAppVersion) {

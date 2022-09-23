@@ -68,11 +68,12 @@ class BufferEncoder extends Encoder {
             mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
 
             format = TestDefinitionHelper.buildMediaFormat(test);
+            Log.d(TAG, "MediaFormat (test)");
             checkMediaFormat(format);
             setConfigureParams(test, format);
             // Needed for the buffer input. this can be either nv12, nv21 or yuv420p
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-            Log.d(TAG, "Format for encoder");
+            Log.d(TAG, "MediaFormat (configure)");
             checkMediaFormat(format);
             Log.d(TAG, "Configure: " + mCodec.getName());
             mCodec.configure(
@@ -80,7 +81,7 @@ class BufferEncoder extends Encoder {
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
-
+            Log.d(TAG, "MediaFormat (post-test)");
             checkMediaFormat(mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

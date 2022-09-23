@@ -77,7 +77,8 @@ public abstract class Encoder {
 
     public static void checkMediaFormat(MediaFormat format) {
 
-        Log.d(TAG, "Check config: version = " + Build.VERSION.SDK_INT);
+        Log.d(TAG, "checkMediaFormat");
+        Log.d(TAG, "VERSION.SDK_INT: " + Build.VERSION.SDK_INT);
         if (Build.VERSION.SDK_INT >= 29) {
             Set<String> features = format.getFeatures();
             for (String feature : features) {
@@ -89,22 +90,22 @@ public abstract class Encoder {
                 int type = format.getValueTypeForKey(key);
                 switch (type) {
                     case MediaFormat.TYPE_BYTE_BUFFER:
-                        Log.d(TAG, "MediaFormat: " + key + " - bytebuffer: " + format.getByteBuffer(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [bytebuffer] " + format.getByteBuffer(key));
                         break;
                     case MediaFormat.TYPE_FLOAT:
-                        Log.d(TAG, "MediaFormat: " + key + " - float: " + format.getFloat(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [float] " + format.getFloat(key));
                         break;
                     case MediaFormat.TYPE_INTEGER:
-                        Log.d(TAG, "MediaFormat: " + key + " - integer: " + format.getInteger(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [integer] " + format.getInteger(key));
                         break;
                     case MediaFormat.TYPE_LONG:
-                        Log.d(TAG, "MediaFormat: " + key + " - long: " + format.getLong(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [long] " + format.getLong(key));
                         break;
                     case MediaFormat.TYPE_NULL:
-                        Log.d(TAG, "MediaFormat: " + key + " - null");
+                        Log.d(TAG, "MediaFormat: " + key + ": [null]");
                         break;
                     case MediaFormat.TYPE_STRING:
-                        Log.d(TAG, "MediaFormat: " + key + " - string: " + format.getString(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [string] " + format.getString(key));
                         break;
                 }
 
