@@ -240,7 +240,7 @@ def run_quality(test_file, override_settings, debug):
         vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
 
         # media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,
-        # ssim,psnr,file
+        # ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
         model = device_info.get('props', {}).get('ro.product.model', '')
         platform = device_info.get('props', {}).get('ro.board.platform', '')
@@ -262,6 +262,7 @@ def run_quality(test_file, override_settings, debug):
             f'{ssim}',
             f'{psnr}',
             f'{test_file}',
+            f'{test.get("input").get("filepath")}',
         )
         return data
     return []
@@ -376,7 +377,8 @@ def main(argv):
         'vmaf',
         'ssim',
         'psnr',
-        'file'
+        'testfile',
+        'reference_file',
     ]
 
     with open(options.output, 'a') as fd:
