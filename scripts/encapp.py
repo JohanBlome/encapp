@@ -459,7 +459,7 @@ def convert_to_bps(value):
         else:
             # not a valid number
             raise AssertionError(f'invalid bitrate: {value}')
-    return int(value[0:index]) * mul
+    return int(float(value[0:index]) * mul)
 
 
 # convert a value (in either time or frame units) into frame units
