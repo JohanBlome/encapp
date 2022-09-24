@@ -27,6 +27,11 @@ parseBitrateFieldCases = [
         'bitrate_list': [100000],
     },
     {
+        'name': 'single float',
+        'bitrate_string': '1.5 Mbps',
+        'bitrate_list': [1500000],
+    },
+    {
         'name': 'list basic',
         'bitrate_string': '100,200',
         'bitrate_list': [100, 200],
@@ -50,6 +55,12 @@ parseBitrateFieldCases = [
         'name': 'range prefix',
         'bitrate_string': '100kbps-200kbps-50kbps',
         'bitrate_list': [100000, 150000],
+    },
+    {
+        'name': 'range prefix and float',
+        'bitrate_string': '1Mbps-4.5Mbps-0.5Mbps',
+        'bitrate_list': [1000000, 1500000, 2000000, 2500000, 3000000,
+                         3500000, 4000000],
     },
     {
         'name': 'mix 1',
