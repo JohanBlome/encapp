@@ -363,7 +363,6 @@ public class Statistics {
             json.put("id", mId);
             json.put("description", mDesc);
             // convert the test configuration to json
-            //json.put("test", mTest.getCommon().getDescription());
             String jsonStr = JsonFormat.printer().includingDefaultValueFields().print(mTest);
             json.put("test", new JSONObject(jsonStr));
             // add environment
@@ -389,7 +388,7 @@ public class Statistics {
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
-            int counter = 1;
+            int counter = 0;
             JSONArray jsonArray = new JSONArray();
 
             JSONObject obj = null;
