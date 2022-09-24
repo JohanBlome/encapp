@@ -239,12 +239,16 @@ def run_quality(test_file, override_settings, debug):
     if os.path.exists(vmaf_file):
         vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
 
-        # media,codec,gop,fps,width,height,bitrate,real_bitrate,size,vmaf,
-        # ssim,psnr,testfile,reference_file
+        # media,codec,gop,fps,width,height,bitrate,meanbitrate,calculated_bitrate,
+        # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
         model = device_info.get('props', {}).get('ro.product.model', '')
         platform = device_info.get('props', {}).get('ro.board.platform', '')
         serial = device_info.get('props', {}).get('ro.serialno', '')
+        # derive the calculated_bitrate from the actual file size
+        calculated_bitrate = int(
+            (file_size * 8 * test.get("configure").get("framerate")) /
+            results.get("framecount"))
         data = (
             f'{encodedfile}',
             f'{model}',
@@ -257,6 +261,8 @@ def run_quality(test_file, override_settings, debug):
             f'{test.get("configure").get("resolution").split("x")[1]}',
             f'{encapp.convert_to_bps(test.get("configure").get("bitrate"))}',
             f'{results.get("meanbitrate")}',
+            f'{calculated_bitrate}',
+            f'{results.get("framecount")}',
             f'{file_size}',
             f'{vmaf}',
             f'{ssim}',
@@ -372,7 +378,9 @@ def main(argv):
         'width',
         'height',
         'bitrate',
-        'real_bitrate',
+        'meanbitrate',
+        'calculated_bitrate',
+        'framecount',
         'size',
         'vmaf',
         'ssim',
