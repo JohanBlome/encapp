@@ -6,6 +6,8 @@ import android.os.Build;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 
 public class MediaCodecInfoHelper {
@@ -132,6 +134,65 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+    private static Map<Integer, String> createAndroidColorFormaNameTable() {
+        Map<Integer, String> m = new HashMap<Integer,String>();
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format12bitRGB444, "COLOR_Format12bitRGB444");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB1555, "COLOR_Format16bitARGB1555");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB4444, "COLOR_Format16bitARGB4444");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitBGR565, "COLOR_Format16bitBGR565");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitRGB565, "COLOR_Format16bitRGB565");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format18BitBGR666, "COLOR_Format18BitBGR666");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format18bitARGB1665, "COLOR_Format18bitARGB1665");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format18bitRGB666, "COLOR_Format18bitRGB666");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format19bitARGB1666, "COLOR_Format19bitARGB1666");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format24BitABGR6666, "COLOR_Format24BitABGR6666");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format24BitARGB6666, "COLOR_Format24BitARGB6666");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format24bitARGB1887, "COLOR_Format24bitARGB1887");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888, "COLOR_Format24bitBGR888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format24bitRGB888, "COLOR_Format24bitRGB888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format25bitARGB1888, "COLOR_Format25bitARGB1888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR8888, "COLOR_Format32bitABGR8888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format32bitARGB8888, "COLOR_Format32bitARGB8888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format32bitBGRA8888, "COLOR_Format32bitBGRA8888");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format8bitRGB332, "COLOR_Format8bitRGB332");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatCbYCrY, "COLOR_FormatCbYCrY");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatCrYCbY, "COLOR_FormatCrYCbY");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL16, "COLOR_FormatL16");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL2, "COLOR_FormatL2");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL24, "COLOR_FormatL24");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL32, "COLOR_FormatL32");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL4, "COLOR_FormatL4");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatL8, "COLOR_FormatL8");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatMonochrome, "COLOR_FormatMonochrome");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatRGBAFlexible, "COLOR_FormatRGBAFlexible");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatRGBFlexible, "COLOR_FormatRGBFlexible");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer10bit, "COLOR_FormatRawBayer10bit");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer8bit, "COLOR_FormatRawBayer8bit");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer8bitcompressed, "COLOR_FormatRawBayer8bitcompressed");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface, "COLOR_FormatSurface");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYCbYCr, "COLOR_FormatYCbYCr");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYCrYCb, "COLOR_FormatYCrYCb");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411PackedPlanar, "COLOR_FormatYUV411PackedPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411Planar, "COLOR_FormatYUV411Planar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible, "COLOR_FormatYUV420Flexible");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar, "COLOR_FormatYUV420PackedPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar, "COLOR_FormatYUV420PackedSemiPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar, "COLOR_FormatYUV420Planar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar, "COLOR_FormatYUV420SemiPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Flexible, "COLOR_FormatYUV422Flexible");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422PackedPlanar, "COLOR_FormatYUV422PackedPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422PackedSemiPlanar, "COLOR_FormatYUV422PackedSemiPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Planar, "COLOR_FormatYUV422Planar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422SemiPlanar, "COLOR_FormatYUV422SemiPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV444Flexible, "COLOR_FormatYUV444Flexible");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV444Interleaved, "COLOR_FormatYUV444Interleaved");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar, "COLOR_QCOM_FormatYUV420SemiPlanar");
+        m.put(MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar, "COLOR_TI_FormatYUV420PackedSemiPlanar");
+        return m;
+    }
+
+    final static Map<Integer, String> androidColorFormatNameTable = createAndroidColorFormaNameTable();
+
     public static String colorFormatsToString(int[] color_formats, int indent) {
         String tab = getIndentation(indent);
         StringBuilder str = new StringBuilder();
@@ -144,163 +205,8 @@ public class MediaCodecInfoHelper {
             indent += 1;
             tab = getIndentation(indent);
             str.append(tab + "format: " + color_format + "\n");
-            switch (color_format) {
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format12bitRGB444:
-                    str.append(tab + "name: COLOR_Format12bitRGB444\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB1555:
-                    str.append(tab + "name: COLOR_Format16bitARGB1555\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB4444:
-                    str.append(tab + "name: COLOR_Format16bitARGB4444\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format16bitBGR565:
-                    str.append(tab + "name: COLOR_Format16bitBGR565\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format16bitRGB565:
-                    str.append(tab + "name: COLOR_Format16bitRGB565\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format18BitBGR666:
-                    str.append(tab + "name: COLOR_Format18BitBGR666\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format18bitARGB1665:
-                    str.append(tab + "name: COLOR_Format18bitARGB1665\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format18bitRGB666:
-                    str.append(tab + "name: COLOR_Format18bitRGB666\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format19bitARGB1666:
-                    str.append(tab + "name: COLOR_Format19bitARGB1666\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format24BitABGR6666:
-                    str.append(tab + "name: COLOR_Format24BitABGR6666\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format24BitARGB6666:
-                    str.append(tab + "name: COLOR_Format24BitARGB6666\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format24bitARGB1887:
-                    str.append(tab + "name: COLOR_Format24bitARGB1887\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format24bitBGR888:
-                    str.append(tab + "name: COLOR_Format24bitBGR888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format24bitRGB888:
-                    str.append(tab + "name: COLOR_Format24bitRGB888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format25bitARGB1888:
-                    str.append(tab + "name: COLOR_Format25bitARGB1888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR8888:
-                    str.append(tab + "name: COLOR_Format32bitABGR8888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitARGB8888:
-                    str.append(tab + "name: COLOR_Format32bitARGB8888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitBGRA8888:
-                    str.append(tab + "name: COLOR_Format32bitBGRA8888\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format8bitRGB332:
-                    str.append(tab + "name: COLOR_Format8bitRGB332\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatCbYCrY:
-                    str.append(tab + "name: COLOR_FormatCbYCrY\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatCrYCbY:
-                    str.append(tab + "name: COLOR_FormatCrYCbY\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL16:
-                    str.append(tab + "name: COLOR_FormatL16\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL2:
-                    str.append(tab + "name: COLOR_FormatL2\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL24:
-                    str.append(tab + "name: COLOR_FormatL24\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL32:
-                    str.append(tab + "name: COLOR_FormatL32\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL4:
-                    str.append(tab + "name: COLOR_FormatL4\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatL8:
-                    str.append(tab + "name: COLOR_FormatL8\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatMonochrome:
-                    str.append(tab + "name: COLOR_FormatMonochrome\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatRGBAFlexible:
-                    str.append(tab + "name: COLOR_FormatRGBAFlexible\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatRGBFlexible:
-                    str.append(tab + "name: COLOR_FormatRGBFlexible\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer10bit:
-                    str.append(tab + "name: COLOR_FormatRawBayer10bit\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer8bit:
-                    str.append(tab + "name: COLOR_FormatRawBayer8bit\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatRawBayer8bitcompressed:
-                    str.append(tab + "name: COLOR_FormatRawBayer8bitcompressed\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface:
-                    str.append(tab + "name: COLOR_FormatSurface\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYCbYCr:
-                    str.append(tab + "name: COLOR_FormatYCbYCr\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYCrYCb:
-                    str.append(tab + "name: COLOR_FormatYCrYCb\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411PackedPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV411PackedPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV411Planar:
-                    str.append(tab + "name: COLOR_FormatYUV411Planar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible:
-                    str.append(tab + "name: COLOR_FormatYUV420Flexible\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV420PackedPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV420PackedSemiPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar:
-                    str.append(tab + "name: COLOR_FormatYUV420Planar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV420SemiPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Flexible:
-                    str.append(tab + "name: COLOR_FormatYUV422Flexible\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422PackedPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV422PackedPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422PackedSemiPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV422PackedSemiPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Planar:
-                    str.append(tab + "name: COLOR_FormatYUV422Planar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422SemiPlanar:
-                    str.append(tab + "name: COLOR_FormatYUV422SemiPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV444Flexible:
-                    str.append(tab + "name: COLOR_FormatYUV444Flexible\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV444Interleaved:
-                    str.append(tab + "name: COLOR_FormatYUV444Interleaved\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar:
-                    str.append(tab + "name: COLOR_QCOM_FormatYUV420SemiPlanar\n");
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
-                    str.append(tab + "name: COLOR_TI_FormatYUV420PackedSemiPlanar\n");
-                    break;
+            if (androidColorFormatNameTable.containsKey(color_format)) {
+                str.append(tab + "name: " + androidColorFormatNameTable.get(color_format) + "\n");
             }
             indent -= 1;
             tab = getIndentation(indent);
