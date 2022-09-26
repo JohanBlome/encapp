@@ -384,7 +384,7 @@ def run_codec_tests(test_suite, files_to_push, protobuf_txt_filepath, model,
     for filepath in files_to_push:
         if not encapp_tool.adb_cmds.push_file_to_device(
                 filepath, serial, device_workdir, debug):
-            abort_test(local_workdir, 'Check file paths and try again')
+            abort_test(local_workdir, f'Error copying {filepath} to {serial}')
 
     # run the test(s)
     if False:  # one pbtxt file per subtest
