@@ -375,5 +375,8 @@ def push_file_to_device(filepath, serial, device_workdir, debug):
     if not os.access(filepath, os.R_OK):
         print(f'error: file "{filepath}" is not readable')
         return False
-    run_cmd(f'adb -s {serial} push {filepath} {device_workdir}/', debug)
-    return True
+    ret, stdout, _ = run_cmd(
+        f'adb -s {serial} push {filepath} {device_workdir}/', debug)
+    if not ret:
+        print(f'error: copying "{filepath}": {stdout}')
+    return ret
