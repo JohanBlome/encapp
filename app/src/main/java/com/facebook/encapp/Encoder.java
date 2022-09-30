@@ -168,7 +168,7 @@ public abstract class Encoder {
     }
 
     public String checkFilePath(String path) {
-        Log.d(TAG, "checkFilePath(" + path + ")");
+        Log.d(TAG, "checkFilePath(\"" + path + "\")");
         // check for absolute paths
         File file = new File(path);
         if (file.isAbsolute()) {
@@ -453,9 +453,9 @@ public abstract class Encoder {
      * @return size of enqueued data.
      */
     protected int queueInputBufferEncoder(
-            MediaCodec codec, ByteBuffer buffer, int index, int frameCount, int flags, int size) {
-        buffer.clear();
-        int read = mYuvReader.fillBuffer(buffer, size);
+            MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size) {
+        byteBuffer.clear();
+        int read = mYuvReader.fillBuffer(byteBuffer, size);
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
@@ -497,13 +497,13 @@ public abstract class Encoder {
         public void run() {
             while (!mDone) {
                 while (mEncodeBuffers.size() > 0) {
-                    FrameBuffer buffer = mEncodeBuffers.poll();
-                    if (buffer == null) {
+                    FrameBuffer frameBuffer = mEncodeBuffers.poll();
+                    if (frameBuffer == null) {
                         Log.e(TAG, "Buffer empty");
                         continue;
                     }
 
-                    if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                    if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());
                         Log.d(TAG, "Start muxer: " + mMuxer +", write? " + mWriteFile);
@@ -512,35 +512,35 @@ public abstract class Encoder {
                             Log.d(TAG, "Start muxer, track = " + mVideoTrack);
                             mMuxer.start();
                         }
-                        mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                        mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                     } else {
-                        if ((buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                             Log.d(TAG, "End of stream: ");
                             mDone = true;
                         }
                         if (mFirstFrameTimestampUsec != -1) {
-                            long timestampUsec = mPts + (long) (buffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
+                            long timestampUsec = mPts + (long) (frameBuffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
                             if (timestampUsec < 0) {
-                                mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                                 continue;
                             }
                             try {
-                                mStats.stopEncodingFrame(timestampUsec, buffer.mInfo.size,
-                                        (buffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                                mStats.stopEncodingFrame(timestampUsec, frameBuffer.mInfo.size,
+                                        (frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                                 ++mOutFramesCount;
                                 if (mMuxer != null && mVideoTrack != -1) {
-                                    ByteBuffer data = mCodec.getOutputBuffer(buffer.mBufferId);
-                                    mMuxer.writeSampleData(mVideoTrack, data, buffer.mInfo);
+                                    ByteBuffer data = mCodec.getOutputBuffer(frameBuffer.mBufferId);
+                                    mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
                                 }
 
-                                mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                             } catch (Exception ise) {
                                 // Codec may be closed elsewhere...
                                 Log.e(TAG, "Writing failed: " + ise.getMessage());
                             }
                             mCurrentTimeSec = timestampUsec / 1000000.0;
                         } else {
-                            mCodec.releaseOutputBuffer(buffer.mBufferId, false /* render */);
+                            mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                         }
                     }
                 }

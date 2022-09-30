@@ -150,12 +150,12 @@ class BufferEncoder extends Encoder {
                 if (index >= 0) {
                     int size = -1;
 
-                    ByteBuffer buffer = mCodec.getInputBuffer(index);
+                    ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
                     while (size < 0 && !done) {
                         try {
                             size = queueInputBufferEncoder(
                                     mCodec,
-                                    buffer,
+                                    byteBuffer,
                                     index,
                                     mInFramesCount,
                                     flags,

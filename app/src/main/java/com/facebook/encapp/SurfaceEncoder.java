@@ -200,7 +200,7 @@ class SurfaceEncoder extends Encoder {
         mFpsMeasure.start();
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         int current_loop = 1;
-        ByteBuffer buffer = ByteBuffer.allocate(mRefFramesizeInBytes);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
@@ -293,7 +293,7 @@ class SurfaceEncoder extends Encoder {
                                 if (mYuvReader != null) {
                                     size = queueInputBufferEncoder(
                                             mCodec,
-                                            buffer,
+                                            byteBuffer,
                                             mInFramesCount,
                                             flags,
                                             mRefFramesizeInBytes);
@@ -402,9 +402,9 @@ class SurfaceEncoder extends Encoder {
      * @return size of enqueued data.
      */
     private int queueInputBufferEncoder(
-            MediaCodec codec, ByteBuffer buffer, int frameCount, int flags, int size) {
-        buffer.clear();
-        int read = mYuvReader.fillBuffer(buffer, size);
+            MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
+        byteBuffer.clear();
+        int read = mYuvReader.fillBuffer(byteBuffer, size);
         long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
@@ -417,13 +417,13 @@ class SurfaceEncoder extends Encoder {
         } else if (read == size) {
             mFramesAdded++;
             if (!mIsRgbaSource) {
-                mYuvIn.copyFrom(buffer.array());
+                mYuvIn.copyFrom(byteBuffer.array());
                 yuvToRgbIntrinsic.setInput(mYuvIn);
                 yuvToRgbIntrinsic.forEach(mYuvOut);
 
                 mYuvOut.copyTo(mBitmap);
             } else {
-                mBitmap.copyPixelsFromBuffer(buffer);
+                mBitmap.copyPixelsFromBuffer(byteBuffer);
             }
 
             if (mFirstFrameTimestampUsec == -1) {
