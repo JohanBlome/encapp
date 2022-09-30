@@ -44,9 +44,8 @@ public class SystemLoad {
         if (tmp.equals("")) {
             Log.e(TAG, "Could not read system data, \"adb root && adb shell setenforce 0\" needed");
             return;
-        } else {
-            Log.e(TAG, "GPU model: "+tmp);
         }
+        Log.d(TAG, "GPU model: " + tmp);
         mGPUInfo.put("gpu_model", tmp.trim());
         tmp = readSystemData(FILE_QCOM_GPU_MIN_CLOCK);
         mGPUInfo.put("gpu_min_clock", tmp.trim());
