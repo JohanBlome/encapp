@@ -63,7 +63,7 @@ message Configure {
     bt601_pal = 2;
     bt601_ntsc = 4;
     bt709 = 1;
-    bt202 = 6;
+    bt2020 = 6;
   }
   optional ColorStandard color_standard = 11;
   enum ColorRange {
