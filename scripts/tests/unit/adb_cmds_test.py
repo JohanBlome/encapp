@@ -2,8 +2,15 @@
 
 import unittest
 import unittest.mock
+import os
+import sys
 
-import encapp_tool
+MODULE_PATH = os.path.dirname(__file__)
+ENCAPP_SCRIPTS_ROOT_DIR = os.path.join(MODULE_PATH, os.pardir, os.pardir)
+sys.path.append(ENCAPP_SCRIPTS_ROOT_DIR)
+
+import encapp_tool  # noqa: E402
+
 
 ADB_DEVICES_EMPTY = 'List of devices attached\n\n'
 ADB_DEVICE_VALID_ID = '1234567890abcde'
@@ -67,14 +74,7 @@ class TestAdbCommands(unittest.TestCase):
             self, mock_run):
         mock_run.return_value = (True, ADB_DEVICES_MULTI_DEV, '')
         expected_result = (
-            {
-                'device': 'device_01',
-                'model': 'MODEL_123',
-                'product': 'product01',
-                'transport_id': '8',
-                'usb': '123456789X',
-            },
-            '1234567890abcde',
+            'model_123', '1234567890abcde',
         )
         actual_result = encapp_tool.adb_cmds.get_device_info(
             ADB_DEVICE_VALID_ID, debug=0)
@@ -110,14 +110,7 @@ class TestAdbCommands(unittest.TestCase):
     ):
         mock_run.return_value = (True, ADB_DEVICES_ONE_DEV, '')
         expected_result = (
-            {
-                'device': 'device_01',
-                'model': 'MODEL_123',
-                'product': 'product01',
-                'transport_id': '8',
-                'usb': '123456789X',
-            },
-            '1234567890abcde',
+            'model_123', '1234567890abcde',
         )
         actual_result = encapp_tool.adb_cmds.get_device_info(None, debug=0)
         self.assertEqual(expected_result, actual_result)
@@ -127,7 +120,7 @@ class TestAdbCommands(unittest.TestCase):
             self, mock_run):
         mock_run.return_value = (True, ADB_LS_ENCAPP, '')
         encapp_tool.adb_cmds.remove_files_using_regex(
-            ADB_DEVICE_VALID_ID, r'encapp_.*', '/sdcard/', 1
+            ADB_DEVICE_VALID_ID, r'encapp_.*', '/sdcard', 1
         )
         mock_run.assert_has_calls(
             [
