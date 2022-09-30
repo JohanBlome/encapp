@@ -7,7 +7,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 public class FileReader {
     private static final String TAG = "encapp.filereader";
@@ -62,6 +64,14 @@ public class FileReader {
                 int read = mBis.read(bytes, 0, bytes.length);
                 byteBuffer.put(bytes);
                 return read;
+            } catch (BufferOverflowException e) {
+                Log.e(TAG, "error BufferOverflowException: " + e.getMessage());
+                e.printStackTrace();
+                return 0;
+            } catch (ReadOnlyBufferException e) {
+                Log.e(TAG, "error ReadOnlyBufferException: " + e.getMessage());
+                e.printStackTrace();
+                return 0;
             } catch (IOException e) {
                 Log.e(TAG, "error: " + e.getMessage());
                 e.printStackTrace();
