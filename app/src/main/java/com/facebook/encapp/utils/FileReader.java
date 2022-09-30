@@ -59,6 +59,11 @@ public class FileReader {
                 return 0;
             }
         } else {
+            // check there is enough capacity in the byteBuffer
+            if (byteBuffer.capacity() < size) {
+                Log.e(TAG, "error: not enough space in ByteBuffer (capacity: " + byteBuffer.capacity() + ") to copy size: " + size + " bytes");
+            }
+
             byte[] bytes = new byte[size];
             try {
                 int read = mBis.read(bytes, 0, bytes.length);
