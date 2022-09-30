@@ -637,7 +637,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Pursuit over");
                         mPursuitOver = true;
                         //  } else {
-                        //      Assert.assertTrue(status, false);
+                        //      Assert.assertTrue(false, status);
                         //   }
 
                     } else {
