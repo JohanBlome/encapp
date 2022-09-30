@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class FileReader {
-    private static final String TAG = "encapp";
+    private static final String TAG = "encapp.filereader";
     File mFile;
     BufferedInputStream mBis;
     public FileReader() {
