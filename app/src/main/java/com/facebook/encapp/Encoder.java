@@ -317,9 +317,9 @@ public abstract class Encoder {
             for (MediaCodecInfo info : matching) {
                 sb.append(info.getName() + "\n");
             }
-            Assert.assertTrue(sb.toString(), false);
+            Assert.assertTrue(false, sb.toString());
         } else if (matching.size() == 0) {
-            Assert.assertTrue("\nNo matching codecs to : " + partialName, false);
+            Assert.assertTrue(false, "\nNo matching codecs to : " + partialName);
         } else {
             Log.d(TAG, "Set codec and mime: " + codecName);
             Test.Builder builder = Test.newBuilder(test);
