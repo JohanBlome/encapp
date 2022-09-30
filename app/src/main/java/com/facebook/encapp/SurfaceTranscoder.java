@@ -191,7 +191,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             } else {
                 mOutputMult.setName("ST_" + mTest.getInput().getFilepath() + "_dec-" + inputFormat.getString(MediaFormat.KEY_MIME));
             }
-            Size encodeResolution = Size.parseSize(mTest.getConfigure().getResolution());
             if (!mNoEncoding) {
 
                 setConfigureParams(mTest, format);
