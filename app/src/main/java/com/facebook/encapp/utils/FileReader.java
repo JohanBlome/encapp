@@ -43,12 +43,12 @@ public class FileReader {
         }
     }
 
-    public int fillBuffer(ByteBuffer buffer, int size){
+    public int fillBuffer(ByteBuffer byteBuffer, int size){
         synchronized (this) {
             if (mBis == null) return 0;
         }
-        if (buffer.hasArray()) {
-            byte[] bytes = buffer.array();
+        if (byteBuffer.hasArray()) {
+            byte[] bytes = byteBuffer.array();
             try {
                 int read = mBis.read(bytes, 0, bytes.length);
                 return read;
@@ -60,7 +60,7 @@ public class FileReader {
             byte[] bytes = new byte[size];
             try {
                 int read = mBis.read(bytes, 0, bytes.length);
-                buffer.put(bytes);
+                byteBuffer.put(bytes);
                 return read;
             } catch (IOException e) {
                 Log.e(TAG, "error: " + e.getMessage());
