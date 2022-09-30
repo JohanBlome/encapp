@@ -2,8 +2,15 @@
 
 import unittest
 import unittest.mock
+import os
+import sys
 
-import encapp_tool
+MODULE_PATH = os.path.dirname(__file__)
+ENCAPP_SCRIPTS_ROOT_DIR = os.path.join(MODULE_PATH, os.pardir, os.pardir)
+sys.path.append(ENCAPP_SCRIPTS_ROOT_DIR)
+
+import encapp_tool  # noqa: E402
+import encapp_tool.app_utils  # noqa: E402
 
 ADB_DEVICE_VALID_ID = '1234567890abcde'
 
@@ -47,3 +54,7 @@ class TestAppUtils(unittest.TestCase):
         mock_uninstall.assert_called_with(
             ADB_DEVICE_VALID_ID, 'com.facebook.encapp', 1
         )
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -87,7 +87,7 @@ def remove_files_using_regex(
         location (str): Path/directory to analyze and remove files from
         debug (int): Debug level
     """
-    adb_cmd = f'adb -s {serial} shell ls {location}'
+    adb_cmd = f'adb -s {serial} shell ls {location}/'
     _, stdout, _ = run_cmd(adb_cmd, debug)
     output_files = re.findall(regex_str, stdout, re.MULTILINE)
     for file in output_files:
