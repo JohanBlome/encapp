@@ -26,8 +26,8 @@ def install_app(serial, debug=0):
         debug (int): Debug level
     """
     encapp_tool.adb_cmds.install_apk(serial, APK_MAIN, debug)
-    encapp_tool.adb_cmds.grant_camera_permission(serial, debug)
-    encapp_tool.adb_cmds.grant_storage_permissions(serial, debug)
+    encapp_tool.adb_cmds.grant_camera_permission(serial, APPNAME_MAIN, debug)
+    encapp_tool.adb_cmds.grant_storage_permissions(serial, APPNAME_MAIN, debug)
     encapp_tool.adb_cmds.force_stop(serial, APPNAME_MAIN, debug)
 
 
