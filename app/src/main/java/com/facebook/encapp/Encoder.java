@@ -472,6 +472,8 @@ public abstract class Encoder {
             }
             mStats.startEncodingFrame(ptsUsec, frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+        } else if((flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            codec.queueInputBuffer(index, 0 /* offset */, 0, ptsUsec /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
         } else {
             read = -1;
         }
