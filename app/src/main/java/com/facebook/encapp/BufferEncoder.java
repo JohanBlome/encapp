@@ -122,7 +122,8 @@ class BufferEncoder extends Encoder {
 
         double currentTime = 0;
         int current_loop = 1;
-        boolean done = false;
+        boolean input_done = false;
+        boolean output_done = false;
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -133,7 +134,7 @@ class BufferEncoder extends Encoder {
             }
         }
         mStats.start();
-        while (!done) {
+        while (!input_done || !output_done) {
             int index;
             if (mFramesAdded % 100 == 0) {
                 Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
@@ -145,13 +146,13 @@ class BufferEncoder extends Encoder {
 
                 if (doneReading(test, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                    done = true;
+                    input_done = true;
                 }
                 if (index >= 0) {
                     int size = -1;
 
                     ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
-                    while (size < 0 && !done) {
+                    while (size < 0 && !input_done) {
                         try {
                             size = queueInputBufferEncoder(
                                     mCodec,
@@ -171,10 +172,19 @@ class BufferEncoder extends Encoder {
                             mYuvReader.closeFile();
                             current_loop++;
                             if (doneReading(test, mInFramesCount, mCurrentTimeSec, true)) {
-                                done = true;
+                                input_done = true;
+                                // Set EOS flag and call encoder
+                                flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                                size = queueInputBufferEncoder(
+	                                    mCodec,
+	                                    byteBuffer,
+	                                    index,
+	                                    mInFramesCount,
+	                                    flags,
+	                                    mRefFramesizeInBytes);
                             }
 
-                            if (!done) {
+                            if (!input_done) {
                                 Log.d(TAG, " *********** OPEN FILE AGAIN *******");
                                 mYuvReader.openFile(test.getInput().getFilepath());
                                 Log.d(TAG, "*** Loop ended start " + current_loop + "***");
@@ -202,7 +212,7 @@ class BufferEncoder extends Encoder {
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    break;
+                    output_done = true;
                 } else {
                     mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
                             (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
