@@ -56,7 +56,7 @@ class BufferEncoder extends Encoder {
             return "\nCould not open file";
         }
 
-        MediaFormat format;
+        MediaFormat mediaFormat;
         try {
             //Unless we have a mime, do lookup
             if (test.getConfigure().getMime().length() == 0) {
@@ -67,17 +67,17 @@ class BufferEncoder extends Encoder {
             Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
             mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
 
-            format = TestDefinitionHelper.buildMediaFormat(test);
+            mediaFormat = TestDefinitionHelper.buildMediaFormat(test);
             Log.d(TAG, "MediaFormat (test)");
-            checkMediaFormat(format);
-            setConfigureParams(test, format);
+            checkMediaFormat(mediaFormat);
+            setConfigureParams(test, mediaFormat);
             // Needed for the buffer input. this can be either nv12, nv21 or yuv420p
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             Log.d(TAG, "MediaFormat (configure)");
-            checkMediaFormat(format);
+            checkMediaFormat(mediaFormat);
             Log.d(TAG, "Configure: " + mCodec.getName());
             mCodec.configure(
-                    format,
+                    mediaFormat,
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);

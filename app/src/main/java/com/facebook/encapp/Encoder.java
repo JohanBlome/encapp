@@ -75,37 +75,36 @@ public abstract class Encoder {
         mDataWriter.start();
     }
 
-    public static void checkMediaFormat(MediaFormat format) {
-
+    public static void checkMediaFormat(MediaFormat mediaFormat) {
         Log.d(TAG, "checkMediaFormat");
         Log.d(TAG, "VERSION.SDK_INT: " + Build.VERSION.SDK_INT);
         if (Build.VERSION.SDK_INT >= 29) {
-            Set<String> features = format.getFeatures();
+            Set<String> features = mediaFormat.getFeatures();
             for (String feature : features) {
                 Log.d(TAG, "MediaFormat: " + feature);
             }
 
-            Set<String> keys = format.getKeys();
+            Set<String> keys = mediaFormat.getKeys();
             for (String key : keys) {
-                int type = format.getValueTypeForKey(key);
+                int type = mediaFormat.getValueTypeForKey(key);
                 switch (type) {
                     case MediaFormat.TYPE_BYTE_BUFFER:
-                        Log.d(TAG, "MediaFormat: " + key + ": [bytebuffer] " + format.getByteBuffer(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [bytebuffer] " + mediaFormat.getByteBuffer(key));
                         break;
                     case MediaFormat.TYPE_FLOAT:
-                        Log.d(TAG, "MediaFormat: " + key + ": [float] " + format.getFloat(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [float] " + mediaFormat.getFloat(key));
                         break;
                     case MediaFormat.TYPE_INTEGER:
-                        Log.d(TAG, "MediaFormat: " + key + ": [integer] " + format.getInteger(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [integer] " + mediaFormat.getInteger(key));
                         break;
                     case MediaFormat.TYPE_LONG:
-                        Log.d(TAG, "MediaFormat: " + key + ": [long] " + format.getLong(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [long] " + mediaFormat.getLong(key));
                         break;
                     case MediaFormat.TYPE_NULL:
                         Log.d(TAG, "MediaFormat: " + key + ": [null]");
                         break;
                     case MediaFormat.TYPE_STRING:
-                        Log.d(TAG, "MediaFormat: " + key + ": [string] " + format.getString(key));
+                        Log.d(TAG, "MediaFormat: " + key + ": [string] " + mediaFormat.getString(key));
                         break;
                 }
 
@@ -132,32 +131,32 @@ public abstract class Encoder {
             };
 
             for (String key : keys) {
-                if (format.containsKey(key)) {
-                    String val = "";
+                if (!mediaFormat.containsKey(key)) {
+                    // key not in MediaFormat object
+                    continue;
+                }
+                String val = "";
+                try {
+                    val = mediaFormat.getString(key);
+                } catch (ClassCastException ex1) {
                     try {
-                        val = format.getString(key);
-                    } catch (ClassCastException ex1) {
+                        val = Integer.toString(mediaFormat.getInteger(key));
+                    } catch (ClassCastException ex2) {
                         try {
-                            val = Integer.toString(format.getInteger(key));
-                        } catch (ClassCastException ex2) {
+                            val = Float.toString(mediaFormat.getFloat(key));
+                        } catch (ClassCastException ex3) {
                             try {
-                                val = Float.toString(format.getFloat(key));
-                            } catch (ClassCastException ex3) {
-                                try {
-                                    val = Long.toString(format.getLong(key));
-                                } catch (ClassCastException ex4) {
-                                    Log.d(TAG, "Failed to get key: " + key);
-                                }
+                                val = Long.toString(mediaFormat.getLong(key));
+                            } catch (ClassCastException ex4) {
+                                Log.d(TAG, "Failed to get key: " + key);
                             }
-
                         }
                     }
-                    if (val != null && val.length() > 0) {
-                        Log.d(TAG, "MediaFormat: " + key + " - string: " + val);
-                    }
+                }
+                if (val != null && val.length() > 0) {
+                    Log.d(TAG, "MediaFormat: " + key + " - string: " + val);
                 }
             }
-
         }
     }
 
