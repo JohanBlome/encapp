@@ -17,43 +17,54 @@ public class TestDefinitionHelper {
         Configure config = test.getConfigure();
         Input input = test.getInput();
         Size targetResolution = SizeUtils.parseXString(config.getResolution());
+        // start with the default MediaFormat
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(
                 config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
 
-        mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(config.getBitrate()));
-        mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, input.getFramerate());
-        mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, config.getBitrateMode().getNumber());
-        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
-       // TODO: mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, config.getColorFormat());
-
-        int colorRange = (config.hasColorRange())? config.getColorRange().getNumber():
-                                                   MediaFormat.COLOR_RANGE_LIMITED;
-
-        int colorTransfer  = (config.hasColorTransfer())? config.getColorTransfer().getNumber():
-                                                          MediaFormat.COLOR_TRANSFER_SDR_VIDEO;
-        int colorStandard  = (config.hasColorStandard())? config.getColorStandard().getNumber():
-                                                          MediaFormat.COLOR_STANDARD_BT709;
-
-        mediaFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
-        mediaFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
-        mediaFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
-
-        int bitrateMode = (config.hasBitrateMode())? config.getBitrateMode().getNumber():
-                                                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR;
-        mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
-        int qpVal = 30;
-        if (bitrateMode == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ) {
-            // Now we need a qp value
-            if (config.hasQualityLevel()) {
-                qpVal = config.getQualityLevel();
+        // optional config parameters
+        if (config.hasBitrate()) {
+            String bitrate  = config.getBitrate();
+            mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(bitrate));
+        }
+        if (input.hasFramerate()) {
+            float framerate  = input.getFramerate();
+            mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, framerate);
+        }
+        // good default: MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+        if (config.hasBitrateMode()) {
+            int bitrateMode = config.getBitrateMode().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+            if (bitrateMode == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ) {
+                // check if there is a QP value
+                if (config.hasQualityLevel()) {
+                    int qualityLevel = config.getQualityLevel();
+                    mediaFormat.setInteger(MediaFormat.KEY_QUALITY, qualityLevel);
+                }
             }
         }
+        if (config.hasIFrameInterval()) {
+            int iFrameInterval  = config.getIFrameInterval();
+            mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
+        }
+        // color parameters
+        // good default: MediaFormat.COLOR_RANGE_LIMITED
+        if (config.hasColorRange()) {
+            int colorRange  = config.getColorRange().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
+        }
+        // good default: MediaFormat.COLOR_TRANSFER_SDR_VIDEO
+        if (config.hasColorTransfer()) {
+            int colorTransfer  = config.getColorTransfer().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
+        }
+        // good default: MediaFormat.COLOR_STANDARD_BT709
+        if (config.hasColorStandard()) {
+            int colorStandard  = config.getColorStandard().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+        }
 
-        mediaFormat.setInteger(MediaFormat.KEY_QUALITY, qpVal);
-
-
-        for (Configure.Parameter param:config.getParameterList()) {
-
+        // set all the available values
+        for (Configure.Parameter param : config.getParameterList()) {
             switch (param.getType().getNumber()) {
                 case DataValueType.floatType_VALUE:
                     float fval = Float.parseFloat(param.getValue());
