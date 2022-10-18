@@ -13,6 +13,7 @@ import encapp_tool  # noqa: E402
 import encapp_tool.app_utils  # noqa: E402
 
 ADB_DEVICE_VALID_ID = '1234567890abcde'
+APP_ID = 'com.facebook.encapp'
 
 
 class TestAppUtils(unittest.TestCase):
@@ -26,10 +27,9 @@ class TestAppUtils(unittest.TestCase):
         encapp_tool.app_utils.install_app(ADB_DEVICE_VALID_ID)
         mock_install.assert_called_with(
             ADB_DEVICE_VALID_ID, encapp_tool.app_utils.APK_MAIN, 0)
-        mock_perm_store.assert_called_with(ADB_DEVICE_VALID_ID, 0)
-        mock_perm_camera.assert_called_with(ADB_DEVICE_VALID_ID, 0)
-        mock_stop.assert_called_with(
-            ADB_DEVICE_VALID_ID, 'com.facebook.encapp', 0)
+        mock_perm_store.assert_called_with(ADB_DEVICE_VALID_ID, APP_ID, 0)
+        mock_perm_camera.assert_called_with(ADB_DEVICE_VALID_ID, APP_ID, 0)
+        mock_stop.assert_called_with(ADB_DEVICE_VALID_ID, APP_ID, 0)
 
     @unittest.mock.patch('encapp_tool.adb_cmds.installed_apps')
     def test_install_ok_shall_verify_if_encapp_is_installed(self, mock_apps):
