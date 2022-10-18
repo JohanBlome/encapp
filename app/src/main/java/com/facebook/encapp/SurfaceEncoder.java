@@ -39,7 +39,6 @@ import java.util.Locale;
  */
 
 class SurfaceEncoder extends Encoder {
-    protected static final String TAG = "encapp.encoder";
     Bitmap mBitmap = null;
     Context mContext;
     SurfaceTexture mSurfaceTexture;
