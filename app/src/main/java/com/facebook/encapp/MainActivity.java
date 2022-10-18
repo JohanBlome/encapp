@@ -135,13 +135,23 @@ public class MainActivity extends AppCompatActivity {
         //setContentView(R.layout.activity_main);
         setContentView(R.layout.activity_visualize);
 
+        // get list of non-granted permissions
         String[] permissions = retrieveNotGrantedPermissions(this);
-
         if (permissions != null && permissions.length > 0) {
             int REQUEST_ALL_PERMISSIONS = 0x4562;
-            ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
+            try {
+                ActivityCompat.requestPermissions(this, permissions, REQUEST_ALL_PERMISSIONS);
+            } catch (java.lang.RuntimeException ex) {
+                // some devices (e.g. headless) may not have the permission UI,
+                // which gets triggered here whether the permission is already
+                // granted or not. In that case, we can avoid punting, in case
+                // the user already granted the permissions using the CLI
+                // (adb shell pm grant ...)
+                Log.w(TAG, "no access to permissions UI.");
+            }
         }
-        // Need to check permission strategy
+
+        // need to check permission strategy
         getTestSettings();
         CliSettings.setWorkDir(this, mExtraData);
         boolean useNewMethod = true;
@@ -151,8 +161,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (Build.VERSION.SDK_INT >= 30 && useNewMethod && !Environment.isExternalStorageManager()) {
             Log.d(TAG, "Check ExternalStorageManager");
-            //request for the permission
-
+            // request the external storage manager permission
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             Uri uri = Uri.fromParts("package", getPackageName(), null);
             intent.setData(uri);
@@ -164,7 +173,6 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Missing MANAGE_APP_ALL_FILES_ACCESS_PERMISSION request,", Toast.LENGTH_LONG).show();
             }
         }
-
         mTable = findViewById(R.id.viewTable);
 
         Log.d(TAG, "Passed all permission checks");
