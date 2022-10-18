@@ -144,10 +144,10 @@ class SurfaceEncoder extends Encoder {
             format = TestDefinitionHelper.buildMediaFormat(mTest);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
                     MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-            checkMediaFormat(format);
+            logMediaFormat(format);
 
             Log.d(TAG, "Format of encoder");
-            checkMediaFormat(format);
+            logMediaFormat(format);
 
             mCodec.setCallback(new EncoderCallbackHandler());
             mCodec.configure(
@@ -155,7 +155,7 @@ class SurfaceEncoder extends Encoder {
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
-            checkMediaFormat(mCodec.getInputFormat());
+            logMediaFormat(mCodec.getInputFormat());
             mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
             setupOutputMult(width, height);
 

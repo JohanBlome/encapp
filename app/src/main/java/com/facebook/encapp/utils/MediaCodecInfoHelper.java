@@ -4,10 +4,12 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
 
+
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 
 public class MediaCodecInfoHelper {
@@ -408,7 +410,7 @@ public class MediaCodecInfoHelper {
         //Odds are that if there is no default profile - nothing else will have defaults anyway...
         if (mediaFormat.getString(MediaFormat.KEY_PROFILE) != null) {
             str.append("\nDefault settings:");
-            str.append(getFormatInfo(mediaFormat));
+            str.append(mediaFormatToString(mediaFormat));
         }
 
         // print encoder capabilities
@@ -427,54 +429,89 @@ public class MediaCodecInfoHelper {
     }
 
 
-    public static String getFormatInfo(MediaFormat mediaFormat) {
-
+    public static String mediaFormatToString(MediaFormat mediaFormat) {
         StringBuilder str = new StringBuilder();
-        String[] keys = {
-                MediaFormat.KEY_BIT_RATE,
-                MediaFormat.KEY_BITRATE_MODE,
-                MediaFormat.KEY_MIME,
-                MediaFormat.KEY_FRAME_RATE,
-                MediaFormat.KEY_COLOR_FORMAT,
-                MediaFormat.KEY_COLOR_RANGE,
-                MediaFormat.KEY_COLOR_STANDARD,
-                MediaFormat.KEY_COLOR_TRANSFER,
-                MediaFormat.KEY_I_FRAME_INTERVAL,
-                MediaFormat.KEY_LATENCY,
-                MediaFormat.KEY_LEVEL,
-                MediaFormat.KEY_PROFILE,
-                MediaFormat.KEY_SLICE_HEIGHT,
-                MediaFormat.KEY_TEMPORAL_LAYERING,
-        };
-
-        for (String key : keys) {
-            if (!mediaFormat.containsKey(key)) {
-                continue;
+        str.append("MediaFormat {\n");
+        if (Build.VERSION.SDK_INT >= 29) {
+            // check the features
+            Set<String> features = mediaFormat.getFeatures();
+            str.append("  features: [ ");
+            for (String feature : features) {
+               str.append(feature + " ");
             }
-            String val="";
-            try {
-                val = mediaFormat.getString(key);
-            } catch (ClassCastException ex1) {
+            str.append("]\n");
+
+            Set<String> keys = mediaFormat.getKeys();
+            for (String key : keys) {
+                int type = mediaFormat.getValueTypeForKey(key);
+                switch (type) {
+                    case MediaFormat.TYPE_BYTE_BUFFER:
+                        str.append("  " + key + ": [bytebuffer] " + mediaFormat.getByteBuffer(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_FLOAT:
+                        str.append("  " + key + ": [float] " + mediaFormat.getFloat(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_INTEGER:
+                        str.append("  " + key + ": [integer] " + mediaFormat.getInteger(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_LONG:
+                        str.append("  " + key + ": [long] " + mediaFormat.getLong(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_NULL:
+                        str.append("  " + key + ": [null]\n");
+                        break;
+                    case MediaFormat.TYPE_STRING:
+                        str.append("  " + key + ": [string] " + mediaFormat.getString(key) + "\n");
+                        break;
+                }
+
+            }
+        } else {
+            String[] keys = {
+                    MediaFormat.KEY_BIT_RATE,
+                    MediaFormat.KEY_BITRATE_MODE,
+                    MediaFormat.KEY_MIME,
+                    MediaFormat.KEY_FRAME_RATE,
+                    MediaFormat.KEY_COLOR_FORMAT,
+                    MediaFormat.KEY_COLOR_RANGE,
+                    MediaFormat.KEY_COLOR_STANDARD,
+                    MediaFormat.KEY_COLOR_TRANSFER,
+                    MediaFormat.KEY_I_FRAME_INTERVAL,
+                    MediaFormat.KEY_LATENCY,
+                    MediaFormat.KEY_LEVEL,
+                    MediaFormat.KEY_PROFILE,
+                    MediaFormat.KEY_SLICE_HEIGHT,
+                    MediaFormat.KEY_TEMPORAL_LAYERING,
+            };
+
+            for (String key : keys) {
+                if (!mediaFormat.containsKey(key)) {
+                    continue;
+                }
+                String val="";
                 try {
-                    val = Integer.toString(mediaFormat.getInteger(key));
-                } catch (ClassCastException ex2) {
+                    val = mediaFormat.getString(key);
+                } catch (ClassCastException ex1) {
                     try {
-                        val = Float.toString(mediaFormat.getFloat(key));
-                    } catch (ClassCastException ex3) {
+                        val = Integer.toString(mediaFormat.getInteger(key));
+                    } catch (ClassCastException ex2) {
                         try {
-                            val = Long.toString(mediaFormat.getLong(key));
-                        } catch (ClassCastException ex4) {
-                            continue;
+                            val = Float.toString(mediaFormat.getFloat(key));
+                        } catch (ClassCastException ex3) {
+                            try {
+                                val = Long.toString(mediaFormat.getLong(key));
+                            } catch (ClassCastException ex4) {
+                                continue;
+                            }
                         }
                     }
-
+                }
+                if (val != null && val.length() > 0) {
+                    str.append("  " + key + ": " + val + "\n");
                 }
             }
-            if (val != null && val.length() > 0) {
-                str.append("\n" + key + ": " + val);
-            }
         }
-
+        str.append("}");
         return str.toString();
     }
 
