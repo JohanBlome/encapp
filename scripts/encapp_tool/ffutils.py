@@ -67,7 +67,7 @@ def get_video_info(videofile, debug=0):
     # check using ffprobe
     cmd = f'ffprobe -v quiet -select_streams v -show_streams {videofile}'
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
-    assert ret, f'error: failed to analyze file {videofile}'
+    assert ret, f'error: failed to analyze file {videofile}: {stderr}'
     videofile_config = ffprobe_parse_output(stdout)
     videofile_config['filepath'] = videofile
     return videofile_config
