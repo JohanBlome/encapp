@@ -35,8 +35,8 @@ public class TestDefinitionHelper {
                                                           MediaFormat.COLOR_STANDARD_BT709;
 
         format.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
-        format.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorTransfer);
-        format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorStandard);
+        format.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+        format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
 
         int bitrateMode = (config.hasBitrateMode())? config.getBitrateMode().getNumber():
                                                     MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR;
