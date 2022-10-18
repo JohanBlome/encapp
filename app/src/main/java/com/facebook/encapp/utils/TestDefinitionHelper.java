@@ -17,14 +17,14 @@ public class TestDefinitionHelper {
         Configure config = test.getConfigure();
         Input input = test.getInput();
         Size targetResolution = SizeUtils.parseXString(config.getResolution());
-        MediaFormat format = MediaFormat.createVideoFormat(
+        MediaFormat mediaFormat = MediaFormat.createVideoFormat(
                 config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
 
-        format.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(config.getBitrate()));
-        format.setFloat(MediaFormat.KEY_FRAME_RATE, input.getFramerate());
-        format.setInteger(MediaFormat.KEY_BITRATE_MODE, config.getBitrateMode().getNumber());
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
-       // TODO: format.setInteger(MediaFormat.KEY_COLOR_FORMAT, config.getColorFormat());
+        mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(config.getBitrate()));
+        mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, input.getFramerate());
+        mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, config.getBitrateMode().getNumber());
+        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, config.getIFrameInterval());
+       // TODO: mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, config.getColorFormat());
 
         int colorRange = (config.hasColorRange())? config.getColorRange().getNumber():
                                                    MediaFormat.COLOR_RANGE_LIMITED;
@@ -34,13 +34,13 @@ public class TestDefinitionHelper {
         int colorStandard  = (config.hasColorStandard())? config.getColorStandard().getNumber():
                                                           MediaFormat.COLOR_STANDARD_BT709;
 
-        format.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
-        format.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
-        format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
+        mediaFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
+        mediaFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+        mediaFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
 
         int bitrateMode = (config.hasBitrateMode())? config.getBitrateMode().getNumber():
                                                     MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR;
-        format.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+        mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
         int qpVal = 30;
         if (bitrateMode == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ) {
             // Now we need a qp value
@@ -49,7 +49,7 @@ public class TestDefinitionHelper {
             }
         }
 
-        format.setInteger(MediaFormat.KEY_QUALITY, qpVal);
+        mediaFormat.setInteger(MediaFormat.KEY_QUALITY, qpVal);
 
 
         for (Configure.Parameter param:config.getParameterList()) {
@@ -57,24 +57,24 @@ public class TestDefinitionHelper {
             switch (param.getType().getNumber()) {
                 case DataValueType.floatType_VALUE:
                     float fval = Float.parseFloat(param.getValue());
-                    format.setFloat(param.getKey(), fval);
+                    mediaFormat.setFloat(param.getKey(), fval);
                     break;
                 case DataValueType.intType_VALUE:
                     int ival = TestDefinitionHelper.magnitudeToInt(param.getValue());
-                    format.setInteger(param.getKey(), ival);
+                    mediaFormat.setInteger(param.getKey(), ival);
                     break;
                 case DataValueType.longType_VALUE:
                     long lval = Long.parseLong(param.getValue());
-                    format.setLong(param.getKey(), lval);
+                    mediaFormat.setLong(param.getKey(), lval);
                     break;
                 case DataValueType.stringType_VALUE:
-                    format.setString(param.getKey(), param.getValue());
+                    mediaFormat.setString(param.getKey(), param.getValue());
                     break;
                 default:
                     ///Should not be here
             }
         }
-        return format;
+        return mediaFormat;
     }
 
 
@@ -107,17 +107,17 @@ public class TestDefinitionHelper {
         return builder.build();
     }
 
-    public static Test updateInputSettings(Test test, MediaFormat format) {
+    public static Test updateInputSettings(Test test, MediaFormat mediaFormat) {
         Test.Builder builder = test.toBuilder();
         Input.Builder input = builder.getInput().toBuilder();
-        input.setResolution(format.getInteger(MediaFormat.KEY_WIDTH) + "x"  + format.getInteger(MediaFormat.KEY_HEIGHT));
+        input.setResolution(mediaFormat.getInteger(MediaFormat.KEY_WIDTH) + "x"  + mediaFormat.getInteger(MediaFormat.KEY_HEIGHT));
         float framerate = 30.0f;
         try {
-            framerate = format.getFloat(MediaFormat.KEY_FRAME_RATE);
+            framerate = mediaFormat.getFloat(MediaFormat.KEY_FRAME_RATE);
         } catch (Exception ex) {
             try {
                 Log.e(TAG, "Failed to grab framerate as float.");
-                framerate = (float) format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                framerate = (float) mediaFormat.getInteger(MediaFormat.KEY_FRAME_RATE);
                 Log.e(TAG, "framerate as int: " + framerate);
             } catch (Exception ex2) {
                 Log.e(TAG, "Failed to grab framerate as int - just set 30 fps");
