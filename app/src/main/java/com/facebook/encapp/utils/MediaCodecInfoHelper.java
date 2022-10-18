@@ -444,7 +444,6 @@ public class MediaCodecInfoHelper {
                 MediaFormat.KEY_LEVEL,
                 MediaFormat.KEY_PROFILE,
                 MediaFormat.KEY_SLICE_HEIGHT,
-                MediaFormat.KEY_SLICE_HEIGHT,
                 MediaFormat.KEY_TEMPORAL_LAYERING,
         };
 
