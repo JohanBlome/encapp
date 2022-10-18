@@ -404,11 +404,11 @@ public class MediaCodecInfoHelper {
         str.append(colorFormatsToString(codec_capabilities.colorFormats, indent));
         str.append(profileLevelsToString(codec_capabilities.profileLevels, indent));
 
-        MediaFormat format = codec_capabilities.getDefaultFormat();
+        MediaFormat mediaFormat = codec_capabilities.getDefaultFormat();
         //Odds are that if there is no default profile - nothing else will have defaults anyway...
-        if (format.getString(MediaFormat.KEY_PROFILE) != null) {
+        if (mediaFormat.getString(MediaFormat.KEY_PROFILE) != null) {
             str.append("\nDefault settings:");
-            str.append(getFormatInfo(format));
+            str.append(getFormatInfo(mediaFormat));
         }
 
         // print encoder capabilities
@@ -427,7 +427,7 @@ public class MediaCodecInfoHelper {
     }
 
 
-    public static String getFormatInfo(MediaFormat format) {
+    public static String getFormatInfo(MediaFormat mediaFormat) {
 
         StringBuilder str = new StringBuilder();
         String[] keys = {
@@ -448,29 +448,30 @@ public class MediaCodecInfoHelper {
         };
 
         for (String key : keys) {
-            if (format.containsKey(key)) {
-                String val="";
+            if (!mediaFormat.containsKey(key)) {
+                continue;
+            }
+            String val="";
+            try {
+                val = mediaFormat.getString(key);
+            } catch (ClassCastException ex1) {
                 try {
-                    val = format.getString(key);
-                } catch (ClassCastException ex1) {
+                    val = Integer.toString(mediaFormat.getInteger(key));
+                } catch (ClassCastException ex2) {
                     try {
-                        val = Integer.toString(format.getInteger(key));
-                    } catch (ClassCastException ex2) {
+                        val = Float.toString(mediaFormat.getFloat(key));
+                    } catch (ClassCastException ex3) {
                         try {
-                            val = Float.toString(format.getFloat(key));
-                        } catch (ClassCastException ex3) {
-                            try {
-                                val = Long.toString(format.getLong(key));
-                            } catch (ClassCastException ex4) {
-                                continue;
-                            }
+                            val = Long.toString(mediaFormat.getLong(key));
+                        } catch (ClassCastException ex4) {
+                            continue;
                         }
-
                     }
+
                 }
-                if (val != null && val.length() > 0) {
-                    str.append("\n" + key + ": " + val);
-                }
+            }
+            if (val != null && val.length() > 0) {
+                str.append("\n" + key + ": " + val);
             }
         }
 
