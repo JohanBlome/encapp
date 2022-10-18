@@ -117,7 +117,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 return "no input format";
             }
             Log.d(TAG, "Check parsed input format:");
-            checkMediaFormat(inputFormat);
+            logMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
          /*   if (noEncoding) {
                 //TODO: throw error on failed lookup
@@ -182,7 +182,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             Log.d(TAG, "Check decoder settings");
             format = TestDefinitionHelper.buildMediaFormat(mTest);
             Log.d(TAG, "Check created encoder format");
-            checkMediaFormat(format);
+            logMediaFormat(format);
             Log.d(TAG, "Set color format");
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
 
@@ -201,7 +201,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         null /* crypto */,
                         MediaCodec.CONFIGURE_FLAG_ENCODE);
                 Log.d(TAG, "Check input format after encoder is configured");
-                checkMediaFormat(mCodec.getInputFormat());
+                logMediaFormat(mCodec.getInputFormat());
                 mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
             }
 
