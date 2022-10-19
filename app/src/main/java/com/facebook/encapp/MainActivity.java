@@ -586,6 +586,8 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Decode only, use view size");
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
+                } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
+                    coder = new BufferDecoder();
                 } else {
                     coder = new SurfaceTranscoder(new OutputMultiplier(mVsyncHandler), mVsyncHandler);
                 }
@@ -652,9 +654,10 @@ public class MainActivity extends AppCompatActivity {
 
                         try {
                             Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                            Log.d(TAG, "Total frames: " + stats.getEncodedFrameCount());
-                            if (stats.getEncodedFrameCount() > 0) {
-                                Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / stats.getEncodedFrameCount()));
+                            int frameCount = coder instanceof BufferDecoder ? stats.getDecodedFrameCount() : stats.getEncodedFrameCount();
+                            Log.d(TAG, "Total frames: " + frameCount);
+                            if (frameCount > 0) {
+                                Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / frameCount));
                             }
                         } catch (ArithmeticException aex) {
                             Log.e(TAG, aex.getMessage());
