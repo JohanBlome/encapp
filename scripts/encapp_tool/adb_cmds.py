@@ -2,6 +2,7 @@
 
 import re
 import os
+import hashlib
 import subprocess
 import typing
 
@@ -368,6 +369,59 @@ def getprop(serial: str, debug=0) -> dict:
     return parse_getprop(stdout)
 
 
+def get_device_size(serial, filepath, debug):
+    # check if the file exists
+    ret, stdout, stderr = run_cmd(
+        f'adb -s {serial} shell test -e {filepath}', debug)
+    if not ret:
+        return -1
+    # get the size in bytes
+    ret, stdout, stderr = run_cmd(
+        f'adb -s {serial} shell stat -c "%s" {filepath}', debug)
+    filesize = int(stdout)
+    return filesize
+
+
+def get_device_hash(serial, filepath, debug):
+    # check if the file exists
+    ret, stdout, stderr = run_cmd(
+        f'adb -s {serial} shell test -e {filepath}', debug)
+    if not ret:
+        return -1
+    # get a hash
+    ret, stdout, stderr = run_cmd(
+        f'adb -s {serial} shell md5sum {filepath}', debug)
+    filehash = stdout.split()[0]
+    return filehash
+
+
+def get_host_hash(filepath, debug):
+    hash_md5 = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def file_already_in_device(host_filepath, serial, device_filepath, debug):
+    # 1. check the size
+    device_filesize = get_device_size(serial, device_filepath, debug)
+    if device_filesize == -1:
+        # file not in device
+        return False
+    host_filesize = os.path.getsize(host_filepath)
+    if device_filesize != host_filesize:
+        # files have different sizes
+        return False
+    # 2. check the hash
+    device_filehash = get_device_hash(serial, device_filepath, debug)
+    host_filehash = get_host_hash(host_filepath, debug)
+    if device_filehash != host_filehash:
+        # files have different hashes
+        return False
+    return True
+
+
 def push_file_to_device(filepath, serial, device_workdir, debug):
     if not os.path.exists(filepath):
         print(f'error: file "{filepath}" does not exist, check path')
@@ -375,6 +429,11 @@ def push_file_to_device(filepath, serial, device_workdir, debug):
     if not os.access(filepath, os.R_OK):
         print(f'error: file "{filepath}" is not readable')
         return False
+    # check whether a file with the same name, size, and hash exists.
+    # In that case, skip the step.
+    device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
+    if file_already_in_device(filepath, serial, device_filepath, debug):
+        return True
     ret, stdout, _ = run_cmd(
         f'adb -s {serial} push {filepath} {device_workdir}/', debug)
     if not ret:
