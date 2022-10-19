@@ -220,6 +220,10 @@ public class Statistics {
         return mEncodingFrames.size();
     }
 
+    public int getDecodedFrameCount() {
+        return mDecodingFrames.size();
+    }
+
     public void setCodec(String codec) {
         mCodec = codec;
     }
