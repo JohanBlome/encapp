@@ -26,7 +26,8 @@ import java.util.Locale;
 class BufferDecoder extends Encoder {
 
     protected static final String TAG = "encapp.decoder";
-    private static final boolean YUV_DUMP = true;
+    // Flag to dump decoded YUV
+    private static final boolean YUV_DUMP = false;
 
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
