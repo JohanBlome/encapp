@@ -34,13 +34,11 @@ public class TestDefinitionHelper {
         if (config.hasBitrateMode()) {
             int bitrateMode = config.getBitrateMode().getNumber();
             mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
-            if (bitrateMode == MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ) {
-                // check if there is a quality value
-                if (config.hasQuality()) {
-                    int quality = config.getQuality();
-                    mediaFormat.setInteger(MediaFormat.KEY_QUALITY, quality);
-                }
-            }
+        }
+        // check if there is a quality value
+        if (config.hasQuality()) {
+            int quality = config.getQuality();
+            mediaFormat.setInteger(MediaFormat.KEY_QUALITY, quality);
         }
         if (config.hasIFrameInterval()) {
             int iFrameInterval  = config.getIFrameInterval();
