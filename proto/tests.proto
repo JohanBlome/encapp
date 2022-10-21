@@ -86,6 +86,7 @@ message Configure {
   optional int64 repeat_previous_frame_after = 19;
   optional string ts_schema = 20;
   optional int32 quality = 21;
+  optional int32 complexity = 22;
 }
 
 message Runtime {

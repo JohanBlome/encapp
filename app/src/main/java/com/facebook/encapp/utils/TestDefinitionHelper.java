@@ -40,6 +40,12 @@ public class TestDefinitionHelper {
             int quality = config.getQuality();
             mediaFormat.setInteger(MediaFormat.KEY_QUALITY, quality);
         }
+        // check if there is a complexity value
+        if (config.hasComplexity()) {
+            int complexity = config.getComplexity();
+            mediaFormat.setInteger(MediaFormat.KEY_COMPLEXITY, complexity);
+        }
+        // check if there is an i-frame-interval value
         if (config.hasIFrameInterval()) {
             int iFrameInterval  = config.getIFrameInterval();
             mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
