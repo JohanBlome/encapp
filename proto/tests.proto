@@ -85,7 +85,7 @@ message Configure {
   optional int32 latency = 18;
   optional int64 repeat_previous_frame_after = 19;
   optional string ts_schema = 20;
-  optional int32 quality_level = 21;
+  optional int32 quality = 21;
 }
 
 message Runtime {
