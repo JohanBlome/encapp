@@ -561,7 +561,7 @@ def get_options(argv):
             options.replace[k1][k2] = values[1]
     parser.add_argument(
         '-e', '--replace', action=ReplaceAction, nargs=2,
-        help='use <key> <value>',
+        help='use <key> <value> (e.g. "-e configure.bitrate_mode cbr")',
         default={})
 
     # replacement shortcuts
