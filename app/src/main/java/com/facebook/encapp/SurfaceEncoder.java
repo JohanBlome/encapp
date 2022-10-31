@@ -225,7 +225,7 @@ class SurfaceEncoder extends Encoder {
             }
             try {
                 int flags = 0;
-                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, false)) {
+                if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     Log.d(TAG, "Done with input, flag endof stream!");
                     mOutputMult.stopAndRelease();
@@ -311,7 +311,7 @@ class SurfaceEncoder extends Encoder {
                                     mYuvReader.closeFile();
                                 }
                                 current_loop++;
-                                if (doneReading(mTest, mInFramesCount, mCurrentTimeSec, true)) {
+                                if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true)) {
                                     Log.d(TAG, "Done with input!");
                                     done = true;
                                 }
