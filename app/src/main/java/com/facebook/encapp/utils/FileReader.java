@@ -31,6 +31,12 @@ public class FileReader {
         return true;
     }
 
+    public boolean isClosed() {
+        synchronized (this) {
+            return (mBis == null);
+        }
+    }
+
     public void closeFile() {
         try {
             synchronized (this) {
@@ -47,7 +53,9 @@ public class FileReader {
 
     public int fillBuffer(ByteBuffer byteBuffer, int size){
         synchronized (this) {
-            if (mBis == null) return 0;
+            if (isClosed()) {
+                return 0;
+            }
         }
         if (byteBuffer.hasArray()) {
             byte[] bytes = byteBuffer.array();
