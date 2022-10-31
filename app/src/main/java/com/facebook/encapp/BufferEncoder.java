@@ -58,10 +58,10 @@ class BufferEncoder extends Encoder {
 
         MediaFormat mediaFormat;
         try {
-            //Unless we have a mime, do lookup
+            // Unless we have a mime, do lookup
             if (test.getConfigure().getMime().length() == 0) {
                 Log.d(TAG, "codec id: " + test.getConfigure().getCodec());
-                //TODO: throw error on failed lookup
+                // TODO: throw error on failed lookup
                 test = setCodecNameAndIdentifier(test);
             }
             Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
@@ -140,6 +140,7 @@ class BufferEncoder extends Encoder {
                 Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
                         ", current loop: " + ", current time: " + currentTime + " sec");
             }
+            // 1. process the encoder input
             try {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
@@ -169,6 +170,7 @@ class BufferEncoder extends Encoder {
                         if (size == -2) {
                             continue;
                         } else if (size <= 0) {
+                            // restart the loop
                             mYuvReader.closeFile();
                             current_loop++;
                             if (doneReading(test, mInFramesCount, mCurrentTimeSec, true)) {
@@ -198,6 +200,7 @@ class BufferEncoder extends Encoder {
                 ex.printStackTrace();
             }
 
+            // 2. process the encoder output
             index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
