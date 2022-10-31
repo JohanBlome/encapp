@@ -206,7 +206,11 @@ class BufferEncoder extends Encoder {
             index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                //Just ignore
+                // check if the input is already done
+                if (input_done) {
+                    output_done = true;
+                }
+                // otherwise ignore
             } else if (index >= 0) {
                 if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                     MediaFormat oformat = mCodec.getOutputFormat();
