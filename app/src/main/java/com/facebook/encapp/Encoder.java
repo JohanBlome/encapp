@@ -270,24 +270,29 @@ public abstract class Encoder {
         }
     }
 
-    boolean doneReading(Test test, int frame, double time, boolean loop) {
-        boolean done = false;
-        if (!test.getInput().hasStoptimeSec() && !test.getInput().hasPlayoutFrames() && loop) {
+    boolean doneReading(Test test, FileReader fileReader, int frame, double time, boolean loop) {
+        if (loop && !test.getInput().hasStoptimeSec() && !test.getInput().hasPlayoutFrames()) {
+            // 1. stop the reading when in loop mode:
+            /// ???
             return true;
         }
         if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {
+            // 2. stop the reader based on explicit playout frames parameter:
+            // stop if we reached the explicit playout frames
             if (frame >= test.getInput().getPlayoutFrames()) {
-                done = true;
+                return true;
             }
         }
         if (test.getInput().hasStoptimeSec() && test.getInput().getStoptimeSec() > 0) {
+            // 3. stop the reader based on explicit stoptime parameter:
+            // stop if we reached the explicit stoptime
             if (time >= test.getInput().getStoptimeSec()) {
                 Log.d(TAG, "Stoptime reached: " + time + " - " + test.getInput().getStoptimeSec());
-                done = true;
+                return true;
             }
         }
-
-        return done;
+        // do not stop the reader
+        return false;
     }
 
     public void setRuntimeParameters(int frame) {

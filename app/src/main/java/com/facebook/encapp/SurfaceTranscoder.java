@@ -505,7 +505,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
                     }
 
-                    if (doneReading(mTest, mInFramesCount, runtime, false)) {
+                    if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
                     }
@@ -548,7 +548,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
                         mLoopTime = mPtsOffset /1000000.0;
                         Log.d(TAG, "*** Loop ended starting " + mCurrentLoop + " - currentTime " + mCurrentTimeSec + " ***");
-                        if (doneReading(mTest, mInFramesCount, runtime, true)) {
+                        if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, true)) {
                             mDone = true;
                         }
                     }
