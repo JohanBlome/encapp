@@ -487,13 +487,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             while (!mDone) {
                 while (mDecoderBuffers.size() > 0 && !mDone) {
                     if (mInFramesCount % 100 == 0) {
-                        if (mNoEncoding) {
-                            Log.d(TAG, "Decoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrentLoop + ", current time: " + mCurrentTimeSec + " sec");
-                        } else {
-                            Log.d(TAG, "Transcoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                                    ", current loop: " + mCurrentLoop + ", current time: " + mCurrentTimeSec + " sec");
-                        }
+                        Log.d(TAG, (mNoEncoding ? "Decoder: " : "Transcoder: ") +
+                                "frames: " + mFramesAdded +
+                                " inframes: " + mInFramesCount +
+                                " current_loop: " + mCurrentLoop +
+                                " current_time: " + mCurrentTimeSec);
                     }
 
                     Integer index = mDecoderBuffers.poll();

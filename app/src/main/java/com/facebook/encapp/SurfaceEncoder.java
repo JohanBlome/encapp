@@ -214,11 +214,14 @@ class SurfaceEncoder extends Encoder {
         int errorCounter = 0;
         while (!done) {
             if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
-                Log.d(TAG, "SurfaceEncoder, Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        " current time: " + mCurrentTimeSec + " sec, frame rate: " + mFrameRate +
-                        ", calc. frame rate: " + (int) (mFramesAdded / mCurrentTimeSec + .5f) +
-                        ", input frame rate: " + (int) (mInFramesCount / mCurrentTimeSec + .5f) +
-                        ", id: " + mStats.getId());
+                Log.d(TAG, "SurfaceEncoder: frames: " + mFramesAdded +
+                        " inframes: " + mInFramesCount +
+                        " current_loop: " + current_loop +
+                        " current_time: " + mCurrentTimeSec +
+                        " frame_rate: " + mFrameRate +
+                        " calc_frame_rate: " + (int) (mFramesAdded / mCurrentTimeSec + .5f) +
+                        " input_frame_rate: " + (int) (mInFramesCount / mCurrentTimeSec + .5f) +
+                        " id: " + mStats.getId());
             }
             try {
                 int flags = 0;

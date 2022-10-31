@@ -137,8 +137,10 @@ class BufferEncoder extends Encoder {
         while (!input_done || !output_done) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "Frames: " + mFramesAdded + " - inframes: " + mInFramesCount +
-                        ", current loop: " + ", current time: " + currentTime + " sec");
+                Log.d(TAG, "BufferEncoder: frames: " + mFramesAdded +
+                        " inframes: " + mInFramesCount +
+                        " current_loop: " + current_loop +
+                        " current_time: " + currentTime);
             }
             // 1. process the encoder input
             try {
