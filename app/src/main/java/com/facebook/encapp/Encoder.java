@@ -291,6 +291,11 @@ public abstract class Encoder {
                 return true;
             }
         }
+        // 4. stop the reader in non-loop mode:
+        // stop when the file is empty
+       if (!loop && fileReader.isClosed()) {
+            return true;
+        }
         // do not stop the reader
         return false;
     }
