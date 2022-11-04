@@ -293,7 +293,7 @@ public abstract class Encoder {
         }
         // 4. stop the reader in non-loop mode:
         // stop when the file is empty
-       if (!loop && fileReader.isClosed()) {
+       if ((!loop && fileReader != null) && fileReader.isClosed()) {
             return true;
         }
         // do not stop the reader
