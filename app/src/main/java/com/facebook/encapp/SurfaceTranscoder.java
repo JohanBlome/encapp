@@ -119,17 +119,18 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             Log.d(TAG, "Check parsed input format:");
             logMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
-         /*   if (noEncoding) {
+            if (mNoEncoding &&  test.getConfigure().hasCodec()) {
                 //TODO: throw error on failed lookup
                 //TODO: fix decoder lookup
-                test = setCodecNameAndIdentifier(test);
+                //TODO: currently either decoder or encoder can be set, need both?
+                //test = setCodecNameAndIdentifier(test);
                 Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
-                mDecoder = MediaCodec.createByCodecName(test.getDecoderConfigure().getCodec());
-
-            } else {*/
-            Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
-            mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
-            //}
+                mDecoder = MediaCodec.createByCodecName(test.getConfigure().getCodec());
+            } else {
+                Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
+            }
         } catch (IOException e) {
             mExtractor.release();
             e.printStackTrace();

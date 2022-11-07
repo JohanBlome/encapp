@@ -561,13 +561,11 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
             OutputAndTexture ot = null;
             if (test.getConfigure().getSurface()) {
-
                 if (mViewsToDraw.size() > 0 &&
                         test.getInput().hasShow() &&
                         test.getInput().getShow()) {
                     ot = getFirstFreeTextureView();
                 }
-
             }
             if (filePath.toLowerCase(Locale.US).equals("camera")) {
                 setupCamera(ot);
@@ -603,7 +601,11 @@ public class MainActivity extends AppCompatActivity {
                 if (ot != null) {
                     ot.mMult = mult;
                 }
-                coder = new SurfaceEncoder(this, mult);
+                if (test.getConfigure().getEncode()) {
+                    coder = new SurfaceEncoder(this, mult);
+                } else {
+                    coder = new SurfaceNoEncoder(mult);
+                }
 
             } else {
                 coder = new BufferEncoder();
@@ -666,7 +668,12 @@ public class MainActivity extends AppCompatActivity {
                 } finally {
                     decreaseTestsInflight();
                     log("\nDone test: " + description);
-                    Log.d(TAG, "Done test: " + coder.getStatistics().getId() + ", to go: " + mInstancesRunning);
+                    Statistics stats = coder.getStatistics();
+                    if (stats != null) {
+                        Log.d(TAG, "Done test: " + stats.getId() + ", to go: " + mInstancesRunning);
+                    } else {
+                        Log.d(TAG, "Done test, stats failed, to go: " + mInstancesRunning);
+                    }
                 }
             }
         }, "TestRunner_" + coder.getOutputFilename());
