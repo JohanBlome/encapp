@@ -601,10 +601,10 @@ public class MainActivity extends AppCompatActivity {
                 if (ot != null) {
                     ot.mMult = mult;
                 }
-                if (test.getConfigure().getEncode()) {
-                    coder = new SurfaceEncoder(this, mult);
-                } else {
+                if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
                     coder = new SurfaceNoEncoder(mult);
+                } else {
+                    coder = new SurfaceEncoder(this, mult);
                 }
 
             } else {
