@@ -124,7 +124,7 @@ def search(options):
     data['configure.bitrate'] = data['configure.bitrate'].apply(
         lambda x: encapp.convert_to_bps(x))
     if options.codec:
-        data = data.loc[data['codec'].str.contains(options.codec)]
+        data = data.loc[data['configure.codec'].str.contains(options.codec, na=False)]
     if options.bitrate:
         ranges = options.bitrate.split('-')
         vals = []
