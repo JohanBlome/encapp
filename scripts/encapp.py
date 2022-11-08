@@ -593,7 +593,7 @@ def get_options(argv):
         metavar='device_workdir',
         help='work (storage) directory on device',)
     parser.add_argument(
-        '--local-workdir', type=str, dest='local_workdir',
+        '-wd', '--local-workdir', type=str, dest='local_workdir',
         default=default_values['local_workdir'],
         metavar='local_workdir',
         help='work (storage) directory on local host',)
