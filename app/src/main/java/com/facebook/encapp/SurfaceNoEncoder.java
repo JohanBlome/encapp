@@ -50,15 +50,16 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
     long mVsyncTimeNs = 0;
     long mFirstSynchNs = -1;
 
-    public SurfaceNoEncoder(OutputMultiplier multiplier ) {
+    public SurfaceNoEncoder(Test test, OutputMultiplier multiplier ) {
+        super(test);
         mOutputMult = multiplier;
     }
 
 
-    public String start(Test test) {
+    public String start() {
         Surface surface = null;
         SurfaceTexture surfaceTexture = null;
-        mTest = test;
+
         mNoEncoding = true;
         Log.d(TAG, "**** Surface Decode, no encode ***");
         mStable = true;
@@ -114,11 +115,10 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
         }
         mStats.start();
         boolean done = false;
-        mStable = true;
+
         long lastPtsUsec = -1;
         int errorCounter = 0;
         while(!done) {
-            if (MainActivity.isStable()) {
                 if (mInFramesCount % 100 == 0 && MainActivity.isStable()) {
                     Log.d(TAG, "SurfaceEncoder: frames: " + mFramesAdded +
                             " inframes: " + mInFramesCount +
@@ -127,20 +127,30 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
                             " input_frame_rate: " + (int) (mInFramesCount / mCurrentTimeSec + .5f) +
                             " id: " + mStats.getId());
                 }
-                int flags = 0;
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
-                    mOutputMult.stopAndRelease();
+                    //mOutputMult.stopAndRelease();
                     done = true;
                 }
 
-                int size = -1;
-
                 try {
-                    long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
-                    if (lastPtsUsec >= 0)
-                        mStats.stopDecodingFrame(lastPtsUsec);
-                    setRuntimeParameters(mInFramesCount);
+                    long time = lastPtsUsec - (long)mFirstFrameTimestampUsec;
+                    if (mFirstFrameTimestampUsec == -1) {
+                        time = 0;
+                        if (lastPtsUsec > 0) {
+                            mFirstFrameTimestampUsec = lastPtsUsec;
+                        }
+                    }
 
+                    if (MainActivity.isStable()) {
+                        mStats.startDecodingFrame(time, 0, 0);
+                    }
+                    long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
+                    mStable = true;
+                    if (lastPtsUsec >= 0)
+                        mStats.stopDecodingFrame(time);
+                    lastPtsUsec = timestampUsec;
+                    setRuntimeParameters(mInFramesCount);
+                    mCurrentTimeSec = time/1000000;
                     mInFramesCount++;
 
                 } catch (Exception ex) {
@@ -155,15 +165,17 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
 
                 }
 
-            }
+
         }
 
         mStats.stop();
+        Log.d(TAG, mTest.getCommon().getId() + " - SurfaceNoEncode done");
+        if (mVsyncHandler != null)
+            mVsyncHandler.removeListener(this);
 
         if (mOutputMult != null) {
-            mOutputMult.stopAndRelease();
+            //mOutputMult.stopAndRelease();
         }
-
 
         if (mFrameSwapSurface != null && mOutputMult != null) {
             mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
@@ -190,5 +202,9 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
             mVsyncTimeNs = frameTimeNs;
             mSyncLock.notifyAll();
         }
+    }
+
+    public void release() {
+        mOutputMult.stopAndRelease();
     }
 }

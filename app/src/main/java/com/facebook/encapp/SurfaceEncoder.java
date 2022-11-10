@@ -52,27 +52,29 @@ class SurfaceEncoder extends Encoder {
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     private FrameswapControl mFrameSwapSurface;
 
-    public SurfaceEncoder(Context context, OutputMultiplier multiplier) {
+    public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier) {
+        super(test);
         mOutputMult = multiplier;
         mContext = context;
     }
 
-    public SurfaceEncoder(Context context) {
+    public SurfaceEncoder(Test test, Context context) {
+        super(test);
         mContext = context;
     }
 
-    public SurfaceEncoder(){}
-    public String start(Test test) {
-        return encode(test, null);
+    public SurfaceEncoder(Test test){
+        super(test);
+    }
+    public String start() {
+        return encode(null);
     }
 
     public String encode(
-            Test test,
             Object synchStart) {
         mStable = false;
         mKeyFrameBundle = new Bundle();
         mKeyFrameBundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-        mTest = test;
         Log.d(TAG, "** Surface input encoding - " + mTest.getCommon().getDescription() + " **");
         mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
         if (mTest.hasRuntime())
@@ -214,7 +216,7 @@ class SurfaceEncoder extends Encoder {
         int errorCounter = 0;
         while (!done) {
             if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
-                Log.d(TAG, "SurfaceEncoder: frames: " + mFramesAdded +
+                Log.d(TAG, mTest.getCommon().getId() + " - SurfaceEncoder: frames: " + mFramesAdded +
                         " inframes: " + mInFramesCount +
                         " current_loop: " + current_loop +
                         " current_time: " + mCurrentTimeSec +
@@ -227,15 +229,19 @@ class SurfaceEncoder extends Encoder {
                 int flags = 0;
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                    Log.d(TAG, "Done with input, flag endof stream!");
-                    mOutputMult.stopAndRelease();
+                    Log.d(TAG, mTest.getCommon().getId() + " - Done with input, flag endof stream!");
+                    //mOutputMult.stopAndRelease();
                     done = true;
+                    continue;
                 }
 
                 int size = -1;
 
                 if (mIsCameraSource) {
                     try {
+                        if (done) {
+                            Log.e(TAG, mTest.getCommon().getId() + " - Oh no. We are done!");
+                        }
                         long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
                         if (!MainActivity.isStable()) {
                             if (!mFpsMeasure.isStable()) {
@@ -374,7 +380,7 @@ class SurfaceEncoder extends Encoder {
         }
         Log.d(TAG, "Stop writer");
         mDataWriter.stopWriter();
-        mOutputMult.stopAndRelease();
+        //mOutputMult.stopAndRelease();
         return "";
     }
 
@@ -448,5 +454,11 @@ class SurfaceEncoder extends Encoder {
     }
 
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
+
+    public void stopAllActivity(){}
+
+    public void release() {
+        mOutputMult.stopAndRelease();
     }
 }

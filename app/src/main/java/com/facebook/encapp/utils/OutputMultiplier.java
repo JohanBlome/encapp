@@ -129,8 +129,27 @@ public class OutputMultiplier {
     }
 
     public void stopAndRelease() {
+        mMessageHandler.removeListener(mRenderer);
         if (mRenderer != null) {
             mRenderer.quit();
+        }
+
+        synchronized (mLock) {
+            for (FrameswapControl swap : mOutputSurfaces) {
+                swap.release();
+            }
+            mOutputSurfaces.removeAllElements();
+        }
+        if (mMasterSurface != null)
+            mMasterSurface.release();
+        if (mInputSurface != null) {
+            mInputSurface.release();
+        }
+        if (mInputTexture != null) {
+            mInputTexture.release();
+        }
+        if (mEglCore != null) {
+            mEglCore.release();
         }
         Log.d(TAG, "Done stop and release");
     }
@@ -278,13 +297,15 @@ public class OutputMultiplier {
         }
 
         private long awaitNewImage() {
+            long time = System.nanoTime();
             synchronized (mFrameDrawnLock) {
                 try {
                     mFrameDrawnLock.wait(WAIT_TIME_SHORT_MS);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                    long stuck = System.nanoTime() - time;
                     Log.e(TAG, "Forced to release a timed wait indicates an error.");
-                    Log.e(TAG, "Release me.");
+                    Log.e(TAG, "Release me. I was stuck for " + (int)(stuck/1000000) + " ms");
                     stopAndRelease();
                 }
             }
@@ -476,9 +497,11 @@ public class OutputMultiplier {
         public void quit() {
             mDone = true;
             synchronized (mInputFrameLock) {
+                Log.e(TAG, "Release inputframe lock!");
                 mInputFrameLock.notifyAll();
             }
             synchronized (mFrameDrawnLock) {
+                Log.e(TAG, "Release frame drawn lock!");
                 mFrameDrawnLock.notifyAll();
             }
         }

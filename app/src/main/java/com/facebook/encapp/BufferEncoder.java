@@ -26,51 +26,49 @@ import java.util.Locale;
  */
 
 class BufferEncoder extends Encoder {
-    public String start(Test td, OutputMultiplier multiplier) {
-        //Maybe we can show it?
-        return start(td);
+    public BufferEncoder(Test test) {
+        super(test);
     }
 
-    public String start(
-            Test test) {
-        Log.d(TAG, "** Raw buffer encoding - " + test.getCommon().getDescription() + " **");
-        test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
-        if (test.hasRuntime())
-            mRuntimeParams = test.getRuntime();
-        if (test.getInput().hasRealtime())
-            mRealtime = test.getInput().getRealtime();
+    public String start() {
+        Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
+        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        if (mTest.hasRuntime())
+            mRuntimeParams = mTest.getRuntime();
+        if (mTest.getInput().hasRealtime())
+            mRealtime = mTest.getInput().getRealtime();
 
-        mFrameRate = test.getConfigure().getFramerate();
-        mWriteFile = !test.getConfigure().hasEncode() || test.getConfigure().getEncode();
+        mFrameRate = mTest.getConfigure().getFramerate();
+        mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
         mSkipped = 0;
         mFramesAdded = 0;
-        Size sourceResolution = SizeUtils.parseXString(test.getInput().getResolution());
+        Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);
 
-        mRealtime = test.getInput().getRealtime();
-        mStats = new Statistics("raw encoder", test);
+        mRealtime = mTest.getInput().getRealtime();
+        mStats = new Statistics("raw encoder", mTest);
         mYuvReader = new FileReader();
 
-        if (!mYuvReader.openFile(checkFilePath(test.getInput().getFilepath()))) {
+        if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()))) {
             return "\nCould not open file";
         }
 
         MediaFormat mediaFormat;
         try {
             // Unless we have a mime, do lookup
-            if (test.getConfigure().getMime().length() == 0) {
-                Log.d(TAG, "codec id: " + test.getConfigure().getCodec());
+            if (mTest.getConfigure().getMime().length() == 0) {
+                Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
                 // TODO: throw error on failed lookup
-                test = setCodecNameAndIdentifier(test);
+                mTest = setCodecNameAndIdentifier(mTest);
             }
-            Log.d(TAG, "Create codec by name: " + test.getConfigure().getCodec());
-            mCodec = MediaCodec.createByCodecName(test.getConfigure().getCodec());
+            Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
+            mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
 
-            mediaFormat = TestDefinitionHelper.buildMediaFormat(test);
-            Log.d(TAG, "MediaFormat (test)");
+            mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+            Log.d(TAG, "MediaFormat (mTest)");
             logMediaFormat(mediaFormat);
-            setConfigureParams(test, mediaFormat);
+            setConfigureParams(mTest, mediaFormat);
             // Needed for the buffer input. this can be either nv12, nv21 or yuv420p
             mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             Log.d(TAG, "MediaFormat (configure)");
@@ -81,7 +79,7 @@ class BufferEncoder extends Encoder {
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
-            Log.d(TAG, "MediaFormat (post-test)");
+            Log.d(TAG, "MediaFormat (post-mTest)");
             logMediaFormat(mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -105,7 +103,7 @@ class BufferEncoder extends Encoder {
             return "Start encoding failed";
         }
 
-        float mReferenceFrameRate = test.getInput().getFramerate();
+        float mReferenceFrameRate = mTest.getInput().getFramerate();
         mKeepInterval = mReferenceFrameRate / mFrameRate;
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -137,7 +135,7 @@ class BufferEncoder extends Encoder {
         while (!input_done || !output_done) {
             int index;
             if (mFramesAdded % 100 == 0) {
-                Log.d(TAG, "BufferEncoder: frames: " + mFramesAdded +
+                Log.d(TAG, mTest.getCommon().getId() + " - BufferEncoder: frames: " + mFramesAdded +
                         " inframes: " + mInFramesCount +
                         " current_loop: " + current_loop +
                         " current_time: " + currentTime);
@@ -147,7 +145,7 @@ class BufferEncoder extends Encoder {
                 index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
                 int flags = 0;
 
-                if (doneReading(test, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
+                if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     input_done = true;
                 }
@@ -175,7 +173,7 @@ class BufferEncoder extends Encoder {
                             // restart the loop
                             mYuvReader.closeFile();
                             current_loop++;
-                            if (doneReading(test, mYuvReader, mInFramesCount, mCurrentTimeSec, true)) {
+                            if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true)) {
                                 input_done = true;
                                 // Set EOS flag and call encoder
                                 flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
@@ -190,7 +188,7 @@ class BufferEncoder extends Encoder {
 
                             if (!input_done) {
                                 Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                mYuvReader.openFile(test.getInput().getFilepath());
+                                mYuvReader.openFile(mTest.getInput().getFilepath());
                                 Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                             }
                         }
@@ -259,5 +257,10 @@ class BufferEncoder extends Encoder {
     }
 
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
+
+    public void stopAllActivity(){}
+
+    public void release() {
     }
 }

@@ -33,6 +33,9 @@ public class VsyncHandler extends Thread implements Choreographer.FrameCallback 
         mListeners.add(listener);
     }
 
+    public void removeListener(VsyncListener listener) {
+        mListeners.remove(listener);
+    }
     /**
      * Called when a new display frame is being rendered.
      * <p>

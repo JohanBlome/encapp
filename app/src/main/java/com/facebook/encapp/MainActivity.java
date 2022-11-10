@@ -391,10 +391,10 @@ public class MainActivity extends AppCompatActivity {
                                 mCameraSource.registerSurface(outputSurface, 1280, 720);
                                 if (test.getInput().hasFramerate())
                                     mCameraSource.setFps(test.getInput().getFramerate());
+                                Log.d(TAG, "Start camera source");
                                 CameraSource.start();
                                 cameraStarted = true;
                             }
-
                             // Start them all
                             for (Encoder enc : mEncoderList) {
                                 synchronized (enc) {
@@ -402,7 +402,8 @@ public class MainActivity extends AppCompatActivity {
                                     enc.notifyAll();
                                 }
                             }
-
+                            Log.d(TAG, "Start encoders");
+                            // Start them all
                             // Wait for stable conditions
                             int stableCounter = 0;
                             while (stableCounter < mEncoderList.size()) {
@@ -419,10 +420,16 @@ public class MainActivity extends AppCompatActivity {
                             while (mViewsToDraw.size() > 0 && !mLayoutDone) {
                                 try {
                                     Log.d(TAG, "Wait for layout to be made");
-                                    Thread.sleep(50);
+                                    Thread.sleep(100);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
+                            }
+                            try {
+                                Log.d(TAG, "Sleep for two secs to catch up");
+                                Thread.sleep(4000);
+                            } catch (InterruptedException iex) {
+                                Log.d(TAG, "exc.: " + iex.getLocalizedMessage());
                             }
                             mStable = true;
                             Log.d(TAG, "\n\n*** All inputs stable - go on!   ***\n\n");
@@ -454,8 +461,17 @@ public class MainActivity extends AppCompatActivity {
                                             if (p.getState() == Thread.State.WAITING ||
                                                 p.getState() == Thread.State.TIMED_WAITING ||
                                                 p.getState() == Thread.State.BLOCKED) {
-                                                Log.d(TAG, p.getName() + " is still waiting. \nThis is probably not correct.");
-                                                p.interrupt();
+                                                Log.d(TAG, p.getName() + " is still waiting (" + p.getState() + ").\nThis is probably not correct.\nTry to release");
+                                                for (Encoder coder: mEncoderList) {
+                                                    coder.release();
+                                                }
+                                                if (p.getState() == Thread.State.WAITING ||
+                                                        p.getState() == Thread.State.TIMED_WAITING ||
+                                                        p.getState() == Thread.State.BLOCKED) {
+                                                    Log.d(TAG, p.getName() + " is still stuck");
+                                                    p.interrupt();
+                                                }
+
                                                 decreaseTestsInflight(); //????
                                             }
                                         } catch (InterruptedException e) {
@@ -481,6 +497,12 @@ public class MainActivity extends AppCompatActivity {
 
                 } while (mInstancesRunning > 0);
                 Log.d(TAG, "Done with tests, instances: " + mInstancesRunning);
+                for (Encoder coder: mEncoderList) {
+                    coder.release();
+                }
+                if (mCameraSource != null) {
+                    mCameraSource.closeCamera();
+                }
                 try {
                     if (mUIHoldtimeSec > 0) {
                         Thread.sleep(mUIHoldtimeSec);
@@ -549,9 +571,9 @@ public class MainActivity extends AppCompatActivity {
         final String description = test.getCommon().getDescription();
 
         if (test.getConfigure().getEncode()) {
-            log("\n\nStart Test: " + description);
+            log("\n\nPrepare Test: " + description);
         } else {
-            log("\n\nStart Test of decoder: " + description +
+            log("\n\nPrepare Test of decoder: " + description +
                     "(" + mInstancesRunning + ")");
         }
 
@@ -564,6 +586,7 @@ public class MainActivity extends AppCompatActivity {
                 if (mViewsToDraw.size() > 0 &&
                         test.getInput().hasShow() &&
                         test.getInput().getShow()) {
+                    Log.d(TAG, test.getCommon().getId() + " - get texture");
                     ot = getFirstFreeTextureView();
                 }
             }
@@ -576,7 +599,7 @@ public class MainActivity extends AppCompatActivity {
                 // A decoder is needed
                 if (ot != null) {
                     ot.mMult = new OutputMultiplier(mVsyncHandler);
-                    coder = new SurfaceTranscoder(ot.mMult, mVsyncHandler);
+                    coder = new SurfaceTranscoder(test, ot.mMult, mVsyncHandler);
                     ot.mEncoder = coder;
                     if (!test.getConfigure().getEncode() &&
                             ot.mMult != null &&
@@ -585,9 +608,9 @@ public class MainActivity extends AppCompatActivity {
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
                 } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
-                    coder = new BufferDecoder();
+                    coder = new BufferDecoder(test);
                 } else {
-                    coder = new SurfaceTranscoder(new OutputMultiplier(mVsyncHandler), mVsyncHandler);
+                    coder = new SurfaceTranscoder(test, new OutputMultiplier(mVsyncHandler), mVsyncHandler);
                 }
             } else if (test.getConfigure().getSurface()) {
                 OutputMultiplier mult = null;
@@ -596,24 +619,31 @@ public class MainActivity extends AppCompatActivity {
                         filePath.toLowerCase(Locale.US).contains(".rgba")) {
                     mult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D, mVsyncHandler);
                 } else if (filePath.toLowerCase(Locale.US).contains("camera")) {
-                    mult = mCameraSourceMultiplier;
+                    if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
+                        // TODO: create a separate viewfinder camera instance in this case
+                        // most android devices support two surfaces from the camera
+                        mult = mCameraSourceMultiplier;
+                    } else {
+                        mult = mCameraSourceMultiplier;
+                    }
                 }
                 if (ot != null) {
                     ot.mMult = mult;
                 }
                 if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
-                    coder = new SurfaceNoEncoder(mult);
+                    coder = new SurfaceNoEncoder(test, mult);
                 } else {
-                    coder = new SurfaceEncoder(this, mult);
+                    coder = new SurfaceEncoder(test, this, mult);
                 }
 
             } else {
-                coder = new BufferEncoder();
+                coder = new BufferEncoder(test);
             }
 
 
             if (ot != null) {
                 ot.mEncoder = coder;
+                Log.d(TAG, "Add surface texture for " + test.getCommon().getId() + " st: "+ot.mView.getSurfaceTexture());
                 ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
             }
             Log.d(TAG, "Add encoder to list");
@@ -625,10 +655,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    Log.d(TAG, "Start test");
-                    final String status = coder.start(test);
-                    Log.d(TAG, "Test done: " + coder.mFilename + " - " + coder.getStatistics().getId());
-                    Log.d(TAG, "Get stats");
+                    Log.d(TAG, "Start test id:" + test.getCommon().getId());
+                    final String status = coder.start();
+                    Log.d(TAG, "Test done " + status + ": " + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId());
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
@@ -643,6 +672,7 @@ public class MainActivity extends AppCompatActivity {
 
                     Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
                     if (status.length() > 0) {
+                        coder.stopAllActivity();
                         log("\nTest failed: " + description);
                         log("\n" + status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
@@ -667,16 +697,17 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } finally {
                     decreaseTestsInflight();
-                    log("\nDone test: " + description);
+                    log("\nDone test: " + test.getCommon().getId());
                     Statistics stats = coder.getStatistics();
                     if (stats != null) {
-                        Log.d(TAG, "Done test: " + stats.getId() + ", to go: " + mInstancesRunning);
+                        Log.d(TAG, "Done test: " + test.getCommon().getId() + " with stats: " + stats.getId() + ", to go: " + mInstancesRunning);
+
                     } else {
                         Log.d(TAG, "Done test, stats failed, to go: " + mInstancesRunning);
                     }
                 }
             }
-        }, "TestRunner_" + coder.getOutputFilename());
+        }, "TestRunner_" + coder.mTest.getCommon().getId());
         t.start();
 
         int waitTime = 10000; //ms
@@ -765,15 +796,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void setupCamera(OutputAndTexture ot) {
+        Log.d(TAG, "Setup camera");
         mCameraSource = CameraSource.getCamera(this);
         if (mCameraSourceMultiplier == null) {
+            Log.d(TAG, "Create outputmult");
             mCameraSourceMultiplier = new OutputMultiplier(mVsyncHandler);
             mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
         }
         if (ot != null) {
+            Log.d(TAG, "Set to output and texture");
             ot.mMult = mCameraSourceMultiplier;
-            //ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
-            mCameraSourceMultiplier = ot.mMult;
             mCameraSourceMultiplier.setHighPrio();
             // This is for camera, if mounted at an angle
             Size previewSize = new Size(mCameraMaxWidth, mCameraMaxHeight);

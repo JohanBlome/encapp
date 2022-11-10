@@ -71,7 +71,8 @@ public abstract class Encoder {
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
 
-    public Encoder() {
+    public Encoder(Test test) {
+        mTest = test;
         mDataWriter = new DataWriter();
         mDataWriter.start();
     }
@@ -83,7 +84,9 @@ public abstract class Encoder {
         Log.d(TAG, mediaFormatString);
     }
 
-    public abstract String start(Test td);
+    public abstract String start();
+
+    public abstract void stopAllActivity();
 
     public boolean isStable() {
         return mStable;
@@ -287,7 +290,7 @@ public abstract class Encoder {
             // 3. stop the reader based on explicit stoptime parameter:
             // stop if we reached the explicit stoptime
             if (time >= test.getInput().getStoptimeSec()) {
-                Log.d(TAG, "Stoptime reached: " + time + " - " + test.getInput().getStoptimeSec());
+                Log.d(TAG, test.getCommon().getId() + " - Stoptime reached: " + time + " - " + test.getInput().getStoptimeSec());
                 return true;
             }
         }
@@ -413,6 +416,7 @@ public abstract class Encoder {
         return read;
     }
 
+    public abstract void release();
 
     public abstract void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder);
 

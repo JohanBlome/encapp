@@ -32,15 +32,17 @@ class BufferDecoder extends Encoder {
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
 
-    public String start(Test td, OutputMultiplier multiplier) {
-        return start(td);
+    public BufferDecoder(Test test) {
+        super(test);
     }
 
-    public String start(
-            Test test) {
-        Log.d(TAG,"** Buffer decoding - " + test.getCommon().getDescription());
-        test = TestDefinitionHelper.checkAnUpdateBasicSettings(test);
-        mTest = test;
+    public String start(OutputMultiplier multiplier) {
+        return start();
+    }
+
+    public String start() {
+        Log.d(TAG,"** Buffer decoding - " + mTest.getCommon().getDescription());
+        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
 
         if (mTest.getInput().hasRealtime()) {
             mRealtime = mTest.getInput().getRealtime();
@@ -71,7 +73,7 @@ class BufferDecoder extends Encoder {
                 return "no input format";
             }
 
-            Log.d(TAG, "Create decoder by name: " + test.getConfigure().getCodec());
+            Log.d(TAG, "Create decoder by name: " + mTest.getConfigure().getCodec());
             mDecoder = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
 
             Log.d(TAG, "MediaFormat (test)");
@@ -254,5 +256,10 @@ class BufferDecoder extends Encoder {
             }
         }
         if(YUV_DUMP) fo.close();
+    }
+
+    public void stopAllActivity(){}
+
+    public void release() {
     }
 }
