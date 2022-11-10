@@ -48,21 +48,22 @@ def getFilesInDir(directory, recursive):
                 files = files + getFilesInDir(full_path, recursive)
     return files
 
-
+common_data=['common', 'input', 'configure']
 def dict_flatten(test):
     key_list = []
     val_list = []
     for k1, v1 in test.items():
-        for k2, v2 in v1.items():
-            if k2 == 'resolution':
-                sizes = v2.split('x')
-                key_list.append(f'{k1}.width')
-                key_list.append(f'{k1}.height')
-                val_list.append(int(sizes[0]))
-                val_list.append(int(sizes[1]))
-                continue
-            key_list.append(f'{k1}.{k2}')
-            val_list.append(v2)
+        if k1 in common_data:
+            for k2, v2 in v1.items():
+                if k2 == 'resolution':
+                    sizes = v2.split('x')
+                    key_list.append(f'{k1}.width')
+                    key_list.append(f'{k1}.height')
+                    val_list.append(int(sizes[0]))
+                    val_list.append(int(sizes[1]))
+                    continue
+                key_list.append(f'{k1}.{k2}')
+                val_list.append(v2)
     return key_list, val_list
 
 
