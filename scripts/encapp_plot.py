@@ -19,6 +19,12 @@ def plotAverageBitrate(data, options):
     pair = []
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
 
     uniqheight = np.unique(data["height"])
     uniqbr = np.unique(data["bitrate"])
@@ -68,11 +74,26 @@ def plotProcRate(data, options):
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
 
-    st = np.min(data["starttime"][0])
+    print(f"{data}")
+    slen = int(data["fps"].iloc[0])
+    # vals = data['av_proc_fps']#.rolling(average_len, min_periods=average_len, win_type=None).sum()/average_len
+    data["smooth_proctime"] = (
+        (data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"])
+    ) / (1e9 * slen)
+    data = data.drop(data.tail(slen).index)
+
+    st = np.min(data["starttime"])
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] >= (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["smooth_proctime"] > 0) & (data["starttime"] > 0)]
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     p = sns.lineplot(  # noqa: F841
-        x=data["relStart"] / 1e6,
-        y="av_proc_fps",
+        x=data["relStart"] / 1e9,
+        y=1.0 / data["smooth_proctime"],
         hue="codec",
         ci="sd",
         data=data,
@@ -83,6 +104,9 @@ def plotProcRate(data, options):
         axs.set_title(f"{options.label} Framerate ( {mean_input_fps} fps )")
     else:
         axs.set_title(f"{options.label} Framerate")
+    if options.limit:
+        axs.set_ylim(0, 60)
+    axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.grid(b=True, which="minor", color="gray", linewidth=0.5)
@@ -94,8 +118,13 @@ def plotLatency(data, options):
     # plot the framerate
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
-
-    st = np.min(data["starttime"][0])
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["proctime"] > 0) & (data["starttime"] > 0)]
+    st = np.min(data["starttime"])
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     p = sns.lineplot(  # noqa: F841
         x=data["relStart"] / 1e6,
@@ -119,6 +148,12 @@ def plotFrameRate(data, options):
     # plot the framerate
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     p = sns.lineplot(  # noqa: F841
         x=data["relPts"] / 1e6, y="av_fps", hue="codec", ci="sd", data=data, ax=axs
@@ -139,6 +174,12 @@ def plotFrameSize(data, options):
     # framesize
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
 
     mean_fr = round(np.mean(data["size"]) / 1000, 2)
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
@@ -159,6 +200,12 @@ def plotBitrate(data, options):
     # Bitrate
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
+    rel_end = np.max(data["relStop"])
+    if options.skip_tail_sec > 0:
+        data = data.loc[data["relStop"] <= (rel_end - options.skip_tail_sec * 1e9)]
+    if options.skip_head_sec > 0:
+        data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
+    data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
 
     mean_br = round(np.mean(data["bitrate_per_frame_bps"] / 1000.0), 2)
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
@@ -216,6 +263,8 @@ def parse_args():
     parser.add_argument("-a", "--av_frame_rate", action="store_true")
     parser.add_argument("-l", "--latency", action="store_true")
     parser.add_argument("--keep_na_codec", action="store_true")
+    parser.add_argument("--skip_tail_sec", default=0, type=int)
+    parser.add_argument("--skip_head_sec", default=0, type=int)
     options = parser.parse_args()
 
     return options

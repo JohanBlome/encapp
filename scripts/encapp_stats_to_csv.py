@@ -25,6 +25,7 @@ def parse_encoding_data(json, inputfile, debug=0):
         start_pts = data.iloc[0]["pts"]
         start_ts = data.iloc[0]["starttime"]
         start_stop = data.iloc[0]["stoptime"]
+        data = data.loc[data["proctime"] > 0]
         data["relPts"] = data["pts"] - start_pts
         data["relStart"] = data["starttime"] - start_ts
         data["relStop"] = data["stoptime"] - start_stop
@@ -90,6 +91,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         start_pts = decoded_data.iloc[0]["pts"]
         start_ts = decoded_data.iloc[0]["starttime"]
         start_stop = decoded_data.iloc[0]["stoptime"]
+        decoded_data = decoded_data.loc[decoded_data["proctime"] > 0]
         decoded_data["relPts"] = decoded_data["pts"] - start_pts
         decoded_data["relStart"] = decoded_data["starttime"] - start_ts
         decoded_data["relStop"] = decoded_data["stoptime"] - start_stop
@@ -101,7 +103,6 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data["height"] = "unknown height"
 
         data = decoded_data.loc[decoded_data["size"] != "0"]
-        start_ts = decoded_data.iloc[0]["starttime"]
         decoded_data["description"] = test["common"]["description"]
         decoded_data["camera"] = (
             test["input"]["filepath"].find('filepath: "camera"')
@@ -127,9 +128,11 @@ def parse_decoding_data(json, inputfile, debug=0):
         decoded_data["av_fps"] = (
             decoded_data["fps"].rolling(fps, min_periods=fps, win_type=None).sum() / fps
         )
-        decoderd_data, __ = calc_infligh(decoded_data, start_ts)
-        print(f"iflight: {decoded_data}")
-        decoded_data["proc_fps"] = (decoded_data["inflight"] * 1.0e9) / data["proctime"]
+        decoded_data, __ = calc_infligh(decoded_data, start_ts)
+        print(f"{decoded_data}")
+        decoded_data["proc_fps"] = (decoded_data["inflight"] * 1.0e9) / decoded_data[
+            "proctime"
+        ]
         decoded_data["av_proc_fps"] = (
             decoded_data["proc_fps"].rolling(fps, min_periods=fps, win_type=None).sum()
             / fps
@@ -137,7 +140,6 @@ def parse_decoding_data(json, inputfile, debug=0):
         decoded_data["av_fps"].fillna(decoded_data["fps"], inplace=True)
         decoded_data["av_proc_fps"].fillna(decoded_data["proc_fps"], inplace=True)
         decoded_data.fillna(0)
-
     # except Exception as ex:
     #    print(f'Failed to parse decode data for {inputfile}: {ex}')
     #    decoded_data = None
@@ -266,7 +268,7 @@ def main():
                 print(f"parse decoding data")
                 decoded_data = parse_decoding_data(alldata, file, options.debug)
                 if decoded_data is not None and len(decoded_data) > 0:
-                    print("Write csv to {file}...")
+                    print(f"Write csv to {file}...")
                     decoded_data.to_csv(f"{file}_decoding_data.csv")
             if "gpu_data" in alldata:
                 gpu_data = parse_gpu_data(alldata, file, options.debug)
