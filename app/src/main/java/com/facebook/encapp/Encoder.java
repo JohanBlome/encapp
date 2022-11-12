@@ -9,7 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-
+import android.os.SystemClock;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Configure;
@@ -105,7 +105,7 @@ public abstract class Encoder {
     }
 
     protected void sleepUntilNextFrame(double frameTimeUsec) {
-        long now = System.nanoTime() / 1000; //To Us
+        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
         long sleepTimeMs = (long)(frameTimeUsec - (now - mLastTime)) / 1000; //To ms
         if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
@@ -118,11 +118,11 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
-        mLastTime = System.nanoTime() / 1000;
+        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
     }
 
     protected void sleepUntilNextFrame() {
-        long now = System.nanoTime() / 1000; //To Us
+        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
         long sleepTimeMs = (long)(mFrameTimeUsec - (now - mLastTime)) / 1000; //To ms
         if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
@@ -135,7 +135,7 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
-        mLastTime = System.nanoTime() / 1000;
+        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
     }
 
 

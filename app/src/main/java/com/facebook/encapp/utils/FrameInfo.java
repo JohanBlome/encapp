@@ -1,5 +1,5 @@
 package com.facebook.encapp.utils;
-
+import android.os.SystemClock;
 public class FrameInfo {
     long mPts;
     long mSize;
@@ -48,11 +48,11 @@ public class FrameInfo {
         mFlags = flags;
     }
     public void start(){
-        mStartTime = System.nanoTime();
+        mStartTime = SystemClock.elapsedRealtimeNanos();
     }
 
     public void stop(){
-        mStopTime = System.nanoTime();
+        mStopTime = SystemClock.elapsedRealtimeNanos();
         if (mStopTime < mStartTime) {
             mStopTime = -1;
             mStartTime = 0;

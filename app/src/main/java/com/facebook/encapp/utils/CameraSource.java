@@ -23,6 +23,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -416,7 +417,6 @@ public class CameraSource {
         @Override
         public void onCaptureProgressed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest captureRequest, @NonNull CaptureResult partialResult) {
             super.onCaptureProgressed(session, captureRequest, partialResult);
-            Log.d(TAG, "onCaptureProgressed");
         }
 
         @Override

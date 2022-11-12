@@ -10,7 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
-
+import android.os.SystemClock;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Configure;
@@ -52,6 +52,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     long mFirstSynchNs = -1;
     Surface mSurface = null;
     boolean mDone = false;
+    Object mStopLock = new Object();
 
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test);
@@ -369,12 +370,12 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 }
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
-                    mFirstFrameSystemTime = System.nanoTime();
+                    mFirstFrameSystemTime = SystemClock.elapsedRealtimeNanos();
                 }
                 // Buffer will be released when drawn
                 mStats.stopDecodingFrame(timestamp);
                 mInFramesCount++;
-                long diffUsec = (System.nanoTime() - mFirstFrameSystemTime)/1000;
+                long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTime)/1000;
                 if (!mNoEncoding) {
                     if (mFirstFrameTimestampUsec == timestamp ) {
                         // Request key frame
@@ -417,7 +418,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     //info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
                     long diff =(diffUsec - timestamp);
                     if (mFirstFrameSystemTime > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
-                        long now = System.nanoTime();
+                        long now = SystemClock.elapsedRealtimeNanos();
                          ;if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
                             mDropNext = false;//true;
@@ -586,70 +587,74 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
 
     public void stopAllActivity(){
-        mDone = true;
-        mStats.stop();
-        Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
-        Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
-        if (mMuxer != null) {
+        synchronized (mStopLock) {
+            mDone = true;
+            mStats.stop();
+            Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
+            Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
+            if (mMuxer != null) {
+                try {
+                    mMuxer.release(); //Release calls stop
+                } catch (IllegalStateException ise) {
+                    //Most likely mean that the muxer is already released. Stupid API
+                    Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
+                }
+                mMuxer = null;
+            }
+
             try {
-                mMuxer.release(); //Release calls stop
-            } catch (IllegalStateException ise) {
-                //Most likely mean that the muxer is already released. Stupid API
-                Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
-            }
-            mMuxer = null;
-        }
-
-        try {
-            if (mCodec != null) {
-                mCodec.flush();
-                // Give it some time
-                synchronized (this) {
-                    try {
-                        this.wait(WAIT_TIME_SHORT_MS);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                if (mCodec != null) {
+                    mCodec.flush();
+                    // Give it some time
+                    synchronized (this) {
+                        try {
+                            this.wait(WAIT_TIME_SHORT_MS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
+                    mCodec.stop();
+                    mCodec.release();
+                    mCodec = null;
                 }
-                mCodec.stop();
-                mCodec.release();
-            }
-            if (mDecoder != null) {
-                Log.d(TAG, mTest.getCommon().getId() + " - FLUSH DECODER");
-                mDecoder.flush();
-                // Give it some time
-                synchronized (this) {
-                    try {
-                        this.wait(WAIT_TIME_SHORT_MS);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                if (mDecoder != null) {
+                    Log.d(TAG, mTest.getCommon().getId() + " - FLUSH DECODER");
+                    mDecoder.flush();
+                    // Give it some time
+                    synchronized (this) {
+                        try {
+                            this.wait(WAIT_TIME_SHORT_MS);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
+                    mDecoder.stop();
+                    mDecoder.release();
+                    mDecoder = null;
                 }
-                mDecoder.stop();
-                mDecoder.release();
+            } catch (IllegalStateException iex) {
+                Log.e(TAG, "Illegal state Failed to shut down:" + iex.getStackTrace().toString());
             }
-        } catch (IllegalStateException iex) {
-            Log.e(TAG, "Illegal state Failed to shut down:" + iex.getStackTrace().toString());
-        }
 
-        if (mVsyncHandler != null)
-            mVsyncHandler.removeListener(this);
+            if (mVsyncHandler != null)
+                mVsyncHandler.removeListener(this);
 
-        if (mFrameSwapSurface != null && mOutputMult != null) {
-            mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
-        }
+            if (mFrameSwapSurface != null && mOutputMult != null) {
+                mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
+            }
 
-        if (mSurfaceTexture != null) {
-            mSurfaceTexture.release();
-        }
-        if (mSurface != null) {
-            mSurface.release();
-        }
+            if (mSurfaceTexture != null) {
+                mSurfaceTexture.release();
+            }
+            if (mSurface != null) {
+                mSurface.release();
+            }
 
-        if (mExtractor != null)
-            mExtractor.release();
-        Log.d(TAG, "Stop writer");
-        mDataWriter.stopWriter();
+            if (mExtractor != null)
+                mExtractor.release();
+            Log.d(TAG, "Stop writer");
+            mDataWriter.stopWriter();
+        }
     }
 
     public void release() {
@@ -659,6 +664,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 " inframes: " + mInFramesCount +
                 " current_loop: " + mCurrentLoop +
                 " current_time: " + mCurrentTimeSec);
+
         mOutputMult.stopAndRelease();
     }
 }

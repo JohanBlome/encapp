@@ -181,6 +181,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     performAllTests();
+                    Log.d(TAG, "***** All tests are done, over and out *****");
                     exit();
                 }
             })).start();
@@ -463,6 +464,8 @@ public class MainActivity extends AppCompatActivity {
                                                 p.getState() == Thread.State.BLOCKED) {
                                                 Log.d(TAG, p.getName() + " is still waiting (" + p.getState() + ").\nThis is probably not correct.\nTry to release");
                                                 for (Encoder coder: mEncoderList) {
+                                                    Log.d(TAG, "Force release");
+                                                    coder.stopAllActivity();
                                                     coder.release();
                                                 }
                                                 if (p.getState() == Thread.State.WAITING ||
@@ -658,6 +661,20 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Start test id:" + test.getCommon().getId());
                     final String status = coder.start();
                     Log.d(TAG, "Test done " + status + ": " + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId());
+
+
+                    Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
+                    if (status.length() > 0) {
+                        log("\nTest failed: " + description);
+                        log("\n" + status);
+                        //    if (test.getPursuit() == 0) { TODO: pursuit
+                        Log.d(TAG, "Pursuit over");
+                        mPursuitOver = true;
+                        //  } else {
+                        //      Assert.assertTrue(false, status);
+                        //   }
+                    }
+                } finally {
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
@@ -667,38 +684,11 @@ public class MainActivity extends AppCompatActivity {
                         stats.writeJSON(fw);
                         fw.close();
                     } catch (IOException e) {
+                        Log.e(TAG, test.getCommon().getId() + " - Error when writing stats");
                         e.printStackTrace();
                     }
-
-                    Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
-                    if (status.length() > 0) {
-                        coder.stopAllActivity();
-                        log("\nTest failed: " + description);
-                        log("\n" + status);
-                        //    if (test.getPursuit() == 0) { TODO: pursuit
-                        Log.d(TAG, "Pursuit over");
-                        mPursuitOver = true;
-                        //  } else {
-                        //      Assert.assertTrue(false, status);
-                        //   }
-
-                    } else {
-
-                        try {
-                            Log.d(TAG, "Total time: " + stats.getProcessingTime());
-                            int frameCount = coder instanceof BufferDecoder ? stats.getDecodedFrameCount() : stats.getEncodedFrameCount();
-                            Log.d(TAG, "Total frames: " + frameCount);
-                            if (frameCount > 0) {
-                                Log.d(TAG, "Time per frame: " + (stats.getProcessingTime() / frameCount));
-                            }
-                        } catch (ArithmeticException aex) {
-                            Log.e(TAG, aex.getMessage());
-                        }
-                    }
-                } finally {
                     decreaseTestsInflight();
                     log("\nDone test: " + test.getCommon().getId());
-                    Statistics stats = coder.getStatistics();
                     if (stats != null) {
                         Log.d(TAG, "Done test: " + test.getCommon().getId() + " with stats: " + stats.getId() + ", to go: " + mInstancesRunning);
 
@@ -711,14 +701,15 @@ public class MainActivity extends AppCompatActivity {
         t.start();
 
         int waitTime = 10000; //ms
+        int waitForPrevious = 50; //todo: make configurable
         while (!coder.initDone() && t.isAlive()) {
             try {
                 // If we do not wait for the init to de done before starting next
                 // transcoder there may be issue in the surface handling on lower levels
                 // on certain hw (not thread safe)
                 Log.d(TAG, "Sleep while waiting for init to be done");
-                Thread.sleep(200);
-                waitTime -= 200;
+                Thread.sleep(waitForPrevious);
+                waitTime -= waitForPrevious;
                 if (waitTime < 0) {
                     Log.e(TAG, "Init not ready within " + waitTime + " ms, probably failure");
                 }

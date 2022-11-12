@@ -4,6 +4,10 @@ import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
 import android.util.Size;
+import android.os.SystemClock;
+import android.os.Trace;
+
+import androidx.annotation.RequiresApi;
 
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.Test;
@@ -149,25 +153,29 @@ public class Statistics {
     }
 
     public void start() {
-        mStartTime = System.nanoTime();
+        mStartTime = SystemClock.elapsedRealtimeNanos();
         mLoad.start();
     }
 
     public void stop() {
-        mStopTime = System.nanoTime();
+        mStopTime = SystemClock.elapsedRealtimeNanos();
         mLoad.stop();
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     public void startEncodingFrame(long pts, int originalFrame) {
         FrameInfo frame = new FrameInfo(pts, originalFrame);
+        Trace.beginAsyncSection("EncodeFrame", (int)pts);
         frame.start();
         mEncodingFrames.add(frame);
         mEncodingProcessingFrames += 1;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     public void stopEncodingFrame(long pts, long size, boolean isIFrame) {
         FrameInfo frame = getClosestMatch(pts);
         if (frame != null) {
+            Trace.endAsyncSection("EncodeFrame", (int)frame.mPts);
             frame.stop();
             frame.setSize(size);
             frame.isIFrame(isIFrame);
@@ -197,17 +205,21 @@ public class Statistics {
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     public void startDecodingFrame(long pts, long size, int flags) {
         FrameInfo frame = new FrameInfo(pts);
         frame.setSize(size);
         frame.setFlags(flags);
+        Trace.beginAsyncSection("DecodeFrame", (int)pts);
         frame.start();
         mDecodingFrames.put(Long.valueOf(pts), frame);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     public void stopDecodingFrame(long pts) {
         FrameInfo frame = mDecodingFrames.get(Long.valueOf(pts));
         if (frame != null) {
+            Trace.endAsyncSection("DecodeFrame", (int)frame.mPts);
             frame.stop();
         }
     }
@@ -484,8 +496,10 @@ public class Statistics {
 
             writer.write(json.toString(2));
         } catch (JSONException e) {
+            Log.e(TAG, "Failed writing stats");
             e.printStackTrace();
         }
+        Log.d(TAG, "Done written stats report: " + mId);
     }
 
 }

@@ -8,7 +8,7 @@ import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.util.Log;
 import android.view.Surface;
-
+import android.os.SystemClock;
 import com.facebook.encapp.utils.grafika.EglCore;
 import com.facebook.encapp.utils.grafika.EglSurfaceBase;
 import com.facebook.encapp.utils.grafika.FullFrameRect;
@@ -297,13 +297,13 @@ public class OutputMultiplier {
         }
 
         private long awaitNewImage() {
-            long time = System.nanoTime();
+            long time = SystemClock.elapsedRealtimeNanos();
             synchronized (mFrameDrawnLock) {
                 try {
                     mFrameDrawnLock.wait(WAIT_TIME_SHORT_MS);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
-                    long stuck = System.nanoTime() - time;
+                    long stuck = SystemClock.elapsedRealtimeNanos() - time;
                     Log.e(TAG, "Forced to release a timed wait indicates an error.");
                     Log.e(TAG, "Release me. I was stuck for " + (int)(stuck/1000000) + " ms");
                     stopAndRelease();
