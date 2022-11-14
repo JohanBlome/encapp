@@ -54,6 +54,7 @@ default_values = {
     "configfile": None,
     "encoder": None,
     "bps": None,
+    "ignore_results": False,
 }
 
 OPERATION_TYPES = ("batch", "realtime")
@@ -278,6 +279,7 @@ def run_codec_tests_file(
         serial,
         local_workdir,
         options.device_workdir,
+        options.ignore_results,
         debug,
     )
 
@@ -402,6 +404,7 @@ def run_codec_tests(
     serial,
     local_workdir,
     device_workdir,
+    ignore_results,
     debug,
 ):
     print(f"running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))")
@@ -425,6 +428,8 @@ def run_codec_tests(
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
     # collect the test results
+    if ignore_results:
+        return None
     return collect_results(
         local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
     )
@@ -669,6 +674,13 @@ def get_options(argv):
         metavar="input-config-file",
         help="input configuration file",
     )
+    parser.add_argument(
+        "--ignore-results",
+        action="store_true",
+        dest="ignore_results",
+        default=False,
+        help="Ignore results on an experiment",
+    )
 
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
@@ -783,7 +795,8 @@ def main(argv):
             options.configfile is not None
         ), "error: need a valid input configuration file"
         result = codec_test(options, model, serial, options.debug)
-        verify_app_version(result)
+        if not options.ignore_results:
+            verify_app_version(result)
 
 
 if __name__ == "__main__":
