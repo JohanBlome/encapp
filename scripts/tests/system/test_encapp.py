@@ -22,8 +22,7 @@ def test_help_option():
     """Verify encapp.py --help do not throw any error"""
     try:
         subprocess.run(
-            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-             f"--help"],
+            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} " f"--help"],
             shell=True,
             check=True,
             universal_newlines=True,
@@ -33,12 +32,15 @@ def test_help_option():
     except subprocess.CalledProcessError as err:
         pytest.fail(err.stdout)
 
+
 def test_install():
     """Verify installation work on specified android device"""
     try:
         subprocess.run(
-            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-             f"--serial {ANDROID_SERIAL} install"],
+            [
+                f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+                f"--serial {ANDROID_SERIAL} install"
+            ],
             shell=True,
             check=True,
             stderr=subprocess.STDOUT,
@@ -52,8 +54,10 @@ def test_uninstall():
     """Verify uninstall work on specified android device"""
     try:
         subprocess.run(
-            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-             f"--serial {ANDROID_SERIAL} uninstall"],
+            [
+                f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+                f"--serial {ANDROID_SERIAL} uninstall"
+            ],
             shell=True,
             check=True,
             universal_newlines=True,
@@ -68,8 +72,10 @@ def test_list(tmp_path):
     """Verify list work on specified android device"""
     try:
         subprocess.run(
-            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-             f"--serial {ANDROID_SERIAL} install"],
+            [
+                f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+                f"--serial {ANDROID_SERIAL} install"
+            ],
             shell=True,
             check=True,
             universal_newlines=True,
@@ -77,14 +83,13 @@ def test_list(tmp_path):
             stdout=subprocess.PIPE,
         )
         subprocess.run(
-            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-             f"--serial {ANDROID_SERIAL} list"],
+            [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} " f"--serial {ANDROID_SERIAL} list"],
             shell=True,
             check=True,
             universal_newlines=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
-            cwd=tmp_path
+            cwd=tmp_path,
         )
     except subprocess.CalledProcessError as err:
         pytest.fail(err.stdout)
