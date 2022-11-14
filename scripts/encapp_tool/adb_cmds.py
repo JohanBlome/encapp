@@ -390,7 +390,7 @@ def get_host_hash(filepath, debug):
     return hash_md5.hexdigest()
 
 
-def file_already_in_device(host_filepath, serial, device_filepath, debug):
+def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, debug):
     # 1. check the size
     device_filesize = get_device_size(serial, device_filepath, debug)
     if device_filesize == -1:
@@ -400,6 +400,10 @@ def file_already_in_device(host_filepath, serial, device_filepath, debug):
     if device_filesize != host_filesize:
         # files have different sizes
         return False
+    if fast_copy:
+        # optimistic copy: assume same size means same file without checking
+        # the hash
+        return True
     # 2. check the hash
     device_filehash = get_device_hash(serial, device_filepath, debug)
     host_filehash = get_host_hash(host_filepath, debug)
@@ -409,7 +413,7 @@ def file_already_in_device(host_filepath, serial, device_filepath, debug):
     return True
 
 
-def push_file_to_device(filepath, serial, device_workdir, debug):
+def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
     if not os.path.exists(filepath):
         print(f'error: file "{filepath}" does not exist, check path')
         return False
@@ -419,7 +423,7 @@ def push_file_to_device(filepath, serial, device_workdir, debug):
     # check whether a file with the same name, size, and hash exists.
     # In that case, skip the step.
     device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
-    if file_already_in_device(filepath, serial, device_filepath, debug):
+    if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
         return True
     ret, stdout, _ = run_cmd(
         f"adb -s {serial} push {filepath} {device_workdir}/", debug

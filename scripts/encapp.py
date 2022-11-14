@@ -55,6 +55,7 @@ default_values = {
     "encoder": None,
     "bps": None,
     "ignore_results": False,
+    "fast_copy": False,
 }
 
 OPERATION_TYPES = ("batch", "realtime")
@@ -280,6 +281,7 @@ def run_codec_tests_file(
         local_workdir,
         options.device_workdir,
         options.ignore_results,
+        options.fast_copy,
         debug,
     )
 
@@ -405,6 +407,7 @@ def run_codec_tests(
     local_workdir,
     device_workdir,
     ignore_results,
+    fast_copy,
     debug,
 ):
     print(f"running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))")
@@ -413,7 +416,7 @@ def run_codec_tests(
     # push all the files to the device workdir
     for filepath in files_to_push:
         if not encapp_tool.adb_cmds.push_file_to_device(
-            filepath, serial, device_workdir, debug
+            filepath, serial, device_workdir, fast_copy, debug
         ):
             abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
@@ -680,6 +683,13 @@ def get_options(argv):
         dest="ignore_results",
         default=False,
         help="Ignore results on an experiment",
+    )
+    parser.add_argument(
+        "--fast-copy",
+        action="store_true",
+        dest="fast_copy",
+        default=False,
+        help="Minimize file interaction",
     )
 
     options = parser.parse_args(argv[1:])
