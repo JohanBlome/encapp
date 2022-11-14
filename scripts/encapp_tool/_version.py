@@ -3,21 +3,20 @@ import os
 import re
 import typing
 
-VERSION_FILE = 'app/build.gradle'
+VERSION_FILE = "app/build.gradle"
 VERSION_TAG = r'versionName "([0-9]*).([0-9]*)"'
-SCRIPT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..')
-ROOT_DIR = os.path.join(SCRIPT_DIR, '..')
+SCRIPT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..")
+ROOT_DIR = os.path.join(SCRIPT_DIR, "..")
 
 
-def _lookup_expected_encapp_version() -> typing.Optional[
-        typing.Tuple[str, str]]:
+def _lookup_expected_encapp_version() -> typing.Optional[typing.Tuple[str, str]]:
     """Get encapp apk expected version from local gradle
 
     Returns:
         A tuple with apk version (major_version, minor_version)
         if found, else None
     """
-    with open(f'{ROOT_DIR}/{VERSION_FILE}', 'r') as fl:
+    with open(f"{ROOT_DIR}/{VERSION_FILE}", "r") as fl:
         data = fl.read()
 
     m = re.search(VERSION_TAG, data)
@@ -27,4 +26,4 @@ def _lookup_expected_encapp_version() -> typing.Optional[
 
 
 __version_info__ = _lookup_expected_encapp_version()
-__version__ = '.'.join((str(i) for i in __version_info__))
+__version__ = ".".join((str(i) for i in __version_info__))

@@ -22,13 +22,12 @@ def test_help_option():
     """Verify encapp_verify.py --help do not throw any error"""
     try:
         subprocess.run(
-            [f"{PYTHON_ENV} {VERIFY_SCRIPT_PATH} "
-             f"--help"],
+            [f"{PYTHON_ENV} {VERIFY_SCRIPT_PATH} " f"--help"],
             shell=True,
             check=True,
             universal_newlines=True,
             stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE
+            stdout=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as err:
         pytest.fail(err.stdout)
