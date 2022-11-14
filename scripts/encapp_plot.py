@@ -74,9 +74,10 @@ def plotProcRate(data, options):
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
 
-    print(f"{data}")
+    data["relStart_quant"] = (
+        (data["relStart"] / (options.quantization * 1e6)).astype(int)
+    ) * options.quantization
     slen = int(data["fps"].iloc[0])
-    # vals = data['av_proc_fps']#.rolling(average_len, min_periods=average_len, win_type=None).sum()/average_len
     data["smooth_proctime"] = (
         (data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"])
     ) / (1e9 * slen)
@@ -92,7 +93,7 @@ def plotProcRate(data, options):
     data = data.loc[(data["smooth_proctime"] > 0) & (data["starttime"] > 0)]
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     p = sns.lineplot(  # noqa: F841
-        x=data["relStart"] / 1e9,
+        x=data["relStart_quant"] / 1e3,
         y=1.0 / data["smooth_proctime"],
         hue="codec",
         ci="sd",
@@ -105,7 +106,7 @@ def plotProcRate(data, options):
     else:
         axs.set_title(f"{options.label} Framerate")
     if options.limit:
-        axs.set_ylim(0, 60)
+        axs.set_ylim(0, 15)
     axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
@@ -124,10 +125,13 @@ def plotLatency(data, options):
     if options.skip_head_sec > 0:
         data = data.loc[data["relStart"] > (options.skip_head_sec * 1e9)]
     data = data.loc[(data["proctime"] > 0) & (data["starttime"] > 0)]
+    data["relStart_quant"] = (
+        (data["relStart"] / (options.quantization * 1e6)).astype(int)
+    ) * options.quantization
     st = np.min(data["starttime"])
     fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     p = sns.lineplot(  # noqa: F841
-        x=data["relStart"] / 1e6,
+        x=data["relStart_quant"] / 1e3,
         y=data["proctime"] / 1e6,
         hue="codec",
         ci="sd",
@@ -138,6 +142,7 @@ def plotLatency(data, options):
     axs.set_title(f"{options.label} Latency (ms)")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
+    axs.set(xlabel="Time (sec)", ylabel="Latency (msec)")
     axs.grid(b=True, which="minor", color="gray", linewidth=0.5)
     name = f"{options.output}.latency.png"
     plt.savefig(name.replace(" ", "_"), format="png")
@@ -262,9 +267,15 @@ def parse_args():
     parser.add_argument("-r", "--frame_rate", action="store_true")
     parser.add_argument("-a", "--av_frame_rate", action="store_true")
     parser.add_argument("-l", "--latency", action="store_true")
+    parser.add_argument(
+        "--quantization",
+        default="60",
+        type=int,
+        help="Quantize time in ms so multiple runs could more easily be calulated together",
+    )
     parser.add_argument("--keep_na_codec", action="store_true")
-    parser.add_argument("--skip_tail_sec", default=0, type=int)
-    parser.add_argument("--skip_head_sec", default=0, type=int)
+    parser.add_argument("--skip_tail_sec", default=0, type=float)
+    parser.add_argument("--skip_head_sec", default=0, type=float)
     options = parser.parse_args()
 
     return options
