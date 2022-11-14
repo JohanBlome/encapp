@@ -187,7 +187,8 @@ def run_quality(test_file, override_settings, debug):
         else:
             ref_part = f"-r {fps} -i {reference_pathname} "
 
-        print(f"input res = {input_res} vs {output_res}")
+        if debug > 0:
+            print(f"input res = {input_res} vs {output_res}")
         if input_res != output_res:
             dist_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} "
