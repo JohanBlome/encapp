@@ -5,6 +5,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Environment;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 
@@ -191,6 +192,7 @@ class BufferDecoder extends Encoder {
         boolean outputDone = false;
         boolean inputDone = false;
 
+        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
         while (!outputDone) {
             int index;
             long presentationTimeUs = 0L;
@@ -219,7 +221,6 @@ class BufferDecoder extends Encoder {
                                 presentationTimeUs, 0 /*flags*/);
 
                         mInFramesCount++;
-                        if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
                         mExtractor.advance();
                     }
                 } else {
@@ -228,20 +229,22 @@ class BufferDecoder extends Encoder {
             }
 
             if (!outputDone) {
-                index = mDecoder.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US);
+                index = mDecoder.dequeueOutputBuffer(info, (long) mFrameTimeUsec);
                 byte[] outData = new byte[info.size];
                 if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     // no output available yet
                 } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     MediaFormat newFormat = mDecoder.getOutputFormat();
-                    String tmp = mDecoder.getOutputFormat().toString();
                     Log.d(TAG, "decoder output format changed: " + newFormat);
                 } else if(index >= 0) {
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         outputDone = true;
                     }
-                    mStats.stopDecodingFrame(presentationTimeUs);
+
                     ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
+                    if(outputBuf.limit() != 0) {
+                        mStats.stopDecodingFrame(info.presentationTimeUs);
+                    }
                     outputBuf.position(info.offset);
                     outputBuf.limit(info.offset + info.size);
                     outputBuf.get(outData);
@@ -258,6 +261,7 @@ class BufferDecoder extends Encoder {
                         Log.e(TAG, "Illegal state exception when trying to release output buffers");
                     }
                 }
+                if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
             }
         }
         if(YUV_DUMP) fo.close();
