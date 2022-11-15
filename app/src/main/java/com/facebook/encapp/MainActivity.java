@@ -426,12 +426,7 @@ public class MainActivity extends AppCompatActivity {
                                     e.printStackTrace();
                                 }
                             }
-                            try {
-                                Log.d(TAG, "Sleep for two secs to catch up");
-                                Thread.sleep(4000);
-                            } catch (InterruptedException iex) {
-                                Log.d(TAG, "exc.: " + iex.getLocalizedMessage());
-                            }
+
                             mStable = true;
                             Log.d(TAG, "\n\n*** All inputs stable - go on!   ***\n\n");
                             Log.d(TAG, "pursuit = " + pursuit);

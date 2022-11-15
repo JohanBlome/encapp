@@ -275,8 +275,7 @@ public abstract class Encoder {
 
     boolean doneReading(Test test, FileReader fileReader, int frame, double time, boolean loop) {
         if (loop && !test.getInput().hasStoptimeSec() && !test.getInput().hasPlayoutFrames()) {
-            // 1. stop the reading when in loop mode:
-            /// ???
+            // 1. stop the reading when reaching end of input file
             return true;
         }
         if (test.getInput().hasPlayoutFrames() && test.getInput().getPlayoutFrames() > 0) {

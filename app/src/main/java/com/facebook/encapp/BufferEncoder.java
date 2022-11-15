@@ -118,7 +118,6 @@ class BufferEncoder extends Encoder {
             mMuxer.start();
         }
 
-        double currentTime = 0;
         int current_loop = 1;
         boolean input_done = false;
         boolean output_done = false;
@@ -138,7 +137,7 @@ class BufferEncoder extends Encoder {
                 Log.d(TAG, mTest.getCommon().getId() + " - BufferEncoder: frames: " + mFramesAdded +
                         " inframes: " + mInFramesCount +
                         " current_loop: " + current_loop +
-                        " current_time: " + currentTime);
+                        " current_time: " + mCurrentTimeSec);
             }
             // 1. process the encoder input
             try {
@@ -229,7 +228,7 @@ class BufferEncoder extends Encoder {
                         mMuxer.writeSampleData(mVideoTrack, data, info);
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
-                    currentTime = info.presentationTimeUs / 1000000.0;
+                    mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
                 }
             }
         }
