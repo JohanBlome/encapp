@@ -56,11 +56,13 @@ class SurfaceEncoder extends Encoder {
         super(test);
         mOutputMult = multiplier;
         mContext = context;
+        mStats = new Statistics("raw encoder", mTest);
     }
 
     public SurfaceEncoder(Test test, Context context) {
         super(test);
         mContext = context;
+        mStats = new Statistics("raw encoder", mTest);
     }
 
     public SurfaceEncoder(Test test){
@@ -82,7 +84,6 @@ class SurfaceEncoder extends Encoder {
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
-        mStats = new Statistics("raw encoder", mTest);
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
@@ -392,7 +393,8 @@ class SurfaceEncoder extends Encoder {
                 // until no buffers are available.
                 mRealtime = true;
             } else {
-                mOutputMult.setRealtime(false);
+                if (mOutputMult != null)
+                    mOutputMult.setRealtime(false);
             }
         }
     }

@@ -34,6 +34,7 @@ class BufferDecoder extends Encoder {
 
     public BufferDecoder(Test test) {
         super(test);
+        mStats = new Statistics("decoder", mTest);
     }
 
     public String start(OutputMultiplier multiplier) {
@@ -51,8 +52,6 @@ class BufferDecoder extends Encoder {
         mFrameRate = mTest.getConfigure().getFramerate();
 
         mExtractor = new MediaExtractor();
-
-        mStats = new Statistics("decoder", mTest);
 
         MediaFormat inputFormat = null;
         int trackNum = 0;
@@ -73,8 +72,14 @@ class BufferDecoder extends Encoder {
                 return "no input format";
             }
 
-            Log.d(TAG, "Create decoder by name: " + mTest.getConfigure().getCodec());
-            mDecoder = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+
+            if (mTest.getConfigure().hasEncode() && !mTest.getConfigure().getEncode() &&  mTest.getConfigure().hasCodec()) {
+                Log.d(TAG, "Create decoder by name: " + mTest.getConfigure().getCodec());
+                mDecoder = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+            } else {
+                Log.d(TAG, "Create decoder by mime: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+            }
 
             Log.d(TAG, "MediaFormat (test)");
             logMediaFormat(inputFormat);
