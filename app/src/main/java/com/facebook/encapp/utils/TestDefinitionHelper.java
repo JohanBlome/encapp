@@ -56,6 +56,10 @@ public class TestDefinitionHelper {
             mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
         }
         // color parameters
+        if (config.hasColorFormat()) {
+            int colorFormat  = config.getColorFormat();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
+        }
         // good default: MediaFormat.COLOR_RANGE_LIMITED
         if (config.hasColorRange()) {
             int colorRange  = config.getColorRange().getNumber();

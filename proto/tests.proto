@@ -58,7 +58,7 @@ message Configure {
   optional uint64 durationUs = 8;
   optional string resolution = 9;
 
-  optional string color_format = 10;
+  optional int32 color_format = 10;
   enum ColorStandard {
     bt601_pal = 2;
     bt601_ntsc = 4;
