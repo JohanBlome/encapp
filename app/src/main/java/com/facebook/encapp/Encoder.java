@@ -266,11 +266,17 @@ public abstract class Encoder {
         List<Configure.Parameter> params = test.getConfigure().getParameterList();
         for (Configure.Parameter param : params) {
             switch (param.getType().getNumber()) {
+                case DataValueType.stringType_VALUE:
+                    format.setString(param.getKey(), param.getValue());
+                    break;
                 case DataValueType.intType_VALUE:
                     format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
                     break;
-                case DataValueType.stringType_VALUE:
-                    format.setString(param.getKey(), param.getValue());
+                case DataValueType.floatType_VALUE:
+                    format.setFloat(param.getKey(), Float.parseFloat(param.getValue()));
+                    break;
+                case DataValueType.longType_VALUE:
+                    format.setLong(param.getKey(), Long.parseLong(param.getValue()));
                     break;
             }
         }
