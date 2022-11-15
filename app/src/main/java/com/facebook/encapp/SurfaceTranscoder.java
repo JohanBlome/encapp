@@ -43,7 +43,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     double mLoopTime = 0;
     int mCurrentLoop = 1;
     long mPtsOffset = 0;
-    long mLastPts = -1;
+    long mLastPtsUs = -1;
     boolean mNoEncoding = false;
     private FrameswapControl mFrameSwapSurface;
     private VsyncHandler mVsyncHandler;
@@ -59,6 +59,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         mOutputMult = multiplier;
         mSourceReader = new SourceReader();
         mVsyncHandler = vsyncHandler;
+        mStats = new Statistics("surface encoder", mTest);
     }
 
     public SurfaceTranscoder(Test test, VsyncHandler vsyncHandler) {
@@ -66,6 +67,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         mOutputMult = new OutputMultiplier(vsyncHandler);
         mSourceReader = new SourceReader();
         mVsyncHandler = vsyncHandler;
+        mStats = new Statistics("surface encoder", mTest);
     }
 
 
@@ -140,7 +142,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
         mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
-        mStats = new Statistics("surface encoder", mTest);
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
@@ -356,7 +357,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
     }
 
-    long mFirstFrameSystemTime = 0;
+    long mFirstFrameSystemTimeNsec = 0;
     long mDropcount = 0;
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
         if (encoder) {
@@ -365,17 +366,14 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             long timestamp = info.presentationTimeUs;
 
             if (MainActivity.isStable()) {
-                if (mRealtime) {
-                    timestamp = mPts;
-                }
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
-                    mFirstFrameSystemTime = SystemClock.elapsedRealtimeNanos();
+                    mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
                 }
                 // Buffer will be released when drawn
                 mStats.stopDecodingFrame(timestamp);
                 mInFramesCount++;
-                long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTime)/1000;
+                long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
                 if (!mNoEncoding) {
                     if (mFirstFrameTimestampUsec == timestamp ) {
                         // Request key frame
@@ -392,10 +390,10 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                     updateDynamicFramerate(mInFramesCount);
                     //Check time, if to far off drop frame, minimize the drops so something is show.
-
                     long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
+
                     mCurrentTimeSec = diffUsec/1000000.0f;
-                    if (mFirstFrameSystemTime > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
+                    if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
                             mDropNext = true;
@@ -417,7 +415,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     mCurrentTimeSec = diffUsec/1000000.0f;
                     //info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
                     long diff =(diffUsec - timestamp);
-                    if (mFirstFrameSystemTime > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
+                    if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
                         long now = SystemClock.elapsedRealtimeNanos();
                          ;if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
@@ -501,15 +499,15 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     }
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
                     // Source time is always what is read
-                    long pts = mExtractor.getSampleTime() + mPtsOffset;
+                    long ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
                     if (mRealtime) {
                         // Limit the pace of incoming frames to the framerate
                         sleepUntilNextFrameSynched();
                     }
                     if (size > 0) {
-                        mStats.startDecodingFrame(pts, size, flags);
+                        mStats.startDecodingFrame(ptsUsec, size, flags);
                         try {
-                            mDecoder.queueInputBuffer(index, 0, size, pts, flags);
+                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
                         } catch (IllegalStateException ise) {
                             // Ignore this
                         }
@@ -523,11 +521,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                         mCurrentLoop++;
-                        if (pts > mLastPts) {
-                            mPtsOffset = pts;
+                        if (ptsUsec > mLastPtsUs) {
+                            mPtsOffset = ptsUsec;
                         } else {
-                            mPtsOffset = mLastPts;
-                            pts = mPtsOffset;
+                            mPtsOffset = mLastPtsUs;
+                            ptsUsec = mPtsOffset;
                         }
 
                         mLoopTime = mPtsOffset /1000000.0;
@@ -536,17 +534,8 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                             mDone = true;
                         }
                     }
-                    mLastPts = pts;
-                }
-
-                synchronized (mDecoderBuffers) {
-                    if (mDecoderBuffers.size() == 0 && !mDone) {
-                        try {
-                            mDecoderBuffers.wait(WAIT_TIME_SHORT_MS);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
+                    //Log.d(TAG, "Set lastpts = " + ptsUsec/1000 +" ms" + ", ptsOffset = " + mPtsOffset);
+                    mLastPtsUs = ptsUsec;
                 }
             }
         }
@@ -560,16 +549,21 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     }
 
     public  long sleepUntilNextFrameSynched() {
-        if (mLastPts == -1) {
+        if (mFirstSynchNs == -1) {
+            Log.d(TAG, "Set first sync: "+mVsyncTimeNs);
+            mFirstSynchNs = mVsyncTimeNs;
+        }
+        if (mLastPtsUs == -1) {
             Log.d(TAG,"First time - no wait");
         } else {
             synchronized (mSyncLock) {
                 long startTime = mVsyncTimeNs;
                 try {
-                    long distance = mVsyncTimeNs - startTime;
-                    while (distance < mFrameTimeUsec * 1000) {
+                    long videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
+                    while (videoDiffMs > 0) {
+                        // Wait for next vsync and check time difference again.
                         mSyncLock.wait(WAIT_TIME_MS);
-                        distance = mVsyncTimeNs - startTime;
+                        videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
                     }
                     mLastTime = mVsyncTimeNs;
 
@@ -578,10 +572,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 }
             }
         }
-        if (mFirstSynchNs == -1) {
-            Log.d(TAG, "Set first sync: "+mVsyncTimeNs);
-            mFirstSynchNs = mVsyncTimeNs;
-        }
+
         return mVsyncTimeNs;
     }
 

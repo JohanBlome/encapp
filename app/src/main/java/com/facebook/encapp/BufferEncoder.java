@@ -28,6 +28,7 @@ import java.util.Locale;
 class BufferEncoder extends Encoder {
     public BufferEncoder(Test test) {
         super(test);
+        mStats = new Statistics("raw encoder", mTest);
     }
 
     public String start() {
@@ -47,7 +48,6 @@ class BufferEncoder extends Encoder {
                 sourceResolution.getHeight() * 1.5);
 
         mRealtime = mTest.getInput().getRealtime();
-        mStats = new Statistics("raw encoder", mTest);
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()))) {

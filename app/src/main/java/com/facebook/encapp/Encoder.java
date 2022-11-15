@@ -225,6 +225,9 @@ public abstract class Encoder {
     }
 
     public Statistics getStatistics() {
+        if (mStats == null) {
+            Log.e(TAG, "No stats available");
+        }
         return mStats;
     }
 
