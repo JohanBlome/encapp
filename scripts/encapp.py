@@ -343,16 +343,27 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
     test_suite = updated_test_suite
 
     # 1.2. replace the parameters that do not create multiple tests
+    # TODO(chema): there should be an automatic way to do this
     CONFIGURE_INT_KEYS = ("quality", "complexity")
+    INPUT_INT_KEYS = ("playout_frames", "pursuit")
+    CONFIGURE_FLOAT_KEYS = ("framerate",)
+    INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
     for test in test_suite.test:
         for k1 in replace:
             for k2, val in replace[k1].items():
                 if (k1, k2) == ("configure", "bitrate"):
                     # already processed
                     continue
-                elif k1 == "configure" and k2 in CONFIGURE_INT_KEYS:
+                elif (k1 == "configure" and k2 in CONFIGURE_INT_KEYS) or (
+                    k1 == "input" and k2 in INPUT_INT_KEYS
+                ):
                     # force integer value
                     val = int(val)
+                elif (k1 == "configure" and k2 in CONFIGURE_FLOAT_KEYS) or (
+                    k1 == "input" and k2 in INPUT_FLOAT_KEYS
+                ):
+                    # force float value
+                    val = float(val)
                 if not test.HasField(k1):
                     # create the Message field
                     getattr(test, k1).SetInParent()
