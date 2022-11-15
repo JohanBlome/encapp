@@ -35,6 +35,11 @@ public class TestDefinitionHelper {
             int bitrateMode = config.getBitrateMode().getNumber();
             mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
         }
+        // check if there is a durationUs value
+        if (config.hasDurationUs()) {
+            long duration_us = config.getDurationUs();
+            mediaFormat.setLong(MediaFormat.KEY_DURATION, duration_us);
+        }
         // check if there is a quality value
         if (config.hasQuality()) {
             int quality = config.getQuality();
