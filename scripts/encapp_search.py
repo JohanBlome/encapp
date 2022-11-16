@@ -58,7 +58,7 @@ def dict_flatten(test):
     for k1, v1 in test.items():
         if k1 in common_data:
             for k2, v2 in v1.items():
-                if k2 == "resolution":
+                if k2 == "resolution" and "x" in v2:
                     sizes = v2.split("x")
                     key_list.append(f"{k1}.width")
                     key_list.append(f"{k1}.height")
