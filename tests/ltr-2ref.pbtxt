@@ -32,7 +32,7 @@ test {
             key: "vendor.qti-ext-enc-ltr.mark-frame"
             type: intType,
             value: "1"
-        }        
+        }
         parameter {
             framenum: 400
             key: "vendor.qti-ext-enc-ltr.use-frame"
@@ -51,7 +51,7 @@ test {
             key: "vendor.qti-ext-enc-ltr.use-frame"
             type: intType,
             value: "1"
-        }        
+        }
         parameter {
             framenum: 800
             key: "vendor.qti-ext-enc-ltr.use-frame"
