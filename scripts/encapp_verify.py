@@ -144,6 +144,9 @@ def check_long_term_ref(resultpath):
                 )
                 ltr_count = -1
                 frame = 0
+                if not os.path.isfile(nal_file):
+                    print("No nal file available")
+                    continue
                 with open(nal_file) as nal:
                     line = "-1"
                     while len(line) > 0:
@@ -328,6 +331,7 @@ def check_idr_placement(resultpath):
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
             encoder_settings = test_def.configure
+            encoder_mediaformat = result["encoder_media_format"]
             codec = encoder_settings.codec
             common_settings = test_def.common
             testname = common_settings.id
@@ -341,6 +345,11 @@ def check_idr_placement(resultpath):
             if gop == None or gop <= 0:
                 gop = 1
             fps = encoder_settings.framerate
+            if fps == 0:
+                if test_.input.framerate > 0:
+                    fps = test_.input.framerate
+                elif "frame-rate" in encoder_mediaformat:
+                    fps = encoder_mediaformat["frame-rate"]
             if fps <= 0:
                 fps = 30
             for frame in iframes:
@@ -444,12 +453,22 @@ def check_mean_bitrate_deviation(resultpath):
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
             encoder_settings = test_def.configure
+            # this is a non mandatory setting in encapp but for mediaformat
+            # is necessary
+            encoder_mediaformat = result["encoder_media_format"]
+            height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
             common_settings = test_def.common
             testname = common_settings.id
             bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             fps = encoder_settings.framerate
-            height = parse_resolution(encoder_settings.resolution)[1]
+            if fps == 0:
+                if test_.input.framerate > 0:
+                    fps = test_.input.framerate
+                elif "frame-rate" in encoder_mediaformat:
+                    fps = encoder_mediaformat["frame-rate"]
+
+            #
             runtime_setting = test_def.runtime
             dynamic_settings = parse_dynamic_settings(runtime_setting)
             dynamic_video_bitrate = None
@@ -482,10 +501,10 @@ def check_mean_bitrate_deviation(resultpath):
                         accum += item["size"]
                     # Calc mean in bits per second
                     num = len(filtered)
+                    mean = 0
                     if num > 0:
-                        mean = fps * 8 * accum / num
-                    else:
-                        mean = 0
+                        mean = fps * 8.0 * accum / num
+
                     ratio = mean / target_bitrate
                     bitrate_error_perc = int((ratio - 1) * 100)
                     if abs(bitrate_error_perc) > ERROR_LIMIT:
@@ -598,13 +617,20 @@ def check_framerate_deviation(resultpath):
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
             encoder_settings = test_def.configure
+            encoder_mediaformat = result["encoder_media_format"]
+            height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
             common_settings = test_def.common
             testname = common_settings.id
             bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             encoder_media_format = result.get("encoder_media_format")
             fps = encoder_settings.framerate
-            height = parse_resolution(encoder_settings.resolution)[1]
+            if fps == 0:
+                if test_.input.framerate > 0:
+                    fps = test_.input.framerate
+                elif "frame-rate" in encoder_mediaformat:
+                    fps = encoder_mediaformat["frame-rate"]
+
             runtime_setting = test_def.runtime
             dynamic_video_framerates = parse_dynamic_settings(runtime_setting)[
                 "framerates"
@@ -622,9 +648,9 @@ def check_framerate_deviation(resultpath):
                 status = "passed"
                 limit_too_high = False
                 target_rate = fps
+                print(f"frames: {len(frames)}")
+                print(f"limits: {limits}")
                 for limit in limits:
-                    if limit > len(frames):
-                        limit_too_high = True
                     filtered = list(
                         filter(
                             lambda x: (
