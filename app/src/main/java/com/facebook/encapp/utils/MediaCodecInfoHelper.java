@@ -4,12 +4,13 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
 
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
+import com.facebook.encapp.proto.Input.PixFmt;
 
 
 public class MediaCodecInfoHelper {
@@ -136,6 +137,19 @@ public class MediaCodecInfoHelper {
         tab = getIndentation(indent);
         str.append(tab + "}\n");
         return str.toString();
+    }
+
+    public static int mapEncappPixFmtToAndroidColorFormat(PixFmt pix_fmt) {
+        switch (pix_fmt.getNumber()) {
+            case PixFmt.yuv420p_VALUE:
+                return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar;
+            case PixFmt.nv12_VALUE:
+                return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar;
+            case PixFmt.rgba_VALUE:
+                return MediaCodecInfo.CodecCapabilities.COLOR_Format32bitARGB8888;
+            default:
+                throw new RuntimeException("unsupported pix_fmt: " + pix_fmt);
+        }
     }
 
     private static Map<Integer, String> createAndroidColorFormaNameTable() {
