@@ -3,11 +3,6 @@ test {
         id: "bitrate_buffer"
         description: "Verify encoding bitrate - buffer"
     }
-    input {
-        filepath: "/tmp/akiyo_qcif.yuv"
-        resolution: "176x144"
-        framerate: 30
-    }
     configure {
         codec: "OMX.google.h264.encoder"
         bitrate: "100 kbps"
