@@ -3,13 +3,6 @@ test {
         id: "b_frames"
         description: "B-Frame Testing"
     }
-    input {
-        filepath: "/tmp/akiyo_qcif.yuv"
-        resolution: "176x144"
-        pix_fmt: nv12
-        framerate: 30
-        playout_frames: 900
-    }
     configure {
         codec: "encoder.avc"
         bitrate: "1000 kbps"
