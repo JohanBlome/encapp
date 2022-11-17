@@ -20,6 +20,7 @@ import android.util.Size;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.proto.Input.PixFmt;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameswapControl;
@@ -118,6 +119,12 @@ class SurfaceEncoder extends Encoder {
 
         if (!mIsRgbaSource && !mIsCameraSource) {
             // if we are getting a YUV source, we need to convert it to RGBA
+            // This conversion routine assumes nv21. Let's make sure that
+            // is the input pix_fmt.
+            if (mTest.getInput().getPixFmt().getNumber() != PixFmt.nv21_VALUE) {
+                return "Error: yuv->rgba conversion on surface encoder only supports nv21 (got " + mTest.getInput().getPixFmt() + ")";
+            }
+
             try {
                 RenderScript rs = RenderScript.create(mContext);
                 yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
