@@ -165,16 +165,16 @@ public class TestDefinitionHelper {
         Size res;
         Input.Builder input = test.getInput().toBuilder();
         if (!input.hasResolution()) {
-            input.setResolution("1280x720");
+            throw new RuntimeException("No valid resolution on input settings");
         }
 
         if (!input.hasFramerate()) {
-            input.setFramerate(30.0f);
+            throw new RuntimeException("No valid framerate on input settings");
         }
 
         Configure.Builder config = test.getConfigure().toBuilder();
         if (!config.hasBitrate()) {
-            config.setBitrate("1 Mbps");
+            throw new RuntimeException("No valid bitrate on configuration settings");
         }
 
         if (!config.hasFramerate()) {

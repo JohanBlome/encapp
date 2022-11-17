@@ -78,7 +78,11 @@ class SurfaceEncoder extends Encoder {
         mKeyFrameBundle = new Bundle();
         mKeyFrameBundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
         Log.d(TAG, "** Surface input encoding - " + mTest.getCommon().getDescription() + " **");
-        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        try {
+            mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
 

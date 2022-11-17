@@ -33,7 +33,11 @@ class BufferEncoder extends Encoder {
 
     public String start() {
         Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
-        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        try {
+            mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
         if (mTest.getInput().hasRealtime())
