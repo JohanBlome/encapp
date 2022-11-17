@@ -115,7 +115,9 @@ def run_quality(test_file, override_settings, debug):
         if len(pix_fmt) == 0:
             # See if source contains a clue
             pix_fmt = "yuv420p"
-            if reference_pathname.find("nv12") > -1:
+            if reference_pathname.find("yuv420p") > -1:
+                pix_fmt = "yuv420p"
+            elif reference_pathname.find("nv12") > -1:
                 pix_fmt = "nv12"
 
         output_media_format = results.get("encoder_media_format")
