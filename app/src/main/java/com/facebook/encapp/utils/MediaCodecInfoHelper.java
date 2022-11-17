@@ -145,6 +145,8 @@ public class MediaCodecInfoHelper {
                 return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar;
             case PixFmt.nv12_VALUE:
                 return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar;
+            case PixFmt.nv21_VALUE:
+                return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar;
             case PixFmt.rgba_VALUE:
                 return MediaCodecInfo.CodecCapabilities.COLOR_Format32bitARGB8888;
             default:
