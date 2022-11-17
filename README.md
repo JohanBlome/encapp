@@ -93,8 +93,11 @@ Note: The `scripts/encapp.py` scripts will install a prebuild apk before running
 To make sure the test data is avalable. run:
 
 ```
-$ bash scripts/prepare_test_data.sh`
+$ ./scripts/prepare_test_data.sh`
 ```
+
+This will download a raw (y4m) video file to `/tmp/akiyo_qcif.y4m` (for encoder tests), and will produce an h264 version in `/tmp/akiyo_qcif.mp4` (decoder tests).
+
 
 ## 3.1. Small QCIF Encoding
 
@@ -110,7 +113,7 @@ $ ffmpeg -i /tmp/akiyo_qcif.y4m -f rawvideo -pix_fmt yuv420p /tmp/akiyo_qcif.yuv
 ```
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
-$ encapp.py run tests/bitrate_buffer.pbtxt
+$ ./scripts/encapp.py run tests/bitrate_buffer.pbtxt -e input.filepath /tmp/akiyo_qcif.y4m
 ...
 results collect: ['PATH/bitrate_files/encapp_XXX.json']
 
