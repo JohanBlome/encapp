@@ -24,7 +24,8 @@ message Input {
   enum PixFmt {
     yuv420p = 0;
     nv12 = 1;
-    rgba = 2;
+    nv21 = 2;
+    rgba = 3;
   }
   optional PixFmt pix_fmt = 3;
   optional float framerate = 4;

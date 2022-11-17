@@ -119,6 +119,8 @@ def run_quality(test_file, override_settings, debug):
                 pix_fmt = "yuv420p"
             elif reference_pathname.find("nv12") > -1:
                 pix_fmt = "nv12"
+            elif reference_pathname.find("nv21") > -1:
+                pix_fmt = "nv21"
 
         output_media_format = results.get("encoder_media_format")
         output_width = output_media_format.get("width")
