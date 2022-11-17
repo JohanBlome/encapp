@@ -92,7 +92,6 @@ def run_quality(test_file, override_settings, debug):
     psnr_file = f"{encodedfile}.psnr"
 
     test = results.get("test")
-    fps = test.get("configure").get("framerate")
     if (
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
@@ -122,6 +121,7 @@ def run_quality(test_file, override_settings, debug):
         output_media_format = results.get("encoder_media_format")
         output_width = output_media_format.get("width")
         output_height = output_media_format.get("height")
+        output_framerate = output_media_format.get("frame-rate")
 
         output_res = f"{output_width}x{output_height}"
         video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
@@ -182,20 +182,20 @@ def run_quality(test_file, override_settings, debug):
         if raw:
             ref_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} -s {input_res} "
-                f"-r {fps} -i {reference_pathname} "
+                f"-r {output_framerate} -i {reference_pathname} "
             )
         else:
-            ref_part = f"-r {fps} -i {reference_pathname} "
+            ref_part = f"-r {output_framerate} -i {reference_pathname} "
 
         if debug > 0:
             print(f"input res = {input_res} vs {output_res}")
         if input_res != output_res:
             dist_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} "
-                f"-s {input_res} -r {fps} -i {distorted}"
+                f"-s {input_res} -r {output_framerate} -i {distorted}"
             )
         else:
-            dist_part = f"-r {fps} -i {distorted} "
+            dist_part = f"-r {output_framerate} -i {distorted} "
 
         # Do calculations
         if override_settings["recalc"] or not os.path.exists(vmaf_file):
@@ -241,16 +241,22 @@ def run_quality(test_file, override_settings, debug):
     if os.path.exists(vmaf_file):
         vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
 
-        # media,codec,gop,fps,width,height,bitrate,meanbitrate,calculated_bitrate,
+        # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
         model = device_info.get("props", {}).get("ro.product.model", "")
         platform = device_info.get("props", {}).get("ro.board.platform", "")
         serial = device_info.get("props", {}).get("ro.serialno", "")
+        # get resolution and framerate
+        resolution = test.get("configure").get("resolution")
+        if not resolution:
+            resolution = test.get("input").get("resolution")
+        framerate = test.get("configure").get("framerate")
+        if not framerate:
+            framerate = test.get("input").get("framerate")
         # derive the calculated_bitrate from the actual file size
         calculated_bitrate = int(
-            (file_size * 8 * test.get("configure").get("framerate"))
-            / results.get("framecount")
+            (file_size * 8 * framerate) / results.get("framecount")
         )
         data = (
             f"{encodedfile}",
@@ -259,9 +265,9 @@ def run_quality(test_file, override_settings, debug):
             f"{serial}",
             f'{test.get("configure").get("codec")}',
             f'{test.get("configure").get("iFrameInterval")}',
-            f'{test.get("configure").get("framerate")}',
-            f'{test.get("configure").get("resolution").split("x")[0]}',
-            f'{test.get("configure").get("resolution").split("x")[1]}',
+            f"{framerate}",
+            f'{resolution.split("x")[0]}',
+            f'{resolution.split("x")[1]}',
             f'{encapp.convert_to_bps(test.get("configure").get("bitrate"))}',
             f'{results.get("meanbitrate")}',
             f"{calculated_bitrate}",
@@ -387,7 +393,7 @@ def main(argv):
         "serial",
         "codec",
         "gop",
-        "fps",
+        "framerate",
         "width",
         "height",
         "bitrate",

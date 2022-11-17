@@ -19,6 +19,7 @@ The output can either be the video source files or the json result.
 import argparse
 import sys
 import json
+import math
 import os
 import pandas as pd
 import re
@@ -58,13 +59,6 @@ def dict_flatten(test):
     for k1, v1 in test.items():
         if k1 in common_data:
             for k2, v2 in v1.items():
-                if k2 == "resolution" and "x" in v2:
-                    sizes = v2.split("x")
-                    key_list.append(f"{k1}.width")
-                    key_list.append(f"{k1}.height")
-                    val_list.append(int(sizes[0]))
-                    val_list.append(int(sizes[1]))
-                    continue
                 key_list.append(f"{k1}.{k2}")
                 val_list.append(v2)
     return key_list, val_list
@@ -129,11 +123,38 @@ def getData(options, recursive):
     return data
 
 
-def search(options):
-    data = getData(options, not options.no_rec)
+def derive_values(data):
+    # get derived values: width/height (resolution), framerate. Configure
+    # info has priority
+    input_framerate_list = data["input.framerate"].tolist()
+    configure_framerate_list = data["configure.framerate"].tolist()
+    framerate_list = []
+    for c_framerate, i_framerate in zip(configure_framerate_list, input_framerate_list):
+        framerate = c_framerate if c_framerate != 0 else i_framerate
+        framerate_list.append(framerate)
+    data["framerate"] = framerate_list
+    input_resolution_list = data["input.resolution"].tolist()
+    configure_resolution_list = data["configure.resolution"].tolist()
+    resolution_list = []
+    width_list = []
+    height_list = []
+    for c_resolution, i_resolution in zip(
+        configure_resolution_list, input_resolution_list
+    ):
+        resolution = c_resolution if not math.isnan(c_resolution) else i_resolution
+        resolution_list.append(resolution)
+        width, height = resolution.split("x")
+        width_list.append(width)
+        height_list.append(height)
+    data["resolution"] = resolution_list
+    data["width"] = width_list
+    data["height"] = height_list
     data["configure.bitrate"] = data["configure.bitrate"].apply(
         lambda x: encapp.convert_to_bps(x)
     )
+
+
+def force_options(data, options):
     if options.codec:
         data = data.loc[data["configure.codec"].str.contains(options.codec, na=False)]
     if options.bitrate:
@@ -153,20 +174,26 @@ def search(options):
     if options.gop:
         data = data.loc[data["configure.iFrameInterval"] == options.gop]
     if options.fps:
-        data = data.loc[data["configure.framerate"] == options.fps]
+        data = data.loc[data["framerate"] == options.fps]
     if options.size:
         sizes = options.size.split("x")
         if len(sizes) == 2:
             data = data.loc[
-                (data["configure.width"] == int(sizes[0]))
-                & (data["configure.height"] == int(sizes[1]))
+                (data["width"] == int(sizes[0])) & (data["height"] == int(sizes[1]))
             ]
         else:
             data = data.loc[
-                (data["configure.width"] == int(sizes[0]))
-                | (data["configure.height"] == int(sizes[0]))
+                (data["width"] == int(sizes[0])) | (data["height"] == int(sizes[0]))
             ]
 
+
+def search(options):
+    # get data from json files or csv cache
+    data = getData(options, not options.no_rec)
+    # get derived values
+    derive_values(data)
+    # force values from CLI
+    force_options(data, options)
     return data
 
 
@@ -198,8 +225,8 @@ def main():
             "model",
             "configure.codec",
             "configure.iFrameInterval",
-            "configure.framerate",
-            "configure.height",
+            "framerate",
+            "height",
             "configure.bitrate",
         ]
     )
@@ -211,9 +238,9 @@ def main():
                     row["encodedfile"],
                     row["configure.codec"],
                     row["configure.iFrameInterval"],
-                    row["configure.framerate"],
-                    row["configure.width"],
-                    row["configure.height"],
+                    row["framerate"],
+                    row["width"],
+                    row["height"],
                     row["configure.bitrate"],
                     row["meanbitrate"],
                 )
