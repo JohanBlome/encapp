@@ -74,8 +74,6 @@ class BufferEncoder extends Encoder {
             Log.d(TAG, "MediaFormat (mTest)");
             logMediaFormat(mediaFormat);
             setConfigureParams(mTest, mediaFormat);
-            // Needed for the buffer input. this can be either nv12, nv21 or yuv420p
-            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
             Log.d(TAG, "MediaFormat (configure)");
             logMediaFormat(mediaFormat);
             Log.d(TAG, "Configure: " + mCodec.getName());

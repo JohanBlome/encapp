@@ -8,7 +8,9 @@ import android.util.Size;
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.Input;
+import com.facebook.encapp.proto.Input.PixFmt;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 
 
 public class TestDefinitionHelper {
@@ -158,20 +160,24 @@ public class TestDefinitionHelper {
         return builder.build();
     }
 
-
-
     public static Test checkAnUpdateBasicSettings(Test test) {
         // Make sure we have the most basic settings well defined
         Size res;
+        // make sure the input is well-defined
         Input.Builder input = test.getInput().toBuilder();
         if (!input.hasResolution()) {
             throw new RuntimeException("No valid resolution on input settings");
+        }
+
+        if (!input.hasPixFmt()) {
+            throw new RuntimeException("No valid pixel format on input settings");
         }
 
         if (!input.hasFramerate()) {
             throw new RuntimeException("No valid framerate on input settings");
         }
 
+        // get derived values
         Configure.Builder config = test.getConfigure().toBuilder();
         if (!config.hasBitrate()) {
             throw new RuntimeException("No valid bitrate on configuration settings");
@@ -186,6 +192,11 @@ public class TestDefinitionHelper {
         }
         if (!config.hasResolution()) {
             config.setResolution(input.getResolution());
+        }
+        if (!config.hasColorFormat()) {
+            PixFmt pix_fmt = input.getPixFmt();
+            int color_format = MediaCodecInfoHelper.mapEncappPixFmtToAndroidColorFormat(pix_fmt);
+            config.setColorFormat(color_format);
         }
 
         Test.Builder builder = test.toBuilder();
