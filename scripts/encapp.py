@@ -232,6 +232,7 @@ def verify_video_size(videofile, resolution):
     # video is raw
     file_size = os.path.getsize(videofile)
     if resolution is not None:
+        # TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
         framesize = int(resolution.split("x")[0]) * int(resolution.split("x")[1]) * 1.5
         if file_size % framesize == 0:
             return True

@@ -146,6 +146,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
         int height = res.getHeight();
+        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
         mRefFramesizeInBytes = (int) (width * height * 1.5);
 
         mReferenceFrameRate = mTest.getInput().getFramerate();
