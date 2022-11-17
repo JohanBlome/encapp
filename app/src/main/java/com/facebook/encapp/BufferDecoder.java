@@ -113,6 +113,7 @@ class BufferDecoder extends Encoder {
         }
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
+        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
         mRefFramesizeInBytes = (int) (res.getWidth() * res.getHeight() * 1.5);
 
         mReferenceFrameRate = mTest.getInput().getFramerate();

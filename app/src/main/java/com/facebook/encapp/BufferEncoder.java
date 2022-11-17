@@ -44,6 +44,7 @@ class BufferEncoder extends Encoder {
         mSkipped = 0;
         mFramesAdded = 0;
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
+        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);
 

@@ -51,6 +51,7 @@ public abstract class Encoder {
     protected MediaMuxer mMuxer;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
+    // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
     protected boolean mWriteFile = true;
     protected Statistics mStats;
