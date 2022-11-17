@@ -158,6 +158,7 @@ class BufferEncoder extends Encoder {
                     while (size < 0 && !input_done) {
                         try {
                             size = queueInputBufferEncoder(
+                                    mYuvReader,
                                     mCodec,
                                     byteBuffer,
                                     index,
@@ -180,12 +181,13 @@ class BufferEncoder extends Encoder {
                                 // Set EOS flag and call encoder
                                 flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                                 size = queueInputBufferEncoder(
-	                                    mCodec,
-	                                    byteBuffer,
-	                                    index,
-	                                    mInFramesCount,
-	                                    flags,
-	                                    mRefFramesizeInBytes);
+                                     mYuvReader,
+                                     mCodec,
+                                     byteBuffer,
+                                     index,
+                                     mInFramesCount,
+                                     flags,
+                                     mRefFramesizeInBytes);
                             }
 
                             if (!input_done) {
