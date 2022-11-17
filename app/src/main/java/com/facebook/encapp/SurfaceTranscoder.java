@@ -141,7 +141,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             return "Failed to create decoder";
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
-        mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        try {
+            mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
