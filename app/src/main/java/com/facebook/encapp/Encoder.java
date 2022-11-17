@@ -397,9 +397,9 @@ public abstract class Encoder {
      * @return size of enqueued data.
      */
     protected int queueInputBufferEncoder(
-            MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size) {
+            FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size) {
         byteBuffer.clear();
-        int read = mYuvReader.fillBuffer(byteBuffer, size);
+        int read = fileReader.fillBuffer(byteBuffer, size);
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);

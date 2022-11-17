@@ -306,6 +306,7 @@ class SurfaceEncoder extends Encoder {
                             try {
                                 if (mYuvReader != null) {
                                     size = queueInputBufferEncoder(
+                                            mYuvReader,
                                             mCodec,
                                             byteBuffer,
                                             mInFramesCount,
@@ -417,9 +418,9 @@ class SurfaceEncoder extends Encoder {
      * @return size of enqueued data.
      */
     private int queueInputBufferEncoder(
-            MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
+            FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
         byteBuffer.clear();
-        int read = mYuvReader.fillBuffer(byteBuffer, size);
+        int read = fileReader.fillBuffer(byteBuffer, size);
         long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
