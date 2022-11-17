@@ -30,6 +30,7 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.IOException;
+import java.lang.NullPointerException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
@@ -116,13 +117,18 @@ class SurfaceEncoder extends Encoder {
         checkRealtime();
 
         if (!mIsRgbaSource && !mIsCameraSource) {
-            RenderScript rs = RenderScript.create(mContext);
-            yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
-
-            Type.Builder yuvType = new Type.Builder(rs, Element.U8(rs)).setX(mRefFramesizeInBytes);
-            mYuvIn = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
-            Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
-            mYuvOut = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+            // if we are getting a YUV source, we need to convert it to RGBA
+            try {
+                RenderScript rs = RenderScript.create(mContext);
+                yuvToRgbIntrinsic = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs));
+                Type.Builder yuvType = new Type.Builder(rs, Element.U8(rs)).setX(mRefFramesizeInBytes);
+                mYuvIn = Allocation.createTyped(rs, yuvType.create(), Allocation.USAGE_SCRIPT);
+                Type.Builder rgbaType = new Type.Builder(rs, Element.RGBA_8888(rs)).setX(width).setY(height);
+                mYuvOut = Allocation.createTyped(rs, rgbaType.create(), Allocation.USAGE_SCRIPT);
+            } catch (NullPointerException npe) {
+                Log.e(TAG, "Failed to access to RenderScript: " + npe.getMessage());
+                return "Failed to access to RenderScript";
+            }
         }
 
         if (!mIsCameraSource) {
