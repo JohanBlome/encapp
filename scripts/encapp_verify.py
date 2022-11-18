@@ -330,11 +330,14 @@ def check_idr_placement(resultpath):
             test_text = json.dumps(result.get("test"))
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
-            encoder_settings = test_def.configure
-            encoder_mediaformat = result["encoder_media_format"]
-            codec = encoder_settings.codec
             common_settings = test_def.common
             testname = common_settings.id
+            encoder_settings = test_def.configure
+            encoder_mediaformat = result["encoder_media_format"]
+            if not encoder_mediaformat:
+                print(f"Error: test {testname} failed")
+                continue
+            codec = encoder_settings.codec
             bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             frames = result.get("frames")
 
@@ -452,14 +455,17 @@ def check_mean_bitrate_deviation(resultpath):
             test_text = json.dumps(result.get("test"))
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
+            common_settings = test_def.common
+            testname = common_settings.id
             encoder_settings = test_def.configure
             # this is a non mandatory setting in encapp but for mediaformat
             # is necessary
             encoder_mediaformat = result["encoder_media_format"]
+            if not encoder_mediaformat:
+                print(f"Error: test {testname} failed")
+                continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            common_settings = test_def.common
-            testname = common_settings.id
             bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             fps = encoder_settings.framerate
             if fps == 0:
@@ -616,12 +622,15 @@ def check_framerate_deviation(resultpath):
             test_text = json.dumps(result.get("test"))
             test_ = tests_definitions.Test()
             test_def = google.protobuf.json_format.Parse(test_text, test_)
-            encoder_settings = test_def.configure
-            encoder_mediaformat = result["encoder_media_format"]
-            height = encoder_mediaformat["height"]
-            codec = encoder_settings.codec
             common_settings = test_def.common
             testname = common_settings.id
+            encoder_settings = test_def.configure
+            encoder_mediaformat = result["encoder_media_format"]
+            if not encoder_mediaformat:
+                print(f"Error: test {testname} failed")
+                continue
+            height = encoder_mediaformat["height"]
+            codec = encoder_settings.codec
             bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             encoder_media_format = result.get("encoder_media_format")
             fps = encoder_settings.framerate
