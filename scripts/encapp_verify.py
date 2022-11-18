@@ -33,6 +33,7 @@ DEFAULT_TESTS = [
     "camera.pbtxt",
     "camera_parallel.pbtxt",
 ]
+TESTS_DIR = "tests"
 
 
 def parse_resolution(resolution):
@@ -923,7 +924,7 @@ def main(argv):
         for test in tests:
             directory, _ = os.path.split(__file__)
             if options.test is None:
-                test_path = "../tests/" + test
+                test_path = "../" + TESTS_DIR + "/" + test
                 if len(directory) > 0:
                     test_path = f"{directory}/{test_path}"
 
