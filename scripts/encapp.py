@@ -680,7 +680,7 @@ def get_options(argv):
         help="work (storage) directory on device",
     )
     parser.add_argument(
-        "-wd",
+        "-w",
         "--local-workdir",
         type=str,
         dest="local_workdir",

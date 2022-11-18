@@ -786,13 +786,35 @@ def main(argv):
         help="Replace all test defined sources with input",
         default=None,
     )
-    parser.add_argument("-is", "--input_res", help="Override input file", default=None)
     parser.add_argument(
-        "-if", "--input_fps", type=float, help="Override input fps", default=None
+        "--is",
+        "--input_res",
+        dest="input_res",
+        help="Override input file",
+        default=None,
     )
-    parser.add_argument("-os", "--output_res", help="Override input file", default=None)
     parser.add_argument(
-        "-of", "--output_fps", type=float, help="Override input fps", default=None
+        "--if",
+        "--input_fps",
+        dest="input_fps",
+        type=float,
+        help="Override input fps",
+        default=None,
+    )
+    parser.add_argument(
+        "--os",
+        "--output_res",
+        dest="output_res",
+        help="Override output file",
+        default=None,
+    )
+    parser.add_argument(
+        "--of",
+        "--output_fps",
+        dest="output_fps",
+        type=float,
+        help="Override output fps",
+        default=None,
     )
     parser.add_argument("-c", "--codec", help="Override encoder", default=None)
     parser.add_argument(
