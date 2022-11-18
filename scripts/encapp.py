@@ -721,21 +721,32 @@ def get_options(argv):
         parser.print_help()
         sys.exit(0)
 
+    global DEBUG
+    DEBUG = options.debug > 0
+    return options
+
+
+def process_options(options):
+    # 1. process serial number
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
 
-    # process replacement shortcuts
+    # 2. process replacement shortcuts
     SHORTCUT_LIST = {
         # '-i', type=str, dest='videofile',
         "videofile": "input.filepath",
+        "input_resolution": "input.resolution",
+        "input_framerate": "input.framerate",
+        "output_resolution": "output.resolution",
+        "output_framerate": "output.framerate",
         # '-c', '--codec', type=str, dest='codec',
         "codec": "configure.codec",
         # '-r', '--bitrate', type=str, dest='bitrate',
         "bitrate": "configure.bitrate",
     }
     for key, val in SHORTCUT_LIST.items():
-        if vars(options)[key] is not None:
+        if vars(options).get(key, None) is not None:
             # shortcut was defined
             k1, k2 = val.split(".")
             if k1 not in options.replace:
@@ -743,7 +754,8 @@ def get_options(argv):
             options.replace[k1][k2] = vars(options)[key]
             # remove the old value
             delattr(options, key)
-    # check the validity of some parameters
+
+    # 3. check the validity of some parameters
     if not options.replace:
         options.replace = {}
     if options.replace.get("input", {}).get("filepath", ""):
@@ -754,8 +766,17 @@ def get_options(argv):
             else f"file {videofile} is not readable"
         )
 
-    global DEBUG
-    DEBUG = options.debug > 0
+    # 4. derive replace values
+    if "input" in options.replace and "filepath" in options.replace["input"]:
+        input_filepath = options.replace["input"]["filepath"]
+        # convert y4m (raw) files into yuv/rgba (raw) files
+        if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
+            input_filepath
+        ):
+            # replace input and other derived values
+            d = process_input_path(input_filepath, options.replace, options.debug)
+            options.replace["input"].update(d)
+
     return options
 
 
@@ -810,20 +831,10 @@ def process_input_path(input_filepath, replace, debug):
 
 def main(argv):
     options = get_options(argv)
+    options = process_options(options)
     if options.version:
         print("version: %s" % encapp_tool.__version__)
         sys.exit(0)
-
-    # derived replace values
-    if "input" in options.replace and "filepath" in options.replace["input"]:
-        input_filepath = options.replace["input"]["filepath"]
-        # convert y4m (raw) files into yuv/rgba (raw) files
-        if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
-            input_filepath
-        ):
-            # replace input and other derived values
-            d = process_input_path(input_filepath, options.replace, options.debug)
-            options.replace["input"].update(d)
 
     # get model and serial number
     model, serial = encapp_tool.adb_cmds.get_device_info(options.serial, options.debug)
