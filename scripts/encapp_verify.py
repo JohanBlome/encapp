@@ -779,7 +779,15 @@ def print_partial_result(header, partial_result):
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="Android device serial number")
-    parser.add_argument("-d", "--dir", default="encapp_verify")
+    parser.add_argument(
+        "-w",
+        "--local-workdir",
+        type=str,
+        dest="local_workdir",
+        default="encapp_verify",
+        metavar="local_workdir",
+        help="work (storage) directory on local host",
+    )
     parser.add_argument(
         "-i",
         "--videofile",
@@ -850,7 +858,7 @@ def main(argv):
     temporal_string = ""
     ltr_string = ""
     framerate_string = ""
-    workdir = options.dir
+    local_workdir = options.local_workdir
     if options.result is not None:
         results = []
         for file in options.result:
@@ -861,10 +869,10 @@ def main(argv):
         ltr_string += check_long_term_ref(results)
         framerate_string += check_framerate_deviation(results)
     else:
-        if os.path.exists(workdir):
-            shutil.rmtree(workdir)
+        if os.path.exists(local_workdir):
+            shutil.rmtree(local_workdir)
 
-        os.mkdir(workdir)
+        os.mkdir(local_workdir)
         model, serial = encapp_tool.adb_cmds.get_device_info(options.serial)
         encapp.remove_encapp_gen_files(serial)
 
@@ -902,7 +910,7 @@ def main(argv):
             settings.out_resolution = options.output_res
             settings.inp_framerate = options.input_fps
             settings.out_framerate = options.output_fps
-            settings.local_workdir = workdir
+            settings.local_workdir = local_workdir
             result = encapp.codec_test(settings, model, serial, False)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
@@ -919,12 +927,12 @@ def main(argv):
     )
 
     print(f"\nRESULTS\n{result_string}")
-    with open(f"{workdir}/RESULT.txt", "w") as output:
+    with open(f"{local_workdir}/RESULT.txt", "w") as output:
         output.write(result_string)
         output.write("\n---------")
         extra = ""
         if model is not None and serial is not None:
-            with open(f"{workdir}/dut.txt", "w") as dut:
+            with open(f"{local_workdir}/dut.txt", "w") as dut:
                 now = datetime.datetime.now()
                 dt_string = now.strftime("%Y-%m-%d_%H_%M")
                 dut.write(f"\nTest performed: {dt_string}")
@@ -933,8 +941,8 @@ def main(argv):
                 else:
                     dut.write(f'\nDUT: {model["product"]}, serial: {serial}')
 
-        if os.path.exists(f"{workdir}/dut.txt"):
-            with open(f"{workdir}/dut.txt", "r") as dut:
+        if os.path.exists(f"{local_workdir}/dut.txt"):
+            with open(f"{local_workdir}/dut.txt", "r") as dut:
                 extra = dut.read()
         output.write(f"\n{extra}")
         output.write("\n")
