@@ -479,11 +479,11 @@ def list_codecs(serial, model, device_workdir, debug=0):
         print(f"File is available in current dir as {filename}")
 
 
-def read_json_file(configfile, debug):
+def read_json_file(jsonfile, debug):
     # read input file
-    with open(configfile, "r") as fp:
+    with open(jsonfile, "r") as fp:
         if debug > 0:
-            print(f"configfile: {configfile}")
+            print(f"jsonfile: {jsonfile}")
         input_config = json.load(fp)
     return input_config
 
