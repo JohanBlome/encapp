@@ -927,14 +927,16 @@ def main(argv):
 
             settings = encapp.get_options(["", "run", ""])
             settings.configfile = test_path
+            settings.debug = options.debug
             settings.videofile = options.videofile
             settings.encoder = options.codec
-            settings.inp_resolution = options.input_res
-            settings.out_resolution = options.output_res
-            settings.inp_framerate = options.input_fps
-            settings.out_framerate = options.output_fps
+            settings.input_resolution = options.input_res
+            settings.output_resolution = options.output_res
+            settings.input_framerate = options.input_fps
+            settings.output_framerate = options.output_fps
             settings.local_workdir = local_workdir
-            result = encapp.codec_test(settings, model, serial, options.debug)
+            settings = encapp.process_options(settings)
+            result = encapp.codec_test(settings, model, serial, settings.debug)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
