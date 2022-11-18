@@ -578,13 +578,14 @@ public class MainActivity extends AppCompatActivity {
 
         Encoder coder;
         synchronized (mEncoderList) {
-            Log.d(TAG, "Source file  = " + filePath.toLowerCase(Locale.US));
+            Log.d(TAG, "[" + test.getCommon().getId() + "] input.filepath: " + filePath.toLowerCase(Locale.US));
             OutputAndTexture ot = null;
+            Log.d(TAG, "[" + test.getCommon().getId() + "] configure.surface: " + test.getConfigure().getSurface());
             if (test.getConfigure().getSurface()) {
                 if (mViewsToDraw.size() > 0 &&
                         test.getInput().hasShow() &&
                         test.getInput().getShow()) {
-                    Log.d(TAG, test.getCommon().getId() + " - get texture");
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] getting texture");
                     ot = getFirstFreeTextureView();
                 }
             }
@@ -594,9 +595,11 @@ public class MainActivity extends AppCompatActivity {
 
             String extension = getFilenameExtension(filePath);
             if (VIDEO_ENCODED_EXTENSIONS.contains(extension)) {
+                Log.d(TAG, "[" + test.getCommon().getId() + "] decoding input");
                 // A decoder is needed
                 if (ot != null) {
                     ot.mMult = new OutputMultiplier(mVsyncHandler);
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test");
                     coder = new SurfaceTranscoder(test, ot.mMult, mVsyncHandler);
                     ot.mEncoder = coder;
                     if (!test.getConfigure().getEncode() &&
@@ -606,8 +609,10 @@ public class MainActivity extends AppCompatActivity {
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
                 } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] BufferDecode test");
                     coder = new BufferDecoder(test);
                 } else {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test (alt)");
                     coder = new SurfaceTranscoder(test, new OutputMultiplier(mVsyncHandler), mVsyncHandler);
                 }
             } else if (test.getConfigure().getSurface()) {
@@ -629,12 +634,15 @@ public class MainActivity extends AppCompatActivity {
                     ot.mMult = mult;
                 }
                 if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceNoEncoder test");
                     coder = new SurfaceNoEncoder(test, mult);
                 } else {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceEncoder test");
                     coder = new SurfaceEncoder(test, this, mult);
                 }
 
             } else {
+                Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
                 coder = new BufferEncoder(test);
             }
 
