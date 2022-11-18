@@ -776,7 +776,7 @@ def print_partial_result(header, partial_result):
     return ""
 
 
-def main(argv):
+def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="Android device serial number")
     parser.add_argument(
@@ -858,6 +858,11 @@ def main(argv):
     )
 
     options = parser.parse_args(argv[1:])
+    return options
+
+
+def main(argv):
+    options = get_options(argv)
     result_string = ""
     model = None
     serial = None
