@@ -780,6 +780,21 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="Android device serial number")
     parser.add_argument(
+        "-d",
+        "--debug",
+        action="count",
+        dest="debug",
+        default=0,
+        help="Increase verbosity (use multiple times for more)",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_const",
+        dest="debug",
+        const=-1,
+        help="Zero verbosity",
+    )
+    parser.add_argument(
         "-w",
         "--local-workdir",
         type=str,
@@ -851,6 +866,9 @@ def main(argv):
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
 
+    if options.debug > 0:
+        print(options)
+
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ""
@@ -911,7 +929,7 @@ def main(argv):
             settings.inp_framerate = options.input_fps
             settings.out_framerate = options.output_fps
             settings.local_workdir = local_workdir
-            result = encapp.codec_test(settings, model, serial, False)
+            result = encapp.codec_test(settings, model, serial, options.debug)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
