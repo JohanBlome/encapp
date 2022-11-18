@@ -24,7 +24,7 @@ import proto.tests_pb2 as tests_definitions  # noqa: E402
 DEFAULT_TESTS = [
     "bitrate_buffer.pbtxt",
     "bitrate_surface.pbtxt",
-    "bitrate_transcoder_show.pbtxt",
+    #"bitrate_transcoder_show.pbtxt",
     "dynamic_bitrate.pbtxt",
     "dynamic_framerate.pbtxt",
     "dynamic_idr.pbtxt",
