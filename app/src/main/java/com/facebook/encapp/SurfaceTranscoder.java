@@ -142,7 +142,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
         try {
-            mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+            mTest = TestDefinitionHelper.updateBasicSettings(mTest);
         } catch (RuntimeException e) {
             Log.e(TAG, "Error: " + e.getMessage());
         }

@@ -24,7 +24,7 @@ import proto.tests_pb2 as tests_definitions  # noqa: E402
 DEFAULT_TESTS = [
     "bitrate_buffer.pbtxt",
     "bitrate_surface.pbtxt",
-    #"bitrate_transcoder_show.pbtxt",
+    "bitrate_transcoder_show.pbtxt",
     "dynamic_bitrate.pbtxt",
     "dynamic_framerate.pbtxt",
     "dynamic_idr.pbtxt",
@@ -864,7 +864,7 @@ def get_options(argv):
         "--bitrate_limit",
         nargs="?",
         help="Set acceptance lmit on bitrate in percentage",
-        default=5,
+        default=10,
     )
 
     options = parser.parse_args(argv[1:])

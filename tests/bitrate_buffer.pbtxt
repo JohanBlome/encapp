@@ -1,10 +1,13 @@
 test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
     common {
         id: "bitrate_buffer"
         description: "Verify encoding bitrate - buffer"
     }
     configure {
         codec: "OMX.google.h264.encoder"
-        bitrate: "100 kbps"
+        bitrate: "200 kbps"
     }
 }

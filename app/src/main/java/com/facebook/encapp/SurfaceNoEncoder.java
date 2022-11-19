@@ -77,7 +77,9 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
         try {
-            mTest = TestDefinitionHelper.checkAnUpdateBasicSettings(mTest);
+            if (TestDefinitionHelper.checkBasicSettings(mTest)) {
+                mTest = TestDefinitionHelper.updateBasicSettings(mTest);
+            }
         } catch (RuntimeException e) {
             Log.e(TAG, "Error: " + e.getMessage());
         }

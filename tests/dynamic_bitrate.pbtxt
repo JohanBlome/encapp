@@ -1,4 +1,7 @@
 test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
     common {
         id: "dynamic_bitrate"
         description: "Verify encoding bitrate"
@@ -8,7 +11,7 @@ test {
     }
     configure {
         codec: "OMX.google.h264.encoder"
-        bitrate: "1Mbps"
+        bitrate: "2Mbps"
     }
     runtime {
         video_bitrate {

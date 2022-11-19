@@ -18,8 +18,11 @@ public class TestDefinitionHelper {
     public static MediaFormat buildMediaFormat(Test test) {
         Configure config = test.getConfigure();
         Input input = test.getInput();
-        Size targetResolution = SizeUtils.parseXString(config.getResolution());
+        Size targetResolution = (config.hasResolution()) ?
+                SizeUtils.parseXString(config.getResolution()):
+                SizeUtils.parseXString(test.getInput().getResolution());
         // start with the default MediaFormat
+        Log.d(TAG, "mim: " +  config.getMime()  + ", res = " + targetResolution);
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(
                 config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
 
@@ -160,7 +163,7 @@ public class TestDefinitionHelper {
         return builder.build();
     }
 
-    public static Test checkAnUpdateBasicSettings(Test test) {
+    public static boolean checkBasicSettings(Test test) {
         // Make sure we have the most basic settings well defined
         Size res;
         // make sure the input is well-defined
@@ -177,7 +180,12 @@ public class TestDefinitionHelper {
             throw new RuntimeException("No valid framerate on input settings");
         }
 
+        return true;
+    }
+
+    public static Test updateBasicSettings(Test test) {
         // get derived values
+        Input.Builder input = test.getInput().toBuilder();
         Configure.Builder config = test.getConfigure().toBuilder();
         if (!config.hasBitrate()) {
             throw new RuntimeException("No valid bitrate on configuration settings");

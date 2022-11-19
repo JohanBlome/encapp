@@ -1,4 +1,7 @@
 test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
     common {
         id: "tl2"
         description: "Verify encoding bitrate on TL-2 (Temporal Layering)"

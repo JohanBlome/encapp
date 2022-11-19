@@ -60,6 +60,12 @@ default_values = {
 
 OPERATION_TYPES = ("batch", "realtime")
 PIX_FMT_TYPES = ("yuv420p", "nv12", "nv21", "rgba")
+PIX_FMT_TYPES_VALUES = {
+    "yuv420p": 0,
+    "nv12": 1,
+    "nv21": 2,
+    "rgba": 3,
+}
 PIX_FMT_TYPES = {
     "yuv420p": "yuv",
     "nv12": "yuv",
@@ -191,7 +197,7 @@ def collect_results(
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
-    # remove the test file
+    # remo/proceve the test file
     adb_cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
     encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     if debug > 0:
@@ -377,9 +383,12 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                     getattr(test, k1).SetInParent()
                 setattr(getattr(test, k1), k2, val)
         # If no surface decode and no raw input, decode to raw
-        if not test.configure.surface and test.input.filepath[-3:] != "yuv":
-            # Placeholder for ffmpeg decode call
-            print(f"// decode {test.input.filepath}//")
+        if encapp_tool.ffutils.video_is_y4m(test.input.filepath):
+            d = process_input_path(test.input.filepath, None)
+            test.input.resolution = d["resolution"]
+            test.input.framerate = d["framerate"]
+            test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+            test.input.filepath = d["filepath"]
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
@@ -776,7 +785,10 @@ def process_options(options):
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
             options.replace["input"].update(d)
-
+            options.replace["framerate"].update(d)
+            options.replace["resolution"].update(d)
+            options.replace["pix_fmt"].update(d)
+            options.replace["extension"].update(d)
     return options
 
 
@@ -796,14 +808,22 @@ def verify_app_version(json_files):
                 print(f"File {fl} failed to be read")
 
 
-def process_input_path(input_filepath, replace, debug):
+def process_input_path(input_filepath, replace, debug=0):
     # decode encoded video (the encoder wants raw video)
     videofile_config = encapp_tool.ffutils.get_video_info(input_filepath)
-    # check whether the user has a preferred raw format
-    pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
-    resolution = f'{videofile_config["width"]}x{videofile_config["height"]}'
-    framerate = videofile_config["framerate"]
-    extension = PIX_FMT_TYPES[pix_fmt]
+    if replace is not None:
+        # check whether the user has a preferred raw format
+        pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
+        resolution = f'{videofile_config["width"]}x{videofile_config["height"]}'
+        # TODO: why not framerate?
+        framerate = videofile_config["framerate"]
+        extension = PIX_FMT_TYPES[pix_fmt]
+    else:
+        pix_fmt = PREFERRED_PIX_FMT
+        resolution = f"{videofile_config['width']}x{videofile_config['height']}"
+        framerate = videofile_config["framerate"]
+        extension = PIX_FMT_TYPES[pix_fmt]
+
     # get raw filepath
     input_filepath_raw = os.path.join(
         tempfile.gettempdir(), os.path.basename(input_filepath)
@@ -812,6 +832,13 @@ def process_input_path(input_filepath, replace, debug):
     input_filepath_raw += f".{framerate}"
     input_filepath_raw += f".{pix_fmt}"
     input_filepath_raw += f".{extension}"
+    print("***********")
+    print("input file will be transcoded")
+    print(f"resolution:  -> {resolution}")
+    print(f"framerate:  -> {framerate}")
+    print(f"pix_fmt: -> {pix_fmt}")
+    print("***********")
+
     encapp_tool.ffutils.ffmpeg_convert_to_raw(
         input_filepath,
         input_filepath_raw,

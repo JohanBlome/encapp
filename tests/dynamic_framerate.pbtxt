@@ -1,4 +1,7 @@
 test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
     common {
         id: "dynamic_framerate"
         description: "Verify encoding frame rate"
