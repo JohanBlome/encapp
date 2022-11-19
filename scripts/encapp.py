@@ -59,7 +59,6 @@ default_values = {
 }
 
 OPERATION_TYPES = ("batch", "realtime")
-PIX_FMT_TYPES = ("yuv420p", "nv12", "nv21", "rgba")
 PIX_FMT_TYPES_VALUES = {
     "yuv420p": 0,
     "nv12": 1,
