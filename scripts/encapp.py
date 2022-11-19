@@ -384,7 +384,14 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                 setattr(getattr(test, k1), k2, val)
         # If no surface decode and no raw input, decode to raw
         if encapp_tool.ffutils.video_is_y4m(test.input.filepath):
-            d = process_input_path(test.input.filepath, None)
+            options = None
+            if test.configure.surface:
+                # set pixel config to rgba
+                options = {}
+                input = {}
+                input["pix_fmt"] = "rgba"
+                options["input"] = input
+            d = process_input_path(test.input.filepath, options)
             test.input.resolution = d["resolution"]
             test.input.framerate = d["framerate"]
             test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
@@ -784,7 +791,6 @@ def process_options(options):
         ):
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
-            print(f"{options}")
             if "input" in options:
                 options.replace["input"].update(d)
             if "framerate" in options:
