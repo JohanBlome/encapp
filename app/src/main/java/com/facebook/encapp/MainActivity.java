@@ -663,6 +663,9 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Log.d(TAG, "Start test id:" + test.getCommon().getId());
                     final String status = coder.start();
+                    if (status.length() > 0) {
+                        Log.e(TAG, "[" + test.getCommon().getId() + "] " + status);
+                    }
                     Log.d(TAG, "Test done " + status + ": " + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId());
 
 
