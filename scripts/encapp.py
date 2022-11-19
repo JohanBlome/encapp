@@ -784,11 +784,17 @@ def process_options(options):
         ):
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
-            options.replace["input"].update(d)
-            options.replace["framerate"].update(d)
-            options.replace["resolution"].update(d)
-            options.replace["pix_fmt"].update(d)
-            options.replace["extension"].update(d)
+            print(f"{options}")
+            if "input" in options:
+                options.replace["input"].update(d)
+            if "framerate" in options:
+                options.replace["framerate"].update(d)
+            if "resolution" in options:
+                options.replace["resolution"].update(d)
+            if "pix_fmt" in options:
+                options.replace["pix_fmt"].update(d)
+            if "extension" in options:
+                options.replace["extension"].update(d)
     return options
 
 
