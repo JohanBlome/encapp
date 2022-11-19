@@ -1,5 +1,6 @@
 package com.facebook.encapp.utils;
 
+import android.graphics.ImageFormat;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
@@ -564,4 +565,34 @@ public class MediaCodecInfoHelper {
         return str.toString();
 
     }
+
+    private static Map<Integer, String> createAndroidImageFormatTable() {
+        Map<Integer, String> m = new HashMap<Integer,String>();
+        m.put(ImageFormat.DEPTH16, "DEPTH16");
+        m.put(ImageFormat.DEPTH_JPEG, "DEPTH_JPEG");
+        m.put(ImageFormat.DEPTH_POINT_CLOUD, "DEPTH_POINT_CLOUD");
+        m.put(ImageFormat.FLEX_RGBA_8888, "FLEX_RGBA_8888");
+        m.put(ImageFormat.FLEX_RGB_888, "FLEX_RGB_888");
+        m.put(ImageFormat.HEIC, "HEIC");
+        m.put(ImageFormat.JPEG, "JPEG");
+        m.put(ImageFormat.NV16, "NV16");
+        m.put(ImageFormat.NV21, "NV21");
+        m.put(ImageFormat.PRIVATE, "PRIVATE");
+        m.put(ImageFormat.RAW10, "RAW10");
+        m.put(ImageFormat.RAW12, "RAW12");
+        m.put(ImageFormat.RAW_PRIVATE, "RAW_PRIVATE");
+        m.put(ImageFormat.RAW_SENSOR, "RAW_SENSOR");
+        m.put(ImageFormat.RGB_565, "RGB_565");
+        m.put(ImageFormat.UNKNOWN, "UNKNOWN");
+        m.put(ImageFormat.Y8, "Y8");
+        // Added in API level 31
+        //m.put(ImageFormat.YCBCR_P010, "YCBCR_P010");
+        m.put(ImageFormat.YUV_420_888, "YUV_420_888");
+        m.put(ImageFormat.YUV_422_888, "YUV_422_888");
+        m.put(ImageFormat.YUV_444_888, "YUV_444_888");
+        m.put(ImageFormat.YUY2, "YUY2");
+        m.put(ImageFormat.YV12, "YV12");
+        return m;
+    }
+    final public static Map<Integer, String> androidImageFormatTable = createAndroidImageFormatTable();
 }
