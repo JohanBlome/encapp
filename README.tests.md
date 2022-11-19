@@ -49,7 +49,7 @@ Step 4 is interesting:
 * (4.1) get the frame index (`mCodec.dequeueInputBuffer()`)
 * (4.2) decide whether it needs to do runtime parameters (`mCodec.setParameters()`)
 * (4.3) get the actual `ByteBuffer` where the frame-to-encode will be copied (`mCodec.getInputBuffer()`). I assume this works for the both the encoder and the decoder side because both are `ByteBuffer` objects
-* (4.4) fill it up from a file (`mYuvReader`). The function `queueInputBufferEncoder()` reads the input image into the ByteBuffer it got in the previous step, and then tells the encoder to go ahead by calling `codec.queueInputBuffer()`. The realtime operation mode is implemented by making the last call wait.
+* (4.4) fill it up from a file (`mYuvReader`). The function `queueInputBufferEncoder()` reads the input image into the ByteBuffer or Image it got in the previous step, and then tells the encoder to go ahead by calling `codec.queueInputBuffer()`. The realtime operation mode is implemented by making the last call wait.
 * (4.5) wait until there is a buffer in the output buffer (`mCodec.dequeueOutputBuffer()`)
 * (4.6) read the output buffer (`mCodec.getOutputBuffer()`)
 * (4.7) release output buffer (`mCodec.releaseOutputBuffer()`)

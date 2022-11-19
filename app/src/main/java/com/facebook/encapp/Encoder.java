@@ -1,5 +1,7 @@
 package com.facebook.encapp;
 
+import android.graphics.ImageFormat;
+import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -395,10 +397,19 @@ public abstract class Encoder {
      * @return size of enqueued data.
      */
     protected int queueInputBufferEncoder(
-            FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size) {
-        // copy a frame to the ByteBuffer
-        byteBuffer.clear();
-        int read = fileReader.fillBuffer(byteBuffer, size);
+            FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size, boolean useImage) {
+        int read = 0;
+        if (useImage) {
+            // copy a frame to the Image
+            Image image = mCodec.getInputImage(index);
+            //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying data to Image.ByteBuffer");
+            read = fileReader.fillImage(image);
+        } else {
+            // copy a frame to the ByteBuffer
+            //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying " + size + " bytes to the ByteBuffer");
+            byteBuffer.clear();
+            read = fileReader.fillBuffer(byteBuffer, size);
+        }
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);

@@ -357,7 +357,7 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
 
     # 1.2. replace the parameters that do not create multiple tests
     # TODO(chema): there should be an automatic way to do this
-    CONFIGURE_INT_KEYS = ("quality", "complexity", "durationUs")
+    CONFIGURE_INT_KEYS = ("quality", "complexity", "durationUs", "color_format")
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
     CONFIGURE_FLOAT_KEYS = ("framerate",)
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")

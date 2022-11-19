@@ -62,6 +62,7 @@ class BufferEncoder extends Encoder {
         }
 
         MediaFormat mediaFormat;
+        boolean useImage = false;
         try {
             // Unless we have a mime, do lookup
             if (mTest.getConfigure().getMime().length() == 0) {
@@ -78,6 +79,10 @@ class BufferEncoder extends Encoder {
             setConfigureParams(mTest, mediaFormat);
             Log.d(TAG, "MediaFormat (configure)");
             logMediaFormat(mediaFormat);
+            if (mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT) == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) {
+                useImage = true;
+            }
+            Log.d(TAG, "useImage: " + useImage);
             Log.d(TAG, "Configure: " + mCodec.getName());
             mCodec.configure(
                     mediaFormat,
@@ -166,7 +171,8 @@ class BufferEncoder extends Encoder {
                                     index,
                                     mInFramesCount,
                                     flags,
-                                    mRefFramesizeInBytes);
+                                    mRefFramesizeInBytes,
+                                    useImage);
 
                             mInFramesCount++;
                         } catch (IllegalStateException isx) {
@@ -189,7 +195,8 @@ class BufferEncoder extends Encoder {
                                      index,
                                      mInFramesCount,
                                      flags,
-                                     mRefFramesizeInBytes);
+                                     mRefFramesizeInBytes,
+                                     useImage);
                             }
 
                             if (!input_done) {
