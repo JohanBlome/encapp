@@ -144,6 +144,8 @@ public class MediaCodecInfoHelper {
         switch (pix_fmt.getNumber()) {
             case PixFmt.yuv420p_VALUE:
                 return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar;
+            case PixFmt.yvu420p_VALUE:
+                return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar;
             case PixFmt.nv12_VALUE:
                 return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar;
             case PixFmt.nv21_VALUE:

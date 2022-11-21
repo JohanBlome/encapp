@@ -117,6 +117,8 @@ def run_quality(test_file, override_settings, debug):
             pix_fmt = "yuv420p"
             if reference_pathname.find("yuv420p") > -1:
                 pix_fmt = "yuv420p"
+            if reference_pathname.find("yvu420p") > -1:
+                pix_fmt = "yvu420p"
             elif reference_pathname.find("nv12") > -1:
                 pix_fmt = "nv12"
             elif reference_pathname.find("nv21") > -1:

@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0btests.proto\"K\n\x06\x43ommon\x12\n\n\x02id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x11\n\toperation\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\t\"\xf4\x01\n\x05Input\x12\x10\n\x08\x66ilepath\x18\x01 \x01(\t\x12\x12\n\nresolution\x18\x02 \x01(\t\x12\x1e\n\x07pix_fmt\x18\x03 \x01(\x0e\x32\r.Input.PixFmt\x12\x11\n\tframerate\x18\x04 \x01(\x02\x12\x16\n\x0eplayout_frames\x18\x05 \x01(\x05\x12\x0f\n\x07pursuit\x18\x06 \x01(\x05\x12\x10\n\x08realtime\x18\x07 \x01(\x08\x12\x14\n\x0cstoptime_sec\x18\x08 \x01(\x02\x12\x0c\n\x04show\x18\t \x01(\x08\"3\n\x06PixFmt\x12\x0b\n\x07yuv420p\x10\x00\x12\x08\n\x04nv12\x10\x01\x12\x08\n\x04nv21\x10\x02\x12\x08\n\x04rgba\x10\x03\"\x81\x07\n\tConfigure\x12\'\n\tparameter\x18\x01 \x03(\x0b\x32\x14.Configure.Parameter\x12\r\n\x05\x63odec\x18\x02 \x01(\t\x12\x0e\n\x06\x65ncode\x18\x03 \x01(\x08\x12\x0f\n\x07surface\x18\x04 \x01(\x08\x12\x0c\n\x04mime\x18\x05 \x01(\t\x12\x0f\n\x07\x62itrate\x18\x06 \x01(\t\x12,\n\x0c\x62itrate_mode\x18\x07 \x01(\x0e\x32\x16.Configure.BitrateMode\x12\x12\n\ndurationUs\x18\x08 \x01(\x04\x12\x12\n\nresolution\x18\t \x01(\t\x12\x14\n\x0c\x63olor_format\x18\n \x01(\x05\x12\x30\n\x0e\x63olor_standard\x18\x0b \x01(\x0e\x32\x18.Configure.ColorStandard\x12*\n\x0b\x63olor_range\x18\x0c \x01(\x0e\x32\x15.Configure.ColorRange\x12\x30\n\x0e\x63olor_transfer\x18\r \x01(\x0e\x32\x18.Configure.ColorTransfer\x12\x1e\n\x16\x63olor_transfer_request\x18\x0e \x01(\t\x12\x11\n\tframerate\x18\x0f \x01(\x02\x12\x18\n\x10i_frame_interval\x18\x10 \x01(\x05\x12\x1c\n\x14intra_refresh_period\x18\x11 \x01(\x05\x12\x0f\n\x07latency\x18\x12 \x01(\x05\x12#\n\x1brepeat_previous_frame_after\x18\x13 \x01(\x03\x12\x11\n\tts_schema\x18\x14 \x01(\t\x12\x0f\n\x07quality\x18\x15 \x01(\x05\x12\x12\n\ncomplexity\x18\x16 \x01(\x05\x1a\x45\n\tParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1c\n\x04type\x18\x02 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x03 \x01(\t\"3\n\x0b\x42itrateMode\x12\x06\n\x02\x63q\x10\x00\x12\x07\n\x03vbr\x10\x01\x12\x07\n\x03\x63\x62r\x10\x02\x12\n\n\x06\x63\x62r_fd\x10\x03\"E\n\rColorStandard\x12\r\n\tbt601_pal\x10\x02\x12\x0e\n\nbt601_ntsc\x10\x04\x12\t\n\x05\x62t709\x10\x01\x12\n\n\x06\x62t2020\x10\x06\"#\n\nColorRange\x12\x08\n\x04\x66ull\x10\x01\x12\x0b\n\x07limited\x10\x02\"?\n\rColorTransfer\x12\n\n\x06linear\x10\x01\x12\r\n\tsdr_video\x10\x03\x12\n\n\x06st2084\x10\x06\x12\x07\n\x03hlg\x10\x07\"\xa1\x03\n\x07Runtime\x12%\n\tparameter\x18\x01 \x03(\x0b\x32\x12.Runtime.Parameter\x12\x35\n\rvideo_bitrate\x18\x02 \x03(\x0b\x32\x1e.Runtime.VideoBitrateParameter\x12\x0c\n\x04\x64rop\x18\x03 \x03(\x03\x12=\n\x11\x64ynamic_framerate\x18\x04 \x03(\x0b\x32\".Runtime.DynamicFramerateParameter\x12\x14\n\x0crequest_sync\x18\x05 \x03(\x03\x1aW\n\tParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0b\n\x03key\x18\x02 \x01(\t\x12\x1c\n\x04type\x18\x03 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x04 \x01(\t\x1a:\n\x15VideoBitrateParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0f\n\x07\x62itrate\x18\x02 \x01(\t\x1a@\n\x19\x44ynamicFramerateParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x11\n\tframerate\x18\x02 \x01(\x02\"\x89\x01\n\x10\x44\x65\x63oderConfigure\x12.\n\tparameter\x18\x01 \x03(\x0b\x32\x1b.DecoderConfigure.Parameter\x1a\x45\n\tParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1c\n\x04type\x18\x02 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x03 \x01(\t\"\x97\x01\n\x0e\x44\x65\x63oderRuntime\x12,\n\tparameter\x18\x01 \x03(\x0b\x32\x19.DecoderRuntime.Parameter\x1aW\n\tParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0b\n\x03key\x18\x02 \x01(\t\x12\x1c\n\x04type\x18\x03 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x04 \x01(\t\"\x1f\n\x08Parallel\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test\"\x1d\n\x06Serial\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test\"\xe5\x01\n\x04Test\x12\x17\n\x06\x63ommon\x18\x01 \x01(\x0b\x32\x07.Common\x12\x15\n\x05input\x18\x02 \x01(\x0b\x32\x06.Input\x12\x1d\n\tconfigure\x18\x03 \x01(\x0b\x32\n.Configure\x12\x19\n\x07runtime\x18\x04 \x01(\x0b\x32\x08.Runtime\x12,\n\x11\x64\x65\x63oder_configure\x18\x05 \x01(\x0b\x32\x11.DecoderConfigure\x12(\n\x0f\x64\x65\x63oder_runtime\x18\x06 \x01(\x0b\x32\x0f.DecoderRuntime\x12\x1b\n\x08parallel\x18\x07 \x01(\x0b\x32\t.Parallel\" \n\tTestSuite\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test*I\n\rDataValueType\x12\x0e\n\nstringType\x10\x00\x12\x0b\n\x07intType\x10\x01\x12\r\n\tfloatType\x10\x02\x12\x0c\n\x08longType\x10\x03\x42-\n\x19\x63om.facebook.encapp.protoB\x0eTestDefinitionP\x01')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0btests.proto\"K\n\x06\x43ommon\x12\n\n\x02id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x11\n\toperation\x18\x03 \x01(\t\x12\r\n\x05start\x18\x04 \x01(\t\"\x81\x02\n\x05Input\x12\x10\n\x08\x66ilepath\x18\x01 \x01(\t\x12\x12\n\nresolution\x18\x02 \x01(\t\x12\x1e\n\x07pix_fmt\x18\x03 \x01(\x0e\x32\r.Input.PixFmt\x12\x11\n\tframerate\x18\x04 \x01(\x02\x12\x16\n\x0eplayout_frames\x18\x05 \x01(\x05\x12\x0f\n\x07pursuit\x18\x06 \x01(\x05\x12\x10\n\x08realtime\x18\x07 \x01(\x08\x12\x14\n\x0cstoptime_sec\x18\x08 \x01(\x02\x12\x0c\n\x04show\x18\t \x01(\x08\"@\n\x06PixFmt\x12\x0b\n\x07yuv420p\x10\x00\x12\x0b\n\x07yvu420p\x10\x01\x12\x08\n\x04nv12\x10\x02\x12\x08\n\x04nv21\x10\x03\x12\x08\n\x04rgba\x10\x04\"\x81\x07\n\tConfigure\x12\'\n\tparameter\x18\x01 \x03(\x0b\x32\x14.Configure.Parameter\x12\r\n\x05\x63odec\x18\x02 \x01(\t\x12\x0e\n\x06\x65ncode\x18\x03 \x01(\x08\x12\x0f\n\x07surface\x18\x04 \x01(\x08\x12\x0c\n\x04mime\x18\x05 \x01(\t\x12\x0f\n\x07\x62itrate\x18\x06 \x01(\t\x12,\n\x0c\x62itrate_mode\x18\x07 \x01(\x0e\x32\x16.Configure.BitrateMode\x12\x12\n\ndurationUs\x18\x08 \x01(\x04\x12\x12\n\nresolution\x18\t \x01(\t\x12\x14\n\x0c\x63olor_format\x18\n \x01(\x05\x12\x30\n\x0e\x63olor_standard\x18\x0b \x01(\x0e\x32\x18.Configure.ColorStandard\x12*\n\x0b\x63olor_range\x18\x0c \x01(\x0e\x32\x15.Configure.ColorRange\x12\x30\n\x0e\x63olor_transfer\x18\r \x01(\x0e\x32\x18.Configure.ColorTransfer\x12\x1e\n\x16\x63olor_transfer_request\x18\x0e \x01(\t\x12\x11\n\tframerate\x18\x0f \x01(\x02\x12\x18\n\x10i_frame_interval\x18\x10 \x01(\x05\x12\x1c\n\x14intra_refresh_period\x18\x11 \x01(\x05\x12\x0f\n\x07latency\x18\x12 \x01(\x05\x12#\n\x1brepeat_previous_frame_after\x18\x13 \x01(\x03\x12\x11\n\tts_schema\x18\x14 \x01(\t\x12\x0f\n\x07quality\x18\x15 \x01(\x05\x12\x12\n\ncomplexity\x18\x16 \x01(\x05\x1a\x45\n\tParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1c\n\x04type\x18\x02 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x03 \x01(\t\"3\n\x0b\x42itrateMode\x12\x06\n\x02\x63q\x10\x00\x12\x07\n\x03vbr\x10\x01\x12\x07\n\x03\x63\x62r\x10\x02\x12\n\n\x06\x63\x62r_fd\x10\x03\"E\n\rColorStandard\x12\r\n\tbt601_pal\x10\x02\x12\x0e\n\nbt601_ntsc\x10\x04\x12\t\n\x05\x62t709\x10\x01\x12\n\n\x06\x62t2020\x10\x06\"#\n\nColorRange\x12\x08\n\x04\x66ull\x10\x01\x12\x0b\n\x07limited\x10\x02\"?\n\rColorTransfer\x12\n\n\x06linear\x10\x01\x12\r\n\tsdr_video\x10\x03\x12\n\n\x06st2084\x10\x06\x12\x07\n\x03hlg\x10\x07\"\xa1\x03\n\x07Runtime\x12%\n\tparameter\x18\x01 \x03(\x0b\x32\x12.Runtime.Parameter\x12\x35\n\rvideo_bitrate\x18\x02 \x03(\x0b\x32\x1e.Runtime.VideoBitrateParameter\x12\x0c\n\x04\x64rop\x18\x03 \x03(\x03\x12=\n\x11\x64ynamic_framerate\x18\x04 \x03(\x0b\x32\".Runtime.DynamicFramerateParameter\x12\x14\n\x0crequest_sync\x18\x05 \x03(\x03\x1aW\n\tParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0b\n\x03key\x18\x02 \x01(\t\x12\x1c\n\x04type\x18\x03 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x04 \x01(\t\x1a:\n\x15VideoBitrateParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0f\n\x07\x62itrate\x18\x02 \x01(\t\x1a@\n\x19\x44ynamicFramerateParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x11\n\tframerate\x18\x02 \x01(\x02\"\x89\x01\n\x10\x44\x65\x63oderConfigure\x12.\n\tparameter\x18\x01 \x03(\x0b\x32\x1b.DecoderConfigure.Parameter\x1a\x45\n\tParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1c\n\x04type\x18\x02 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x03 \x01(\t\"\x97\x01\n\x0e\x44\x65\x63oderRuntime\x12,\n\tparameter\x18\x01 \x03(\x0b\x32\x19.DecoderRuntime.Parameter\x1aW\n\tParameter\x12\x10\n\x08\x66ramenum\x18\x01 \x01(\x03\x12\x0b\n\x03key\x18\x02 \x01(\t\x12\x1c\n\x04type\x18\x03 \x01(\x0e\x32\x0e.DataValueType\x12\r\n\x05value\x18\x04 \x01(\t\"\x1f\n\x08Parallel\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test\"\x1d\n\x06Serial\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test\"\xe5\x01\n\x04Test\x12\x17\n\x06\x63ommon\x18\x01 \x01(\x0b\x32\x07.Common\x12\x15\n\x05input\x18\x02 \x01(\x0b\x32\x06.Input\x12\x1d\n\tconfigure\x18\x03 \x01(\x0b\x32\n.Configure\x12\x19\n\x07runtime\x18\x04 \x01(\x0b\x32\x08.Runtime\x12,\n\x11\x64\x65\x63oder_configure\x18\x05 \x01(\x0b\x32\x11.DecoderConfigure\x12(\n\x0f\x64\x65\x63oder_runtime\x18\x06 \x01(\x0b\x32\x0f.DecoderRuntime\x12\x1b\n\x08parallel\x18\x07 \x01(\x0b\x32\t.Parallel\" \n\tTestSuite\x12\x13\n\x04test\x18\x01 \x03(\x0b\x32\x05.Test*I\n\rDataValueType\x12\x0e\n\nstringType\x10\x00\x12\x0b\n\x07intType\x10\x01\x12\r\n\tfloatType\x10\x02\x12\x0c\n\x08longType\x10\x03\x42-\n\x19\x63om.facebook.encapp.protoB\x0eTestDefinitionP\x01')
 
 _DATAVALUETYPE = DESCRIPTOR.enum_types_by_name['DataValueType']
 DataValueType = enum_type_wrapper.EnumTypeWrapper(_DATAVALUETYPE)
@@ -168,48 +168,48 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   DESCRIPTOR._serialized_options = b'\n\031com.facebook.encapp.protoB\016TestDefinitionP\001'
-  _DATAVALUETYPE._serialized_start=2283
-  _DATAVALUETYPE._serialized_end=2356
+  _DATAVALUETYPE._serialized_start=2296
+  _DATAVALUETYPE._serialized_end=2369
   _COMMON._serialized_start=15
   _COMMON._serialized_end=90
   _INPUT._serialized_start=93
-  _INPUT._serialized_end=337
+  _INPUT._serialized_end=350
   _INPUT_PIXFMT._serialized_start=286
-  _INPUT_PIXFMT._serialized_end=337
-  _CONFIGURE._serialized_start=340
-  _CONFIGURE._serialized_end=1237
-  _CONFIGURE_PARAMETER._serialized_start=942
-  _CONFIGURE_PARAMETER._serialized_end=1011
-  _CONFIGURE_BITRATEMODE._serialized_start=1013
-  _CONFIGURE_BITRATEMODE._serialized_end=1064
-  _CONFIGURE_COLORSTANDARD._serialized_start=1066
-  _CONFIGURE_COLORSTANDARD._serialized_end=1135
-  _CONFIGURE_COLORRANGE._serialized_start=1137
-  _CONFIGURE_COLORRANGE._serialized_end=1172
-  _CONFIGURE_COLORTRANSFER._serialized_start=1174
-  _CONFIGURE_COLORTRANSFER._serialized_end=1237
-  _RUNTIME._serialized_start=1240
-  _RUNTIME._serialized_end=1657
-  _RUNTIME_PARAMETER._serialized_start=1444
-  _RUNTIME_PARAMETER._serialized_end=1531
-  _RUNTIME_VIDEOBITRATEPARAMETER._serialized_start=1533
-  _RUNTIME_VIDEOBITRATEPARAMETER._serialized_end=1591
-  _RUNTIME_DYNAMICFRAMERATEPARAMETER._serialized_start=1593
-  _RUNTIME_DYNAMICFRAMERATEPARAMETER._serialized_end=1657
-  _DECODERCONFIGURE._serialized_start=1660
-  _DECODERCONFIGURE._serialized_end=1797
-  _DECODERCONFIGURE_PARAMETER._serialized_start=942
-  _DECODERCONFIGURE_PARAMETER._serialized_end=1011
-  _DECODERRUNTIME._serialized_start=1800
-  _DECODERRUNTIME._serialized_end=1951
-  _DECODERRUNTIME_PARAMETER._serialized_start=1444
-  _DECODERRUNTIME_PARAMETER._serialized_end=1531
-  _PARALLEL._serialized_start=1953
-  _PARALLEL._serialized_end=1984
-  _SERIAL._serialized_start=1986
-  _SERIAL._serialized_end=2015
-  _TEST._serialized_start=2018
-  _TEST._serialized_end=2247
-  _TESTSUITE._serialized_start=2249
-  _TESTSUITE._serialized_end=2281
+  _INPUT_PIXFMT._serialized_end=350
+  _CONFIGURE._serialized_start=353
+  _CONFIGURE._serialized_end=1250
+  _CONFIGURE_PARAMETER._serialized_start=955
+  _CONFIGURE_PARAMETER._serialized_end=1024
+  _CONFIGURE_BITRATEMODE._serialized_start=1026
+  _CONFIGURE_BITRATEMODE._serialized_end=1077
+  _CONFIGURE_COLORSTANDARD._serialized_start=1079
+  _CONFIGURE_COLORSTANDARD._serialized_end=1148
+  _CONFIGURE_COLORRANGE._serialized_start=1150
+  _CONFIGURE_COLORRANGE._serialized_end=1185
+  _CONFIGURE_COLORTRANSFER._serialized_start=1187
+  _CONFIGURE_COLORTRANSFER._serialized_end=1250
+  _RUNTIME._serialized_start=1253
+  _RUNTIME._serialized_end=1670
+  _RUNTIME_PARAMETER._serialized_start=1457
+  _RUNTIME_PARAMETER._serialized_end=1544
+  _RUNTIME_VIDEOBITRATEPARAMETER._serialized_start=1546
+  _RUNTIME_VIDEOBITRATEPARAMETER._serialized_end=1604
+  _RUNTIME_DYNAMICFRAMERATEPARAMETER._serialized_start=1606
+  _RUNTIME_DYNAMICFRAMERATEPARAMETER._serialized_end=1670
+  _DECODERCONFIGURE._serialized_start=1673
+  _DECODERCONFIGURE._serialized_end=1810
+  _DECODERCONFIGURE_PARAMETER._serialized_start=955
+  _DECODERCONFIGURE_PARAMETER._serialized_end=1024
+  _DECODERRUNTIME._serialized_start=1813
+  _DECODERRUNTIME._serialized_end=1964
+  _DECODERRUNTIME_PARAMETER._serialized_start=1457
+  _DECODERRUNTIME_PARAMETER._serialized_end=1544
+  _PARALLEL._serialized_start=1966
+  _PARALLEL._serialized_end=1997
+  _SERIAL._serialized_start=1999
+  _SERIAL._serialized_end=2028
+  _TEST._serialized_start=2031
+  _TEST._serialized_end=2260
+  _TESTSUITE._serialized_start=2262
+  _TESTSUITE._serialized_end=2294
 # @@protoc_insertion_point(module_scope)

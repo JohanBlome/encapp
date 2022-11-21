@@ -111,6 +111,7 @@ public class FileReader {
         }
         // make sure we support the pixel (source) and Image (destination) format
         Assert.assertTrue(mPixFmt.getNumber() == PixFmt.yuv420p_VALUE ||
+                          mPixFmt.getNumber() == PixFmt.yvu420p_VALUE ||
                           mPixFmt.getNumber() == PixFmt.nv12_VALUE ||
                           mPixFmt.getNumber() == PixFmt.nv21_VALUE,
                           "Invalid PixFmt: " + mPixFmt);
@@ -147,6 +148,8 @@ public class FileReader {
         int[] inputPlaneOffset = {0, lumaLength, lumaLength};
         if (mPixFmt.getNumber() == PixFmt.yuv420p_VALUE) {
             inputPlaneOffset[2] = lumaLength + chromaLength;
+        } else if (mPixFmt.getNumber() == PixFmt.yvu420p_VALUE) {
+            inputPlaneOffset[1] = lumaLength + chromaLength;
         }
 
         for (int planeid = 0; planeid < planes.length; ++planeid) {

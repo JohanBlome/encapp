@@ -23,9 +23,10 @@ message Input {
   optional string resolution = 2;
   enum PixFmt {
     yuv420p = 0;
-    nv12 = 1;
-    nv21 = 2;
-    rgba = 3;
+    yvu420p = 1;
+    nv12 = 2;
+    nv21 = 3;
+    rgba = 4;
   }
   optional PixFmt pix_fmt = 3;
   optional float framerate = 4;
