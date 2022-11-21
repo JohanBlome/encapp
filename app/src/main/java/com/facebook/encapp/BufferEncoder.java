@@ -57,7 +57,7 @@ class BufferEncoder extends Encoder {
         mRealtime = mTest.getInput().getRealtime();
         mYuvReader = new FileReader();
 
-        if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()))) {
+        if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
             return "\nCould not open file";
         }
 
@@ -194,7 +194,7 @@ class BufferEncoder extends Encoder {
 
                             if (!input_done) {
                                 Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                mYuvReader.openFile(mTest.getInput().getFilepath());
+                                mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
                                 Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                             }
                         }

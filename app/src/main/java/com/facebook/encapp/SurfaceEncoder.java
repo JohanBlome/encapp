@@ -142,7 +142,7 @@ class SurfaceEncoder extends Encoder {
             mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
             mYuvReader = new FileReader();
-            if (!mYuvReader.openFile(mTest.getInput().getFilepath())) {
+            if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
                 return "\nCould not open file";
             }
 
@@ -345,7 +345,7 @@ class SurfaceEncoder extends Encoder {
                                 if (!done) {
                                     if (mYuvReader != null) {
                                         Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                        mYuvReader.openFile(mTest.getInput().getFilepath());
+                                        mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
                                         Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                                     }
                                 }

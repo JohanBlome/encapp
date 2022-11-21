@@ -11,16 +11,21 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 
+import com.facebook.encapp.proto.Input.PixFmt;
+
 public class FileReader {
     private static final String TAG = "encapp.filereader";
     File mFile;
     BufferedInputStream mBis;
+    PixFmt mPixFmt;
+
     public FileReader() {
     }
 
-    public boolean openFile(String name) {
+    public boolean openFile(String name, PixFmt pixFmt) {
         try {
-            Log.i(TAG, "Open file: " + name);
+            Log.i(TAG, "FileReader.openFile: name: " + name + " pix_fmt: " + pixFmt);
+            mPixFmt = pixFmt;
             mFile = new File(name);
             mBis = new BufferedInputStream(new FileInputStream(mFile));
         } catch (FileNotFoundException e) {
