@@ -237,7 +237,6 @@ public abstract class Encoder {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        String codecName = "";
         Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, partialName);
 
         if (matching.size() > 1) {
@@ -250,7 +249,6 @@ public abstract class Encoder {
         } else if (matching.size() == 0) {
             Assert.assertTrue(false, "\nNo matching codecs to : " + partialName);
         } else {
-            Log.d(TAG, "Set codec and mime: " + codecName);
             Test.Builder builder = Test.newBuilder(test);
             Configure configure = Configure.
                     newBuilder(test.
