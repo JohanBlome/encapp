@@ -61,12 +61,14 @@ default_values = {
 OPERATION_TYPES = ("batch", "realtime")
 PIX_FMT_TYPES_VALUES = {
     "yuv420p": 0,
-    "nv12": 1,
-    "nv21": 2,
-    "rgba": 3,
+    "yvu420p": 1,
+    "nv12": 2,
+    "nv21": 3,
+    "rgba": 4,
 }
 PIX_FMT_TYPES = {
     "yuv420p": "yuv",
+    "yvu420p": "yuv",
     "nv12": "yuv",
     "nv21": "yuv",
     "rgba": "rgba",
