@@ -398,10 +398,13 @@ public abstract class Encoder {
      */
     protected int queueInputBufferEncoder(
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size) {
+        // copy a frame to the ByteBuffer
         byteBuffer.clear();
         int read = fileReader.fillBuffer(byteBuffer, size);
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
+        // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);
+        // support for dropping frames
         mDropNext = dropFrame(mInFramesCount);
         mDropNext |= dropFromDynamicFramerate(mInFramesCount);
         updateDynamicFramerate(mInFramesCount);
@@ -409,14 +412,17 @@ public abstract class Encoder {
             mSkipped++;
             mDropNext = false;
             read = -2;
-        } else if (read == size) {
+            return read;
+        }
+        // queue the frame into the encoder
+        if (read == size) {
             mFramesAdded++;
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
             mStats.startEncodingFrame(ptsUsec, frameCount);
             codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
-        } else if((flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+        } else if ((flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
             codec.queueInputBuffer(index, 0 /* offset */, 0, ptsUsec /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
         } else {
             read = -1;
