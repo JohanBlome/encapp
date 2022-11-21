@@ -22,7 +22,7 @@ public class TestDefinitionHelper {
                 SizeUtils.parseXString(config.getResolution()):
                 SizeUtils.parseXString(test.getInput().getResolution());
         // start with the default MediaFormat
-        Log.d(TAG, "mim: " +  config.getMime()  + ", res = " + targetResolution);
+        Log.d(TAG, "mime: " +  config.getMime()  + ", res = " + targetResolution);
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(
                 config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
 
