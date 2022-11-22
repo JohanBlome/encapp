@@ -155,7 +155,7 @@ class BufferEncoder extends Encoder {
                 }
                 if (index >= 0) {
                     int size = -1;
-
+                    // get the ByteBuffer where we will write the image to encode
                     ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
                     while (size < 0 && !input_done) {
                         try {
