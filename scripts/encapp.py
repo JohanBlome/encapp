@@ -369,20 +369,34 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                 if (k1, k2) == ("configure", "bitrate"):
                     # already processed
                     continue
-                elif (k1 == "configure" and k2 in CONFIGURE_INT_KEYS) or (
+                # process integer keys
+                if (k1 == "configure" and k2 in CONFIGURE_INT_KEYS) or (
                     k1 == "input" and k2 in INPUT_INT_KEYS
                 ):
                     # force integer value
                     val = int(val)
-                elif (k1 == "configure" and k2 in CONFIGURE_FLOAT_KEYS) or (
+                # process float keys
+                if (k1 == "configure" and k2 in CONFIGURE_FLOAT_KEYS) or (
                     k1 == "input" and k2 in INPUT_FLOAT_KEYS
                 ):
                     # force float value
                     val = float(val)
+                # convert enum strings to integer
+                if k1 == "input" and k2 == "pix_fmt":
+                    val = tests_definitions.Input.PixFmt.Value(val)
+                if k1 == "configure" and k2 == "bitrate_mode":
+                    val = tests_definitions.Configure.BitrateMode.Value(val)
+                if k1 == "configure" and k2 == "color_standard":
+                    val = tests_definitions.Configure.ColorStandard.Value(val)
+                if k1 == "configure" and k2 == "color_range":
+                    val = tests_definitions.Configure.ColorRange.Value(val)
+                if k1 == "configure" and k2 == "color_transfer":
+                    val = tests_definitions.Configure.ColorTransfer.Value(val)
                 if not test.HasField(k1):
                     # create the Message field
                     getattr(test, k1).SetInParent()
                 setattr(getattr(test, k1), k2, val)
+
         # If no surface decode and no raw input, decode to raw
         if encapp_tool.ffutils.video_is_y4m(test.input.filepath):
             options = None
