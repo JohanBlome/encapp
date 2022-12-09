@@ -21,17 +21,18 @@ SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
 
-def parse_quality(vmaf_file, ssim_file, psnr_file):
-    """Read calculated log/output files and pick relevant vmaf/ssim/psnr
-    data
-    """
-    # currently only vmaf
+def parse_quality_vmaf(vmaf_file):
+    """Parse log/output files and return quality score"""
     vmaf = -1
     with open(vmaf_file) as input_file:
         data = json.load(input_file)
         input_file.close()
         vmaf = data["pooled_metrics"]["vmaf"]["mean"]
+    return vmaf
 
+
+def parse_quality_ssim(ssim_file):
+    """Parse log/output files and return quality score"""
     ssim = -1
     with open(ssim_file) as input_file:
         line = " "
@@ -41,7 +42,11 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
             if match:
                 ssim = round(float(match.group(1)), 2)
                 break
+    return ssim
 
+
+def parse_quality_psnr(psnr_file):
+    """Parse log/output files and return quality score"""
     psnr = -1
     with open(psnr_file) as input_file:
         line = " "
@@ -51,8 +56,7 @@ def parse_quality(vmaf_file, ssim_file, psnr_file):
             if match:
                 psnr = round(float(match.group(1)), 2)
                 break
-
-    return vmaf, ssim, psnr
+    return psnr
 
 
 def run_quality(test_file, override_settings, debug):
@@ -245,7 +249,9 @@ def run_quality(test_file, override_settings, debug):
             os.remove(distorted)
 
     if os.path.exists(vmaf_file):
-        vmaf, ssim, psnr = parse_quality(vmaf_file, ssim_file, psnr_file)
+        vmaf = parse_quality_vmaf(vmaf_file)
+        ssim = parse_quality_ssim(ssim_file)
+        psnr = parse_quality_psnr(psnr_file)
 
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
