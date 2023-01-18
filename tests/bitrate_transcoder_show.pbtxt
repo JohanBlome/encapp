@@ -1,13 +1,11 @@
 test {
     input {
         filepath: "/tmp/akiyo_qcif.mp4"
+        show: true
     }
     common {
         id: "bitrate_transcoder_show"
         description: "Verify encoding bitrate - show surface"
-    }
-    input {
-        show: true
     }
     configure {
         codec: "OMX.google.h264.encoder"
