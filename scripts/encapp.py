@@ -157,7 +157,8 @@ def wait_for_exit(serial, debug=0):
 
 
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
-    print(f"running test: {protobuf_txt_filepath}")
+    if debug > 0:
+        print(f"running test: {protobuf_txt_filepath}")
     # clean the logcat first
     encapp_tool.adb_cmds.reset_logcat(serial)
     ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
@@ -174,7 +175,8 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
 def collect_results(
     local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
 ):
-    print(f"collecting result: {protobuf_txt_filepath}")
+    if debug > 0:
+        print(f"collecting result: {protobuf_txt_filepath}")
     adb_cmd = f"adb -s {serial} shell ls {device_workdir}/"
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
     output_files = re.findall(
@@ -201,7 +203,7 @@ def collect_results(
     # remo/proceve the test file
     adb_cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
     encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
-    if debug > 0:
+    if debug >= 0:
         print(f"results collect: {result_json}")
     # dump device information
     dump_device_info(serial, local_workdir, debug)
@@ -278,12 +280,14 @@ def add_media_files(test):
 def run_codec_tests_file(
     protobuf_txt_file, model, serial, local_workdir, options, debug
 ):
-    print(f"reading test: {protobuf_txt_file}")
+    if debug > 0:
+        print(f"reading test: {protobuf_txt_file}")
     test_suite = tests_definitions.TestSuite()
     with open(protobuf_txt_file, "rb") as fd:
         text_format.Merge(fd.read(), test_suite)
         # test_suite.ParseFromString(fd.read())
-    print(f"updating test: {protobuf_txt_file}")
+    if debug > 0:
+        print(f"updating test: {protobuf_txt_file}")
     test_suite, files_to_push, protobuf_txt_filepath = update_codec_tests(
         test_suite, local_workdir, options.device_workdir, options.replace
     )
@@ -468,7 +472,8 @@ def run_codec_tests(
     fast_copy,
     debug,
 ):
-    print(f"running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))")
+    if debug > 0:
+        print(f"running {protobuf_txt_filepath} ({len(test_suite.test)} test(s))")
     os.makedirs(local_workdir, exist_ok=True)
 
     # push all the files to the device workdir
@@ -589,7 +594,8 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
 
 
 def codec_test(options, model, serial, debug):
-    print(f"codec test: {options}")
+    if debug > 0:
+        print(f"codec test: {options}")
     # get the local working directory (at the host)
     local_workdir = options.local_workdir
     if local_workdir is None:
@@ -867,12 +873,13 @@ def process_input_path(input_filepath, replace, debug=0):
     input_filepath_raw += f".{framerate}"
     input_filepath_raw += f".{pix_fmt}"
     input_filepath_raw += f".{extension}"
-    print("***********")
-    print("input file will be transcoded")
-    print(f"resolution:  -> {resolution}")
-    print(f"framerate:  -> {framerate}")
-    print(f"pix_fmt: -> {pix_fmt}")
-    print("***********")
+    if debug > 0:
+        print("***********")
+        print("input file will be transcoded")
+        print(f"resolution:  -> {resolution}")
+        print(f"framerate:  -> {framerate}")
+        print(f"pix_fmt: -> {pix_fmt}")
+        print("***********")
 
     encapp_tool.ffutils.ffmpeg_convert_to_raw(
         input_filepath,
