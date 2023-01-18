@@ -363,6 +363,8 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
     CONFIGURE_FLOAT_KEYS = ("framerate",)
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
+    CONFIGURE_BOOL_KEYS = ()
+    INPUT_BOOL_KEYS = ("show",)
     for test in test_suite.test:
         for k1 in replace:
             for k2, val in replace[k1].items():
@@ -381,6 +383,12 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
                 ):
                     # force float value
                     val = float(val)
+                # process integer keys
+                if (k1 == "configure" and k2 in CONFIGURE_BOOL_KEYS) or (
+                    k1 == "input" and k2 in INPUT_BOOL_KEYS
+                ):
+                    # force bool value
+                    val = bool(val)
                 # convert enum strings to integer
                 if k1 == "input" and k2 == "pix_fmt":
                     val = tests_definitions.Input.PixFmt.Value(val)
