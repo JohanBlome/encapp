@@ -27,11 +27,11 @@ import java.util.Locale;
 class BufferDecoder extends Encoder {
 
     protected static final String TAG = "encapp.decoder";
-    // Flag to dump decoded YUV
-    private static final boolean YUV_DUMP = false;
 
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
+    // Flag to dump decoded YUV
+    boolean mDecodeDump = false;
 
     public BufferDecoder(Test test) {
         super(test);
@@ -54,6 +54,10 @@ class BufferDecoder extends Encoder {
 
         if (mTest.getInput().hasRealtime()) {
             mRealtime = mTest.getInput().getRealtime();
+        }
+
+        if (mTest.getConfigure().hasDecodeDump()) {
+          mDecodeDump = mTest.getConfigure().getDecodeDump();
         }
 
         mFrameRate = mTest.getConfigure().getFramerate();
@@ -185,7 +189,7 @@ class BufferDecoder extends Encoder {
         /* YUV file dump */
         File file = null;
         OutputStream fo = null;
-        if(YUV_DUMP) {
+        if (mDecodeDump) {
             String outputYUVName = mStats.getId() + ".yuv";
             Log.d(TAG, "YUV Filename: "+ outputYUVName);
             file = new File(Environment.getExternalStorageDirectory() + "/" + File.separator + outputYUVName);
@@ -254,7 +258,7 @@ class BufferDecoder extends Encoder {
                     outputBuf.limit(info.offset + info.size);
                     outputBuf.get(outData);
 
-                    if(YUV_DUMP) {
+                    if (mDecodeDump) {
                         if (file.exists()) {
                             fo.write(outData);
                         }
@@ -269,7 +273,7 @@ class BufferDecoder extends Encoder {
                 if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
             }
         }
-        if(YUV_DUMP) fo.close();
+        if (mDecodeDump) fo.close();
     }
 
     public void stopAllActivity(){}

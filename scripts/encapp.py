@@ -367,7 +367,7 @@ def update_codec_tests(test_suite, local_workdir, device_workdir, replace):
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
     CONFIGURE_FLOAT_KEYS = ("framerate",)
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
-    CONFIGURE_BOOL_KEYS = ()
+    CONFIGURE_BOOL_KEYS = ("decode_dump",)
     INPUT_BOOL_KEYS = ("show",)
     for test in test_suite.test:
         for k1 in replace:
