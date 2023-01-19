@@ -274,6 +274,21 @@ $ ffplay -f rawvideo -pixel_format nv12 -video_size 176x144 -i /tmp/test/encapp_
 ```
 
 
+## 3.7 Troubleshooting
+
+* Encapp uses /sdcard/ to send files back and forth between the python script and the java app. Some devices have problems with writing in that directory. In that case, you can request a different directory to be used. Typically "`/data/data/com.facebook.encapp`" is available for encapp. In order to do this, append "`--device-workdir /data/data/com.facebook.encapp`" to any of the encapp commands.
+
+For example:
+```
+$ ./scripts/encapp.py list --device-workdir /data/data/com.facebook.encapp
+...
+  MediaCodec {
+    name: OMX.google.vp9.decoder
+    canonical_name: c2.android.vp9.decoder
+...
+File is available in current dir as codecs_<id>.txt
+```
+
 
 # 4. Multiple Encoding Experiments
 
