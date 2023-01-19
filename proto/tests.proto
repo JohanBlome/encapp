@@ -89,6 +89,7 @@ message Configure {
   optional string ts_schema = 20;
   optional int32 quality = 21;
   optional int32 complexity = 22;
+  optional bool decode_dump = 23 [default = false];
 }
 
 message Runtime {
