@@ -168,12 +168,6 @@ $ ls -Flasg /tmp/kristen_and_sara*
 ```
 
 ```
-$ wget https://media.xiph.org/video/derf/y4m/KristenAndSara_1280x720_60.y4m -O /tmp/KristenAndSara_1280x720_60.y4m
-$ ffmpeg -i /tmp/KristenAndSara_1280x720_60.y4m -f rawvideo -pix_fmt yuv420p /tmp/KristenAndSara_1280x720_60.yuv
-
-```
-
-```
 $ ./scripts/encapp.py run tests/bitrate_buffer.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/kristen_and_sara.1280x720.60.y4m
 ...
 results collect: ['/tmp/test/encapp_<uuid>.json']
