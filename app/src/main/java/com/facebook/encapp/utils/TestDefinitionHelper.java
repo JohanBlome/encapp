@@ -166,20 +166,21 @@ public class TestDefinitionHelper {
     public static boolean checkBasicSettings(Test test) {
         // Make sure we have the most basic settings well defined
         Size res;
+        Configure.Builder config = test.getConfigure().toBuilder();
         // make sure the input is well-defined
         Input.Builder input = test.getInput().toBuilder();
-        if (!input.hasResolution()) {
-            throw new RuntimeException("No valid resolution on input settings");
+        // default configure.encode value is True
+        if (!config.hasEncode() || (config.getEncode() == true)) {
+            if (!input.hasResolution()) {
+                throw new RuntimeException("No valid resolution on input settings");
+            }
+            if (!input.hasPixFmt()) {
+                throw new RuntimeException("No valid pixel format on input settings");
+            }
+            if (!input.hasFramerate()) {
+                throw new RuntimeException("No valid framerate on input settings");
+            }
         }
-
-        if (!input.hasPixFmt()) {
-            throw new RuntimeException("No valid pixel format on input settings");
-        }
-
-        if (!input.hasFramerate()) {
-            throw new RuntimeException("No valid framerate on input settings");
-        }
-
         return true;
     }
 
