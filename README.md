@@ -113,8 +113,8 @@ Note that the resolution of the videos used is QCIF (176x144).
 First, select one of the codecs from step 4. In this case, we will use `OMX.google.h264.encoder`.
 
 Push the (raw) video file to be encoded into the device. Note that we are using a QCIF video (176x144).
-In this case the raw format is yuv420p (which is stated in the codec list from (2.2), COLOR_FormatYUV420Planar).0
-For sw codecs in most case it is yuv420p. For hw codecs e.g. Qcom: COLOR_QCOM_FormatYUV420SemiPlanar this is nv12.
+In this case the raw format is yuv420p (which is stated in the codec list from (2.2), `COLOR_FormatYUV420Planar`).0
+For sw codecs in most case it is yuv420p. For hw codecs e.g. Qcom: `COLOR_QCOM_FormatYUV420SemiPlanar` this is nv12.
 In the case of surface encoder from raw the source should be nv21 regardless of codec.
 
 Now run the h264 encoder (`OMX.google.h264.encoder`):
