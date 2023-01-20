@@ -209,41 +209,57 @@ class BufferEncoder extends Encoder {
                 } else {
                     Log.w(TAG, "dequeueInputBuffer, no index, " + index);
                 }
-            } catch (Exception ex) {
+            } catch (MediaCodec.CodecException ex) {
+                Log.e(TAG, "dequeueInputBuffer: MediaCodec.CodecException error");
                 ex.printStackTrace();
+                return "\ndequeueInputBuffer: MediaCodec.CodecException error";
+            } catch (IllegalStateException ex) {
+                Log.e(TAG, "dequeueInputBuffer: IllegalStateException error");
+                ex.printStackTrace();
+                return "\ndequeueInputBuffer: IllegalStateException error";
             }
 
             // 2. process the encoder output
-            index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+            try {
+                index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
 
-            if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                // check if the input is already done
-                if (input_done) {
-                    output_done = true;
-                }
-                // otherwise ignore
-            } else if (index >= 0) {
-                if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                    MediaFormat oformat = mCodec.getOutputFormat();
+                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    // check if the input is already done
+                    if (input_done) {
+                        output_done = true;
+                    }
+                    // otherwise ignore
+                } else if (index >= 0) {
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        MediaFormat oformat = mCodec.getOutputFormat();
 
-                    if (mWriteFile) {
-                        mVideoTrack = mMuxer.addTrack(oformat);
-                        mMuxer.start();
+                        if (mWriteFile) {
+                            mVideoTrack = mMuxer.addTrack(oformat);
+                            mMuxer.start();
+                        }
+                        mCodec.releaseOutputBuffer(index, false /* render */);
+                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        output_done = true;
+                    } else {
+                        mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                        ++mOutFramesCount;
+                        if (mMuxer != null && mVideoTrack != -1) {
+                            ByteBuffer data = mCodec.getOutputBuffer(index);
+                            mMuxer.writeSampleData(mVideoTrack, data, info);
+                        }
+                        mCodec.releaseOutputBuffer(index, false /* render */);
+                        mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
                     }
-                    mCodec.releaseOutputBuffer(index, false /* render */);
-                } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    output_done = true;
-                } else {
-                    mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                            (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                    ++mOutFramesCount;
-                    if (mMuxer != null && mVideoTrack != -1) {
-                        ByteBuffer data = mCodec.getOutputBuffer(index);
-                        mMuxer.writeSampleData(mVideoTrack, data, info);
-                    }
-                    mCodec.releaseOutputBuffer(index, false /* render */);
-                    mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
                 }
+            } catch (MediaCodec.CodecException ex) {
+                Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
+                ex.printStackTrace();
+                return "\ndequeueOutputBuffer: MediaCodec.CodecException error";
+            } catch (IllegalStateException ex) {
+                Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
+                ex.printStackTrace();
+                return "\ndequeueOutputBuffer: IllegalStateException error";
             }
         }
         mStats.stop();

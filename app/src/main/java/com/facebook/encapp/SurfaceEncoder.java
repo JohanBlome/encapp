@@ -357,12 +357,19 @@ class SurfaceEncoder extends Encoder {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-
-
         }
+
         Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
         mStats.stop();
-        mCodec.flush();
+        try {
+            mCodec.flush();
+        } catch (MediaCodec.CodecException ex) {
+            Log.e(TAG, "flush: MediaCodec.CodecException error");
+            ex.printStackTrace();
+        } catch (IllegalStateException ex) {
+            Log.e(TAG, "flush: IllegalStateException error");
+            ex.printStackTrace();
+        }
 
         if (mMuxer != null) {
             try {
@@ -374,7 +381,15 @@ class SurfaceEncoder extends Encoder {
             mMuxer = null;
         }
         if (mCodec != null) {
-            mCodec.flush();
+            try {
+                mCodec.flush();
+            } catch (MediaCodec.CodecException ex) {
+                Log.e(TAG, "flush: MediaCodec.CodecException error");
+                ex.printStackTrace();
+            } catch (IllegalStateException ex) {
+                Log.e(TAG, "flush: IllegalStateException error");
+                ex.printStackTrace();
+            }
             synchronized (this) {
                 try {
                     this.wait(WAIT_TIME_SHORT_MS);
@@ -382,7 +397,12 @@ class SurfaceEncoder extends Encoder {
                     e.printStackTrace();
                 }
             }
-            mCodec.stop();
+            try {
+                mCodec.stop();
+            } catch (IllegalStateException ex) {
+                Log.e(TAG, "stop: IllegalStateException error");
+                ex.printStackTrace();
+            }
             mCodec.release();
         }
 
