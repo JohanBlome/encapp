@@ -152,12 +152,15 @@ class SurfaceEncoder extends Encoder {
         MediaFormat format;
 
         try {
-
-            //Unless we have a mime, do lookup
+            // Unless we have a mime, do lookup
             if (mTest.getConfigure().getMime().length() == 0) {
                 Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
-                //TODO: throw error on failed lookup
-                mTest = setCodecNameAndIdentifier(mTest);
+                try {
+                    mTest = setCodecNameAndIdentifier(mTest);
+                } catch (Exception e) {
+                    return e.getMessage();
+                }
+                Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
             }
             Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
             mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());

@@ -664,10 +664,9 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Start test id:" + test.getCommon().getId());
                     final String status = coder.start();
                     if (status.length() > 0) {
-                        Log.e(TAG, "[" + test.getCommon().getId() + "] " + status);
+                        Log.e(TAG, "error: id: \"" + test.getCommon().getId() + "\" status: \"" + status + "\"");
                     }
-                    Log.d(TAG, "Test done " + status + ": " + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId());
-
+                    Log.d(TAG, "Test done id: \"" + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId() + "\" status: \"" + status + "\"");
 
                     Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
                     if (status.length() > 0) {
