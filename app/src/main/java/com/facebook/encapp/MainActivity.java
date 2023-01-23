@@ -509,13 +509,11 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-        }
-        catch (IOException iox) {
-                Log.e(TAG, "Test failed: " + iox.getMessage());
-        }
 
+        } catch (IOException iox) {
+            report_result("unknown", "unknown", "error", iox.getMessage());
+        }
     }
-
 
 
     /**
@@ -551,6 +549,13 @@ public class MainActivity extends AppCompatActivity {
         return t;
     }
 
+    public void report_result(String test_name, String run_id, String result, String error_code) {
+        if (result == "ok") {
+            Log.d(TAG, "Test finished id: \"" + test_name + "\" run_id: " + run_id + " result: \"ok\"");
+        } else {
+            Log.e(TAG, "Test finished id: \"" + test_name + "\" run_id: " + run_id + " result: \"" + result + "\" error: \"" + error_code + "\"");
+        }
+    }
 
     /**
      * This is the starting point for the actual test
@@ -661,17 +666,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    Log.d(TAG, "Start test id:" + test.getCommon().getId());
+                    Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
                     final String status = coder.start();
-                    if (status.length() > 0) {
-                        Log.e(TAG, "error: id: \"" + test.getCommon().getId() + "\" status: \"" + status + "\"");
-                    }
-                    Log.d(TAG, "Test done id: \"" + coder.mTest.getCommon().getId() + " - " + coder.getStatistics().getId() + "\" status: \"" + status + "\"");
-
-                    Log.d(TAG, "One test done, instances running: " + mInstancesRunning);
-                    if (status.length() > 0) {
-                        log("\nTest failed: " + description);
-                        log("\n" + status);
+                    if (status.length() == 0) {
+                        // test was ok
+                        report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "ok", "");
+                    } else if (status.length() > 0) {
+                        report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "error", status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
                         Log.d(TAG, "Pursuit over");
                         mPursuitOver = true;
@@ -679,7 +680,9 @@ public class MainActivity extends AppCompatActivity {
                         //      Assert.assertTrue(false, status);
                         //   }
                     }
+                    Log.d(TAG, "Instances running: " + mInstancesRunning);
                 } finally {
+                    // dump statistics
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
@@ -786,9 +789,9 @@ public class MainActivity extends AppCompatActivity {
         if (mLogText != null) {
             runOnUiThread(() -> {
                 mLogText.append(text);
-                Log.d(TAG, text);
             });
         }
+        Log.d(TAG, text);
     }
 
     public void setupCamera(OutputAndTexture ot) {
