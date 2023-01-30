@@ -141,8 +141,9 @@ def derive_values(data):
     for c_resolution, i_resolution in zip(
         configure_resolution_list, input_resolution_list
     ):
-        resolution = c_resolution if not math.isnan(c_resolution) else i_resolution
+        resolution = c_resolution if not None and not "nan" else i_resolution
         resolution_list.append(resolution)
+        width = height = 0
         width, height = resolution.split("x")
         width_list.append(width)
         height_list.append(height)
@@ -164,6 +165,7 @@ def force_options(data, options):
             bitrate = encapp.convert_to_bps(val)
             vals.append(int(bitrate))
 
+        print(f"vals = {vals}")
         if len(vals) == 2:
             data = data.loc[
                 (data["configure.bitrate"] >= vals[0])
@@ -177,14 +179,16 @@ def force_options(data, options):
         data = data.loc[data["framerate"] == options.fps]
     if options.size:
         sizes = options.size.split("x")
+        print(f"sizes = {sizes}")
         if len(sizes) == 2:
             data = data.loc[
                 (data["width"] == int(sizes[0])) & (data["height"] == int(sizes[1]))
             ]
         else:
-            data = data.loc[
-                (data["width"] == int(sizes[0])) | (data["height"] == int(sizes[0]))
-            ]
+            print(f"Filter on size: befeor = {len(data)}")
+            data = data.loc[(data["width"] == sizes[0]) | (data["height"] == sizes[0])]
+        print(f"Filter on size: after = {len(data)}")
+    return data
 
 
 def search(options):
@@ -193,7 +197,7 @@ def search(options):
     # get derived values
     derive_values(data)
     # force values from CLI
-    force_options(data, options)
+    data = force_options(data, options)
     return data
 
 
@@ -251,7 +255,7 @@ def main():
             directory, filename = os.path.split(fl)
             if options.video:
                 video = data.loc[data["filename"] == fl]
-                name = directory + "/" + video["media"].values[0]
+                name = directory + "/" + video["encodedfile"].values[0]
             else:
                 name = fl
             print(name)

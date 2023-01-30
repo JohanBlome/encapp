@@ -197,6 +197,9 @@ public abstract class Encoder {
         }
 
         mStats.setEncodedfile(mFilename);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mStats.setEncoderIsHardwareAccelerated(encoder.getCodecInfo().isHardwareAccelerated());
+        }
         return mMuxer;
     }
 
