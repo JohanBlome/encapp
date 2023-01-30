@@ -69,8 +69,10 @@ def get_device_info(
         )
         serial = list(device_info.keys())[0]
     # ensure the serial number is available
+
     assert serial in device_info, f"error: device {serial} not available"
     # get the model id
+
     model = device_info[serial]["model"].lower()
     if debug > 0:
         print(f"selecting device: serial: {serial} model: {model}")
@@ -89,13 +91,25 @@ def remove_files_using_regex(
         location (str): Path/directory to analyze and remove files from
         debug (int): Debug level
     """
-    adb_cmd = f"adb -s {serial} shell ls {location}/"
-    _, stdout, _ = run_cmd(adb_cmd, debug)
-    output_files = re.findall(regex_str, stdout, re.MULTILINE)
-    for file in output_files:
-        # remove the output
-        adb_cmd = f"adb -s {serial} shell rm {location}/{file}"
-        run_cmd(adb_cmd, debug)
+    if USE_IDB:
+        cmd = f"idb file ls {location} --udid {serial}  --bundle-id Meta.Encapp"
+        _, stdout, _ = run_cmd(cmd, debug)
+        output_files = re.findall(regex_str, stdout, re.MULTILINE)
+        counter = 1
+        for file in output_files:
+            # remove the output
+            print(f"Removing {counter}/{len(output_files)}", end="\r")
+            cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id Meta.Encapp"
+            run_cmd(cmd, debug)
+            counter += 1
+    else:
+        adb_cmd = f"adb -s {serial} shell ls {location}/"
+        _, stdout, _ = run_cmd(adb_cmd, debug)
+        output_files = re.findall(regex_str, stdout, re.MULTILINE)
+        for file in output_files:
+            # remove the output
+            adb_cmd = f"adb -s {serial} shell rm {location}/{file}"
+            run_cmd(adb_cmd, debug)
 
 
 def get_connected_devices(debug: int) -> typing.Dict:
@@ -111,6 +125,22 @@ def get_connected_devices(debug: int) -> typing.Dict:
         as key.
     """
     # list all available devices
+    if USE_IDB:
+        cmd = "idb list-targets | grep -i booted"
+        ret, stdout, _ = run_cmd(cmd, debug)
+        assert ret, "error: failed to get adb devices"
+        # parse list
+        device_info = {}
+        for line in stdout.splitlines():
+            item_dict = {}
+            items = line.split("|")
+            item_dict["model"] = items[0].strip()
+            item_dict["type"] = items[3].strip()
+            item_dict["version"] = items[4].strip()
+            item_dict["platform"] = items[5].strip()
+            device_info[items[1].strip()] = item_dict
+        return device_info
+
     adb_cmd = "adb devices -l"
     ret, stdout, _ = run_cmd(adb_cmd, debug)
     assert ret, "error: failed to get adb devices"
@@ -270,7 +300,10 @@ def force_stop(serial: str, package: str, debug=0):
         package (str): Android package name
         debug (int): Debug level
     """
-    run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
+    if USE_IDB:
+        run_cmd(f"idb terminate --udid {serial}  Meta.Encapp", debug)
+    else:
+        run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
 
 
 def reset_logcat(serial: str, debug=0):
@@ -307,39 +340,98 @@ def parse_getprop(stdout: str) -> dict:
     Returns:
       Current props dump
     """
-    # [persist.sys.boot.reason]: []
-    # [persist.sys.boot.reason.history]: [reboot,powerloss,1659352492
-    # reboot,adb,1663120966
-    # reboot,`db,1661299722]
-    # [persist.sys.call_debug_v2]: [true]
     props_dict = {}
-    reading_val = False
-    key = ""
-    val = ""
-    for line in stdout.splitlines():
-        if not line:
-            continue
-        if not reading_val:
-            key, val = line.split(": ")
-            key = key.lstrip("[").rstrip("]")
-            val = val.lstrip("[")
-            if val[-1] == "]":
-                val = val.lstrip("[").rstrip("]")
-                # single-line pair
-                props_dict[key] = val
+    if USE_IDB:
+        # We translate to some of the known android names so comparison is easier...
+        # on a pysical device there will be more info than on an emulator
+
+        match = re.search("'HardwarePlatform': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["ro.board.platform"] = match.group(1)
+
+        match = re.search("'HardwareModel': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["ro.product.model"] = match.group(1)
+
+        match = re.search("'CPUArchitecture': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["CPUArchitecture"] = match.group(1)
+
+        match = re.search("'ProductVersion': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["ProductVersion"] = match.group(1)
+
+        match = re.search("'BuildVersion': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["BuildVersion"] = match.group(1)
+
+        match = re.search("'CPUArchitecture': '([\w\d\s]*)'", stdout)
+        if match:
+            props_dict["CPUArchitecture"] = match.group(1)
+
+        if "ro.product.model" not in props_dict:
+            match = re.search("target_type=<[\w.]*:\s?'([\w\d\s]*)'>", stdout)
+            target_type = ""
+            if match:
+                target_type = match.group(1)
+            match = re.search("name='([\w\d\s]*)'", stdout)
+            if match:
+                props_dict["ro.product.model"] = f"{match.group(1)}_{target_type}"
             else:
-                # multiple-line value
-                reading_val = True
-            val = val.lstrip("[").rstrip("]")
-        else:
-            if line[-1] != "]":
-                # continued multiple-line value
-                val += "\n" + line
+                props_dict["ro.product.model"] = "unknown ios"
+        if "ro.board.platform" not in props_dict:
+            match = re.search("os_version='([\w\d\s\.]*)'", stdout)
+            os_version = ""
+            if match:
+                os_version = match.group(1)
+            match = re.search("architecture='([\w\d\s]*)'", stdout)
+            arch = ""
+            if match:
+                arch = match.group(1)
+                props_dict["ro.board.platform"] = f"{os_version}-{arch}"
+        match = re.search("udid='([\w\d\s\-]*)'", stdout)
+        serial = ""
+        if match:
+            serial = match.group(1)
+        props_dict["ro.serialno"] = serial
+        # The rest is not that interesting.
+
+    else:
+        # [persist.sys.boot.reason]: []
+        # [persist.sys.boot.reason.history]: [reboot,powerloss,1659352492
+        # reboot,adb,1663120966
+        # reboot,`db,1661299722]
+        # [persist.sys.call_debug_v2]: [true]
+        reading_val = False
+        key = ""
+        val = ""
+        for line in stdout.splitlines():
+            if not line:
+                continue
+            if not reading_val:
+                try:
+                    key, val = line.split(": ")
+                    key = key.lstrip("[").rstrip("]")
+                    val = val.lstrip("[")
+                    if val[-1] == "]":
+                        val = val.lstrip("[").rstrip("]")
+                        # single-line pair
+                        props_dict[key] = val
+                    else:
+                        # multiple-line value
+                        reading_val = True
+                    val = val.lstrip("[").rstrip("]")
+                except:
+                    print(f"Failed parsing: {line}")
             else:
-                # end of multiple-line value
-                val += "\n" + line.rstrip("]")
-                props_dict[key] = val
-                reading_val = False
+                if line[-1] != "]":
+                    # continued multiple-line value
+                    val += "\n" + line
+                else:
+                    # end of multiple-line value
+                    val += "\n" + line.rstrip("]")
+                    props_dict[key] = val
+                    reading_val = False
     return props_dict
 
 
@@ -353,9 +445,14 @@ def getprop(serial: str, debug=0) -> dict:
     Returns:
       Current props dump
     """
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell getprop", debug)
-    assert ret, f"error: failed to getprop: {stderr}"
-    return parse_getprop(stdout)
+    if USE_IDB:
+        ret, stdout, stderr = run_cmd(f"idb describe --udid {serial}", debug)
+        assert ret, f"error: failed to getprop: {stderr}"
+        return parse_getprop(stdout)
+    else:
+        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell getprop", debug)
+        assert ret, f"error: failed to getprop: {stderr}"
+        return parse_getprop(stdout)
 
 
 def get_device_size(serial, filepath, debug):
@@ -364,10 +461,14 @@ def get_device_size(serial, filepath, debug):
     if not ret:
         return -1
     # get the size in bytes
-    ret, stdout, stderr = run_cmd(
-        f'adb -s {serial} shell stat -c "%s" {filepath}', debug
-    )
-    filesize = int(stdout)
+    try:
+        ret, stdout, stderr = run_cmd(
+            f'adb -s {serial} shell stat -c "%s" {filepath}', debug
+        )
+        filesize = int(stdout)
+    except:
+        print(f"Failed to grap file size for {filepath}")
+        return 0
     return filesize
 
 
@@ -377,8 +478,12 @@ def get_device_hash(serial, filepath, debug):
     if not ret:
         return -1
     # get a hash
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug)
-    filehash = stdout.split()[0]
+    try:
+        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug)
+        filehash = stdout.split()[0]
+    except:
+        print(f"Failed to calc hash for {filepath}")
+        return 0
     return filehash
 
 
@@ -390,7 +495,26 @@ def get_host_hash(filepath, debug):
     return hash_md5.hexdigest()
 
 
+def file_exists_in_device(filename, serial, debug=False):
+    if USE_IDB:
+        cmd = f"idb file ls /Documents --udid {serial}  --bundle-id Meta.Encapp"
+        _, stdout, _ = run_cmd(cmd, debug)
+        output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
+        return len(output_files) > 0
+
+
 def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, debug):
+    # Do not check .pbtxt files
+    if host_filepath[-6] == ".pbtxt":
+        return false
+
+    if USE_IDB and fast_copy:
+        # TODO: fix
+        basename = os.path.basename(device_filepath)
+        cmd = f"idb file ls Documents --udid {serial}  --bundle-id Meta.Encapp"
+        _, stdout, _ = run_cmd(cmd, debug)
+        output_files = re.findall(f"{basename}", stdout, re.MULTILINE)
+        return len(output_files) > 0
     # 1. check the size
     device_filesize = get_device_size(serial, device_filepath, debug)
     if device_filesize == -1:
@@ -422,12 +546,58 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         return False
     # check whether a file with the same name, size, and hash exists.
     # In that case, skip the step.
-    device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
-    if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
-        return True
-    ret, stdout, _ = run_cmd(
-        f"adb -s {serial} push {filepath} {device_workdir}/", debug
-    )
-    if not ret:
-        print(f'error: copying "{filepath}": {stdout}')
+    if USE_IDB:
+        device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
+        if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
+            return True
+        ret, stdout, _ = run_cmd(
+            f"idb file push  {filepath} {device_workdir}/ --udid {serial} --bundle-id Meta.Encapp",
+            debug,
+        )
+        if not ret:
+            print(f'error: copying "{filepath}" to  {device_workdir}/ : {stdout}')
+    else:
+        device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
+        if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
+            return True
+        ret, stdout, _ = run_cmd(
+            f"adb -s {serial} push {filepath} {device_workdir}/", debug
+        )
+        if not ret:
+            print(f'error: copying "{filepath}": {stdout}')
     return ret
+
+
+def pull_files_from_device(
+    serial: str, regex_str: str, location: str, debug: int
+) -> None:
+
+    if USE_IDB:
+        cmd = f"idb file ls {location} --udid {serial}  --bundle-id Meta.Encapp"
+        _, stdout, _ = run_cmd(cmd, debug)
+        output_files = re.findall(regex_str, stdout, re.MULTILINE)
+        counter = 1
+        for file in output_files:
+            print(f"Pulling {counter}/{len(output_files)}", end="\r")
+            cmd = f"idb file pull {location}/{file} .  --udid {serial}  --bundle-id Meta.Encapp"
+            run_cmd(cmd, debug)
+            counter += 1
+    else:
+        adb_cmd = f"adb -s {serial} shell ls {location}/"
+        _, stdout, _ = run_cmd(adb_cmd, debug)
+        output_files = re.findall(regex_str, stdout, re.MULTILINE)
+        for file in output_files:
+            print(f"Pulling {counter}/{len(output_files)}", end="\r")
+            adb_cmd = f"adb -s {serial} shell pull {location}/{file} . "
+            run_cmd(adb_cmd, debug)
+            counter += 1
+
+
+def set_idb_mode(mode):
+    global USE_IDB
+    USE_IDB = mode
+
+
+def is_using_idb():
+    global USE_IDB
+    return USE_IDB

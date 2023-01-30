@@ -36,12 +36,58 @@ DEFAULT_TESTS = [
 TESTS_DIR = "tests"
 
 
-def parse_resolution(resolution):
-    reg = "([0-9]).([0-9])"
-    match = re.search(reg, resolution)
-    if match:
-        return [int(match.group(1)), int(match.group(2))]
-    return []
+class TestResult:
+    name = None
+    source = None
+    data = None
+
+    def __init__(self, name, pdresult):
+        self.name = name
+        self.data = pdresult
+
+    def setResult(self, pdresult):
+        self.data = pdresult
+
+    def printResult(self):
+        result_string = ""
+        result_string += f"\n\n----- test case: [{self.name}] -----"
+        return result_string
+
+
+class BitrateResult(TestResult):
+    def printResult(self):
+        return ""
+
+
+class MeanBitrateResult(TestResult):
+    def printResult(self):
+        result_string = TestResult.printResult(self)
+
+        data = self.data.sort_values(by=["bitrate"])
+        print(f"data = {data}")
+        test_names = np.unique(data["test"])
+        for name in test_names:
+            result_string += f"\n\n----- test case: [{self.name}] -----"
+            files = data.loc[data["test"] == name]
+            for row in files.itertuples():
+                status = "passed"
+                if abs(row.error) > ERROR_LIMIT:
+                    status = "failed"
+                result_string += (
+                    '\n{:s} "Bitrate accuracy" {:3d} % error for '
+                    "{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}".format(
+                        status,
+                        row.error,
+                        int(row.bitrate / 1000),
+                        int(row.real_bitrate / 1000),
+                        row.codec,
+                        row.height,
+                        float(row.fps),
+                        row.file,
+                    )
+                )
+            result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
+        return result_string
 
 
 def parse_schema(schema):
@@ -445,6 +491,72 @@ def parse_dynamic_settings(settings):
 ERROR_LIMIT = 5
 
 
+def run_bitrate_verification(
+    testname,
+    encoder_settings,
+    frames,
+    dynamic_video_bitrate,
+    original_fps=None,
+    original_bitrate=None,
+    is_fps=False,
+):
+    print(
+        f"run_bitrate_verification: of: {original_fps}, ob: {original_bitrate}, fps? {is_fps}"
+    )
+    previous_limit = 0
+    dyn_data = []
+    target_bitrate = original_bitrate
+    fps = original_fps
+    result_string = ""
+    # Test bitrate of frame rate is dynamic
+    limits = list(dynamic_video_bitrate.keys())
+    limits.append(frames[-1]["frame"])
+    failed = False
+    limit_too_high = False
+    for limit in limits:
+        if limit > len(frames):
+            limit_too_high = True
+        filtered = list(
+            filter(
+                lambda x: (
+                    x["frame"] >= int(previous_limit) and x["frame"] < int(limit)
+                ),
+                frames,
+            )
+        )
+        accum = 0
+        for item in filtered:
+            accum += item["size"]
+        # Calc mean in bits per second
+        num = len(filtered)
+        mean = 0
+        if num > 0:
+            mean = fps * 8.0 * accum / num
+
+        ratio = mean / target_bitrate
+        bitrate_error_perc = int((ratio - 1) * 100)
+        if abs(bitrate_error_perc) > ERROR_LIMIT:
+            failed = True
+        dyn_data.append(
+            [
+                int(previous_limit),
+                int(limit),
+                int(target_bitrate),
+                int(round(mean, 0)),
+                int(round(bitrate_error_perc, 0)),
+            ]
+        )
+        if limit in dynamic_video_bitrate:
+            if is_fps == 0:  # looking at bitrates
+                target_bitrate = encapp.convert_to_bps(dynamic_video_bitrate[limit])
+            else:
+                fps = dynamic_video_bitrate[limit]
+
+        previous_limit = limit
+
+    return dyn_data
+
+
 def check_mean_bitrate_deviation(resultpath):
     result_string = ""
     bitrate_error = []
@@ -455,7 +567,15 @@ def check_mean_bitrate_deviation(resultpath):
             _, resultfilename = os.path.split(file)
             test_text = json.dumps(result.get("test"))
             test_ = tests_definitions.Test()
-            test_def = google.protobuf.json_format.Parse(test_text, test_)
+
+            test_def = None
+            try:
+                test_def = google.protobuf.json_format.Parse(test_text, test_)
+            except Exception as ex:
+                print(f"ERROR: someting is broken in the test def. Check json: {ex}")
+                print(f"Test definition: \n{test_text}")
+                exit(0)
+
             common_settings = test_def.common
             testname = common_settings.id
             encoder_settings = test_def.configure
@@ -479,91 +599,58 @@ def check_mean_bitrate_deviation(resultpath):
             runtime_setting = test_def.runtime
             dynamic_settings = parse_dynamic_settings(runtime_setting)
             dynamic_video_bitrate = None
+            frames = result.get("frames")
             if len(dynamic_settings) > 0:
                 dynamic_video_bitrate = dynamic_settings["bitrates"]
+            if len(dynamic_settings) > 0:
+                dynamic_video_framerate = dynamic_settings["framerates"]
 
+            calc_result = None
             if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
-                frames = result.get("frames")
-                previous_limit = 0
-                dyn_data = []
-                target_bitrate = bitrate
-                limits = list(dynamic_video_bitrate.keys())
-                limits.append(frames[-1]["frame"])
-                status = "passed"
-                limit_too_high = False
-                for limit in limits:
-                    if limit > len(frames):
-                        limit_too_high = True
-                    filtered = list(
-                        filter(
-                            lambda x: (
-                                x["frame"] >= int(previous_limit)
-                                and x["frame"] < int(limit)
-                            ),
-                            frames,
-                        )
-                    )
-                    accum = 0
-                    for item in filtered:
-                        accum += item["size"]
-                    # Calc mean in bits per second
-                    num = len(filtered)
-                    mean = 0
-                    if num > 0:
-                        mean = fps * 8.0 * accum / num
-
-                    ratio = mean / target_bitrate
-                    bitrate_error_perc = int((ratio - 1) * 100)
-                    if abs(bitrate_error_perc) > ERROR_LIMIT:
-                        status = "failed"
-                    dyn_data.append(
-                        [
-                            int(previous_limit),
-                            int(limit),
-                            int(target_bitrate),
-                            int(round(mean, 0)),
-                            int(round(bitrate_error_perc, 0)),
-                        ]
-                    )
-                    if limit in dynamic_video_bitrate:
-                        target_bitrate = encapp.convert_to_bps(
-                            dynamic_video_bitrate[limit]
-                        )
-                    previous_limit = limit
-                result_string += f"\n\n----- test case: [{testname}] -----"
-
-                result_string += f'\n{status} "Dynamic bitrate", '
-                result_string += (
-                    f" codec: {encoder_settings.codec}"
-                    f", {height}"
-                    f"p @ {fps}fps"
-                    f", {resultfilename}"
+                print("Check dynamic bitrate")
+                calc_result = run_bitrate_verification(
+                    testname,
+                    encoder_settings,
+                    frames,
+                    dynamic_video_bitrate,
+                    original_fps=fps,
+                    original_bitrate=bitrate,
+                    is_fps=False,
                 )
-
-                if limit_too_high:
-                    result_string += (
-                        f"\nERROR: limit higher than available frames "
-                        f"({len(frames)}), adjust test case"
-                    )
-                for item in dyn_data:
-                    result_string += (
-                        "\n      {:3d}% error in {:4d}:{:4d} "
-                        "({:4d}kbps) for {:4d}kbps".format(
-                            item[4],
-                            item[0],
-                            item[1],
-                            int(item[3] / 1000),
-                            int(item[2] / 1000),
-                        )
-                    )
-                result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
             else:
                 mean_bitrate = result.get("meanbitrate")
                 ratio = mean_bitrate / bitrate
                 bitrate_error_perc = int((ratio - 1) * 100)
+                if bitrate_error_perc > ERROR_LIMIT:
+                    bitrate_error.append(
+                        [
+                            testname,
+                            failed,
+                            bitrate_error_perc,
+                            int(bitrate),
+                            mean_bitrate,
+                            codec,
+                            height,
+                            fps,
+                            resultfilename,
+                        ]
+                    )
+
+            if dynamic_video_framerate is not None and len(dynamic_video_framerate):
+                calc_result = run_bitrate_verification(
+                    testname,
+                    encoder_settings,
+                    frames,
+                    dynamic_video_framerate,
+                    original_fps=fps,
+                    original_bitrate=bitrate,
+                    is_fps=True,
+                )
+                detailed = MeanBitrateResult("mean bitrate", calc_result)
                 bitrate_error.append(
                     [
                         testname,
+                        failed,
                         bitrate_error_perc,
                         int(bitrate),
                         mean_bitrate,
@@ -576,6 +663,7 @@ def check_mean_bitrate_deviation(resultpath):
 
     labels = [
         "test",
+        "status",
         "error",
         "bitrate",
         "real_bitrate",
@@ -585,37 +673,14 @@ def check_mean_bitrate_deviation(resultpath):
         "file",
     ]
     data = pd.DataFrame.from_records(bitrate_error, columns=labels, coerce_float=True)
-    data = data.sort_values(by=["bitrate"])
-    test_names = np.unique(data["test"])
-    for name in test_names:
-        result_string += f"\n\n----- test case: [{testname}] -----"
-        files = data.loc[data["test"] == name]
-        for row in files.itertuples():
-            status = "passed"
-            if abs(row.error) > ERROR_LIMIT:
-                status = "failed"
-            result_string += (
-                '\n{:s} "Bitrate accuracy" {:3d} % error for '
-                "{:4d}kbps ({:4d}kbps), codec: {:s}, {:4d}p @ {:.2f} fps, {:s}".format(
-                    status,
-                    row.error,
-                    int(row.bitrate / 1000),
-                    int(row.real_bitrate / 1000),
-                    row.codec,
-                    row.height,
-                    float(row.fps),
-                    row.file,
-                )
-            )
-        result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
 
-    return result_string
+    return
 
 
 def check_framerate_deviation(resultpath):
     result_string = ""
     framerate_error = []
-
+    dyn_data = []
     for file in resultpath:
         with open(file) as resultfile:
             result = json.load(resultfile)
@@ -652,7 +717,7 @@ def check_framerate_deviation(resultpath):
                 and len(dynamic_video_framerates) > 0
             ):
                 previous_limit = 0
-                dyn_data = []
+
                 limits = list(dynamic_video_framerates.keys())
                 limits.append(frames[-1]["original_frame"])
                 status = "passed"
@@ -766,7 +831,7 @@ def check_framerate_deviation(resultpath):
                             )
                         )
                     result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
-    return result_string
+    return result_string, framerate_error, dyn_data
 
 
 def calcFrameRate(frame1, frame2, target_rate):
@@ -866,6 +931,13 @@ def get_options(argv):
         help="Set acceptance lmit on bitrate in percentage",
         default=10,
     )
+    parser.add_argument(
+        "--idb",
+        action="store_true",
+        dest="idb",
+        default=False,
+        help="Run on ios using idb",
+    )
 
     options = parser.parse_args(argv[1:])
     return options
@@ -873,6 +945,7 @@ def get_options(argv):
 
 def main(argv):
     options = get_options(argv)
+    options = encapp.process_options(options)
     result_string = ""
     model = None
     serial = None
@@ -896,11 +969,11 @@ def main(argv):
         results = []
         for file in options.result:
             results.append(file)
-        bitrate_string += check_mean_bitrate_deviation(results)
+        bitrate_string += check_mean_bitrate_deviation(results).printResult()
         idr_string += check_idr_placement(results)
         temporal_string += check_temporal_layer(results)
         ltr_string += check_long_term_ref(results)
-        framerate_string += check_framerate_deviation(results)
+        framerate_string += check_framerate_deviation(results)[0]
     else:
         if os.path.exists(local_workdir):
             shutil.rmtree(local_workdir)
@@ -946,6 +1019,7 @@ def main(argv):
             settings.output_framerate = options.output_fps
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
+            print(f"{options.device_workdir} (dev dir)")
             result = encapp.codec_test(settings, model, serial, settings.debug)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)

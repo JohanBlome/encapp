@@ -147,7 +147,7 @@ Files include:
 Note that the default encoder value is a Google-provided, software, h264 encoder (`OMX.google.h264.encoder`). If you want to test one of the encoders (from the "`list`" command output), use the CLI. For example, some Qualcomm devices offer an h264 HW encoder called "`OMX.qcom.video.encoder.avc`". In order to test it, use:
 
 ```
-$ ./scripts/encapp.py run tests/bitrate_surface.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.y4m --codec OMX.qcom.video.encoder.avc
+$ ./scripts/encapp.py run tests/bitrate_surface.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.y4m --codec OMX.qcom.video.encoder.avc -e input.pix_fmt nv21
 ...
 results collect: ['/tmp/test/encapp_<uuid>.json']
 ```

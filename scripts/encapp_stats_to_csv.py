@@ -5,51 +5,78 @@ import argparse
 import pandas as pd
 import numpy as np
 import encapp as ep
+import os
 import re
 
 
 def parse_resolution(resolution):
-    reg = "([0-9]).([0-9])"
+    reg = "([0-9]*).([0-9]*)"
     match = re.search(reg, resolution)
     if match:
         return [int(match.group(1)), int(match.group(2))]
+
     return []
 
 
 def parse_encoding_data(json, inputfile, debug=0):
     if debug > 0:
         print(f"Parse encoding data: {inputfile}")
-
     try:
         data = pd.DataFrame(json["frames"])
+        test = json["test"]
+
+        # Basic data
+        data = data.loc[data["proctime"] > 0]
         start_pts = data.iloc[0]["pts"]
         start_ts = data.iloc[0]["starttime"]
         start_stop = data.iloc[0]["stoptime"]
-        data = data.loc[data["proctime"] > 0]
-        data["relPts"] = data["pts"] - start_pts
-        data["relStart"] = data["starttime"] - start_ts
-        data["relStop"] = data["stoptime"] - start_stop
         data["source"] = inputfile
-        test = json["test"]
+        data["test_id"] = test["common"]["id"]
+        data["test_description"] = test["common"]["description"]
         data["codec"] = test["configure"]["codec"]
         data["description"] = test["common"]["description"]
         data["camera"] = (test["input"]["filepath"].find('filepath: "camera"')) > 0
         data["test"] = test["common"]["id"]
         data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
         resolution = test["configure"]["resolution"]
+        if len(resolution) == 0:
+            resolution = test["input"]["resolution"]
+
         data["height"] = parse_resolution(resolution)[1]
         fps = test["configure"]["framerate"]
+        if fps == 0:
+            fps = test["input"]["framerate"]
         data["fps"] = fps
+
+        # Derived Data
+        data["rel_pts"] = data["pts"] - start_pts
+        data["rel_start"] = data["starttime"] - start_ts
+        data["rel_stop"] = data["stoptime"] - start_stop
+        
         if "pts" in data:
+            print("Calculating mean data from framedata")
             data["duration_ms"] = round(
                 (data["pts"].shift(-1, axis="index", fill_value=0) - data["pts"])
                 / 1000,
                 2,
             )
+            data.loc[data["duration_ms"] < 0] = 0
             data["bitrate_per_frame_bps"] = (data["size"] * 8.0) / (
                 data["duration_ms"] / 1000.0
             )
-            data["average_bitrate"] = np.mean(data["bitrate_per_frame_bps"])
+            #Drop last row
+            data.drop(data.tail(1).index,inplace=True) 
+            data["mean_bitrate"] = np.mean(data["bitrate_per_frame_bps"])
+
+            data["av_bitrate"] = (
+                data["bitrate_per_frame_bps"]
+                .rolling(fps, min_periods=fps, win_type=None)
+                .sum()
+                / fps
+            )
+            data.replace([np.inf, -np.inf], 0, inplace=True)
+            data.replace(np.NaN, 0, inplace=True)
+            data["av_bitrate"] =  data["av_bitrate"].astype(int)
             data["real_fps"] = round(1000.0 / (data["duration_ms"]), 2)
             # delete the last item
             data = data.loc[data["starttime"] > 0]
@@ -65,12 +92,15 @@ def parse_encoding_data(json, inputfile, debug=0):
             )
             data["av_fps"].fillna(data["fps"], inplace=True)
             data["av_proc_fps"].fillna(data["proc_fps"], inplace=True)
-            data.fillna(0, inplace=True)
+
+        data.fillna(pd.Timedelta(seconds=0), inplace=True)
+
     except Exception as ex:
-        print(f"parsing failed: {ex}")
+        print(f"Encode data parsing failed: {ex}")
         return None
     if debug > 2:
-        print(f"{data}")
+        print(f"data = \"{data}\"")
+    print("leaving encoding")
     return data
 
 
@@ -81,7 +111,6 @@ def parse_decoding_data(json, inputfile, debug=0):
     # try:
     decoded_data = pd.DataFrame(json["decoded_frames"])
     decoded_data["source"] = inputfile
-    fps = 30
     if len(decoded_data) > 0:
         test = json["test"]
         codec = test["configure"]["codec"]
@@ -92,10 +121,11 @@ def parse_decoding_data(json, inputfile, debug=0):
         start_ts = decoded_data.iloc[0]["starttime"]
         start_stop = decoded_data.iloc[0]["stoptime"]
         decoded_data = decoded_data.loc[decoded_data["proctime"] > 0]
-        decoded_data["relPts"] = decoded_data["pts"] - start_pts
-        decoded_data["relStart"] = decoded_data["starttime"] - start_ts
-        decoded_data["relStop"] = decoded_data["stoptime"] - start_stop
+        #decoded_data["pts_sec"] = pd.to_timedelta(decoded_data["pts"], unit="s")
 
+        decoded_data["rel_pts"] = decoded_data["pts"] - start_pts
+        decoded_data["rel_start"] = decoded_data["starttime"] - start_ts
+        decoded_data["rel_stop"] = decoded_data["stoptime"] - start_stop
         try:
             decoded_data["height"] = json["decoder_media_format"]["height"]
         except Exception:
@@ -108,12 +138,15 @@ def parse_decoding_data(json, inputfile, debug=0):
             test["input"]["filepath"].find('filepath: "camera"')
         ) > 0
         decoded_data["test"] = test["common"]["id"]
-        decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
-        resolution = test["configure"]["resolution"]
+        #decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
+        resolution = test["input"]["resolution"]
         decoded_data["height"] = parse_resolution(resolution)[1]
         fps = test["configure"]["framerate"]
-        decoded_data["fps"] = fps
+        if fps == 0:
+            fps = 30
 
+        decoded_data["fps"] = fps
+  
         # oh no we may have b frames...
         decoded_data["duration_ms"] = round(
             (
@@ -139,7 +172,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         )
         decoded_data["av_fps"].fillna(decoded_data["fps"], inplace=True)
         decoded_data["av_proc_fps"].fillna(decoded_data["proc_fps"], inplace=True)
-        decoded_data.fillna(0)
+        decoded_data.fillna(pd.Timedelta(seconds=0), inplace=True)
     # except Exception as ex:
     #    print(f'Failed to parse decode data for {inputfile}: {ex}')
     #    decoded_data = None
@@ -238,6 +271,12 @@ def parse_args():
         const=-1,
         help="Zero verbosity",
     )
+    parser.add_argument(
+        "--model",
+        dest="model",
+        default=None,
+        help="If info is missing tag it with this",
+    )
     parser.add_argument("files", nargs="*", help="file to analyze")
     parser.add_argument("--label", default="")
 
@@ -253,27 +292,52 @@ def main():
     Can output data for a single file or aggregated data for several files.
     """
     options = parse_args()
+    current_dir = None
+    device_info = None
+    for filename in options.files:
+        with open(filename) as json_file:
+            # see if there is device info avalable
+            # read device info results
+            directory = os.path.dirname(filename)
+            if current_dir is None or current_dir != directory:
+                device_info_file = os.path.join(directory, "device.json")
+                if os.path.exists(device_info_file):
+                   
+                    current_dir = directory
+                    with open(device_info_file, "r") as input_file:
+                        device_info = json.load(input_file)
+                    print(f"File exist: {device_info}")
+                else:
+                    device_info = {}
 
-    for file in options.files:
-        with open(file) as json_file:
             alldata = json.load(json_file)
             if "frames" in alldata and len(alldata["frames"]) > 0:
                 print("parse encoding data")
-                encoding_data = parse_encoding_data(alldata, file, options.debug)
-
+                encoding_data = parse_encoding_data(alldata, filename, options.debug)
+                if device_info != None:
+                    model = device_info.get("props", {}).get("ro.product.model", "")
+                    if options.model:
+                        model = options.model
+                    encoding_data["model"] = model
+                    encoding_data["platform"] = device_info.get("props", {}).get(
+                        "ro.board.platform", ""
+                    )
+                    encoding_data["serial"] = device_info.get("props", {}).get(
+                        "ro.serialno", ""
+                    )
                 if encoding_data is not None and len(encoding_data) > 0:
-                    encoding_data.to_csv(f"{file}_encoding_data.csv")
+                    encoding_data.to_csv(f"{filename}_encoding_data.csv")
 
             if "decoded_frames" in alldata and len(alldata["decoded_frames"]) > 0:
                 print(f"parse decoding data")
-                decoded_data = parse_decoding_data(alldata, file, options.debug)
+                decoded_data = parse_decoding_data(alldata, filename, options.debug)
                 if decoded_data is not None and len(decoded_data) > 0:
-                    print(f"Write csv to {file}...")
-                    decoded_data.to_csv(f"{file}_decoding_data.csv")
+                    print(f"Write csv to {filename}...")
+                    decoded_data.to_csv(f"{filename}_decoding_data.csv")
             if "gpu_data" in alldata:
-                gpu_data = parse_gpu_data(alldata, file, options.debug)
+                gpu_data = parse_gpu_data(alldata, filename, options.debug)
                 if gpu_data is not None and len(gpu_data) > 0:
-                    gpu_data.to_csv(f"{file}_gpu_data.csv")
+                    gpu_data.to_csv(f"{filename}_gpu_data.csv")
 
 
 if __name__ == "__main__":

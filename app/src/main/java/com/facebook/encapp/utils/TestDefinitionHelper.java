@@ -188,7 +188,7 @@ public class TestDefinitionHelper {
         // get derived values
         Input.Builder input = test.getInput().toBuilder();
         Configure.Builder config = test.getConfigure().toBuilder();
-        if (!config.hasBitrate()) {
+        if (test.getConfigure().getEncode() && !config.hasBitrate()) {
             throw new RuntimeException("No valid bitrate on configuration settings");
         }
 

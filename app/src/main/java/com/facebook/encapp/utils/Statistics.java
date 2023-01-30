@@ -47,6 +47,9 @@ public class Statistics {
     private MediaFormat mDecoderMediaFormat;
     private String mDecoderName = "";
     private String mAppVersion = "";
+    private boolean mIsEncoderHw = false;
+    private boolean mIsDecoderHw = false;
+
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -270,6 +273,9 @@ public class Statistics {
         mDecoderName = decoderName;
     }
 
+    public void setEncoderIsHardwareAccelerated(boolean accelerated) { mIsDecoderHw = accelerated; }
+
+    public void setDecoderIsHardwareAccelerated(boolean accelerated) { mIsDecoderHw = accelerated; }
 
     private JSONObject getSettingsFromMediaFormat(MediaFormat mediaFormat) {
         // Log.d(TAG, "mediaFormat: " + mediaFormat);
@@ -373,7 +379,12 @@ public class Statistics {
             // add environment
             json.put("environment", new JSONObject(System.getenv()));
             // derived test configuration items
-            json.put("codec", mCodec);
+            if (mEncodingFrames.size() > 0) {
+                json.put("codec", mCodec);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    json.put("encoder_hw_accelerated", mIsEncoderHw);
+                }
+            }
             json.put("meanbitrate", getAverageBitrate());
             json.put("date", mStartDate.toString());
             Log.d(TAG, "log app version: " + mAppVersion);
@@ -388,8 +399,11 @@ public class Statistics {
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder", mDecoderName);
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
-            }
 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    json.put("decoder_hw_accelerated", mIsDecoderHw);
+                }
+            }
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);

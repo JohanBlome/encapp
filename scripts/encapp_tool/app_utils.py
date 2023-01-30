@@ -41,9 +41,13 @@ def install_ok(serial: str, debug=0) -> bool:
     Returns:
         True if encapp is installed at device, False otherwise.
     """
-    package_list = encapp_tool.adb_cmds.installed_apps(serial, debug)
-    if APPNAME_MAIN not in package_list:
-        return False
+    if encapp_tool.adb_cmds.USE_IDB:
+        # TODO: check app
+        print("Check app")
+    else:
+        package_list = encapp_tool.adb_cmds.installed_apps(serial, debug)
+        if APPNAME_MAIN not in package_list:
+            return False
     return True
 
 
