@@ -19,12 +19,7 @@ FFPROBE_FIELDS = {
     "r_frame_rate": "framerate",
     "duration": "duration",
 }
-R_FRAME_RATE_MAP = {
-    "30/1": 30,
-    "50/1": 50,
-    "60/1": 60,
-    "30000/1001": 29.97,
-}
+
 FFMPEG_SILENT = ["ffmpeg", "-hide_banner", "-y"]
 
 
@@ -42,7 +37,11 @@ def ffprobe_parse_output(stdout):
         if key in FFPROBE_FIELDS.keys():
             # process some values
             if key == "r_frame_rate":
-                value = R_FRAME_RATE_MAP[value]
+                split = value.split("/")
+                if len(split) > 1:
+                    value = round(float(split[0]) / float(split[1]), 2)
+                else:
+                    value = float(value)
             elif key == "width" or key == "height":
                 value = int(value)
             elif key == "duration":
@@ -63,10 +62,10 @@ def video_is_y4m(videofile):
 
 
 def get_video_info(videofile, debug=0):
-    assert os.path.exists(videofile), "input video file (%s) does not exist" % videofile
-    assert os.path.isfile(videofile), "input video file (%s) is not a file" % videofile
+    assert os.path.exists(videofile), f"input video file {videofile} not exist"
+    assert os.path.isfile(videofile), f"input video file {videofile} is not a file"
     assert os.access(videofile, os.R_OK), (
-        "input video file (%s) is not readable" % videofile
+        f"input video file (%s) is not readable" % videofile
     )
     if video_is_raw(videofile):
         return {}
@@ -77,6 +76,42 @@ def get_video_info(videofile, debug=0):
     videofile_config = ffprobe_parse_output(stdout)
     videofile_config["filepath"] = videofile
     return videofile_config
+
+
+def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
+    filter_cmd = (
+        f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))},"
+        f"fps={str(settings.get('output', {}).get('framerate', settings.get('input', {}).get('framerate')))}"
+    )
+    if debug > 0:
+        print(f"filter command {filter_cmd}")
+    cmd = FFMPEG_SILENT + [
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        settings.get("input", {}).get("pix_fmt"),
+        "-video_size",
+        settings.get("input", {}).get("resolution"),
+        "-framerate",
+        str(settings.get("input", {}).get("framerate")),
+        "-i",
+        input_filepath,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        settings.get("output", {}).get(
+            "pix_fmt", settings.get("input", {}).get("pix_fmt")
+        ),
+        "-vf",
+        filter_cmd,
+        output_filepath,
+    ]
+
+    # TODO(chema): run_cmd() should accept list of parameters
+    cmd = " ".join(cmd)
+    print(f"cmd=\n{cmd}")
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    assert ret, f"error: ffmpeg returned {stderr}"
 
 
 def ffmpeg_convert_to_raw(

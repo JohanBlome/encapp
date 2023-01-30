@@ -561,15 +561,17 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         if (mLastPtsUs == -1) {
             Log.d(TAG,"First time - no wait");
         } else {
+            //TODO: Fix this, it is broken. Lockup with the loop and growing delay without it.
             synchronized (mSyncLock) {
                 long startTime = mVsyncTimeNs;
+
                 try {
                     long videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    while (videoDiffMs > 0) {
+                    //while (videoDiffMs > 0) {
                         // Wait for next vsync and check time difference again.
                         mSyncLock.wait(WAIT_TIME_MS);
                         videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    }
+                    ///}
                     mLastTime = mVsyncTimeNs;
 
                 } catch (InterruptedException e) {
@@ -577,7 +579,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 }
             }
         }
-
         return mVsyncTimeNs;
     }
 
