@@ -237,24 +237,30 @@ public abstract class Encoder {
         return mStats;
     }
 
-    protected Test setCodecNameAndIdentifier(Test test) {
+    protected Test setCodecNameAndIdentifier(Test test) throws Exception {
         String partialName = test.getConfigure().getCodec();
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
 
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+        Log.d(TAG, "Searching for partialName: \"" + partialName + "\" in codecList");
         Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, partialName);
 
         if (matching.size() > 1) {
             StringBuilder sb = new StringBuilder();
-            sb.append("\nAmbigous codecs for " + partialName + "\n" + matching.size() + " codecs matching.\n");
+            sb.append("\nMultiple matching codecs for partialName: \"" + partialName + "\" codecs_matching: " + matching.size() + " ");
+            sb.append("{");
             for (MediaCodecInfo info : matching) {
-                sb.append(info.getName() + "\n");
+                sb.append(info.getName() + " ");
             }
-            Assert.assertTrue(false, sb.toString());
+            sb.append("}");
+            Log.e(TAG, sb.toString());
+            throw new Exception(sb.toString());
         } else if (matching.size() == 0) {
-            Assert.assertTrue(false, "\nNo matching codecs to : " + partialName);
+            Log.e(TAG, "No matching codecs for partialName: \"" + partialName + "\"");
+            throw new Exception("No matching codecs for \"" + partialName + "\"");
         } else {
             Test.Builder builder = Test.newBuilder(test);
+            // set the codec and mime types
             Configure configure = Configure.
                     newBuilder(test.
                             getConfigure())
@@ -263,7 +269,6 @@ public abstract class Encoder {
             builder.setConfigure(configure);
             return builder.build();
         }
-        return test;
     }
 
     protected void setConfigureParams(Test test, MediaFormat format) {

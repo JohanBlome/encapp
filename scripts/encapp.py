@@ -291,10 +291,13 @@ def collect_results(
             f"idb launch --udid {serial} Meta.Encapp reset",
             debug,
         )
+        # TODO: checks on ios
+        result_ok = True
+        return result_ok, result_json
     else:
-        log = encapp_tool.adb_cmds.logcat_dump(serial)
-        parse_log(log, local_workdir)
-    return result_json
+      logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+      result_ok = parse_logcat(logcat_contents, local_workdir)
+      return result_ok, result_json
 
 
 def dump_device_info(serial, local_workdir, debug):
@@ -307,21 +310,38 @@ def dump_device_info(serial, local_workdir, debug):
         fd.write(json.dumps(device_info, sort_keys=True, indent=4))
 
 
-def parse_log(log, local_workdir):
-    test_reg = re.compile(r".*Test failed: ([\w\W]*)")
-    failed = False
-    for line in log.splitlines():
-        match = test_reg.search(line)
-        if match:
-            print("**********\n\nTest case failed:")
-            print(f'"{match.group(1)}"\n')
-            print("\n\n**********")
-            failed = True
+def parse_logcat(logcat_contents, local_workdir):
+    # 1. store the logcat
     logcat_filepath = f"{local_workdir}/logcat.txt"
     with open(logcat_filepath, "wb") as fd:
-        fd.write(log.encode("utf8"))
-    if failed:
+        fd.write(logcat_contents.encode("utf8"))
+    # 2. look for the status
+    line_re = re.compile(
+        r".*Test finished id: \"(?P<id>[^\"]+)\".*run_id: (?P<run_id>[^\ ]+) result: \"(?P<result>[^\"]+)\"(?P<rem>.*)"
+    )
+    result_ok = True
+    for line in logcat_contents.splitlines():
+        line_match = line_re.search(line)
+        if line_match:
+            if line_match.group("result") == "ok":
+                # experiment went well
+                print(
+                    f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
+                )
+                result_ok = True
+            elif line_match.group("result") == "error":
+                if "error:" not in line_match.group("rem"):
+                    print(f'error: invalid error line match: "{line}"')
+                error_re = re.compile(r".*error: \"(?P<error_code>.+)\"")
+                error_match = error_re.search(line_match.group("rem"))
+                error_code = error_match.group("error_code")
+                print(
+                    f'error: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")} error_code: "{error_code}"'
+                )
+                result_ok = False
+    if not result_ok:
         print(f'logcat has been saved to "{logcat_filepath}"')
+    return result_ok
 
 
 def verify_video_size(videofile, resolution):
@@ -1000,7 +1020,7 @@ def run_codec_tests(
             except Exception as ex:
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
-            return None
+            return None, None
         collected_results.extend(collect_results(
             local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
         ))
@@ -1629,11 +1649,15 @@ def main(argv):
         assert (
             options.configfile is not None
         ), "error: need a valid input configuration file"
+
         # first clear out old result
         remove_encapp_gen_files(serial, options.device_workdir, options.debug)
-        result = codec_test(options, model, serial, options.debug)
+        result_ok, result_json = codec_test(options, model, serial, options.debug)
+
         if not options.ignore_results:
-            verify_app_version(result)
+            verify_app_version(result_json)
+        if not result_ok:
+            sys.exit(-1)
 
 
 if __name__ == "__main__":

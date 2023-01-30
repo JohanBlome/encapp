@@ -178,8 +178,12 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             if (!mNoEncoding) {
                 if (mTest.getConfigure().getMime().length() == 0) {
                     Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
-                    //TODO: throw error on failed lookup
-                    mTest = setCodecNameAndIdentifier(mTest);
+                    try {
+                        mTest = setCodecNameAndIdentifier(mTest);
+                    } catch (Exception e) {
+                        return e.getMessage();
+                    }
+                    Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
                 }
                 Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
                 mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
