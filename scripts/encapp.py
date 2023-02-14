@@ -689,7 +689,9 @@ def update_codec_test(
                 subtest, test, local_workdir, device_workdir, replace, mediastore, True
             )
 
-    # 1.2. replace the parameters that do not create multiple tests
+    # 1. update the tests with the CLI parameters
+
+    # 1.1. replace the parameters that do not create multiple tests
     # TODO(chema): there should be an automatic way to do this
     CONFIGURE_INT_KEYS = ("quality", "complexity", "durationUs", "color_format")
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
@@ -834,6 +836,10 @@ def update_codec_test(
             test.common.id = test.common.id + f"@{framerate_list[0]}"
             test.configure.framerate = float(framerate_list[0])
 
+
+    # 1.2. replace the parameters that create multiple tests
+    # 1.2.1. process configure.bitrate
+
     bitrate_str = replace.get("configure", {}).get("bitrate", "")
     if bitrate_str:
         # update the bitrate
@@ -846,6 +852,7 @@ def update_codec_test(
                 else:
                     ntest = tests_definitions.Test()
                     ntest.CopyFrom(test)
+
                 ntest.common.id = test.common.id + f".{bitrate}bps"
                 ntest.configure.bitrate = str(bitrate)
                 if not is_parallel:
@@ -862,7 +869,10 @@ def update_codec_test(
                     )
             return
         else:
+            # replace the namd and bitrate in the old test
             test.common.id = test.common.id + f".{bitrate_list[0]}bps"
+            test.configure.bitrate = str(bitrate_list[0])
+
     if not is_parallel:
         updated_test_suite.test.extend([test])
 
@@ -873,10 +883,6 @@ def update_codec_test(
 def update_codec_testsuite(
     test_suite, updated_test_suite, local_workdir, device_workdir, replace, mediastore
 ):
-    # 1. update the tests with the CLI parameters
-
-    # 1.1. replace the parameters that create multiple tests
-    # 1.1.1. process configure.bitrate
     for test in test_suite.test:
         update_codec_test(
             test, updated_test_suite, local_workdir, device_workdir, replace, mediastore
