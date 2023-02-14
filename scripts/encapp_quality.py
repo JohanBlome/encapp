@@ -100,7 +100,7 @@ def run_quality(test_file, options, debug):
         # only for raw, obviously
         split = reference_pathname.split(".yuv_")
         reference_pathname = split[0] + ".yuv"
-    print(f"ref = \"{reference_pathname}\"\n")
+    print(f'ref = "{reference_pathname}"\n')
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 

@@ -99,7 +99,7 @@ def parse_encoding_data(json, inputfile, debug=0):
         print(f"Encode data parsing failed: {ex}")
         return None
     if debug > 2:
-        print(f"data = \"{data}\"")
+        print(f'data = "{data}"')
     print("leaving encoding")
     return data
 

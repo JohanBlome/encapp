@@ -237,7 +237,7 @@ def collect_results(
     )
     if encapp_tool.adb_cmds.USE_IDB:
         # Set app in standby so screen is not locked
-        cmd = f"idb launch --udid {serial} Meta.Encapp standby",
+        cmd = (f"idb launch --udid {serial} Meta.Encapp standby",)
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
     if debug > 0:
         print(f"outputfiles: {len(output_files)}")
@@ -633,7 +633,9 @@ def update_media(test, options):
     if out_rate == 0:
         out_rate = in_rate
 
-    if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (in_res != out_res or in_rate != out_rate or in_pix_fmt != out_pix_fmt):
+    if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (
+        in_res != out_res or in_rate != out_rate or in_pix_fmt != out_pix_fmt
+    ):
         print(f"Transcode raw input: {test.input.filepath}")
         replace = {}
         input = {}
@@ -694,7 +696,11 @@ def update_codec_test(
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
     CONFIGURE_FLOAT_KEYS = ("framerate", "stoptime_sec")
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
-    CONFIGURE_BOOL_KEYS = ("encode", "surface", "decode_dump",)
+    CONFIGURE_BOOL_KEYS = (
+        "encode",
+        "surface",
+        "decode_dump",
+    )
     INPUT_BOOL_KEYS = ("show", "realtime")
 
     for k1 in replace:
@@ -963,11 +969,11 @@ def run_codec_tests(
                 except:
                     print("Changing name on the ios log file")
             print("Collect results")
-            collected_results.extend(collect_results(
-                local_workdir,
-                protobuf_txt_filepath,
-                serial, device_workdir,
-                debug))
+            collected_results.extend(
+                collect_results(
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                )
+            )
 
     else:  # one pbtxt for all tests
         # push all the files to the device workdir
@@ -1017,9 +1023,11 @@ def run_codec_tests(
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
             return None, None
-        collected_results.extend(collect_results(
-            local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
-        ))
+        collected_results.extend(
+            collect_results(
+                local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+            )
+        )
     return collected_results
 
 
@@ -1119,7 +1127,9 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
         or not os.path.isfile(protobuf_txt_file)
         or not os.access(protobuf_txt_file, os.R_OK)
     ):
-        abort_test(local_workdir, f'ERROR: invalid test file name "{protobuf_txt_file}"')
+        abort_test(
+            local_workdir, f'ERROR: invalid test file name "{protobuf_txt_file}"'
+        )
     # use a temp file for the binary output
     _, protobuf_bin_file = tempfile.mkstemp(dir=tempfile.gettempdir())
     cmd = f'protoc -I {protobuf_txt_file} --encode="TestSuite" ' f"{protobuf_bin_file}"

@@ -250,7 +250,7 @@ def _parse_pm_list_packages(stdout: str) -> typing.List:
         if not line:
             continue
         if line.startswith("package:"):
-            package_list.append(line[len("package:"):])
+            package_list.append(line[len("package:") :])
     return package_list
 
 
