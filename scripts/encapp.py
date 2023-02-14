@@ -195,12 +195,10 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
     encapp_tool.adb_cmds.reset_logcat(serial)
     if encapp_tool.adb_cmds.USE_IDB:
         # remove log file first
-
         ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
             f"idb file rm Documents/encapp.log --udid {serial} Meta.Encapp ",
             debug,
         )
-
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
             f"idb launch --udid {serial} Meta.Encapp " f"test {protobuf_txt_filepath}",
             debug,
@@ -270,7 +268,7 @@ def collect_results(
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
-    # remo/proceve the test file
+    # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id Meta.Encapp"
     else:
@@ -421,12 +419,12 @@ def parse_multiply(multiply):
     return definition
 
 
-def read_and_update_proto(protobuf_txt_file, local_workdir, options):
+def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
     test_suite = tests_definitions.TestSuite()
-    with open(protobuf_txt_file, "rb") as fd:
+    with open(protobuf_txt_filepath, "rb") as fd:
         text_format.Merge(fd.read(), test_suite)
 
     updated_test_suite = tests_definitions.TestSuite()
@@ -463,7 +461,8 @@ def read_and_update_proto(protobuf_txt_file, local_workdir, options):
         update_file_paths(test, options.device_workdir)
 
     # 5. save the full protobuf text file(s)
-    if options.split:  # one pbtxt file per subtest
+    if options.split:
+        # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
         for test in test_suite.test:
             output_dir = f"{local_workdir}/{test.common.id}"
@@ -473,7 +472,8 @@ def read_and_update_proto(protobuf_txt_file, local_workdir, options):
             with open(filename, "w") as f:
                 f.write(text_format.MessageToString(test))
             files_to_push |= {filename}
-    else:  # one pbtxt for all tests
+    else:
+        # (b) one pbtxt for all tests
         protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
@@ -482,12 +482,12 @@ def read_and_update_proto(protobuf_txt_file, local_workdir, options):
 
 
 def run_codec_tests_file(
-    protobuf_txt_file, model, serial, local_workdir, options, debug
+    protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     if debug > 0:
-        print(f"reading test: {protobuf_txt_file}")
+        print(f"reading test: {protobuf_txt_filepath}")
     test_suite, files_to_push, protobuf_txt_filepath = read_and_update_proto(
-        protobuf_txt_file, local_workdir, options
+        protobuf_txt_filepath, local_workdir, options
     )
 
     # multiply tests per request
@@ -786,7 +786,7 @@ def update_codec_test(
                 ntest.configure.resolution = str(resolution)
                 if not is_parallel:
 
-                    # remove the options already teken care of
+                    # remove the options already taken care of
                     rep_copy = copy.deepcopy(replace)
                     rep_copy["configure"]["resolution"] = ""
                     update_codec_test(
@@ -818,7 +818,7 @@ def update_codec_test(
                 ntest.configure.framerate = float(framerate)
 
                 if not is_parallel:
-                    # remove the options already teken care of
+                    # remove the options already taken care of
                     rep_copy = copy.deepcopy(replace)
                     rep_copy["configure"]["framerate"] = ""
                     update_codec_test(
@@ -849,7 +849,7 @@ def update_codec_test(
                 ntest.common.id = test.common.id + f".{bitrate}bps"
                 ntest.configure.bitrate = str(bitrate)
                 if not is_parallel:
-                    # remove the options already teken care of
+                    # remove the options already taken care of
                     rep_copy = copy.deepcopy(replace)
                     rep_copy["configure"]["bitrate"] = ""
                     update_codec_test(
@@ -906,7 +906,8 @@ def run_codec_tests(
 
     collected_results = []
     # run the test(s)
-    if split:  # one pbtxt file per subtest
+    if split:
+        # (a) one pbtxt file per subtest
         # push just the files we need by looking up the name
         tests_run = f"{local_workdir}/tests_run.log"
         total_number = len(test_suite.test)
@@ -974,7 +975,8 @@ def run_codec_tests(
                 )
             )
 
-    else:  # one pbtxt for all tests
+    else:
+        # (b) one pbtxt for all tests
         # push all the files to the device workdir
         if encapp_tool.adb_cmds.USE_IDB:
             cmd = f"idb launch --udid {serial} Meta.Encapp standby"
@@ -1117,21 +1119,24 @@ def convert_to_frames(value, fps=30):
     return int(sec * fps)
 
 
-def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
+def check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug):
     # ensure the protobuf text file exists and is readable
-    if protobuf_txt_file is None:
+    if protobuf_txt_filepath is None:
         abort_test(local_workdir, "ERROR: need a test file name")
     if (
-        not os.path.exists(protobuf_txt_file)
-        or not os.path.isfile(protobuf_txt_file)
-        or not os.access(protobuf_txt_file, os.R_OK)
+        not os.path.exists(protobuf_txt_filepath)
+        or not os.path.isfile(protobuf_txt_filepath)
+        or not os.access(protobuf_txt_filepath, os.R_OK)
     ):
         abort_test(
-            local_workdir, f'ERROR: invalid test file name "{protobuf_txt_file}"'
+            local_workdir, f'ERROR: invalid test file name "{protobuf_txt_filepath}"'
         )
     # use a temp file for the binary output
     _, protobuf_bin_file = tempfile.mkstemp(dir=tempfile.gettempdir())
-    cmd = f'protoc -I {protobuf_txt_file} --encode="TestSuite" ' f"{protobuf_bin_file}"
+    cmd = (
+        f'protoc -I {protobuf_txt_filepath} --encode="TestSuite" '
+        f"{protobuf_bin_file}"
+    )
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret == 0, f"ERROR: {stderr}"
 
@@ -1150,12 +1155,12 @@ def codec_test(options, model, serial, debug):
     if options.mediastore is None:
         options.mediastore = local_workdir
     # check the protobuf text is correct
-    protobuf_txt_file = options.configfile
-    check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug)
+    protobuf_txt_filepath = options.configfile
+    check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug)
 
     # run the codec test
     return run_codec_tests_file(
-        protobuf_txt_file, model, serial, local_workdir, options, debug
+        protobuf_txt_filepath, model, serial, local_workdir, options, debug
     )
 
 
