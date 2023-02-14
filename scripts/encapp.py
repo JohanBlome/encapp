@@ -654,9 +654,11 @@ def update_media(test, options):
         extension = "raw"
         if output["pix_fmt"] == "rgba":
             extension = "rgba"
+        pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
+        pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         output[
             "output_filepath"
-        ] = f"{options.mediastore}/{basename}_{out_res}@{round(out_rate, 2)}_{out_pix_fmt}.{extension}"
+        ] = f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
         replace["input"] = input
         replace["output"] = output
 
@@ -1528,7 +1530,7 @@ def process_input_path(input_filepath, replace, debug=0):
             print(f"{replace}")
         output_filepath = replace.get("output", {}).get(
             "output_filepath",
-            f"{input_filepath}_{settings['resolution']}@{settings['framerate']}_{settings['pix_fmt']}.raw",
+            f"{input_filepath}_{settings['resolution']}p{settings['framerate']}_{settings['pix_fmt']}.raw",
         )
 
         # lazy but let us skip transcodig if the target is already there...
