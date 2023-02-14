@@ -98,7 +98,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
         mYuvReader = new FileReader();
         if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
-            return "\nCould not open file";
+            return "Could not open file";
         }
         mExtractor = new MediaExtractor();
         MediaFormat inputFormat = null;

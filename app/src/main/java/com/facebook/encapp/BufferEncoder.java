@@ -58,7 +58,7 @@ class BufferEncoder extends Encoder {
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
-            return "\nCould not open file";
+            return "Could not open file";
         }
 
         MediaFormat mediaFormat;
@@ -215,11 +215,11 @@ class BufferEncoder extends Encoder {
             } catch (MediaCodec.CodecException ex) {
                 Log.e(TAG, "dequeueInputBuffer: MediaCodec.CodecException error");
                 ex.printStackTrace();
-                return "\ndequeueInputBuffer: MediaCodec.CodecException error";
+                return "dequeueInputBuffer: MediaCodec.CodecException error";
             } catch (IllegalStateException ex) {
                 Log.e(TAG, "dequeueInputBuffer: IllegalStateException error");
                 ex.printStackTrace();
-                return "\ndequeueInputBuffer: IllegalStateException error";
+                return "dequeueInputBuffer: IllegalStateException error";
             }
 
             // 2. process the encoder output
@@ -258,11 +258,11 @@ class BufferEncoder extends Encoder {
             } catch (MediaCodec.CodecException ex) {
                 Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
                 ex.printStackTrace();
-                return "\ndequeueOutputBuffer: MediaCodec.CodecException error";
+                return "dequeueOutputBuffer: MediaCodec.CodecException error";
             } catch (IllegalStateException ex) {
                 Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
                 ex.printStackTrace();
-                return "\ndequeueOutputBuffer: IllegalStateException error";
+                return "dequeueOutputBuffer: IllegalStateException error";
             }
         }
         mStats.stop();
