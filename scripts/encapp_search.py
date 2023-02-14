@@ -19,7 +19,6 @@ The output can either be the video source files or the json result.
 import argparse
 import sys
 import json
-import math
 import os
 import pandas as pd
 import re

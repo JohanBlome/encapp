@@ -75,7 +75,7 @@ def run_quality(test_file, options, debug):
     with open(test_file, "r") as input_file:
         results = json.load(input_file)
 
-    if results.get("sourcefile") == None:
+    if results.get("sourcefile") is None:
         print(f"ERROR, bad source, {test_file}")
         return
     # read device info results
@@ -96,11 +96,11 @@ def run_quality(test_file, options, debug):
     if options.override_reference is not None:
         reference_pathname = options.override_reference
     elif options.guess_original:
-        # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv 
+        # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv
         # only for raw, obviously
         split = reference_pathname.split(".yuv_")
         reference_pathname = split[0] + ".yuv"
-    print(f"ref = \"{reference_pathname}\"\n")
+    print(f'ref = "{reference_pathname}"\n')
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 
@@ -160,7 +160,7 @@ def run_quality(test_file, options, debug):
         output_width = -1
         output_height = -1
         output_framerate = -1
-        if output_media_format != None:
+        if output_media_format is not None:
             output_width = output_media_format.get("width")
             output_height = output_media_format.get("height")
             output_framerate = output_media_format.get("frame-rate")
@@ -174,7 +174,7 @@ def run_quality(test_file, options, debug):
             output_framerate = test["configure"]["framerate"]
             if output_framerate == 0:
                 output_framerate = test["input"]["framerate"]
-            print(f"WARNING! output media format is missing, guessing values...")
+            print("WARNING! output media format is missing, guessing values...")
             print(f"outputres: {res}\noutput_framerate: {output_framerate}")
 
         output_resolution = f"{output_width}x{output_height}"
@@ -187,16 +187,16 @@ def run_quality(test_file, options, debug):
         duration = f'{video_info["duration"]}'
         if options.limit_length > 0:
             duration = float(options.limit_length)
-        if output_framerate == None or output_framerate == 0:
+        if output_framerate is None or output_framerate == 0:
             output_framerate = f'{video_info["framerate"]}'
         if output_resolution != media_res:
             print("Warning. Discrepancy in resolutions for output")
-            print(f"Json {output_res}, media {media_res}")
+            print(f"Json {output_resolution}, media {media_res}")
             output_resolution = media_res
 
         if options.resolution is not None:
             input_resolution = options.resolution
-        elif input_media_format != None:
+        elif input_media_format is not None:
             try:
                 input_width = int(input_media_format.get("width"))
                 input_height = int(input_media_format.get("height"))
@@ -210,12 +210,12 @@ def run_quality(test_file, options, debug):
                 input_resolution = output_resolution
             else:
                 input_resolution = f"{input_width}x{input_height}"
-        else:
-            input_res = output_res
+        # else:
+        #     input_res = output_resolution
 
         if options.framerate is not None:
             input_framerate = options.framerate
-        elif input_media_format != None:
+        elif input_media_format is not None:
             try:
                 input_framerate = float(input_media_format.get("framerate"))
             except BaseException:
@@ -344,7 +344,7 @@ def run_quality(test_file, options, debug):
             source_complexity = options.mark_complexity
         if options.mark_motion:
             source_motion = options.mark_motion
-        
+
         frames = pd.DataFrame(results["frames"])
         iframes = frames.loc[frames["iframe"] == 1]
         pframes = frames.loc[frames["iframe"] == 0]
@@ -487,7 +487,7 @@ def get_options(argv):
         help="Set a complexity marker for the whole collection e.g. low, mid, high",
         default=None,
     )
-    #TODO: remove
+    # TODO: remove
     parser.add_argument(
         "--mark_motion",
         help="Set a motion marker for the whole collection e.g. low, mid, high",
@@ -569,8 +569,7 @@ def main(argv):
             time_left_m = int(time_left / 60)
             time_left_s = int(time_left) % 60
             print(
-                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s} m:s" #,
-                #end="\r",
+                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s} m:s"
             )
             current += 1
             if data is not None:

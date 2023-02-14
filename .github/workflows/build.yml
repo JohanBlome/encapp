@@ -21,7 +21,7 @@ jobs:
       - name: Build python
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pylint flake8 humanfriendly numpy pandas seaborn protobuf
+          pip install pytest pylint flake8 humanfriendly numpy pandas seaborn protobuf argparse_formatter
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           flake8 scripts --count --select=E9,F63,F7,F82 --exclude scripts/proto --show-source --statistics
           flake8 scripts --exclude scripts/proto --count --exit-zero --statistics

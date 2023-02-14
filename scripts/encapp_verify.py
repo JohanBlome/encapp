@@ -384,15 +384,15 @@ def check_idr_placement(resultpath):
             if not encoder_mediaformat:
                 print(f"Error: test {testname} failed")
                 continue
-            codec = encoder_settings.codec
-            bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # codec = encoder_settings.codec
+            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
             frames = result.get("frames")
 
             iframes = list(filter(lambda x: (x["iframe"] == 1), frames))
             idr_ids = []
             # gop, either static gop or distance from last?
             gop = encoder_settings.i_frame_interval
-            if gop == None or gop <= 0:
+            if gop is None or gop <= 0:
                 gop = 1
             fps = encoder_settings.framerate
             if fps == 0:
@@ -507,15 +507,14 @@ def run_bitrate_verification(
     dyn_data = []
     target_bitrate = original_bitrate
     fps = original_fps
-    result_string = ""
     # Test bitrate of frame rate is dynamic
     limits = list(dynamic_video_bitrate.keys())
     limits.append(frames[-1]["frame"])
-    failed = False
-    limit_too_high = False
+    # failed = False
+    # limit_too_high = False
     for limit in limits:
-        if limit > len(frames):
-            limit_too_high = True
+        # if limit > len(frames):
+        #     limit_too_high = True
         filtered = list(
             filter(
                 lambda x: (
@@ -535,8 +534,8 @@ def run_bitrate_verification(
 
         ratio = mean / target_bitrate
         bitrate_error_perc = int((ratio - 1) * 100)
-        if abs(bitrate_error_perc) > ERROR_LIMIT:
-            failed = True
+        # if abs(bitrate_error_perc) > ERROR_LIMIT:
+        #     failed = True
         dyn_data.append(
             [
                 int(previous_limit),
@@ -558,7 +557,6 @@ def run_bitrate_verification(
 
 
 def check_mean_bitrate_deviation(resultpath):
-    result_string = ""
     bitrate_error = []
 
     for file in resultpath:
@@ -606,6 +604,7 @@ def check_mean_bitrate_deviation(resultpath):
                 dynamic_video_framerate = dynamic_settings["framerates"]
 
             calc_result = None
+            failed = False
             if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
                 print("Check dynamic bitrate")
                 calc_result = run_bitrate_verification(
@@ -697,8 +696,8 @@ def check_framerate_deviation(resultpath):
                 continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
-            encoder_media_format = result.get("encoder_media_format")
+            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # encoder_media_format = result.get("encoder_media_format")
             fps = encoder_settings.framerate
             if fps == 0:
                 if test_.input.framerate > 0:
@@ -780,7 +779,7 @@ def check_framerate_deviation(resultpath):
                     )
                 result_string += f"\n      (limit set to {ERROR_LIMIT}%)"
             elif len(frames) > 0:
-                framerate = encoder_settings.framerate
+                # framerate = encoder_settings.framerate
                 frame1 = frames[0]
                 frame2 = frames[-1]
                 actual_framerate, deviation_perc = calcFrameRate(frame1, frame2, fps)

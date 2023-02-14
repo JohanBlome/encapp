@@ -160,7 +160,7 @@ def remove_encapp_gen_files(
 
 def wait_for_exit(serial, debug=0):
     if debug > 0:
-        print(f"\n\n*** Wait for exit **\n\n")
+        print("\n\n*** Wait for exit **\n\n")
     time.sleep(2)
     if encapp_tool.adb_cmds.USE_IDB:
         state = "Running"
@@ -185,7 +185,7 @@ def wait_for_exit(serial, debug=0):
             print(f"exit from {pid}")
 
     if debug > 0:
-        print(f"\n\n*** Done waiting **\n\n")
+        print("\n\n*** Done waiting **\n\n")
 
 
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
@@ -237,7 +237,7 @@ def collect_results(
     )
     if encapp_tool.adb_cmds.USE_IDB:
         # Set app in standby so screen is not locked
-        cmd = f"idb launch --udid {serial} Meta.Encapp standby",
+        cmd = (f"idb launch --udid {serial} Meta.Encapp standby",)
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
     if debug > 0:
         print(f"outputfiles: {len(output_files)}")
@@ -295,9 +295,9 @@ def collect_results(
         result_ok = True
         return result_ok, result_json
     else:
-      logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
-      result_ok = parse_logcat(logcat_contents, local_workdir)
-      return result_ok, result_json
+        logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+        result_ok = parse_logcat(logcat_contents, local_workdir)
+        return result_ok, result_json
 
 
 def dump_device_info(serial, local_workdir, debug):
@@ -397,7 +397,6 @@ def add_media_files(test, files_to_push):
 
 
 def update_media_files(test, options):
-    files_to_push = set()
     if test.input.filepath != "camera":
         update_media(test, options)
     for subtest in test.parallel.test:
@@ -409,7 +408,7 @@ def update_media_files(test, options):
 def parse_multiply(multiply):
     definition = []
     # [32,][3,"test"] or 32
-    reg = '([0-9]*),\s?([\w.\/"]*)'
+    reg = r'([0-9]*),\s?([\w.\/"]*)'
     m = re.findall(reg, multiply)
     if m:
         for pair in m:
@@ -499,7 +498,7 @@ def run_codec_tests_file(
         for definition in parallel_defs:
             template = test
             counts = definition[0] + 1
-            if definition[1] != None and len(definition[1]) > 0:
+            if definition[1] is not None and len(definition[1]) > 0:
                 # Read the file and setup
                 (
                     tmpsuite,
@@ -576,9 +575,8 @@ def parse_bitrate_field(bitrate):
         bitrate_spec = bitrate.split("-")
         assert len(bitrate_spec) == 3, f'error: invalid bitrate spec: "{bitrate}"'
         start, stop, step = [convert_to_bps(it) for it in bitrate_spec]
-        return list(
-            range(start, stop + 1, step)
-        )  # We want to include the last value...
+        # We want to include the last value...
+        return list(range(start, stop + 1, step))
     # parse single elements
     return [convert_to_bps(bitrate)]
 
@@ -591,7 +589,7 @@ def parse_resolution_field(resolution):
         return resolution_list
     # parse ranges
     if "-" in resolution:
-        resolution_spec = bitrate.split("-")
+        resolution_spec = resolution.split("-")
         assert (
             len(resolution_spec) == 3
         ), f'error: invalid resolution spec: "{resolution}"'
@@ -611,7 +609,7 @@ def parse_framerate_field(framerate):
         return framerate_list
     # parse ranges
     if "-" in framerate:
-        framerate_spec = bitrate.split("-")
+        framerate_spec = framerate.split("-")
         assert len(framerate_spec) == 3, f'error: invalid framerate spec: "{framerate}"'
         start, stop, step = framerate_spec
         return list(
@@ -634,7 +632,9 @@ def update_media(test, options):
     if out_rate == 0:
         out_rate = in_rate
 
-    if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (in_res != out_res or in_rate != out_rate or  in_pix_fmt != out_pix_fmt):
+    if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (
+        in_res != out_res or in_rate != out_rate or in_pix_fmt != out_pix_fmt
+    ):
         print(f"Transcode raw input: {test.input.filepath}")
         replace = {}
         input = {}
@@ -645,7 +645,7 @@ def update_media(test, options):
         input["resolution"] = in_res
         input["framerate"] = in_rate
         if options.pix_fmt is None:
-             output["pix_fmt"] = input["pix_fmt"]
+            output["pix_fmt"] = input["pix_fmt"]
         else:
             output["pix_fmt"] = options.pix_fmt
         output["resolution"] = out_res
@@ -681,11 +681,9 @@ def update_codec_test(
     mediastore,
     is_parallel=False,
 ):
-    tests_id = None
     # save the main test id
     if test.parallel:
         subtests = test.parallel.test
-        loop_counter = 0
         for subtest in subtests:
             update_codec_test(
                 subtest, test, local_workdir, device_workdir, replace, mediastore, True
@@ -695,10 +693,14 @@ def update_codec_test(
     # TODO(chema): there should be an automatic way to do this
     CONFIGURE_INT_KEYS = ("quality", "complexity", "durationUs", "color_format")
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
-    CONFIGURE_FLOAT_KEYS = ("framerate","stoptime_sec")
+    CONFIGURE_FLOAT_KEYS = ("framerate", "stoptime_sec")
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
-    CONFIGURE_BOOL_KEYS = ("encode", "surface", "decode_dump",)
-    INPUT_BOOL_KEYS = ("show","realtime")
+    CONFIGURE_BOOL_KEYS = (
+        "encode",
+        "surface",
+        "decode_dump",
+    )
+    INPUT_BOOL_KEYS = ("show", "realtime")
 
     for k1 in replace:
         for k2, val in replace[k1].items():
@@ -897,11 +899,11 @@ def run_codec_tests(
     debug=False,
 ):
     global default_values
-    if device_workdir == None:
+    if device_workdir is None:
         device_workdir = default_values["device_workdir"]
 
     os.makedirs(local_workdir, exist_ok=True)
-        
+
     collected_results = []
     # run the test(s)
     if split:  # one pbtxt file per subtest
@@ -966,12 +968,11 @@ def run_codec_tests(
                 except:
                     print("Changing name on the ios log file")
             print("Collect results")
-            collected_results.extend(collect_results(
-                local_workdir,
-                protobuf_txt_filepath,
-                serial, device_workdir,
-                debug))
-    
+            collected_results.extend(
+                collect_results(
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                )
+            )
 
     else:  # one pbtxt for all tests
         # push all the files to the device workdir
@@ -979,7 +980,7 @@ def run_codec_tests(
             cmd = f"idb launch --udid {serial} Meta.Encapp standby"
             encapp_tool.adb_cmds.run_cmd(cmd)
         protobuf_txt_filepath = ""
-        
+
         for filepath in files_to_push:
             # Kind of stupid but there should be a pbtxtx, and just one here
             fc = fast_copy
@@ -1000,7 +1001,7 @@ def run_codec_tests(
 
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
-            
+
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
         # collect the test results
@@ -1021,9 +1022,11 @@ def run_codec_tests(
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
             return None, None
-        collected_results.extend(collect_results(
-            local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
-        ))
+        collected_results.extend(
+            collect_results(
+                local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+            )
+        )
     return collected_results
 
 
@@ -1123,7 +1126,9 @@ def check_protobuf_txt_file(protobuf_txt_file, local_workdir, debug):
         or not os.path.isfile(protobuf_txt_file)
         or not os.access(protobuf_txt_file, os.R_OK)
     ):
-        abort_test(local_workdir, f'ERROR: invalid test file name "{protobuf_txt_file}"')
+        abort_test(
+            local_workdir, f'ERROR: invalid test file name "{protobuf_txt_file}"'
+        )
     # use a temp file for the binary output
     _, protobuf_bin_file = tempfile.mkstemp(dir=tempfile.gettempdir())
     cmd = f'protoc -I {protobuf_txt_file} --encode="TestSuite" ' f"{protobuf_bin_file}"
@@ -1267,9 +1272,9 @@ def get_options(argv):
         dest="bitrate",
         default=default_values["bps"],
         metavar="input-video-bitrate",
-        help="""input video bitrate. Can be 
-        1. a single number (e.g. "100 kbps") 
-        2. a list (e.g. "100kbps,200kbps") 
+        help="""input video bitrate. Can be
+        1. a single number (e.g. "100 kbps")
+        2. a list (e.g. "100kbps,200kbps")
         3. a range (e.g. "100k-1M-100k") (start-stop-step)""",
     )
     parser.add_argument(
@@ -1279,9 +1284,9 @@ def get_options(argv):
         dest="framerate",
         default=default_values["framerate"],
         metavar="input-video-framerate",
-        help="""input video bitrate. Can be 
-        1. a single number (e.g. "100 kbps") 
-        2. a list (e.g. "100kbps,200kbps") 
+        help="""input video bitrate. Can be
+        1. a single number (e.g. "100 kbps")
+        2. a list (e.g. "100kbps,200kbps")
         3. a range (e.g. "100k-1M-100k") (start-stop-step)""",
     )
     parser.add_argument(
@@ -1291,9 +1296,9 @@ def get_options(argv):
         dest="resolution",
         default=default_values["resolution"],
         metavar="input-video-resolution",
-        help="""input video resolution. Can be 
-        1. a single size (e.g. "1280x720") 
-        2. a list (e.g. "320x240,1280x720") 
+        help="""input video resolution. Can be
+        1. a single size (e.g. "1280x720")
+        2. a list (e.g. "320x240,1280x720")
         3. a range (e.g. "320x240-4000x4000-2") (start-stop-step)
         In the case of the step it is a multiplication of the first.
         It will stop when the pixel count pass stop value (calculated as wxh)""",
@@ -1304,14 +1309,14 @@ def get_options(argv):
         dest="multiply",
         default=default_values["multiply"],
         metavar="multiply",
-        help="""Multiply a test input. Can be a 
+        help="""Multiply a test input. Can be a
         1. single number
-        2. An array in the form of \"[nbr,source][nbr,source]...\" e.g. 
+        2. An array in the form of \"[nbr,source][nbr,source]...\" e.g.
            \"[x,][y,'../test/test1.pbtxt'][z,'test2.pbtxt']\"
 
-        (1) will simply multiply the source test the set number of times as parallell case and 
+        (1) will simply multiply the source test the set number of times as parallell case and
         (2) will add x number of the source in addition to
-        the test1.pbxt y number of times etc. 
+        the test1.pbxt y number of times etc.
 
         If updating a parameter all tests will get the same update.""",
     )
