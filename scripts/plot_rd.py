@@ -77,7 +77,6 @@ class RDPlot:
         plt.draw()
 
     def plot_rd_curve(self, quality_csv):
-        rd_results = None
         with open(quality_csv, "r") as fp:
             data = pd.read_csv(fp)
             fp.close()
@@ -92,7 +91,7 @@ class RDPlot:
                     continue
                 self.vmaf_figure(f"VMAF for {height}p")
                 for codec in codecs:
-                    filtCodec = filtHeight.loc[filtHeight["height"] == height]
+                    # filtCodec = filtHeight.loc[filtHeight["height"] == height]
                     filtHeight = filtHeight.sort_values("real_bitrate")
                     if len(filtHeight) > 0:
                         self.draw(
@@ -103,7 +102,7 @@ class RDPlot:
                 self.finish()
                 self.bitrate_figure(f"Bitrate accuracy for {height}p")
                 for codec in codecs:
-                    filtCodec = filtHeight.loc[filtHeight["height"] == height]
+                    # filtCodec = filtHeight.loc[filtHeight["height"] == height]
                     filtHeight = filtHeight.sort_values("real_bitrate")
                     if len(filtHeight) > 0:
                         self.draw(

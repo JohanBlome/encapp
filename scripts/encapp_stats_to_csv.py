@@ -52,7 +52,7 @@ def parse_encoding_data(json, inputfile, debug=0):
         data["rel_pts"] = data["pts"] - start_pts
         data["rel_start"] = data["starttime"] - start_ts
         data["rel_stop"] = data["stoptime"] - start_stop
-        
+
         if "pts" in data:
             print("Calculating mean data from framedata")
             data["duration_ms"] = round(
@@ -64,8 +64,8 @@ def parse_encoding_data(json, inputfile, debug=0):
             data["bitrate_per_frame_bps"] = (data["size"] * 8.0) / (
                 data["duration_ms"] / 1000.0
             )
-            #Drop last row
-            data.drop(data.tail(1).index,inplace=True) 
+            # drop last row
+            data.drop(data.tail(1).index, inplace=True)
             data["mean_bitrate"] = np.mean(data["bitrate_per_frame_bps"])
 
             data["av_bitrate"] = (
@@ -76,7 +76,7 @@ def parse_encoding_data(json, inputfile, debug=0):
             )
             data.replace([np.inf, -np.inf], 0, inplace=True)
             data.replace(np.NaN, 0, inplace=True)
-            data["av_bitrate"] =  data["av_bitrate"].astype(int)
+            data["av_bitrate"] = data["av_bitrate"].astype(int)
             data["real_fps"] = round(1000.0 / (data["duration_ms"]), 2)
             # delete the last item
             data = data.loc[data["starttime"] > 0]
@@ -121,7 +121,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         start_ts = decoded_data.iloc[0]["starttime"]
         start_stop = decoded_data.iloc[0]["stoptime"]
         decoded_data = decoded_data.loc[decoded_data["proctime"] > 0]
-        #decoded_data["pts_sec"] = pd.to_timedelta(decoded_data["pts"], unit="s")
+        # decoded_data["pts_sec"] = pd.to_timedelta(decoded_data["pts"], unit="s")
 
         decoded_data["rel_pts"] = decoded_data["pts"] - start_pts
         decoded_data["rel_start"] = decoded_data["starttime"] - start_ts
@@ -132,13 +132,13 @@ def parse_decoding_data(json, inputfile, debug=0):
             print("Failed to read decoder data")
             decoded_data["height"] = "unknown height"
 
-        data = decoded_data.loc[decoded_data["size"] != "0"]
+        # data = decoded_data.loc[decoded_data["size"] != "0"]
         decoded_data["description"] = test["common"]["description"]
         decoded_data["camera"] = (
             test["input"]["filepath"].find('filepath: "camera"')
         ) > 0
         decoded_data["test"] = test["common"]["id"]
-        #decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
+        # decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
         resolution = test["input"]["resolution"]
         decoded_data["height"] = parse_resolution(resolution)[1]
         fps = test["configure"]["framerate"]
@@ -146,7 +146,7 @@ def parse_decoding_data(json, inputfile, debug=0):
             fps = 30
 
         decoded_data["fps"] = fps
-  
+
         # oh no we may have b frames...
         decoded_data["duration_ms"] = round(
             (
@@ -302,7 +302,6 @@ def main():
             if current_dir is None or current_dir != directory:
                 device_info_file = os.path.join(directory, "device.json")
                 if os.path.exists(device_info_file):
-                   
                     current_dir = directory
                     with open(device_info_file, "r") as input_file:
                         device_info = json.load(input_file)
@@ -314,7 +313,7 @@ def main():
             if "frames" in alldata and len(alldata["frames"]) > 0:
                 print("parse encoding data")
                 encoding_data = parse_encoding_data(alldata, filename, options.debug)
-                if device_info != None:
+                if device_info is not None:
                     model = device_info.get("props", {}).get("ro.product.model", "")
                     if options.model:
                         model = options.model
@@ -329,7 +328,7 @@ def main():
                     encoding_data.to_csv(f"{filename}_encoding_data.csv")
 
             if "decoded_frames" in alldata and len(alldata["decoded_frames"]) > 0:
-                print(f"parse decoding data")
+                print("parse decoding data")
                 decoded_data = parse_decoding_data(alldata, filename, options.debug)
                 if decoded_data is not None and len(decoded_data) > 0:
                     print(f"Write csv to {filename}...")

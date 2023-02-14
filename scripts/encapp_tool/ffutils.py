@@ -65,7 +65,7 @@ def get_video_info(videofile, debug=0):
     assert os.path.exists(videofile), f"input video file {videofile} not exist"
     assert os.path.isfile(videofile), f"input video file {videofile} is not a file"
     assert os.access(videofile, os.R_OK), (
-        f"input video file (%s) is not readable" % videofile
+        f"input video file ({videofile}) is not readable"
     )
     if video_is_raw(videofile):
         return {}

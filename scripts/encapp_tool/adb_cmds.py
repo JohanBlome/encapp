@@ -18,7 +18,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         debug (int): Debug level from 0 (No debug)
 
     Returns:
-        Tuple with boolean (True cmd execution succeeded, false otherwise)
+        Tuple with boolean (True cmd execution succeeded, False otherwise)
         stdout and stderr messages.
     """
     try:
@@ -250,7 +250,7 @@ def _parse_pm_list_packages(stdout: str) -> typing.List:
         if not line:
             continue
         if line.startswith("package:"):
-            package_list.append(line[len("package:") :])
+            package_list.append(line[len("package:"):])
     return package_list
 
 
@@ -345,51 +345,51 @@ def parse_getprop(stdout: str) -> dict:
         # We translate to some of the known android names so comparison is easier...
         # on a pysical device there will be more info than on an emulator
 
-        match = re.search("'HardwarePlatform': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'HardwarePlatform': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["ro.board.platform"] = match.group(1)
 
-        match = re.search("'HardwareModel': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'HardwareModel': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["ro.product.model"] = match.group(1)
 
-        match = re.search("'CPUArchitecture': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'CPUArchitecture': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["CPUArchitecture"] = match.group(1)
 
-        match = re.search("'ProductVersion': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'ProductVersion': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["ProductVersion"] = match.group(1)
 
-        match = re.search("'BuildVersion': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'BuildVersion': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["BuildVersion"] = match.group(1)
 
-        match = re.search("'CPUArchitecture': '([\w\d\s]*)'", stdout)
+        match = re.search(r"'CPUArchitecture': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["CPUArchitecture"] = match.group(1)
 
         if "ro.product.model" not in props_dict:
-            match = re.search("target_type=<[\w.]*:\s?'([\w\d\s]*)'>", stdout)
+            match = re.search(r"target_type=<[\w.]*:\s?'([\w\d\s]*)'>", stdout)
             target_type = ""
             if match:
                 target_type = match.group(1)
-            match = re.search("name='([\w\d\s]*)'", stdout)
+            match = re.search(r"name='([\w\d\s]*)'", stdout)
             if match:
                 props_dict["ro.product.model"] = f"{match.group(1)}_{target_type}"
             else:
                 props_dict["ro.product.model"] = "unknown ios"
         if "ro.board.platform" not in props_dict:
-            match = re.search("os_version='([\w\d\s\.]*)'", stdout)
+            match = re.search(r"os_version='([\w\d\s\.]*)'", stdout)
             os_version = ""
             if match:
                 os_version = match.group(1)
-            match = re.search("architecture='([\w\d\s]*)'", stdout)
+            match = re.search(r"architecture='([\w\d\s]*)'", stdout)
             arch = ""
             if match:
                 arch = match.group(1)
                 props_dict["ro.board.platform"] = f"{os_version}-{arch}"
-        match = re.search("udid='([\w\d\s\-]*)'", stdout)
+        match = re.search(r"udid='([\w\d\s\-]*)'", stdout)
         serial = ""
         if match:
             serial = match.group(1)
@@ -506,7 +506,7 @@ def file_exists_in_device(filename, serial, debug=False):
 def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, debug):
     # Do not check .pbtxt files
     if host_filepath[-6] == ".pbtxt":
-        return false
+        return False
 
     if USE_IDB and fast_copy:
         # TODO: fix
