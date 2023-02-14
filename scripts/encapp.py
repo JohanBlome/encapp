@@ -575,9 +575,7 @@ def parse_bitrate_field(bitrate):
         bitrate_spec = bitrate.split("-")
         assert len(bitrate_spec) == 3, f'error: invalid bitrate spec: "{bitrate}"'
         start, stop, step = [convert_to_bps(it) for it in bitrate_spec]
-        return list(
-            range(start, stop + 1, step)
-        )  # We want to include the last value...
+        return list(range(start, stop, step))
     # parse single elements
     return [convert_to_bps(bitrate)]
 
