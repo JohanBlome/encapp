@@ -144,6 +144,7 @@ class BufferEncoder extends Encoder {
             }
         }
         mStats.start();
+        int failures = 0;
         while (!input_done || !output_done) {
             int index;
             if (mFramesAdded % 100 == 0) {
@@ -162,6 +163,7 @@ class BufferEncoder extends Encoder {
                     input_done = true;
                 }
                 if (index >= 0) {
+                    failures = 0;
                     int size = -1;
                     // get the ByteBuffer where we will write the image to encode
                     ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
@@ -211,6 +213,11 @@ class BufferEncoder extends Encoder {
                     }
                 } else {
                     Log.w(TAG, "dequeueInputBuffer, no index, " + index);
+                    failures += 1;
+                    if (failures >= VIDEO_CODEC_MAX_INPUT_SEC) {
+                        // too many consecutive failures
+                        return "dequeueInputBuffer(): Too many consecutive failures";
+                    }
                 }
             } catch (MediaCodec.CodecException ex) {
                 Log.e(TAG, "dequeueInputBuffer: MediaCodec.CodecException error");
