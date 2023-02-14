@@ -8,6 +8,7 @@ import typing
 
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
+USE_IDB = False
 
 
 def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
