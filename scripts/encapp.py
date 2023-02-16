@@ -191,8 +191,6 @@ def wait_for_exit(serial, debug=0):
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
     if debug > 0:
         print(f"running test: {protobuf_txt_filepath}")
-    # clean the logcat first
-    encapp_tool.adb_cmds.reset_logcat(serial)
     if encapp_tool.adb_cmds.USE_IDB:
         # remove log file first
         ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
@@ -655,7 +653,10 @@ def update_media(test, options):
         if output["pix_fmt"] == "rgba":
             extension = "rgba"
         pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
-        pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
+        if pix_fmt_id.isnumeric():
+            pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
+        else:
+            pix_fmt = pix_fmt_id
         output[
             "output_filepath"
         ] = f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
@@ -1013,7 +1014,6 @@ def run_codec_tests(
             encapp_tool.app_utils.force_stop(serial, debug)
 
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
-
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
         if encapp_tool.adb_cmds.USE_IDB:
