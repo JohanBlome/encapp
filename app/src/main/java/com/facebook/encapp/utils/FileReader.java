@@ -109,6 +109,7 @@ public class FileReader {
                 return 0;
             }
         }
+        Log.e(TAG, "fillImage: image { format: " + image.getFormat() + " width: " + image.getWidth() + " height: " + image.getHeight() + " }");
         // make sure we support the pixel (source) and Image (destination) format
         Assert.assertTrue(mPixFmt.getNumber() == PixFmt.yuv420p_VALUE ||
                           mPixFmt.getNumber() == PixFmt.yvu420p_VALUE ||
@@ -153,6 +154,7 @@ public class FileReader {
         }
 
         for (int planeid = 0; planeid < planes.length; ++planeid) {
+            Log.e(TAG, "fillImage: plane[" + planeid + "] { rowStride: " + planes[planeid].getRowStride() + " pixelStride: " + planes[planeid].getPixelStride() + " }");
             ByteBuffer buf = planes[planeid].getBuffer();
             int width = imageWidth;
             int height = imageHeight;
