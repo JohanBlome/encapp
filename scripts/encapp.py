@@ -653,7 +653,7 @@ def update_media(test, options):
         if output["pix_fmt"] == "rgba":
             extension = "rgba"
         pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
-        if pix_fmt_id.isnumeric():
+        if str(pix_fmt_id).isnumeric():
             pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
