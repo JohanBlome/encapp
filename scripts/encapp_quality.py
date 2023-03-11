@@ -215,13 +215,12 @@ def run_quality(test_file, options, debug):
 
         if options.framerate is not None:
             input_framerate = options.framerate
-        elif input_media_format is not None:
-            try:
-                input_framerate = float(input_media_format.get("framerate"))
-            except BaseException:
-                print("Warning. Input framerate is wrong.")
-                print(f'json {input_media_format.get("framerate")}')
-                input_resolution = output_resolution
+        elif (
+            input_media_format is not None
+            and input_media_format.get("framerate") is not None
+        ):
+            # get the input framerate from the MediaFormat
+            input_framerate = float(input_media_format.get("framerate"))
         else:
             input_framerate = output_framerate
         if not os.path.exists(reference_pathname):
