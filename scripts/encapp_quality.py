@@ -568,7 +568,7 @@ def main(argv):
             time_left_m = int(time_left / 60)
             time_left_s = int(time_left) % 60
             print(
-                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s} m:s"
+                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
             )
             current += 1
             if data is not None:
