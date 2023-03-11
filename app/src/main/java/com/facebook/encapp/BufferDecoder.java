@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.util.Locale;
 
 class BufferDecoder extends Encoder {
-
     protected static final String TAG = "encapp.decoder";
 
     MediaExtractor mExtractor;
