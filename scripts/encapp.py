@@ -696,7 +696,13 @@ def update_codec_test(
 
     # 1.1. replace the parameters that do not create multiple tests
     # TODO(chema): there should be an automatic way to do this
-    CONFIGURE_INT_KEYS = ("quality", "complexity", "durationUs", "color_format")
+    CONFIGURE_INT_KEYS = (
+        "quality",
+        "complexity",
+        "durationUs",
+        "color_format",
+        "i_frame_interval",
+    )
     INPUT_INT_KEYS = ("playout_frames", "pursuit")
     CONFIGURE_FLOAT_KEYS = ("framerate", "stoptime_sec")
     INPUT_FLOAT_KEYS = ("framerate", "stoptime_sec")
@@ -838,7 +844,6 @@ def update_codec_test(
         else:
             test.common.id = test.common.id + f"@{framerate_list[0]}"
             test.configure.framerate = float(framerate_list[0])
-
 
     # 1.2. replace the parameters that create multiple tests
     # 1.2.1. process configure.bitrate
