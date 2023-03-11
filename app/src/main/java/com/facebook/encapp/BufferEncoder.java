@@ -26,6 +26,8 @@ import java.util.Locale;
  */
 
 class BufferEncoder extends Encoder {
+    protected static final String TAG = "encapp.buffer_encoder";
+
     public BufferEncoder(Test test) {
         super(test);
         mStats = new Statistics("raw encoder", mTest);

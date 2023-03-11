@@ -34,7 +34,8 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
-    private final String TAG = "encapp.surfacenoencoder";
+    private final String TAG = "encapp.surface_noencoder";
+
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     DecoderRuntime mDecoderRuntimeParams;
