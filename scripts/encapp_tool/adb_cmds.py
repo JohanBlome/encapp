@@ -354,10 +354,6 @@ def parse_getprop(stdout: str) -> dict:
         if match:
             props_dict["ro.product.model"] = match.group(1)
 
-        match = re.search(r"'CPUArchitecture': '([\w\d\s]*)'", stdout)
-        if match:
-            props_dict["CPUArchitecture"] = match.group(1)
-
         match = re.search(r"'ProductVersion': '([\w\d\s]*)'", stdout)
         if match:
             props_dict["ProductVersion"] = match.group(1)
