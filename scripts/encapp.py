@@ -664,8 +664,8 @@ def update_media(test, options):
         replace["output"] = output
 
         d = process_input_path(test.input.filepath, replace)
-        # now both config and input should be the same i.e. matchign config
-        print(f"INPUT {input}, OUTPUT {output} red:{d}")
+        # now both config and input should be the same i.e. matching config
+        print(f"{input = } {output = } {d = }")
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
         test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
