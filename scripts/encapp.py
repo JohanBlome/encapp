@@ -631,9 +631,19 @@ def update_media(test, options):
         out_rate = in_rate
 
     if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (
-        in_res != out_res or in_rate != out_rate or in_pix_fmt != out_pix_fmt
+        in_res != out_res
+        or in_rate != out_rate
+        or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
     ):
-        print(f"Transcode raw input: {test.input.filepath}")
+        reason = ""
+        if in_res != out_res:
+            reason = f" res ({in_res} != {out_res})"
+        if in_rate != out_rate:
+            reason = f" rate ({in_rate} != {out_rate})"
+        if in_pix_fmt != out_pix_fmt:
+            reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
+        reason = reason.strip()
+        print(f"Transcode raw input: {test.input.filepath} {reason = }")
         replace = {}
         input = {}
         output = {}
