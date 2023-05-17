@@ -15,3 +15,13 @@ test:
 
 verify: /tmp/akiyo_qcif.y4m
 	./scripts/encapp_verify.py -i /tmp/akiyo_qcif.y4m -ddd
+
+
+build:
+	./gradlew build
+
+install:
+	./gradlew installDebug
+
+clean:
+	./gradlew clean
