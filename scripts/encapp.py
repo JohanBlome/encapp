@@ -535,19 +535,23 @@ def run_codec_tests_file(
         if debug > 0:
             print(f"add {protobuf_txt_filepath}")
         files_to_push |= {protobuf_txt_filepath}
-    return run_codec_tests(
-        test_suite,
-        files_to_push,
-        model,
-        serial,
-        options.mediastore,
-        local_workdir,
-        options.device_workdir,
-        options.ignore_results,
-        options.fast_copy,
-        options.split,
-        debug,
-    )
+        if options.dry_run:
+            # Do nothing here
+            return None, None
+        else:
+            return run_codec_tests(
+                test_suite,
+                files_to_push,
+                model,
+                serial,
+                options.mediastore,
+                local_workdir,
+                options.device_workdir,
+                options.ignore_results,
+                options.fast_copy,
+                options.split,
+                debug,
+            )
 
 
 def abort_test(local_workdir, message):
@@ -1417,6 +1421,13 @@ def get_options(argv):
         default=default_values["mediastore"],
         metavar="mediastore",
         help="store all input and generated file in one folder",
+    )
+    parser.add_argument(
+        "--dry_run",
+        action="store_true",
+        dest="idb",
+        default=False,
+        help="Do not execute the tests. Just prepare the test(s).",
     )
 
     options = parser.parse_args(argv[1:])
