@@ -99,7 +99,8 @@ def run_quality(test_file, options, debug):
         # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv
         # only for raw, obviously
         split = reference_pathname.split(".yuv_")
-        reference_pathname = split[0] + ".yuv"
+        split = split[0].rsplit("/")
+        reference_pathname = reference_dirname  + split[-1] + ".yuv"
     print(f'ref = "{reference_pathname}"\n')
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
@@ -134,6 +135,7 @@ def run_quality(test_file, options, debug):
         input_media_format = results.get("decoder_media_format")
         raw = True
 
+        print(f"test def: {test}")
         pix_fmt = test["input"]["pixFmt"]
         if options.pix_fmt is not None:
             pix_fmt = options.pix_fmt
@@ -210,8 +212,8 @@ def run_quality(test_file, options, debug):
                 input_resolution = output_resolution
             else:
                 input_resolution = f"{input_width}x{input_height}"
-        # else:
-        #     input_res = output_resolution
+        else:
+             input_resolution = output_resolution
 
         if options.framerate is not None:
             input_framerate = options.framerate
@@ -334,8 +336,9 @@ def run_quality(test_file, options, debug):
         if not framerate:
             framerate = test.get("input").get("framerate")
         # derive the calculated_bitrate from the actual file size
+        framecount = len(results.get("frames"))
         calculated_bitrate = int(
-            (file_size * 8 * framerate) / results.get("framecount")
+            (file_size * 8 * framerate) / framecount
         )
         source_complexity = ""
         source_motion = ""
