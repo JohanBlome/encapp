@@ -69,6 +69,9 @@ def indexDirectory(options, recursive):
 
     key_list = []
     for filename in files:
+        model = ""
+        platform = ""
+        serial = ""
         try:
             # get device data
             device_filename = os.path.join(os.path.dirname(filename), "device.json")
@@ -77,6 +80,10 @@ def indexDirectory(options, recursive):
             model = device_info.get("props", {}).get("ro.product.model", "")
             platform = device_info.get("props", {}).get("ro.board.platform", "")
             serial = device_info.get("props", {}).get("ro.serialno", "")
+        except Exception as exc:
+            print("json " + filename + ", load failed: " + str(exc))
+        try:
+
             # get experiment data
             with open(filename) as f:
                 data = json.load(f)
@@ -234,20 +241,7 @@ def main():
         ]
     )
     if options.print_data:
-        for _index, row in data.iterrows():
-            print(
-                "{:s},{:s},{:s},{:d},{:d},{:d},{:d},{:d},{:d}".format(
-                    row["filename"],
-                    row["encodedfile"],
-                    row["configure.codec"],
-                    row["configure.iFrameInterval"],
-                    row["framerate"],
-                    row["width"],
-                    row["height"],
-                    row["configure.bitrate"],
-                    row["meanbitrate"],
-                )
-            )
+        print(data[["filename", "encodedfile", "configure.codec", "configure.iFrameInterval", "framerate", "height", "configure.bitrate","meanbitrate"]])
     else:
         files = data["filename"].values
         for fl in files:
