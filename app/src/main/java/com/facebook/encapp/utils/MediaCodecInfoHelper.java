@@ -575,6 +575,7 @@ public class MediaCodecInfoHelper {
                     MediaCodec.ParameterDescriptor descr = codec.getParameterDescriptor(param);
                     str.append(tab + String.format("%2d", counter++) + ". " + param + " [" + mediaFormatTypeToString(descr.getType()) +"] \n");
                 }
+                codec.release();
             } catch (IOException iox) {
             }
         }
