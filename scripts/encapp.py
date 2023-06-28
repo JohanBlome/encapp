@@ -1425,7 +1425,7 @@ def get_options(argv):
     parser.add_argument(
         "--dry_run",
         action="store_true",
-        dest="idb",
+        dest="dry_run",
         default=False,
         help="Do not execute the tests. Just prepare the test(s).",
     )
