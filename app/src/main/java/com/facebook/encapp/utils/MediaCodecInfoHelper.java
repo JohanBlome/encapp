@@ -1,10 +1,13 @@
 package com.facebook.encapp.utils;
 
 import android.graphics.ImageFormat;
+import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
+import android.util.Log;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.HashMap;
@@ -465,26 +468,8 @@ public class MediaCodecInfoHelper {
             Set<String> keys = mediaFormat.getKeys();
             for (String key : keys) {
                 int type = mediaFormat.getValueTypeForKey(key);
-                switch (type) {
-                    case MediaFormat.TYPE_BYTE_BUFFER:
-                        str.append("  " + key + ": [bytebuffer] " + mediaFormat.getByteBuffer(key) + "\n");
-                        break;
-                    case MediaFormat.TYPE_FLOAT:
-                        str.append("  " + key + ": [float] " + mediaFormat.getFloat(key) + "\n");
-                        break;
-                    case MediaFormat.TYPE_INTEGER:
-                        str.append("  " + key + ": [integer] " + mediaFormat.getInteger(key) + "\n");
-                        break;
-                    case MediaFormat.TYPE_LONG:
-                        str.append("  " + key + ": [long] " + mediaFormat.getLong(key) + "\n");
-                        break;
-                    case MediaFormat.TYPE_NULL:
-                        str.append("  " + key + ": [null]\n");
-                        break;
-                    case MediaFormat.TYPE_STRING:
-                        str.append("  " + key + ": [string] " + mediaFormat.getString(key) + "\n");
-                        break;
-                }
+                String sType = mediaFormatTypeToString(type);
+                str.append("  " + key + ": [ " + sType + "] " + mediaFormat.getString(key) + "\n");
 
             }
         } else {
@@ -536,6 +521,24 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+    private static String mediaFormatTypeToString(int type) {
+        switch (type) {
+            case MediaFormat.TYPE_BYTE_BUFFER:
+                return "bytebuffer";
+            case MediaFormat.TYPE_FLOAT:
+                return "float";
+            case MediaFormat.TYPE_INTEGER:
+                return "integer";
+            case MediaFormat.TYPE_LONG:
+                return "long";
+            case MediaFormat.TYPE_NULL:
+                return "null";
+            case MediaFormat.TYPE_STRING:
+                return "string";
+        }
+        return "";
+    }
+
 
     public static String toText(MediaCodecInfo media_codec_info, int indent) {
         String tab = getIndentation(indent);
@@ -561,7 +564,22 @@ public class MediaCodecInfoHelper {
         for (String media_type : media_types) {
             str.append(codecCapabilitiesToText(media_codec_info, media_type, indent));
         }
+        if (Build.VERSION.SDK_INT >= 31) {
+
+            try {
+                MediaCodec codec = MediaCodec.createByCodecName(media_codec_info.getName());
+                List<String> params = codec.getSupportedVendorParameters();
+                str.append(tab + "Vendor Paramaters: " + params.size() + "\n");
+                int counter = 1;
+                for (String param: params) {
+                    MediaCodec.ParameterDescriptor descr = codec.getParameterDescriptor(param);
+                    str.append(tab + String.format("%2d", counter++) + ". " + param + " [" + mediaFormatTypeToString(descr.getType()) +"] \n");
+                }
+            } catch (IOException iox) {
+            }
+        }
         indent -= 1;
+
         tab = getIndentation(indent);
         str.append(tab + "}\n");
         return str.toString();
