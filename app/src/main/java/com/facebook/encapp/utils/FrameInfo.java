@@ -1,5 +1,8 @@
 package com.facebook.encapp.utils;
 import android.os.SystemClock;
+
+import java.util.Dictionary;
+
 public class FrameInfo {
     long mPts;
     long mSize;
@@ -9,6 +12,8 @@ public class FrameInfo {
     boolean mIsIframe;
     int mFlags;
     int mOriginalFrame;
+
+    Dictionary<String, Object> mInfo;
 
     public FrameInfo(long pts) {
         mPts = pts;
@@ -66,5 +71,11 @@ public class FrameInfo {
     public long getStartTime() { return mStartTime;}
     public long getStopTime() { return mStopTime;}
 
+    public Dictionary getInfo() {
+        return mInfo;
+    }
+    public void addInfo(Dictionary<String, Object> info) {
+        mInfo = info;
+    }
 
 }

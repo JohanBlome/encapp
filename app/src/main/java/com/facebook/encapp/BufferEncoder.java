@@ -1,5 +1,7 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
+
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -11,14 +13,17 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
-import com.facebook.encapp.utils.OutputMultiplier;
+import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.Locale;
+import java.util.Set;
 
 
 /**
@@ -55,8 +60,6 @@ class BufferEncoder extends Encoder {
         // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
                 sourceResolution.getHeight() * 1.5);
-
-        mRealtime = mTest.getInput().getRealtime();
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
@@ -147,6 +150,8 @@ class BufferEncoder extends Encoder {
         }
         mStats.start();
         int failures = 0;
+        MediaFormat currentOutputFormat = mCodec.getOutputFormat();
+        Dictionary<String, Object> latestFrameChanges = null;
         while (!input_done || !output_done) {
             int index;
             if (mFramesAdded % 100 == 0) {
@@ -163,6 +168,9 @@ class BufferEncoder extends Encoder {
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     input_done = true;
+                }
+                if (mRealtime) {
+                    sleepUntilNextFrame();
                 }
                 if (index >= 0) {
                     failures = 0;
@@ -232,46 +240,64 @@ class BufferEncoder extends Encoder {
             }
 
             // 2. process the encoder output
-            try {
-                index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
-
-                if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    // check if the input is already done
-                    if (input_done) {
-                        output_done = true;
-                    }
-                    // otherwise ignore
-                } else if (index >= 0) {
-                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                        MediaFormat oformat = mCodec.getOutputFormat();
-
-                        if (mWriteFile) {
-                            mVideoTrack = mMuxer.addTrack(oformat);
-                            mMuxer.start();
+            index = 1;
+            while (index != MediaCodec.INFO_TRY_AGAIN_LATER) {
+                try {
+                    index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                    if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                        // check if the input is already done
+                        if (input_done) {
+                            output_done = true;
                         }
-                        mCodec.releaseOutputBuffer(index, false /* render */);
-                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        output_done = true;
-                    } else {
-                        mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                                (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                        ++mOutFramesCount;
-                        if (mMuxer != null && mVideoTrack != -1) {
-                            ByteBuffer data = mCodec.getOutputBuffer(index);
-                            mMuxer.writeSampleData(mVideoTrack, data, info);
+                        // otherwise ignore
+                    } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        if (Build.VERSION.SDK_INT >= 29) {
+                            latestFrameChanges = new Hashtable<>();
+                            MediaFormat oformat = mCodec.getOutputFormat();
+                            Set<String> keys = oformat.getKeys();
+                            for (String key : keys) {
+                                Object value = getMediaFormatValueFromKey(oformat, key);
+                                Object old = getMediaFormatValueFromKey(currentOutputFormat, key);
+                                if (!value.equals(old)) {
+                                    latestFrameChanges.put(key, value);
+                                }
+                            }
+                            currentOutputFormat = oformat;
                         }
-                        mCodec.releaseOutputBuffer(index, false /* render */);
-                        mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
+                    } else if (index >= 0) {
+                        if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                            MediaFormat oformat = mCodec.getOutputFormat();
+
+                            if (mWriteFile) {
+                                mVideoTrack = mMuxer.addTrack(oformat);
+                                mMuxer.start();
+                            }
+                            mCodec.releaseOutputBuffer(index, false /* render */);
+                        } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                            output_done = true;
+                        } else {
+                            FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                    (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                            ++mOutFramesCount;
+                            frameInfo.addInfo(latestFrameChanges);
+                            latestFrameChanges = null;
+                            if (mMuxer != null && mVideoTrack != -1) {
+                                ByteBuffer data = mCodec.getOutputBuffer(index);
+                                mMuxer.writeSampleData(mVideoTrack, data, info);
+                            }
+                            mCodec.releaseOutputBuffer(index, false /* render */);
+                            mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
+                        }
                     }
+                } catch (MediaCodec.CodecException ex) {
+                    Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
+                    ex.printStackTrace();
+                    return "dequeueOutputBuffer: MediaCodec.CodecException error";
+                } catch (IllegalStateException ex) {
+                    Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
+                    ex.printStackTrace();
+                    return "dequeueOutputBuffer: IllegalStateException error";
                 }
-            } catch (MediaCodec.CodecException ex) {
-                Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
-                ex.printStackTrace();
-                return "dequeueOutputBuffer: MediaCodec.CodecException error";
-            } catch (IllegalStateException ex) {
-                Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
-                ex.printStackTrace();
-                return "dequeueOutputBuffer: IllegalStateException error";
             }
         }
         mStats.stop();

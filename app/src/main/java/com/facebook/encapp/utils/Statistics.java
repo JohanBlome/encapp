@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.Dictionary;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -170,7 +172,7 @@ public class Statistics {
         mEncodingProcessingFrames += 1;
     }
 
-    public void stopEncodingFrame(long pts, long size, boolean isIFrame) {
+    public FrameInfo stopEncodingFrame(long pts, long size, boolean isIFrame) {
         FrameInfo frame = getClosestMatch(pts);
         if (frame != null) {
             frame.stop();
@@ -180,6 +182,7 @@ public class Statistics {
             Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
         mEncodingProcessingFrames -= 1;
+        return frame;
     }
 
     private FrameInfo getClosestMatch(long pts) {
@@ -427,6 +430,14 @@ public class Statistics {
                 }
                 obj.put("starttime", info.getStartTime());
                 obj.put("stoptime", info.getStopTime());
+                Dictionary<String, Object> dict = info.getInfo();
+                if (dict != null) {
+                    Enumeration<String> keys = dict.keys();
+                    while (keys.hasMoreElements()) {
+                        String key = keys.nextElement();
+                        obj.put(key, dict.get(key).toString());
+                    }
+                }
                 jsonArray.put(obj);
             }
             json.put("frames", jsonArray);
@@ -451,6 +462,12 @@ public class Statistics {
                         obj.put("proctime", info.getProcessingTime());
                         obj.put("starttime", info.getStartTime());
                         obj.put("stoptime", info.getStopTime());
+                        Dictionary<String, Object> dict = info.getInfo();
+                        Enumeration<String> keys = dict.keys();
+                        while(keys.hasMoreElements()) {
+                            String key = keys.nextElement();
+                            obj.put(key, dict.get(key).toString());
+                        }
                         jsonArray.put(obj);
                     }
                 }

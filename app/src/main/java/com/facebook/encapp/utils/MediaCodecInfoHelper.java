@@ -558,6 +558,28 @@ public class MediaCodecInfoHelper {
         }
     }
 
+    public static Object getMediaFormatValueFromKey(MediaFormat format, String key) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            int type = format.getValueTypeForKey(key);
+            switch (type) {
+                case MediaFormat.TYPE_BYTE_BUFFER:
+                    return format.getByteBuffer(key);
+                case MediaFormat.TYPE_FLOAT:
+                    return format.getFloat(key, -1);
+                case MediaFormat.TYPE_INTEGER:
+                    return format.getInteger(key, -1);
+                case MediaFormat.TYPE_LONG:
+                    return format.getLong(key, -1);
+                case MediaFormat.TYPE_NULL:
+                    return null; //???
+                case MediaFormat.TYPE_STRING:
+                    return format.getString(key, "");
+                default:
+            }
+        }
+        return null;
+    }
+
 
     public static String toText(MediaCodecInfo media_codec_info, int indent) {
         String tab = getIndentation(indent);
