@@ -2,13 +2,12 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.google.protobuf'
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion '29.0.2'
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "com.facebook.encapp"
         minSdkVersion 27
-        targetSdkVersion 30
+        targetSdkVersion 31
         versionCode 1
         versionName "1.12"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)

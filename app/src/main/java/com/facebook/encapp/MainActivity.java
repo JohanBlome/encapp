@@ -53,7 +53,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
-
+import android.media.MediaCodec;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
