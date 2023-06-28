@@ -19,7 +19,7 @@ import com.facebook.encapp.proto.Input.PixFmt;
 
 public class MediaCodecInfoHelper {
     final static int mIndentWidth = 2;
-
+    protected final String TAG = "MediaCodecInfoHelper";
     public static String getIndentation(int indent) {
         String tab = "";
         if (indent > 0){
@@ -468,8 +468,26 @@ public class MediaCodecInfoHelper {
             Set<String> keys = mediaFormat.getKeys();
             for (String key : keys) {
                 int type = mediaFormat.getValueTypeForKey(key);
-                String sType = mediaFormatTypeToString(type);
-                str.append("  " + key + ": [ " + sType + "] " + mediaFormat.getString(key) + "\n");
+                switch (type) {
+                    case MediaFormat.TYPE_BYTE_BUFFER:
+                        str.append("  " + key + ": [bytebuffer] " + mediaFormat.getByteBuffer(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_FLOAT:
+                        str.append("  " + key + ": [float] " + mediaFormat.getFloat(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_INTEGER:
+                        str.append("  " + key + ": [integer] " + mediaFormat.getInteger(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_LONG:
+                        str.append("  " + key + ": [long] " + mediaFormat.getLong(key) + "\n");
+                        break;
+                    case MediaFormat.TYPE_NULL:
+                        str.append("  " + key + ": [null]\n");
+                        break;
+                    case MediaFormat.TYPE_STRING:
+                        str.append("  " + key + ": [string] " + mediaFormat.getString(key) + "\n");
+                        break;
+                }
 
             }
         } else {
@@ -535,8 +553,9 @@ public class MediaCodecInfoHelper {
                 return "null";
             case MediaFormat.TYPE_STRING:
                 return "string";
+            default:
+                return "Unknown: " + type;
         }
-        return "";
     }
 
 
