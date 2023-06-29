@@ -1,5 +1,7 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
+
 import android.graphics.ImageFormat;
 import android.media.Image;
 import android.media.MediaCodec;
@@ -23,6 +25,7 @@ import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
+import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -30,6 +33,8 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -66,7 +71,6 @@ public abstract class Encoder {
     protected int mVideoTrack = -1;
     long mPts = 132;
     boolean mRealtime = false;
-
 
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
@@ -466,6 +470,8 @@ public abstract class Encoder {
 
         @Override
         public void run() {
+            MediaFormat currentOutputFormat = null;
+            Dictionary<String, Object> latestFrameChanges;
             while (!mDone) {
                 while (mEncodeBuffers.size() > 0) {
                     FrameBuffer frameBuffer = mEncodeBuffers.poll();
@@ -484,6 +490,9 @@ public abstract class Encoder {
                             mMuxer.start();
                         }
                         mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                        if (currentOutputFormat == null) {
+                           currentOutputFormat =  mCodec.getOutputFormat();
+                        }
                     } else {
                         if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                             Log.d(TAG, "End of stream: ");
@@ -496,9 +505,23 @@ public abstract class Encoder {
                                 continue;
                             }
                             try {
-                                mStats.stopEncodingFrame(timestampUsec, frameBuffer.mInfo.size,
+                                FrameInfo info =  mStats.stopEncodingFrame(timestampUsec, frameBuffer.mInfo.size,
                                         (frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                                 ++mOutFramesCount;
+                                if (Build.VERSION.SDK_INT >= 29) {
+                                    latestFrameChanges = new Hashtable<>();
+                                    MediaFormat oformat = mCodec.getOutputFormat();
+                                    Set<String> keys = oformat.getKeys();
+                                    for (String key : keys) {
+                                        Object value = getMediaFormatValueFromKey(oformat, key);
+                                        Object old = getMediaFormatValueFromKey(currentOutputFormat, key);
+                                        if (!value.equals(old)) {
+                                            latestFrameChanges.put(key, value);
+                                        }
+                                    }
+                                    currentOutputFormat = oformat;
+                                    info.addInfo(latestFrameChanges);
+                                }
                                 if (mMuxer != null && mVideoTrack != -1) {
                                     ByteBuffer data = mCodec.getOutputBuffer(frameBuffer.mBufferId);
                                     mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
@@ -555,9 +578,6 @@ public abstract class Encoder {
 
         @Override
         public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
-            MediaFormat oformat = codec.getOutputFormat();
-            Log.d(TAG, "Encoder output format changed to:");
-            Encoder.logMediaFormat(oformat);
         }
     }
 
