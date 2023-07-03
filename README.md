@@ -28,6 +28,7 @@ For running encapp:
 
 List of required python packages:
 * humanfriendly
+* `argparse_formatter`
 * numpy
 * pandas
 * seaborn
