@@ -163,7 +163,8 @@ class BufferEncoder extends Encoder {
             }
             // 1. process the encoder input
             try {
-                index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
+                index = mCodec.dequeueInputBuffer(timeoutUs);
                 int flags = 0;
 
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
@@ -244,7 +245,8 @@ class BufferEncoder extends Encoder {
             index = 1;
             while (index != MediaCodec.INFO_TRY_AGAIN_LATER) {
                 try {
-                    index = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US /* timeoutUs */);
+                    long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
+                    index = mCodec.dequeueOutputBuffer(info, timeoutUs);
                     if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                         // check if the input is already done
                         if (input_done) {
