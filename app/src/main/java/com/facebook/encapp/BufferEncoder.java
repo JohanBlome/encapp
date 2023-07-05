@@ -1,6 +1,7 @@
 package com.facebook.encapp;
 
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -252,16 +253,8 @@ class BufferEncoder extends Encoder {
                         // otherwise ignore
                     } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                         if (Build.VERSION.SDK_INT >= 29) {
-                            latestFrameChanges = new Hashtable<>();
                             MediaFormat oformat = mCodec.getOutputFormat();
-                            Set<String> keys = oformat.getKeys();
-                            for (String key : keys) {
-                                Object value = getMediaFormatValueFromKey(oformat, key);
-                                Object old = getMediaFormatValueFromKey(currentOutputFormat, key);
-                                if (!value.equals(old)) {
-                                    latestFrameChanges.put(key, value);
-                                }
-                            }
+                            latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
                             currentOutputFormat = oformat;
                         }
                     } else if (index >= 0) {

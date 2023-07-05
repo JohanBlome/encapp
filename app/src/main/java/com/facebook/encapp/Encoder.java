@@ -1,6 +1,7 @@
 package com.facebook.encapp;
 
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
 import android.graphics.ImageFormat;
 import android.media.Image;
@@ -509,16 +510,8 @@ public abstract class Encoder {
                                         (frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
                                 ++mOutFramesCount;
                                 if (Build.VERSION.SDK_INT >= 29) {
-                                    latestFrameChanges = new Hashtable<>();
                                     MediaFormat oformat = mCodec.getOutputFormat();
-                                    Set<String> keys = oformat.getKeys();
-                                    for (String key : keys) {
-                                        Object value = getMediaFormatValueFromKey(oformat, key);
-                                        Object old = getMediaFormatValueFromKey(currentOutputFormat, key);
-                                        if (!value.equals(old)) {
-                                            latestFrameChanges.put(key, value);
-                                        }
-                                    }
+                                    latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
                                     currentOutputFormat = oformat;
                                     info.addInfo(latestFrameChanges);
                                 }
@@ -601,9 +594,6 @@ public abstract class Encoder {
 
         @Override
         public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
-            MediaFormat oformat = codec.getOutputFormat();
-            Log.d(TAG, "Decoder output format changed to: ");
-            Encoder.logMediaFormat(oformat);
         }
     }
 }

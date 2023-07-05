@@ -1,5 +1,7 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
+
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -12,6 +14,7 @@ import android.util.Size;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -22,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Dictionary;
 import java.util.Locale;
 
 class BufferDecoder extends Encoder {
@@ -202,6 +206,8 @@ class BufferDecoder extends Encoder {
         boolean outputDone = false;
         boolean inputDone = false;
         int currentLoop = 1;
+        MediaFormat currentOutputFormat = mDecoder.getOutputFormat();
+        Dictionary<String, Object> latestFrameChanges = null;
         mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
         while (!outputDone) {
             int index;
@@ -271,24 +277,32 @@ class BufferDecoder extends Encoder {
                 if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     // no output available yet
                 } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        MediaFormat oformat = mDecoder.getOutputFormat();
+                        latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
+                        currentOutputFormat = oformat;
+                    }
+                } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     MediaFormat newFormat = mDecoder.getOutputFormat();
-                    Log.d(TAG, "decoder output format changed: " + newFormat);
                 } else if(index >= 0) {
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         outputDone = true;
                     }
 
                     ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
-                    if(outputBuf.limit() != 0) {
-                        mStats.stopDecodingFrame(info.presentationTimeUs);
-                    }
-                    outputBuf.position(info.offset);
-                    outputBuf.limit(info.offset + info.size);
-                    outputBuf.get(outData);
+                    int limit = outputBuf.limit();
+                    if(limit != 0) {
+                        FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
+                        frameInfo.addInfo(latestFrameChanges);
+                        latestFrameChanges = null;
 
-                    if (mDecodeDump) {
-                        if (file.exists()) {
-                            fo.write(outData);
+                        outputBuf.position(info.offset);
+                        outputBuf.limit(info.offset + info.size);
+                        outputBuf.get(outData);
+                        if (mDecodeDump) {
+                            if (file.exists()) {
+                                fo.write(outData);
+                            }
                         }
                     }
 

@@ -1,5 +1,8 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
+
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -19,7 +22,9 @@ import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -29,8 +34,11 @@ import com.facebook.encapp.utils.VsyncListener;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
@@ -307,9 +315,9 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     public void setDecoderConfigureParams(Test mTest, MediaFormat format) {
         DecoderConfigure config = mTest.getDecoderConfigure();
 
-
-        List<Configure.Parameter> params = mTest.getConfigure().getParameterList();
-        for (Configure.Parameter param : params) {
+        List<DecoderConfigure.Parameter> params = config.getParameterList();
+        Log.d(TAG, "Set decoder config: " + params);
+        for (DecoderConfigure.Parameter param : params) {
             switch (param.getType().getNumber()) {
                 case DataValueType.intType_VALUE:
                     format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
@@ -369,6 +377,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
     long mFirstFrameSystemTimeNsec = 0;
     long mDropcount = 0;
+    MediaFormat currentMediaFormat;
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
         if (encoder) {
             codec.releaseOutputBuffer(index, true);
@@ -381,7 +390,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
                 }
                 // Buffer will be released when drawn
-                mStats.stopDecodingFrame(timestamp);
+                MediaFormat newFormat = codec.getOutputFormat();
+                Dictionary<String, Object> mediaFormatInfo = mediaFormatComparison(currentMediaFormat, newFormat);
+                FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
+                frameInfo.addInfo(mediaFormatInfo);
+                currentMediaFormat = newFormat;
                 mInFramesCount++;
                 long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
                 if (!mNoEncoding) {
@@ -468,6 +481,8 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
         @Override
         public void run() {
+            MediaFormat currentOutputFormat = mCodec.getInputFormat();
+            Dictionary<String, Object> latestFrameChanges;
             Log.d(TAG, "Start Source reader.");
             while (!mDone) {
                 while (mDecoderBuffers.size() > 0 && !mDone) {
@@ -557,6 +572,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             }
         }
     }
+
 
     public  long sleepUntilNextFrameSynched() {
         if (mFirstSynchNs == -1) {

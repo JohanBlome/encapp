@@ -9,6 +9,8 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
@@ -557,6 +559,28 @@ public class MediaCodecInfoHelper {
                 return "Unknown: " + type;
         }
     }
+
+
+    public static Dictionary<String, Object> mediaFormatComparison(MediaFormat current, MediaFormat newformat) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            Dictionary<String, Object> formatChanges = new Hashtable<>();
+            Set<String> keys = newformat.getKeys();
+            for (String key : keys) {
+                Object value = getMediaFormatValueFromKey(newformat, key);
+                if ( current == null) {
+                    formatChanges.put(key, value);
+                } else {
+                    Object old = getMediaFormatValueFromKey(current, key);
+                    if (!value.equals(old)) {
+                        formatChanges.put(key, value);
+                    }
+                }
+            }
+            return formatChanges;
+        }
+        return new Hashtable<>();
+    }
+
 
     public static Object getMediaFormatValueFromKey(MediaFormat format, String key) {
         if (Build.VERSION.SDK_INT >= 29) {

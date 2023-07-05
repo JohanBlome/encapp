@@ -212,11 +212,13 @@ public class Statistics {
         mDecodingFrames.put(Long.valueOf(pts), frame);
     }
 
-    public void stopDecodingFrame(long pts) {
+    public FrameInfo stopDecodingFrame(long pts) {
         FrameInfo frame = mDecodingFrames.get(Long.valueOf(pts));
         if (frame != null) {
             frame.stop();
         }
+
+        return frame;
     }
 
     public long getProcessingTime() {
@@ -414,9 +416,9 @@ public class Statistics {
             JSONArray jsonArray = new JSONArray();
 
             JSONObject obj = null;
-            for (FrameInfo info : allFrames) {
+            ArrayList<FrameInfo> frameCopy = (ArrayList<FrameInfo>) allFrames.clone();
+            for (FrameInfo info : frameCopy) {
                 obj = new JSONObject();
-
                 obj.put("frame", counter++);
                 obj.put("original_frame", info.getOriginalFrame());
                 obj.put("iframe", (info.isIFrame()) ? 1 : 0);
@@ -463,17 +465,17 @@ public class Statistics {
                         obj.put("starttime", info.getStartTime());
                         obj.put("stoptime", info.getStopTime());
                         Dictionary<String, Object> dict = info.getInfo();
-                        Enumeration<String> keys = dict.keys();
-                        while(keys.hasMoreElements()) {
-                            String key = keys.nextElement();
-                            obj.put(key, dict.get(key).toString());
+                        if (dict != null) {
+                            Enumeration<String> keys = dict.keys();
+                            while (keys.hasMoreElements()) {
+                                String key = keys.nextElement();
+                                obj.put(key, dict.get(key).toString());
+                            }
+                            jsonArray.put(obj);
                         }
-                        jsonArray.put(obj);
                     }
                 }
                 json.put("decoded_frames", jsonArray);
-
-
             }
 
             // GPU info
@@ -513,7 +515,6 @@ public class Statistics {
             }
             gpuData.put("gpu_clock_freq", jsonArray);
             json.put("gpu_data", gpuData);
-
             writer.write(json.toString(2));
         } catch (JSONException e) {
             Log.e(TAG, "Failed writing stats");
