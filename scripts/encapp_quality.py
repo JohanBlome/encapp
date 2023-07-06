@@ -123,6 +123,7 @@ def run_quality(test_file, options, debug):
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
 
+    video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
     test = results.get("test")
     if (
         os.path.exists(vmaf_file)
@@ -180,8 +181,6 @@ def run_quality(test_file, options, debug):
             print(f"outputres: {res}\noutput_framerate: {output_framerate}")
 
         output_resolution = f"{output_width}x{output_height}"
-        print(f"Try to get info from {encodedfile}")
-        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
         media_res = f'{video_info["width"]}x{video_info["height"]}'
         # Although we assume that the distorted file is starting at the beginning
         # at least we limit the length to the duration of it.
@@ -332,6 +331,9 @@ def run_quality(test_file, options, debug):
         resolution = test.get("configure").get("resolution")
         if not resolution:
             resolution = test.get("input").get("resolution")
+        if not resolution:
+            # get res from file
+            resolution= f'{video_info["width"]}x{video_info["height"]}'
         framerate = test.get("configure").get("framerate")
         if not framerate:
             framerate = test.get("input").get("framerate")
