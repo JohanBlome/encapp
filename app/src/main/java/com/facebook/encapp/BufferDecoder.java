@@ -100,6 +100,7 @@ class BufferDecoder extends Encoder {
             Log.d(TAG, "MediaFormat (test)");
             logMediaFormat(inputFormat);
 
+            TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
             Log.d(TAG, "Configure: " + mDecoder.getName());
             mDecoder.configure(inputFormat, null, null, 0);
             Log.d(TAG, "MediaFormat (post-test)");

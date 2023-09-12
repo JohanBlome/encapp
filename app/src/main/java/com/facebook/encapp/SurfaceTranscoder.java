@@ -228,7 +228,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             }
 
             Log.d(TAG, "Check input format before config decoder");
-            setDecoderConfigureParams(mTest, inputFormat);
+            TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
             mDecoder.setCallback(new DecoderCallbackHandler());
             mSurface = mOutputMult.getInputSurface();
             if (mSurface == null) {
@@ -312,22 +312,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     }
 
 
-    public void setDecoderConfigureParams(Test mTest, MediaFormat format) {
-        DecoderConfigure config = mTest.getDecoderConfigure();
-
-        List<DecoderConfigure.Parameter> params = config.getParameterList();
-        Log.d(TAG, "Set decoder config: " + params);
-        for (DecoderConfigure.Parameter param : params) {
-            switch (param.getType().getNumber()) {
-                case DataValueType.intType_VALUE:
-                    format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
-                    break;
-                case DataValueType.stringType_VALUE:
-                    format.setString(param.getKey(), param.getValue());
-                    break;
-            }
-        }
-    }
 
     public void setDecoderRuntimeParameters(Test mTest, int frame) {
         // go through all runtime settings and see which are due

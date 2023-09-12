@@ -7,10 +7,13 @@ import android.util.Size;
 
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
+import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.Input;
 import com.facebook.encapp.proto.Input.PixFmt;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
+
+import java.util.List;
 
 
 public class TestDefinitionHelper {
@@ -213,5 +216,23 @@ public class TestDefinitionHelper {
         builder.setConfigure(config);
 
         return builder.build();
+    }
+
+
+    public static void setDecoderConfigureParams(Test mTest, MediaFormat format) {
+        DecoderConfigure config = mTest.getDecoderConfigure();
+
+        List<DecoderConfigure.Parameter> params = config.getParameterList();
+        Log.d(TAG, "Set decoder config: " + params);
+        for (DecoderConfigure.Parameter param : params) {
+            switch (param.getType().getNumber()) {
+                case DataValueType.intType_VALUE:
+                    format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));
+                    break;
+                case DataValueType.stringType_VALUE:
+                    format.setString(param.getKey(), param.getValue());
+                    break;
+            }
+        }
     }
 }

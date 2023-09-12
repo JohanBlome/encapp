@@ -471,8 +471,8 @@ public class Statistics {
                                 String key = keys.nextElement();
                                 obj.put(key, dict.get(key).toString());
                             }
-                            jsonArray.put(obj);
                         }
+                        jsonArray.put(obj);
                     }
                 }
                 json.put("decoded_frames", jsonArray);
