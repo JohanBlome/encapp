@@ -579,6 +579,8 @@ def run_quality(test_file, options, debug):
         iframes_size = 0
         pframes_size = 0
         description = ""
+        bitratemode = ""
+        quality=-1 # CQ is between 0-100
         id = ""
         if test is not None:
             # get resolution and framerate
@@ -600,6 +602,14 @@ def run_quality(test_file, options, debug):
             description = test.get("common").get("description")
             id = test.get("common").get("id")
             filepath = test.get("input").get("filepath")
+            bitratemode = test.get("configure").get("bitrateMode")
+            if bitratemode == "cq":
+                # look for a quality parameter
+                parameters = test.get("configure").get("parameter")
+                for par in parameters:
+                    if par.get("key") == "quality":
+                        quality = int(par.get("value"))
+                        continue
         else:
             framerate = video_info["framerate"]
             resolution= f'{video_info["width"]}x{video_info["height"]}'
@@ -637,20 +647,22 @@ def run_quality(test_file, options, debug):
             f"{model}",
             f"{platform}",
             f"{serial}",
-            f'{codec}', 
-            f'{iframeinterval}',
+            f"{codec}",
+            f"{bitratemode}",
+            f"{quality}",
+            f"{iframeinterval}",
             f"{framerate}",
-            f'{resolution.split("x")[0]}',
-            f'{resolution.split("x")[1]}',
-            f'{encapp.convert_to_bps(bitrate)}', 
-            f'{meanbitrate}',
+            f"{resolution.split('x')[0]}",
+            f"{resolution.split('x')[1]}",
+            f"{encapp.convert_to_bps(bitrate)}",
+            f"{meanbitrate}",
             f"{calculated_bitrate}",
-            f'{framecount}',
+            f"{framecount}",
             f"{file_size}",
             f"{len(iframes)}",
             f"{len(pframes)}",
             f"{iframes_size}",
-            f"{pframes_size}", 
+            f"{pframes_size}",
             f"{vmaf}",
             f"{vmaf_hm}",
             f"{vmaf_min}",
@@ -658,7 +670,7 @@ def run_quality(test_file, options, debug):
             f"{ssim}",
             f"{psnr}",
             f"{test_file}",
-            f'{filepath}', 
+            f"{filepath}",
             source_complexity,
             source_motion,
         )
@@ -812,6 +824,8 @@ def main(argv):
         "platform",
         "serial",
         "codec",
+        "bitrate_mode",
+        "quality", # cq setting
         "gop_sec",
         "framerate_fps",
         "width",
