@@ -627,14 +627,17 @@ def update_media(test, options):
     in_pix_fmt = test.input.pix_fmt
     out_res = test.configure.resolution
     out_rate = test.configure.framerate
-    out_pix_fmt = options.pix_fmt
+    replace = getattr(options, "replace", {})
+    input_repl = replace.get("input", {})
+    out_pix_fmt = input_repl.get("pix_fmt", in_pix_fmt)
 
     if len(out_res) == 0:
         out_res = in_res
     if out_rate == 0:
         out_rate = in_rate
 
-    if encapp_tool.ffutils.video_is_raw(test.input.filepath) and (
+    if (encapp_tool.ffutils.video_is_raw(test.input.filepath) or \
+        encapp_tool.ffutils.video_is_y4m(test.input.filepath)) and (
         in_res != out_res
         or in_rate != out_rate
         or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
@@ -656,12 +659,9 @@ def update_media(test, options):
         input["pix_fmt"] = tests_definitions.Input.PixFmt.Name(in_pix_fmt)
         input["resolution"] = in_res
         input["framerate"] = in_rate
-        if options.pix_fmt is None:
-            output["pix_fmt"] = input["pix_fmt"]
-        else:
-            output["pix_fmt"] = options.pix_fmt
         output["resolution"] = out_res
         output["framerate"] = out_rate
+        output["pix_fmt"] = out_pix_fmt
 
         extension = "raw"
         if output["pix_fmt"] == "rgba":
@@ -679,10 +679,9 @@ def update_media(test, options):
 
         d = process_input_path(test.input.filepath, replace)
         # now both config and input should be the same i.e. matching config
-        print(f"{input = } {output = } {d = }")
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
-        test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+        test.input.pix_fmt = d["pix_fmt"] #???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
         test.input.filepath = d["filepath"]
 
 

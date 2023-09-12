@@ -13,7 +13,7 @@ import argparse
 import re
 import time
 import pandas as pd
-
+import numpy as np
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import encapp
@@ -21,6 +21,216 @@ import encapp
 PSNR_RE = "average:([0-9.]*)"
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
+
+def calc_stats(pdata, options, label, print_text=False):
+    if pdata.empty:
+        print("Failed to read data")
+        return None
+    last_frame_index = np.argmax(pdata["pts"])
+    total_duration = (
+        pdata.iloc[last_frame_index]["pts"]
+        + pdata.iloc[last_frame_index]["duration"]
+    )
+    total_size = np.sum(pdata["size"])
+    frame_count = len(pdata)
+    # Need to check all individual clips and calculate
+    files = pd.unique(pdata["file"])
+    fps = 0
+    for fl in files:
+        fdata = pdata.loc[pdata["file"] == fl]
+        findex = np.argmax(fdata["pts"])
+        fduration = fdata.iloc[findex]["pts"] + fdata.iloc[findex]["duration"]
+        fps += len(fdata) / fduration
+
+    fps = fps / len(files)
+    iframes = pdata.loc[pdata["iframe"] == 1]
+    iframe_cnt = len(iframes)
+    pframes = pdata.loc[pdata["iframe"] != 1]
+    pframe_cnt = len(pframes)
+    iframes = iframes.fillna(0)
+    pframes = pframes.fillna(0)
+
+    imean=0
+    pmean=0
+    imax=imin=pmax=pmin=0
+    if len(iframes["size"]) > 0:
+        imean = np.mean(iframes["size"])
+        imax = np.max(iframes["size"])
+        imin = np.min(iframes["size"])
+    if len(pframes["size"]) > 0:
+        pmean = np.mean(pframes["size"])
+        pmax = np.max(pframes["size"])
+        pmin = np.min(pframes["size"])
+    mean_ratio = imean / pmean
+    size_ratio = np.sum(iframes["size"]) / np.sum(pframes["size"])
+
+
+
+    print(f"ime,imx,imi = {imean}, {imax}, {imin}")
+    print(f"{len(pframes)}")
+    print("*** {:s} stats ***".format(label))
+    print("Frame count: {:f}".format(len(pdata)))
+    print("Duration: {:.3f} secs".format(total_duration))
+    print("Fps: {:.2f} fps".format(fps))
+    print(
+        "Bitrate {:.2f} kbps".format(
+            8 * total_size / (total_duration * 1000)
+        )
+    )
+    print(
+        "Iframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
+            int(imean), int(imax), int(imin)
+        )
+    )
+    print(
+        "Pframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
+            int(pmean), int(pmax), int(pmin)
+        )
+    )
+    print("Iframe count: {:d}".format(iframe_cnt))
+    print("Pframe count: {:d}".format(pframe_cnt))
+    print("mean size iframe/pframe ratio: {:.2f}".format(mean_ratio))
+    print("total size iframe/pframe ratio: {:.2f}".format(size_ratio))
+    print("___")
+    
+    '''
+    elif options.csv and print_text:
+        if options.header:
+            print(
+                "file,frames,duration,fps,ipratio,imean,imax,imin,pmean,pmax,pmin"
+            )
+        print(
+            "{:s},{:d},{:.3f},{:.2f},{:.2f},{:d},{:d},{:d},{:d},{:d},{:d}".format(
+                label,
+                frame_count,
+                total_duration,
+                fps,
+                mean_ratio,
+                int(imean),
+                int(imax),
+                int(imin),
+                int(pmean),
+                int(pmax),
+                int(pmin),
+            )
+        )
+    '''
+    return frame_count, total_duration, fps
+
+
+def detailed_media_info(inputfile, options):
+    # read file
+    data = []
+
+    name = inputfile + ".frames.csv"
+    if not os.path.exists(name):
+        '''
+        media_type=video
+        stream_index=0
+        key_frame=0
+        pts=2884
+        pts_time=0.032044
+        pkt_dts=2884
+        pkt_dts_time=0.032044
+        best_effort_timestamp=2884
+        best_effort_timestamp_time=0.032044
+        pkt_duration=6115
+        pkt_duration_time=0.067944
+        pkt_pos=24546
+        pkt_size=714
+        width=640
+        height=360
+        pix_fmt=yuv420p
+        sample_aspect_ratio=1:1
+        pict_type=P
+        coded_picture_number=1
+        display_picture_number=0
+        interlaced_frame=0
+        top_field_first=0
+        repeat_pict=0
+        color_range=tv
+        color_space=gbr
+        color_primaries=reserved
+        color_transfer=reserved
+        chroma_location=left
+        '''
+        command = (
+            "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
+            "pkt_duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
+            + inputfile
+            + "  >  "
+            + name
+        )
+        os.system(command)
+    alt_dur = 1.0 / 29.97
+    counter = 0
+    time_error = False
+    fps = -1
+    override_dur = -1
+
+    first_pts = -1
+    pts = 0
+    recalc_duration = False
+    with open(name, "r") as csvfile:
+        datareader = csv.reader(csvfile, delimiter=",")
+        for row in datareader:
+            try:
+                is_iframe = int(row[0])
+                try:
+                    dur = float(row[2])
+                except Exception as ex:
+                    print(f"{ex}")
+                    recalc_duration = True
+                    dur = -1
+
+                if fps < 0 and dur == 0:
+                    dur = override_dur
+                    time_error = True
+                else:
+                    if not time_error:
+                        try:
+                            if first_pts == -1:
+                                pts = 0
+                                first_pts = float(row[1])
+                            else:
+                                pts = float(row[1]) - first_pts
+                        except Exception as ex:
+                            print(f"{ex}")
+                            time_error = True
+
+                frame_size = int(row[3])
+                if time_error:
+                    # Assume 29.97 fps
+                    data.append(
+                        [
+                            inputfile,
+                            is_iframe,
+                            counter * alt_dur,
+                            alt_dur,
+                            frame_size,
+                            8 * frame_size / (alt_dur * 1000),
+                        ]
+                    )
+                else:
+                    data.append(
+                        [
+                            inputfile,
+                            is_iframe,
+                            pts,
+                            dur,
+                            frame_size,
+                            8 * frame_size / (dur * 1000),
+                        ]
+                    )
+
+            except Exception as e:
+                print(str(e) + ", row = " + str(row))
+            counter += 1
+
+    labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
+    pdata = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
+    calc_stats(pdata, options, inputfile, True)
+    return pdata
 
 
 def parse_quality_vmaf(vmaf_file):
@@ -30,7 +240,10 @@ def parse_quality_vmaf(vmaf_file):
         data = json.load(input_file)
         input_file.close()
         vmaf = data["pooled_metrics"]["vmaf"]["mean"]
-    return vmaf
+        vmaf_hm = data["pooled_metrics"]["vmaf"]["harmonic_mean"]
+        vmaf_min = data["pooled_metrics"]["vmaf"]["min"]
+        vmaf_max = data["pooled_metrics"]["vmaf"]["max"]
+    return vmaf, vmaf_hm, vmaf_min, vmaf_max
 
 
 def parse_quality_ssim(ssim_file):
@@ -71,13 +284,17 @@ def run_quality(test_file, options, debug):
     """Compare the output found in test_file with the source/reference
     found in options.media_path directory or overriden
     """
-    # read test file results
-    with open(test_file, "r") as input_file:
-        results = json.load(input_file)
+    duration = 0
+    results={}
+    if test_file[-4:] == "json":
+        # read test file results
+        with open(test_file, "r") as input_file:
+            results = json.load(input_file)
 
-    if results.get("sourcefile") is None:
-        print(f"ERROR, bad source, {test_file}")
-        return
+        if results.get("sourcefile") is None:
+            print(f"ERROR, bad source, {test_file}")
+            return
+
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
     if os.path.exists(device_info_file):
@@ -86,13 +303,13 @@ def run_quality(test_file, options, debug):
     else:
         device_info = {}
 
-    # find the reference source
-    reference_dirname = options.media_path
-    if reference_dirname is None:
-        # get the reference dirname from the test path
-        reference_dirname = os.path.dirname(test_file)
-
-    reference_pathname = os.path.join(reference_dirname, results.get("sourcefile"))
+    if options.override_reference is None:
+        # find the reference source
+        reference_dirname = options.media_path
+        if reference_dirname is None:
+            # get the reference dirname from the test path
+            reference_dirname = os.path.dirname(test_file)
+        reference_pathname = os.path.join(reference_dirname, results.get("sourcefile"))
     if options.override_reference is not None:
         reference_pathname = options.override_reference
     elif options.guess_original:
@@ -101,14 +318,16 @@ def run_quality(test_file, options, debug):
         split = reference_pathname.split(".yuv_")
         split = split[0].rsplit("/")
         reference_pathname = reference_dirname  + split[-1] + ".yuv"
-    print(f'ref = "{reference_pathname}"\n')
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 
     # Assume encoded file in same directory as test result json file
     directory, _ = os.path.split(test_file)
-    encodedfile = results.get("encodedfile")
-    print(f"Encoded file: {encodedfile}")
+    if len(results) > 0:
+        encodedfile = results.get("encodedfile")
+    else:
+        encodedfile = test_file
+
 
     if len(encodedfile) <= 0:
         print(f"No file: {encodedfile}")
@@ -123,7 +342,12 @@ def run_quality(test_file, options, debug):
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
 
-    video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
+    video_info = None
+    try:
+        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
+    except:
+        print("Failed to parse with ffprobe")
+        video_info = None
     test = results.get("test")
     if (
         os.path.exists(vmaf_file)
@@ -136,10 +360,10 @@ def run_quality(test_file, options, debug):
         input_media_format = results.get("decoder_media_format")
         raw = True
 
-        print(f"test def: {test}")
-        pix_fmt = test["input"]["pixFmt"]
         if options.pix_fmt is not None:
             pix_fmt = options.pix_fmt
+        else:
+            pix_fmt = test["input"]["pixFmt"]
 
         if isinstance(input_media_format, str):
             # surface mode
@@ -168,36 +392,50 @@ def run_quality(test_file, options, debug):
             output_height = output_media_format.get("height")
             output_framerate = output_media_format.get("frame-rate")
         else:
-            resolution = test["configure"]["resolution"]
-            if len(resolution) == 0:
-                resolution = test["input"]["resolution"]
-            res = encapp.parse_resolution(resolution)
-            output_width = res[0]
-            output_height = res[1]
-            output_framerate = test["configure"]["framerate"]
-            if output_framerate == 0:
-                output_framerate = test["input"]["framerate"]
-            print("WARNING! output media format is missing, guessing values...")
-            print(f"outputres: {res}\noutput_framerate: {output_framerate}")
+            if test != None:
+                resolution = test["configure"]["resolution"]
+                if len(resolution) == 0:
+                    resolution = test["input"]["resolution"]
 
+                res = encapp.parse_resolution(resolution)
+                output_width = res[0]
+                output_height = res[1]
+
+            else:
+                output_width = video_info['width']
+                output_height = video_info['height']
+
+            if test != None:
+                output_framerate = test["configure"]["framerate"]
+                if output_framerate == 0:
+                    output_framerate = test["input"]["framerate"]
+            else:
+                output_framerate = video_info["framerate"]
+            print("WARNING! output media format is missing, guessing values...")
+            print(f"outputres: {output_width}x{output_height}\noutput_framerate: {output_framerate}")
+
+        
         output_resolution = f"{output_width}x{output_height}"
-        media_res = f'{video_info["width"]}x{video_info["height"]}'
-        # Although we assume that the distorted file is starting at the beginning
-        # at least we limit the length to the duration of it.
-        # TODO: shortest file wins :)
-        duration = f'{video_info["duration"]}'
+        if video_info is not None:
+            media_res = f'{video_info["width"]}x{video_info["height"]}'
+            # Although we assume that the distorted file is starting at the beginning
+            # at least we limit the length to the duration of it.
+            # TODO: shortest file wins :)
+            duration = f'{video_info["duration"]}'
+        else:
+            media_res = None
         if options.limit_length > 0:
             duration = float(options.limit_length)
         if output_framerate is None or output_framerate == 0:
             output_framerate = f'{video_info["framerate"]}'
-        if output_resolution != media_res:
+        if media_res != None and output_resolution != media_res:
             print("Warning. Discrepancy in resolutions for output")
             print(f"Json {output_resolution}, media {media_res}")
             output_resolution = media_res
 
         if options.resolution is not None:
             input_resolution = options.resolution
-        elif input_media_format is not None:
+        if input_media_format is not None:
             try:
                 input_width = int(input_media_format.get("width"))
                 input_height = int(input_media_format.get("height"))
@@ -212,7 +450,7 @@ def run_quality(test_file, options, debug):
             else:
                 input_resolution = f"{input_width}x{input_height}"
         else:
-             input_resolution = output_resolution
+            input_resolution = output_resolution
 
         if options.framerate is not None:
             input_framerate = options.framerate
@@ -226,7 +464,12 @@ def run_quality(test_file, options, debug):
             input_framerate = output_framerate
         if not os.path.exists(reference_pathname):
             print(f"Reference {reference_pathname} is unavailable")
-            exit(-1)
+            # check raw instead of yuv
+            if reference_pathname[-3:] == "yuv":
+                reference_pathname = reference_pathname[:-3] + "raw"
+            if not os.path.exists(reference_pathname):
+                print(f"Reference {reference_pathname} is unavailable")
+                exit(-1)
         distorted = encodedfile
         if not os.path.exists(distorted):
             print(f"Distorted {distorted} is unavailable")
@@ -315,7 +558,7 @@ def run_quality(test_file, options, debug):
             os.remove(distorted)
 
     if os.path.exists(vmaf_file):
-        vmaf = parse_quality_vmaf(vmaf_file)
+        vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr = parse_quality_psnr(psnr_file)
 
@@ -327,18 +570,50 @@ def run_quality(test_file, options, debug):
             model = options.model
         platform = device_info.get("props", {}).get("ro.board.platform", "")
         serial = device_info.get("props", {}).get("ro.serialno", "")
-        # get resolution and framerate
-        resolution = test.get("configure").get("resolution")
-        if not resolution:
-            resolution = test.get("input").get("resolution")
-        if not resolution:
-            # get res from file
+        bitrate = 0
+        codec = ""
+        iframeinterval = 0
+        framecount = 0
+        meanbitrate = 0
+        filepath = ""
+        iframes_size = 0
+        pframes_size = 0
+        description = ""
+        id = ""
+        if test is not None:
+            # get resolution and framerate
+            resolution = test.get("configure").get("resolution")
+            if not resolution:
+                resolution = test.get("input").get("resolution")
+            if not resolution:
+                # get res from file
+                resolution= f'{video_info["width"]}x{video_info["height"]}'
+            framerate = test.get("configure").get("framerate")
+            if not framerate:
+                framerate = test.get("input").get("framerate")
+            # derive the calculated_bitrate from the actual file size
+            framecount = len(results.get("frames"))
+            codec = test.get("configure").get("codec")
+            bitrate = test.get("configure").get("bitrate")
+            meanbitrate = results.get("meanbitrate")
+            iframeinterval = test.get("configure").get("iFrameInterval")
+            description = test.get("common").get("description")
+            id = test.get("common").get("id")
+            filepath = test.get("input").get("filepath")
+        else:
+            framerate = video_info["framerate"]
             resolution= f'{video_info["width"]}x{video_info["height"]}'
-        framerate = test.get("configure").get("framerate")
-        if not framerate:
-            framerate = test.get("input").get("framerate")
-        # derive the calculated_bitrate from the actual file size
-        framecount = len(results.get("frames"))
+            codec = video_info["codec-name"]
+        # get the data from ffmpeg
+        data = detailed_media_info(encodedfile, options)
+        framecount = len(data)
+        iframes = data.loc[data["iframe"] == 1]
+        pframes = data.loc[data["iframe"] == 0]
+        iframeinterval=video_info["duration"]/len(iframes)
+
+        if len(iframes) > 0:
+            iframes_size = iframes['size'].mean()
+        pframes_size = pframes['size'].mean()
         calculated_bitrate = int(
             (file_size * 8 * framerate) / framecount
         )
@@ -349,34 +624,41 @@ def run_quality(test_file, options, debug):
         if options.mark_motion:
             source_motion = options.mark_motion
 
-        frames = pd.DataFrame(results["frames"])
-        iframes = frames.loc[frames["iframe"] == 1]
-        pframes = frames.loc[frames["iframe"] == 0]
-
+        if len(results) > 0:
+            frames = pd.DataFrame(results["frames"])
+            iframes = frames.loc[frames["iframe"] == 1]
+            pframes = frames.loc[frames["iframe"] == 0]
+        else:
+            meanbitrate = bitrate = calculated_bitrate
         data = (
             f"{encodedfile}",
+            f"{description}",
+            f"{id}",
             f"{model}",
             f"{platform}",
             f"{serial}",
-            f'{test.get("configure").get("codec")}',
-            f'{test.get("configure").get("iFrameInterval")}',
+            f'{codec}', 
+            f'{iframeinterval}',
             f"{framerate}",
             f'{resolution.split("x")[0]}',
             f'{resolution.split("x")[1]}',
-            f'{encapp.convert_to_bps(test.get("configure").get("bitrate"))}',
-            f'{results.get("meanbitrate")}',
+            f'{encapp.convert_to_bps(bitrate)}', 
+            f'{meanbitrate}',
             f"{calculated_bitrate}",
-            f'{results.get("framecount")}',
+            f'{framecount}',
             f"{file_size}",
             f"{len(iframes)}",
             f"{len(pframes)}",
-            f"{iframes['size'].mean()}",
-            f"{pframes['size'].mean()}",
+            f"{iframes_size}",
+            f"{pframes_size}", 
             f"{vmaf}",
+            f"{vmaf_hm}",
+            f"{vmaf_min}",
+            f"{vmaf_max}",
             f"{ssim}",
             f"{psnr}",
             f"{test_file}",
-            f'{test.get("input").get("filepath")}',
+            f'{filepath}', 
             source_complexity,
             source_motion,
         )
@@ -524,24 +806,29 @@ def main(argv):
 
     FIELD_LIST = [
         "media",
+        "description",
+        "id",
         "model",
         "platform",
         "serial",
         "codec",
-        "gop",
-        "framerate",
+        "gop_sec",
+        "framerate_fps",
         "width",
         "height",
-        "bitrate",
-        "meanbitrate",
-        "calculated_bitrate",
+        "bitrate_bps",
+        "meanbitrate_bps",
+        "calculated_bitrate_bps",
         "framecount",
-        "size",
+        "size_bytes",
         "iframes",
         "pframes",
-        "iframe_size",
-        "pframe_size",
+        "iframe_size_bytes",
+        "pframe_size_bytes",
         "vmaf",
+        "vmaf_hm",
+        "vmaf_min",
+        "vmaf_max",
         "ssim",
         "psnr",
         "testfile",
@@ -576,7 +863,7 @@ def main(argv):
                 f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
             )
             current += 1
-            if data is not None:
+            if data is not None and len(data) > 0:
                 writer.writerow(data)
 
 

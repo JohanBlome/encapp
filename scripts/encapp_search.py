@@ -150,7 +150,10 @@ def derive_values(data):
         resolution = c_resolution if not None and not "nan" else i_resolution
         resolution_list.append(resolution)
         width = height = 0
-        width, height = resolution.split("x")
+        if "x" in resolution:
+            width, height = resolution.split("x")
+        else:
+            width=height=-1;
         width_list.append(width)
         height_list.append(height)
     data["resolution"] = resolution_list
@@ -163,7 +166,9 @@ def derive_values(data):
 
 def force_options(data, options):
     if options.codec:
-        data = data.loc[data["configure.codec"].str.contains(options.codec, na=False)]
+        for val in data['configure.codec']:
+            print(f"{val}")
+        data = data.loc[data["configure.codec"].str.contains(options.codec, case=False, na=False)]
     if options.bitrate:
         ranges = options.bitrate.split("-")
         vals = []
