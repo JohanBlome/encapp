@@ -1465,6 +1465,7 @@ def process_options(options):
         "input_framerate": "input.framerate",
         "output_resolution": "output.resolution",
         "output_framerate": "output.framerate",
+        "pix_fmt": "input.pix_fmt",
         # '-c', '--codec', type=str, dest='codec',
         "codec": "configure.codec",
         # '-r', '--bitrate', type=str, dest='bitrate',
