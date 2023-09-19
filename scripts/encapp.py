@@ -205,7 +205,7 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
         # clean the logcat first
         encapp_tool.adb_cmds.reset_logcat(serial)
         ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-            f"adb -s {serial} shell am start -W "
+            f"adb -s {serial} shell am start "
             f"-e workdir {device_workdir} "
             f"-e test {protobuf_txt_filepath} "
             f"{encapp_tool.app_utils.ACTIVITY}",
