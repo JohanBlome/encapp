@@ -123,6 +123,7 @@ message DecoderConfigure {
     optional string value = 3;
   }
   repeated Parameter parameter = 1;
+  optional string codec = 2;
 }
 
 message DecoderRuntime {

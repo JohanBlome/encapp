@@ -107,9 +107,9 @@ class BufferDecoder extends Encoder {
             logMediaFormat(mDecoder.getInputFormat());
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                mStats.setDecoderName(mDecoder.getCodecInfo().getCanonicalName());
+                mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
             } else {
-                mStats.setDecoderName(mDecoder.getCodecInfo().getName());
+                mStats.setDecoder(mDecoder.getCodecInfo().getName());
             }
         } catch (IOException iox) {
             mExtractor.release();

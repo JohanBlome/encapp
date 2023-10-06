@@ -1,6 +1,5 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
 import android.graphics.SurfaceTexture;
@@ -16,15 +15,12 @@ import android.view.Surface;
 import android.os.SystemClock;
 import androidx.annotation.NonNull;
 
-import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
-import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
-import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -35,10 +31,7 @@ import com.facebook.encapp.utils.VsyncListener;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
-import java.util.Hashtable;
-import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
@@ -132,13 +125,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             Log.d(TAG, "Check parsed input format:");
             logMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
-            if (mNoEncoding &&  mTest.getConfigure().hasCodec()) {
+            if (mTest.getDecoderConfigure().hasCodec()) {
                 //TODO: throw error on failed lookup
-                //TODO: fix decoder lookup
-                //TODO: currently either decoder or encoder can be set, need both?
                 //mTest = setCodecNameAndIdentifier(mTest);
-                Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
-                mDecoder = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+                Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
+                mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
             } else {
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
@@ -240,9 +231,9 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             Log.d(TAG, "Start decoder");
             mDecoder.start();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                mStats.setDecoderName(mDecoder.getCodecInfo().getCanonicalName());
+                mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
             } else {
-                mStats.setDecoderName(mDecoder.getCodecInfo().getName());
+                mStats.setDecoder(mDecoder.getCodecInfo().getName());
             }
 
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());

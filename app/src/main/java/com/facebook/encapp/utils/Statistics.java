@@ -3,11 +3,8 @@ package com.facebook.encapp.utils;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
-import android.util.Size;
 import android.os.SystemClock;
-import android.os.Trace;
 
-import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
 
@@ -274,7 +271,7 @@ public class Statistics {
         mDecoderMediaFormat = format;
     }
 
-    public void setDecoderName(String decoderName) {
+    public void setDecoder(String decoderName) {
         mDecoderName = decoderName;
     }
 
