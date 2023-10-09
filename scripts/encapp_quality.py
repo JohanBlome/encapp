@@ -155,10 +155,15 @@ def detailed_media_info(inputfile, options):
         chroma_location=left
         '''
         command = (
+            "echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > "
+            + name
+        )
+        os.system(command)
+        command = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
             "pkt_duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
             + inputfile
-            + "  >  "
+            + "  >>  "
             + name
         )
         os.system(command)
@@ -338,7 +343,7 @@ def run_quality(test_file, options, debug):
     if (len(encodedfile) == 0) or (not os.path.exists(encodedfile)):
         print(f"ERROR! Encoded file name is missing, {encodedfile}")
         return
-    vmaf_file = f"{encodedfile}.vmaf"
+    vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
 
