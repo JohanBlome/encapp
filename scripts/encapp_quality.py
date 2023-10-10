@@ -120,6 +120,7 @@ def calc_stats(pdata, options, label, print_text=False):
 
 def detailed_media_info(inputfile, options):
     # read file
+    pdata = DataFrame()
     data = []
 
     name = inputfile + ".frames.csv"
@@ -167,73 +168,77 @@ def detailed_media_info(inputfile, options):
             + name
         )
         os.system(command)
-    alt_dur = 1.0 / 29.97
-    counter = 0
-    time_error = False
-    fps = -1
-    override_dur = -1
+        alt_dur = 1.0 / 29.97
+        counter = 0
+        time_error = False
+        fps = -1
+        override_dur = -1
 
-    first_pts = -1
-    pts = 0
-    recalc_duration = False
-    with open(name, "r") as csvfile:
-        datareader = csv.reader(csvfile, delimiter=",")
-        for row in datareader:
-            try:
-                is_iframe = int(row[0])
+        first_pts = -1
+        pts = 0
+        recalc_duration = False
+        with open(name, "r") as csvfile:
+            datareader = csv.reader(csvfile, delimiter=",")
+            for row in datareader:
                 try:
-                    dur = float(row[2])
-                except Exception as ex:
-                    print(f"{ex}")
-                    recalc_duration = True
-                    dur = -1
+                    is_iframe = int(row[0])
+                    try:
+                        dur = float(row[2])
+                    except Exception as ex:
+                        print(f"{ex}")
+                        recalc_duration = True
+                        dur = -1
 
-                if fps < 0 and dur == 0:
-                    dur = override_dur
-                    time_error = True
-                else:
-                    if not time_error:
-                        try:
-                            if first_pts == -1:
-                                pts = 0
-                                first_pts = float(row[1])
-                            else:
-                                pts = float(row[1]) - first_pts
-                        except Exception as ex:
-                            print(f"{ex}")
-                            time_error = True
+                    if fps < 0 and dur == 0:
+                        dur = override_dur
+                        time_error = True
+                    else:
+                        if not time_error:
+                            try:
+                                if first_pts == -1:
+                                    pts = 0
+                                    first_pts = float(row[1])
+                                else:
+                                    pts = float(row[1]) - first_pts
+                            except Exception as ex:
+                                print(f"{ex}")
+                                time_error = True
 
-                frame_size = int(row[3])
-                if time_error:
-                    # Assume 29.97 fps
-                    data.append(
-                        [
-                            inputfile,
-                            is_iframe,
-                            counter * alt_dur,
-                            alt_dur,
-                            frame_size,
-                            8 * frame_size / (alt_dur * 1000),
-                        ]
-                    )
-                else:
-                    data.append(
-                        [
-                            inputfile,
-                            is_iframe,
-                            pts,
-                            dur,
-                            frame_size,
-                            8 * frame_size / (dur * 1000),
-                        ]
-                    )
+                    frame_size = int(row[3])
+                    if time_error:
+                        # Assume 29.97 fps
+                        data.append(
+                            [
+                                inputfile,
+                                is_iframe,
+                                counter * alt_dur,
+                                alt_dur,
+                                frame_size,
+                                8 * frame_size / (alt_dur * 1000),
+                            ]
+                        )
+                    else:
+                        data.append(
+                            [
+                                inputfile,
+                                is_iframe,
+                                pts,
+                                dur,
+                                frame_size,
+                                8 * frame_size / (dur * 1000),
+                            ]
+                        )
 
-            except Exception as e:
-                print(str(e) + ", row = " + str(row))
-            counter += 1
+                except Exception as e:
+                    print(str(e) + ", row = " + str(row))
+                counter += 1
 
-    labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
-    pdata = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
+        labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
+        pdata = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
+        # overwrite with derived data
+        pdata.to_csv(name)
+    else:
+        pdata = pd.read_csv(name)
     calc_stats(pdata, options, inputfile, True)
     return pdata
 
