@@ -120,7 +120,7 @@ def calc_stats(pdata, options, label, print_text=False):
 
 def detailed_media_info(inputfile, options):
     # read file
-    pdata = DataFrame()
+    pdata = pd.DataFrame()
     data = []
 
     name = inputfile + ".frames.csv"
