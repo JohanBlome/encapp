@@ -656,6 +656,9 @@ def run_quality(test_file, options, debug):
             pframes = frames.loc[frames["iframe"] == 0]
         else:
             meanbitrate = bitrate = calculated_bitrate
+        # calculate the bits/pixel from the meanbitrate
+        width, height = resolution.split('x')
+        mean_bpp = (1.0 * meanbitrate) / (framerate * width * height)
         data = (
             f"{encodedfile}",
             f"{description}",
@@ -668,10 +671,11 @@ def run_quality(test_file, options, debug):
             f"{quality}",
             f"{iframeinterval}",
             f"{framerate}",
-            f"{resolution.split('x')[0]}",
-            f"{resolution.split('x')[1]}",
+            f"{width}",
+            f"{height}",
             f"{encapp.convert_to_bps(bitrate)}",
             f"{meanbitrate}",
+            f"{mean_bpp}",
             f"{calculated_bitrate}",
             f"{framecount}",
             f"{file_size}",
@@ -851,6 +855,7 @@ def main(argv):
         "height",
         "bitrate_bps",
         "meanbitrate_bps",
+        "mean_bpp",
         "calculated_bitrate_bps",
         "framecount",
         "size_bytes",
