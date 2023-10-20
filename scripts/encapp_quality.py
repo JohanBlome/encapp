@@ -17,8 +17,7 @@ import numpy as np
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import encapp
-
-PSNR_RE = "average:([0-9.]*)"
+PSNR_RE = re.compile(r"y:(?P<psnr_y>[0-9.]*) u:(?P<psnr_u>[0-9.]*) v:(?P<psnr_v>[0-9.]*) average:(?P<psnr_avg>[0-9.]*)")
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
@@ -273,15 +272,22 @@ def parse_quality_ssim(ssim_file):
 def parse_quality_psnr(psnr_file):
     """Parse log/output files and return quality score"""
     psnr = -1
+    psnr_y = -1
+    psnr_u = -1
+    psnr_v = -1
+
     with open(psnr_file) as input_file:
         line = " "
         while len(line) > 0:
             line = input_file.readline()
             match = re.search(PSNR_RE, line)
             if match:
-                psnr = round(float(match.group(1)), 2)
+                psnr = round(float(match.group("psnr_avg")), 2)
+                psnr_y = round(float(match.group("psnr_y")), 2)
+                psnr_u = round(float(match.group("psnr_u")), 2)
+                psnr_v = round(float(match.group("psnr_v")), 2)
                 break
-    return psnr
+    return psnr, psnr_y, psnr_u, psnr_v
 
 
 """
@@ -570,7 +576,7 @@ def run_quality(test_file, options, debug):
     if os.path.exists(vmaf_file):
         vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
-        psnr = parse_quality_psnr(psnr_file)
+        psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
 
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
@@ -679,6 +685,9 @@ def run_quality(test_file, options, debug):
             f"{vmaf_max}",
             f"{ssim}",
             f"{psnr}",
+            f"{psnr_y}",
+            f"{psnr_u}",
+            f"{psnr_v}",
             f"{test_file}",
             f"{filepath}",
             source_complexity,
@@ -855,6 +864,9 @@ def main(argv):
         "vmaf_max",
         "ssim",
         "psnr",
+        "psnr_y",
+        "psnr_u",
+        "psnr_v",
         "testfile",
         "reference_file",
         "source_complexity",
