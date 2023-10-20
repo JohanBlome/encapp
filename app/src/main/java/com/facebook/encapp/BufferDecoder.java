@@ -64,7 +64,7 @@ class BufferDecoder extends Encoder {
         }
 
         mFrameRate = mTest.getConfigure().getFramerate();
-
+        Log.d(TAG, "Create extractor");
         mExtractor = new MediaExtractor();
 
         MediaFormat inputFormat = null;
@@ -79,6 +79,7 @@ class BufferDecoder extends Encoder {
                     trackNum = track;
                 }
             }
+            Log.d(TAG, "Select track");
             mExtractor.selectTrack(trackNum);
             inputFormat = mExtractor.getTrackFormat(trackNum);
             if (inputFormat == null) {
@@ -86,10 +87,10 @@ class BufferDecoder extends Encoder {
                 return "no input format";
             }
 
-
-            if (mTest.getConfigure().hasEncode() && !mTest.getConfigure().getEncode() &&  mTest.getConfigure().hasCodec()) {
-                Log.d(TAG, "Create decoder by name: " + mTest.getConfigure().getCodec());
-                mDecoder = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+            Log.d(TAG, "Create decoder)");
+            if (mTest.getDecoderConfigure().hasCodec()) {
+                Log.d(TAG, "Create decoder by name: " + mTest.getDecoderConfigure().getCodec());
+                mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
             } else {
                 Log.d(TAG, "Create decoder by mime: " + inputFormat.getString(MediaFormat.KEY_MIME));
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
