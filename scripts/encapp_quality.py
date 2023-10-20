@@ -17,6 +17,8 @@ import numpy as np
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import encapp
+import vmaf_json2csv as vmafcsv
+
 PSNR_RE = re.compile(r"y:(?P<psnr_y>[0-9.]*) u:(?P<psnr_u>[0-9.]*) v:(?P<psnr_v>[0-9.]*) average:(?P<psnr_avg>[0-9.]*)")
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
@@ -577,7 +579,10 @@ def run_quality(test_file, options, debug):
         vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
-
+        
+        if options.csv:
+            base, extension = os.path.splitext(vmaf_file)
+            vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
@@ -657,7 +662,7 @@ def run_quality(test_file, options, debug):
         else:
             meanbitrate = bitrate = calculated_bitrate
         # calculate the bits/pixel from the meanbitrate
-        width, height = resolution.split('x')
+        width, height = [int(x) for x in resolution.split('x')]
         mean_bpp = (1.0 * meanbitrate) / (framerate * width * height)
         data = (
             f"{encodedfile}",
@@ -761,6 +766,9 @@ def get_options(argv):
     )
     parser.add_argument(
         "--header", help="print header to output", action="store_true", default=False
+    )
+    parser.add_argument(
+        "--csv", help="output csv data from calculated results not in csv format", action="store_true", default=False
     )
     parser.add_argument(
         "--fr_fr",

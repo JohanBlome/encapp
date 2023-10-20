@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-"""vtools-full.py module description.
+"""
+Converts a ffmpeg vmaf json file to a csv file
 
-Runs a series of video analysis on multiple files.
 """
 
 
@@ -125,8 +125,11 @@ def main(argv):
     # print results
     if options.debug > 0:
         print(options)
-    process_infile(options.infile, options.outfile, options.debug)
-
+    
+    if options.infile is not None:
+        process_infile(options.infile, options.outfile, options.debug)
+    else:
+        print("Input file is missing.")
 
 if __name__ == "__main__":
     # at least the CLI program name: (CLI) execution
