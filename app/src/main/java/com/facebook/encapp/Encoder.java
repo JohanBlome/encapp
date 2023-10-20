@@ -566,7 +566,7 @@ public abstract class Encoder {
 
         @Override
         public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.d(TAG, "onError: " + e.getDiagnosticInfo());
+            Log.e(TAG, "onError: " + e.getMessage() + ", error code: " + e.getErrorCode());
         }
 
         @Override

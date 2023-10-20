@@ -368,7 +368,9 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 MediaFormat newFormat = codec.getOutputFormat();
                 Dictionary<String, Object> mediaFormatInfo = mediaFormatComparison(currentMediaFormat, newFormat);
                 FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
-                frameInfo.addInfo(mediaFormatInfo);
+                if (frameInfo != null) {
+                    frameInfo.addInfo(mediaFormatInfo);
+                }
                 currentMediaFormat = newFormat;
                 mInFramesCount++;
                 long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
@@ -456,7 +458,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
         @Override
         public void run() {
-            MediaFormat currentOutputFormat = mCodec.getInputFormat();
             Dictionary<String, Object> latestFrameChanges;
             Log.d(TAG, "Start Source reader.");
             while (!mDone) {

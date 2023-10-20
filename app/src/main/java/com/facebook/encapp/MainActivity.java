@@ -399,11 +399,11 @@ public class MainActivity extends AppCompatActivity {
                             // Start them all
                             for (Encoder enc : mEncoderList) {
                                 synchronized (enc) {
-                                    Log.d(TAG, "Start encoder: " + enc);
+                                    Log.d(TAG, "Start codec: " + enc);
                                     enc.notifyAll();
                                 }
                             }
-                            Log.d(TAG, "Start encoders");
+                            Log.d(TAG, "Start codecs");
                             // Start them all
                             // Wait for stable conditions
                             int stableCounter = 0;
@@ -657,7 +657,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Add surface texture for " + test.getCommon().getId() + " st: "+ot.mView.getSurfaceTexture());
                 ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
             }
-            Log.d(TAG, "Add encoder to list");
+            Log.d(TAG, "Add codec to list");
             mEncoderList.add(coder);
         }
 

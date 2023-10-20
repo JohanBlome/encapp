@@ -158,7 +158,13 @@ public class OutputMultiplier {
         if (mRenderer != null) { // it will be null if no surface is connected
             mRenderer.newFrameAvailableInBuffer(codec, bufferId, info);
         } else {
-            codec.releaseOutputBuffer(bufferId, false);
+            try {
+                codec.releaseOutputBuffer(bufferId, false);
+            } catch (MediaCodec.CodecException mec) {
+                Log.e(TAG, "Buffer release failed: " + mec.getMessage());
+            } catch (IllegalStateException ise) {
+                Log.e(TAG, "Buffer release failed, illegal state exception " + ise.getMessage());
+            }
         }
     }
 
