@@ -19,9 +19,12 @@ import encapp_tool.ffutils
 import encapp
 import vmaf_json2csv as vmafcsv
 
-PSNR_RE = re.compile(r"y:(?P<psnr_y>[0-9.]*) u:(?P<psnr_u>[0-9.]*) v:(?P<psnr_v>[0-9.]*) average:(?P<psnr_avg>[0-9.]*)")
+PSNR_RE = re.compile(
+    r"y:(?P<psnr_y>[0-9.]*) u:(?P<psnr_u>[0-9.]*) v:(?P<psnr_v>[0-9.]*) average:(?P<psnr_avg>[0-9.]*)"
+)
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
+
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -29,8 +32,7 @@ def calc_stats(pdata, options, label, print_text=False):
         return None
     last_frame_index = np.argmax(pdata["pts"])
     total_duration = (
-        pdata.iloc[last_frame_index]["pts"]
-        + pdata.iloc[last_frame_index]["duration"]
+        pdata.iloc[last_frame_index]["pts"] + pdata.iloc[last_frame_index]["duration"]
     )
     total_size = np.sum(pdata["size"])
     frame_count = len(pdata)
@@ -51,9 +53,9 @@ def calc_stats(pdata, options, label, print_text=False):
     iframes = iframes.fillna(0)
     pframes = pframes.fillna(0)
 
-    imean=0
-    pmean=0
-    imax=imin=pmax=pmin=0
+    imean = 0
+    pmean = 0
+    imax = imin = pmax = pmin = 0
     if len(iframes["size"]) > 0:
         imean = np.mean(iframes["size"])
         imax = np.max(iframes["size"])
@@ -65,19 +67,13 @@ def calc_stats(pdata, options, label, print_text=False):
     mean_ratio = imean / pmean
     size_ratio = np.sum(iframes["size"]) / np.sum(pframes["size"])
 
-
-
     print(f"ime,imx,imi = {imean}, {imax}, {imin}")
     print(f"{len(pframes)}")
     print("*** {:s} stats ***".format(label))
     print("Frame count: {:f}".format(len(pdata)))
     print("Duration: {:.3f} secs".format(total_duration))
     print("Fps: {:.2f} fps".format(fps))
-    print(
-        "Bitrate {:.2f} kbps".format(
-            8 * total_size / (total_duration * 1000)
-        )
-    )
+    print("Bitrate {:.2f} kbps".format(8 * total_size / (total_duration * 1000)))
     print(
         "Iframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
             int(imean), int(imax), int(imin)
@@ -93,8 +89,8 @@ def calc_stats(pdata, options, label, print_text=False):
     print("mean size iframe/pframe ratio: {:.2f}".format(mean_ratio))
     print("total size iframe/pframe ratio: {:.2f}".format(size_ratio))
     print("___")
-    
-    '''
+
+    """
     elif options.csv and print_text:
         if options.header:
             print(
@@ -115,7 +111,7 @@ def calc_stats(pdata, options, label, print_text=False):
                 int(pmin),
             )
         )
-    '''
+    """
     return frame_count, total_duration, fps
 
 
@@ -126,7 +122,7 @@ def detailed_media_info(inputfile, options):
 
     name = inputfile + ".frames.csv"
     if not os.path.exists(name):
-        '''
+        """
         media_type=video
         stream_index=0
         key_frame=0
@@ -155,11 +151,8 @@ def detailed_media_info(inputfile, options):
         color_primaries=reserved
         color_transfer=reserved
         chroma_location=left
-        '''
-        command = (
-            "echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > "
-            + name
-        )
+        """
+        command = "echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > " + name
         os.system(command)
         command = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
@@ -302,8 +295,9 @@ def run_quality(test_file, options, debug):
     """Compare the output found in test_file with the source/reference
     found in options.media_path directory or overriden
     """
+    print(f"Run quality, {test_file} - {options}")
     duration = 0
-    results={}
+    results = {}
     if test_file[-4:] == "json":
         # read test file results
         with open(test_file, "r") as input_file:
@@ -335,14 +329,7 @@ def run_quality(test_file, options, debug):
             # get the reference dirname from the test path
             reference_dirname = os.path.dirname(test_file)
         reference_pathname = os.path.join(reference_dirname, results.get("sourcefile"))
-    if options.override_reference is not None:
-        reference_pathname = options.override_reference
-    elif options.guess_original:
-        # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv
-        # only for raw, obviously
-        split = reference_pathname.split(".yuv_")
-        split = split[0].rsplit("/")
-        reference_pathname = reference_dirname  + split[-1] + ".yuv"
+
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 
@@ -352,7 +339,6 @@ def run_quality(test_file, options, debug):
         encodedfile = results.get("encodedfile")
     else:
         encodedfile = test_file
-
 
     if len(encodedfile) <= 0:
         print(f"No file: {encodedfile}")
@@ -373,19 +359,21 @@ def run_quality(test_file, options, debug):
     except:
         print("Failed to parse with ffprobe")
         video_info = None
+
+    recalc = options.get("recalc", None)
     test = results.get("test")
     if (
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
-        and not options.recalc
+        and not recalc
     ):
         print("All quality indicators already calculated for media, " f"{vmaf_file}")
     else:
         input_media_format = results.get("decoder_media_format")
         raw = True
 
-        if options.pix_fmt is not None:
+        if options.get("pix_fmt", None):
             pix_fmt = options.pix_fmt
         else:
             pix_fmt = test["input"]["pixFmt"]
@@ -427,8 +415,8 @@ def run_quality(test_file, options, debug):
                 output_height = res[1]
 
             else:
-                output_width = video_info['width']
-                output_height = video_info['height']
+                output_width = video_info["width"]
+                output_height = video_info["height"]
 
             if test != None:
                 output_framerate = test["configure"]["framerate"]
@@ -437,9 +425,10 @@ def run_quality(test_file, options, debug):
             else:
                 output_framerate = video_info["framerate"]
             print("WARNING! output media format is missing, guessing values...")
-            print(f"outputres: {output_width}x{output_height}\noutput_framerate: {output_framerate}")
+            print(
+                f"outputres: {output_width}x{output_height}\noutput_framerate: {output_framerate}"
+            )
 
-        
         output_resolution = f"{output_width}x{output_height}"
         if video_info is not None:
             media_res = f'{video_info["width"]}x{video_info["height"]}'
@@ -449,7 +438,7 @@ def run_quality(test_file, options, debug):
             duration = f'{video_info["duration"]}'
         else:
             media_res = None
-        if options.limit_length > 0:
+        if options.get("limit_length", -1) > 0:
             duration = float(options.limit_length)
         if output_framerate is None or output_framerate == 0:
             output_framerate = f'{video_info["framerate"]}'
@@ -458,7 +447,7 @@ def run_quality(test_file, options, debug):
             print(f"Json {output_resolution}, media {media_res}")
             output_resolution = media_res
 
-        if options.resolution is not None:
+        if options.get("resolution", None):
             input_resolution = options.resolution
         if input_media_format is not None:
             try:
@@ -477,7 +466,7 @@ def run_quality(test_file, options, debug):
         else:
             input_resolution = output_resolution
 
-        if options.framerate is not None:
+        if options.get("framerate", None):
             input_framerate = options.framerate
         elif (
             input_media_format is not None
@@ -507,13 +496,13 @@ def run_quality(test_file, options, debug):
         shell_cmd = ""
 
         force_scale = ""
-        if options.fr_fr:
+        if options.get("fr_fr", None):
             force_scale = ";[d1]scale=in_range=full:out_range=full[distorted]"
-        if options.fr_lr:
+        if options.get("fr_lr", None):
             force_scale = ";[d1]scale=in_range=full:out_range=limited[distorted]"
-        if options.lr_lr:
+        if options.get("lr_lr", None):
             force_scale = ";[d1]scale=in_range=limited:out_range=limited[distorted]"
-        if options.lr_fr:
+        if options.get("lr_fr", None):
             force_scale = ";[d1]scale=in_range=limited:out_range=full[distorted]"
 
         if raw:
@@ -542,7 +531,7 @@ def run_quality(test_file, options, debug):
         filter_cmd = f"[0:v]framerate={output_framerate}[d0];[d0]scale={input_width}:{input_height}[{diststream}];[1:v]framerate={output_framerate}[ref]{force_scale};[distorted][ref]"
 
         # Do calculations
-        if options.recalc or not os.path.exists(vmaf_file):
+        if recalc or not os.path.exists(vmaf_file):
 
             # important: vmaf must be called with videos in the right order
             # <distorted_video> <reference_video>
@@ -557,7 +546,7 @@ def run_quality(test_file, options, debug):
         else:
             print(f"vmaf already calculated for media, {vmaf_file}")
 
-        if options.recalc or not os.path.exists(ssim_file):
+        if recalc or not os.path.exists(ssim_file):
             shell_cmd = (
                 f"ffmpeg {dist_part} {ref_part}  -t {duration} "
                 "-filter_complex "
@@ -568,7 +557,7 @@ def run_quality(test_file, options, debug):
         else:
             print(f"ssim already calculated for media, {ssim_file}")
 
-        if options.recalc or not os.path.exists(psnr_file):
+        if recalc or not os.path.exists(psnr_file):
             shell_cmd = (
                 f"ffmpeg {dist_part} {ref_part} -t {duration} "
                 "-filter_complex "
@@ -586,15 +575,15 @@ def run_quality(test_file, options, debug):
         vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
-        
-        if options.csv:
+
+        if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
             vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
         model = device_info.get("props", {}).get("ro.product.model", "")
-        if options.model:
+        if options.get("model", None):
             model = options.model
         platform = device_info.get("props", {}).get("ro.board.platform", "")
         serial = device_info.get("props", {}).get("ro.serialno", "")
@@ -608,7 +597,7 @@ def run_quality(test_file, options, debug):
         pframes_size = 0
         description = ""
         bitratemode = ""
-        quality=-1 # CQ is between 0-100
+        quality = -1  # CQ is between 0-100
         id = ""
         if test is not None:
             # get resolution and framerate
@@ -617,7 +606,7 @@ def run_quality(test_file, options, debug):
                 resolution = test.get("input").get("resolution")
             if not resolution:
                 # get res from file
-                resolution= f'{video_info["width"]}x{video_info["height"]}'
+                resolution = f'{video_info["width"]}x{video_info["height"]}'
             framerate = test.get("configure").get("framerate")
             if not framerate:
                 framerate = test.get("input").get("framerate")
@@ -640,26 +629,24 @@ def run_quality(test_file, options, debug):
                         continue
         else:
             framerate = video_info["framerate"]
-            resolution= f'{video_info["width"]}x{video_info["height"]}'
+            resolution = f'{video_info["width"]}x{video_info["height"]}'
             codec = video_info["codec-name"]
         # get the data from ffmpeg
         data = detailed_media_info(encodedfile, options)
         framecount = len(data)
         iframes = data.loc[data["iframe"] == 1]
         pframes = data.loc[data["iframe"] == 0]
-        iframeinterval=video_info["duration"]/len(iframes)
+        iframeinterval = video_info["duration"] / len(iframes)
 
         if len(iframes) > 0:
-            iframes_size = iframes['size'].mean()
-        pframes_size = pframes['size'].mean()
-        calculated_bitrate = int(
-            (file_size * 8 * framerate) / framecount
-        )
+            iframes_size = iframes["size"].mean()
+        pframes_size = pframes["size"].mean()
+        calculated_bitrate = int((file_size * 8 * framerate) / framecount)
         source_complexity = ""
         source_motion = ""
-        if options.mark_complexity:
+        if options.get("mark_complexity", None):
             source_complexity = options.mark_complexity
-        if options.mark_motion:
+        if options.get("mark_motion", None):
             source_motion = options.mark_motion
 
         if len(results) > 0:
@@ -669,7 +656,7 @@ def run_quality(test_file, options, debug):
         else:
             meanbitrate = bitrate = calculated_bitrate
         # calculate the bits/pixel from the meanbitrate
-        width, height = [int(x) for x in resolution.split('x')]
+        width, height = [int(x) for x in resolution.split("x")]
         mean_bpp = (1.0 * meanbitrate) / (framerate * width * height)
         data = (
             f"{encodedfile}",
@@ -775,7 +762,10 @@ def get_options(argv):
         "--header", help="print header to output", action="store_true", default=False
     )
     parser.add_argument(
-        "--csv", help="output csv data from calculated results not in csv format", action="store_true", default=False
+        "--csv",
+        help="output csv data from calculated results not in csv format",
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--fr_fr",
@@ -863,7 +853,7 @@ def main(argv):
         "serial",
         "codec",
         "bitrate_mode",
-        "quality", # cq setting
+        "quality",  # cq setting
         "gop_sec",
         "framerate_fps",
         "width",

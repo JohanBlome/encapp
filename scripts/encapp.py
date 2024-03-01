@@ -277,6 +277,7 @@ def collect_results(
     # dump device information
     dump_device_info(serial, local_workdir, debug)
     # get logcat
+    result_ok = False
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id Meta.Encapp"
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
@@ -291,8 +292,11 @@ def collect_results(
         result_ok = True
         return result_ok, result_json
     else:
-        logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
-        result_ok = parse_logcat(logcat_contents, local_workdir)
+        try:
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            result_ok = parse_logcat(logcat_contents, local_workdir)
+        except Exception:
+            print("Failed to parse logcat")
         return result_ok, result_json
 
 
@@ -636,8 +640,10 @@ def update_media(test, options):
     if out_rate == 0:
         out_rate = in_rate
 
-    if (encapp_tool.ffutils.video_is_raw(test.input.filepath) or \
-        encapp_tool.ffutils.video_is_y4m(test.input.filepath)) and (
+    if (
+        encapp_tool.ffutils.video_is_raw(test.input.filepath)
+        or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+    ) and (
         in_res != out_res
         or in_rate != out_rate
         or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
@@ -681,7 +687,7 @@ def update_media(test, options):
         # now both config and input should be the same i.e. matching config
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
-        test.input.pix_fmt = d["pix_fmt"] #???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+        test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
         test.input.filepath = d["filepath"]
 
 
