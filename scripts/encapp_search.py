@@ -26,7 +26,7 @@ import re
 import encapp
 
 INDEX_FILE_NAME = ".encapp_index"
-
+DEBUG = 0
 
 def getProperties(options, json):
     data = getData(options, True)
@@ -66,7 +66,6 @@ def dict_flatten(test):
 def indexDirectory(options, recursive):
     files = getFilesInDir(f"{options.path}", recursive)
     settings = []
-
     key_list = []
     for filename in files:
         model = ""
@@ -81,7 +80,9 @@ def indexDirectory(options, recursive):
             platform = device_info.get("props", {}).get("ro.board.platform", "")
             serial = device_info.get("props", {}).get("ro.serialno", "")
         except Exception as exc:
-            print("json " + filename + ", load failed: " + str(exc))
+            if DEBUG >  0:
+                print("json " + filename + ", load device data failed: " + str(exc))
+
         try:
 
             # get experiment data
@@ -100,7 +101,8 @@ def indexDirectory(options, recursive):
                     ]
                 )
         except Exception as exc:
-            print("json " + filename + ", load failed: " + str(exc))
+            if DEBUG > 0:
+                print("json " + filename + ", load experiment data failed: " + str(exc))
 
     labels = (
         ["model", "platform", "serial", "filename", "encodedfile"]
@@ -213,6 +215,7 @@ def search(options):
 
 
 def main():
+    global DEBUG
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
@@ -226,8 +229,10 @@ def main():
     parser.add_argument("-i", "--index", action="store_true")
     parser.add_argument("-v", "--video", action="store_true")
     parser.add_argument("-p", "--print_data", action="store_true")
+    parser.add_argument("-d", "--debug", action="count", default = 0)
 
     options = parser.parse_args()
+    DEBUG = options.debug
     if options.path is None:
         options.path = os.getcwd()
 
