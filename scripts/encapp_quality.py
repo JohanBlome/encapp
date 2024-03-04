@@ -321,9 +321,16 @@ def run_quality(test_file, options, debug):
     else:
         device_info = {}
 
-    if options.override_reference is None:
+    reference_pathname = ""
+    reference_dirname = options.get("media_path", None)
+    if options.get("guess_original", None):
+        # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv
+        # only for raw, obviously
+        split = reference_dirname.split(".yuv_")
+        split = split[0].rsplit("/")
+        reference_pathname = reference_dirname + split[-1] + ".yuv"
+    elif options.get("override_reference", None) == None:
         # find the reference source
-        reference_dirname = options.media_path
         if reference_dirname is None:
             # get the reference dirname from the test path
             reference_dirname = os.path.dirname(test_file)
