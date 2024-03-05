@@ -11,15 +11,12 @@ import math
 
 def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({",": "_", " ": "_"}))
-    print(f"{name} -> {ret}")
     return ret
 
 
 def plotAverageBitrate(data, options):
     pair = []
     uniqheight = np.unique(data["height"])
-    print(f"{data['height']}")
-    print(f"heights: {uniqheight}")
     uniqbr = np.unique(data["bitrate"])
     uniqcodec = np.unique(data["codec"])
     uniqdescr = np.unique(data["description"])
@@ -41,8 +38,7 @@ def plotAverageBitrate(data, options):
     bitrates = pd.DataFrame(
         pair, columns=["bitrate", "real_bitrate", "codec", "height", "description"]
     )
-    print(f"br: {bitrates}")
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
+    fig = plt.subplots(nrows=1, dpi=100)
     style = "codec"
     if options.split_descr:
         style = "description"
@@ -53,12 +49,13 @@ def plotAverageBitrate(data, options):
         hue="height",
         data=bitrates,
         marker="o",
-        ax=axs,
     )
+    axs = p.axes
     p.set_xlabel("Target bitrate (kbps)")
     p.set_ylabel("Bitrate ratio")
     plt.ticklabel_format(style="plain", axis="x")
     if len(options.files) == 1:
+
         axs.set_title(f"{options.label} Bitrate in kbps")
     else:
         axs.set_title(f"{options.label} Bitrate in kbps")
@@ -76,11 +73,6 @@ def plotProcRate(data, options):
     data["rel_start_quant"] = (
         (data["rel_start"] / (options.quantization * 1e6)).astype(int)
     ) * options.quantization
-    print(
-        f"Any inf? {data['rel_start'].isin([np.inf, -np.inf]).values.sum()}, na {data.isin([np.NaN]).values.sum()}"
-    )
-    print(f"rel_start_quant: {data['rel_start_quant']}")
-    print(f"{data['fps']}")
 
     slen = int(data["fps"].iloc[0])
     data["smooth_proctime"] = (
@@ -96,29 +88,29 @@ def plotProcRate(data, options):
     if options.skip_head_sec > 0:
         data = data.loc[data["rel_start"] >= (options.skip_head_sec * 1e9)]
     data = data.loc[(data["smooth_proctime"] > 0) & (data["starttime"] > 0)]
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     hue = "codec"
+    fig = plt.figure()
     if options.split_descr:
         hue = "description"
     p = sns.lineplot(  # noqa: F841
         x=data["rel_start_quant"] / 1e3,
         y=1.0 / data["smooth_proctime"],
         hue=hue,
-        ci="sd",
+        errorbar="sd",
         data=data,
-        ax=axs,
     )
     # p.set_ylim(0, 90)
+    axs = p.axes
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Framerate ( {mean_input_fps} fps )")
+        axs.set_title(f"{options.label} Processing framerate ( {mean_input_fps} fps )")
     else:
-        axs.set_title(f"{options.label} Framerate")
+        axs.set_title(f"{options.label} Processing framerate")
     if options.limit:
         axs.set_ylim(0, 15)
     axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
-    axs.grid(b=True, which="minor", color="gray", linewidth=0.5)
+    axs.grid(visible=True, which="minor", color="gray", linewidth=0.5)
     name = f"{options.output}.procrate.png"
     plt.savefig(name.replace(" ", "_"), format="png")
 
@@ -138,13 +130,7 @@ def plotLatency(data, options):
     data["rel_start_quant"] = (
         (data["rel_start"] / (options.quantization * 1e6)).astype(int)
     ) * options.quantization
-    # first = data.iloc[0]["rel_start_quant"]
-    # last = data.iloc[0]["rel_start_quant"]
-
-    print(f"head {data.head(3)['rel_stop']/1e9}")
-    print(f"tail {data.tail(3)['rel_stop']/1e9}")
-    # st = np.min(data["starttime"])
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
+    fig = plt.figure()
 
     hue = "codec"
     if options.split_descr:
@@ -153,16 +139,16 @@ def plotLatency(data, options):
         x=data["rel_start_quant"] / 1e3,
         y=data["proctime"] / 1e6,
         hue=hue,
-        ci="sd",
+        errorbar="sd",
         data=data,
-        ax=axs,
     )
+    axs = p.axes
     # p.set_ylim(0, 90)
     axs.set_title(f"{options.label} Latency (ms)")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.set(xlabel="Time (sec)", ylabel="Latency (msec)")
-    axs.grid(b=True, which="minor", color="gray", linewidth=0.5)
+    axs.grid(visible=True, which="minor", color="gray", linewidth=0.5)
     name = f"{options.output}.latency.png"
     plt.savefig(name.replace(" ", "_"), format="png")
 
@@ -178,22 +164,27 @@ def plotFrameRate(data, options):
         data = data.loc[data["rel_stop"] <= (rel_end - options.skip_tail_sec * 1e9)]
     if options.skip_head_sec > 0:
         data = data.loc[data["rel_start"] > (options.skip_head_sec * 1e9)]
+    fig = plt.figure()
     data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
     hue = "codec"
     if options.split_descr:
         hue = "description"
     p = sns.lineplot(  # noqa: F841
-        x=data["rel_pts"] / 1e6, y="av_fps", hue=hue, ci="sd", data=data, ax=axs
+        x=data["rel_pts"] / 1e6,
+        y="av_fps",
+        hue=hue,
+        errorbar="sd",
+        data=data,
     )
     # p.set_ylim(0, 90)
+    axs = p.axes
     if len(options.files) == 1:
-        axs.set_title(f"{options.label} Framerate ( {mean_input_fps} fps )")
+        axs.set_title(f"{options.label} Average framerate ( {mean_input_fps} fps )")
     else:
-        axs.set_title(f"{options.label} Framerate")
+        axs.set_title(f"{options.label} Average framerate")
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
-    axs.grid(b=True, which="minor", color="gray", linewidth=0.5)
+    axs.grid(visible=True, which="minor", color="gray", linewidth=0.5)
     name = f"{options.output}.framerate.png"
     plt.savefig(name.replace(" ", "_"), format="png")
 
@@ -210,7 +201,6 @@ def plotFrameSize(data, options):
     data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
 
     mean_fr = round(np.mean(data["size"]) / 1000, 2)
-    fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
 
     data.loc[data["iframe"] == 0, "frame type"] = "P frames"
     data.loc[data["iframe"] == 1, "frame type"] = "I frames"
@@ -221,11 +211,11 @@ def plotFrameSize(data, options):
         print(f"There is only one type of frames: {u_frame_types[0]}")
         palette = ["g"]
 
-    if len(options.label) == 0 and "test_description" in list(data.columns):
+    fig = plt.figure()
+    if options.split_descr and "test_description" in list(data.columns):
         data = data.sort_values(by=["test_description", "codec", "height", "bitrate"])
         u_test_description = np.unique(data["test_description"].astype(str))
         col_wrap = len(u_test_description)
-        print(f"ft: {np.unique(data['frame type'])}")
         fg = sns.relplot(
             x=data["pts"] / 1e6,
             y=data["size"] / 1000,
@@ -235,7 +225,6 @@ def plotFrameSize(data, options):
             col_wrap=col_wrap,
             data=data,
             kind="scatter",
-            ax=axs,
             palette=palette,
         )
         p = fg.axes
@@ -248,9 +237,9 @@ def plotFrameSize(data, options):
             style="codec",
             hue="frame type",
             data=data,
-            ax=axs,
             palette=["r", "b"],
         )
+        axs = p.axes
         if len(options.files) == 1:
             axs.set_title(f"{options.label} I/P Framesize in kb ( {mean_fr} kb )")
         else:
@@ -268,34 +257,35 @@ def plotBitrate(data, options):
     if not options.keep_na_codec:
         data = data.loc[data["codec"] != "na"]
     rel_end = np.max(data["pts"])
-    print(f"end: {rel_end}")
     if options.skip_tail_sec > 0:
         data = data.loc[data["pts"] <= (rel_end - options.skip_tail_sec * 1e6)]
     if options.skip_head_sec > 0:
         data = data.loc[data["pts"] > (options.skip_head_sec * 1e6)]
     data = data.loc[(data["av_fps"] > 0) & (data["starttime"] > 0)]
+    data = data.reset_index()
+
+    data["Average kbps"] = (data["av_bitrate"] / 1000).astype("int")
+    data["Bitrate in kbps"] = (data["bitrate"] / 1000).astype("int")
 
     # plot per codec
     mean_br = round(np.mean(data["bitrate_per_frame_bps"] / 1000.0), 2)
 
     u_codecs = np.unique(data["codec"])
     # u_model = pd.unique((data.loc[data["model"] != ""])["model"])
-    print(f"last ts: {data.iloc[-1]}")
     set_label = True
+    fig = plt.figure()
     if options.rename_codec is None:
 
         data = data.sort_values(by=["description", "codec", "height", "bitrate"])
-        if len(options.label) == 0 and "description" in list(data.columns):
-            print(f"td: {np.unique(data['description'])}")
+        if options.split_descr and "description" in list(data.columns):
             # maybe filter on models
             u_test_description = np.unique(data["description"].astype(str))
             col_wrap = len(u_test_description)
-            fig = plt.figure(figsize=(12, 9), dpi=100)
             counter = 0
 
             fg = sns.relplot(
                 x=data["pts"] / 1e6,
-                y=data["av_bitrate"] / 1000,
+                y="Average kbps",
                 hue="codec",
                 style="model",
                 col="description",
@@ -310,38 +300,30 @@ def plotBitrate(data, options):
             set_label = False
         else:
             # maybe filter on models
-            fig, axs = plt.subplots(nrows=len(u_codecs), figsize=(12, 9), dpi=100)
             counter = 0
             for codec in u_codecs:
                 filt = data.loc[data["codec"] == codec]
-                ax1 = axs
-                if len(u_codecs) > 1:
-                    ax1 = axs[counter]
                 p = sns.lineplot(
                     x=filt["pts"] / 1e6,
-                    y=data["av_bitrate"] / 1000,
-                    label=f"{codec}",
-                    hue="bitrate",
+                    y="Average kbps",
+                    hue="Bitrate in kbps",
                     style="model",
                     data=filt,
-                    ax=ax1,
                     palette="dark",
                 )
                 counter += 1
 
     else:
         # plot per model with codecs hard coded to be same
-        fig, axs = plt.subplots(nrows=1, figsize=(12, 9), dpi=100)
         counter = 0
 
         p = sns.lineplot(
             x=filt["pts"] / 1e6,
-            y=data["av_bitrate"] / 1000,
+            y="Average kbps",
             label=f"{codec}",
             hue="model",
-            style="bitrate",
+            style="Bitrate in kbps",
             data=data,
-            ax=ax1,
             palette="dark",
         )
 
@@ -350,9 +332,9 @@ def plotBitrate(data, options):
     plt.ticklabel_format(style="plain", axis="x")
     if set_label:
         if len(options.files) == 1:
-            p.set_title(f"{options.label} Bitrate in kbps ( {mean_br} kbps )")
+            p.set_title(f"{options.label}, Bitrate in kbps ( {mean_br} kbps )")
         else:
-            p.set_title(f"{options.label} Bitrate in kbps )")
+            p.set_title(f"{options.label}, Bitrate in kbps ")
     name = f"{options.output}.bitrate.png"
     plt.savefig(name.replace(" ", "_"), format="png")
 
@@ -361,12 +343,9 @@ def plotTestNumbers(data):
     # plot the number of test per test description
     u_descrs = np.unique(data["description"])
     items = []
-    print(f"u_descrs: {u_descrs}")
     for desc in u_descrs:
         filt = data.loc[(data["description"] == desc) & (data["frame"] == 1)]
         num = len(filt)
-        print(f"descr: {desc} num = {num}")
-        print(f"{filt}")
         items.append([desc, num])
 
     data = pd.DataFrame(items, columns=["description", "num"])
@@ -404,7 +383,11 @@ def parse_args():
     parser.add_argument("-r", "--frame_rate", action="store_true")
     parser.add_argument("-a", "--av_frame_rate", action="store_true")
     parser.add_argument("-l", "--latency", action="store_true")
-    parser.add_argument("--split_descr", action="store_true")
+    parser.add_argument(
+        "--split_descr",
+        action="store_true",
+        help="Use test description to distinguish groups of data. Otherwise all data will be considered as being related",
+    )
     parser.add_argument(
         "--quantization",
         default="60",
@@ -421,20 +404,24 @@ def parse_args():
 
 def main():
     """
-    Calculate stats for videos based on parsing individual frames
-    with ffprobe frame parser.
-    Can output data for a single file or aggregated data for several files.
+    Takes the output from encapp_stats_to_csv.py as a source for plotting performance stats.
     """
     options = parse_args()
     data = None
     if len(options.files) == 1 and len(options.output) == 0:
         options.output = options.files[0]
     for file in options.files:
+        if not file[-4:] == ".csv":
+            print(f"Warning! {file} is not a csv file. Check input.")
         input_data = pd.read_csv(file)
         if data is not None:
             data = pd.concat([data, input_data])
         else:
             data = input_data
+
+    # clean up and removed potential error runs
+    if not options.keep_na_codec:
+        data = data.dropna(subset=["codec"])
 
     sns.set_style("whitegrid")
     sns.set(rc={"xtick.bottom": True, "ytick.left": True})
@@ -453,7 +440,6 @@ def main():
 
     # Average proc time
     if options.av_frame_rate:  # and len(options.files) > 1:
-        print(f"data = {data}")
         plotAverageBitrate(data, options)
     if options.frame_rate:
         plotFrameRate(data, options)
@@ -464,7 +450,7 @@ def main():
         plotFrameSize(data, options)
     if options.latency:
         plotLatency(data, options)
-    if len(np.unique(data["description"])) > 1:
+    if len(np.unique(data["description"].str)) > 1:
         plotTestNumbers(data)
     if options.show:
         plt.show()
