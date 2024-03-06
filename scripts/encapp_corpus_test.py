@@ -162,7 +162,7 @@ def run_encapp(files, md5sums, options):
                 ignore_results=False,
                 fast_copy=True,
                 split=False,
-                debug=0,
+                debug=options.debug,
             )
 
     # Done with the encoding
@@ -172,7 +172,7 @@ def run_encapp(files, md5sums, options):
     quality_options["media_path"] = options.mediastore
     result = []
     for file in json_files:
-        tmp = encapp_quality.run_quality(file, quality_options, debug=0)
+        tmp = encapp_quality.run_quality(file, quality_options, debug=options.debug)
         # The parsing could have failed and it will be None or empty
         if tmp:
             if len(tmp[0]) > 0:
@@ -519,6 +519,14 @@ def get_options(argv):
         metavar="output_csv",
         help="output csv file with quality metrics",
     )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="count",
+        dest="debug",
+        default=default_values["debug"],
+        help="Increase verbosity (use multiple times for more)",
+    )
 
     return parser.parse_args(argv[1:])
 
@@ -531,7 +539,7 @@ def main(argv):
 
     # Check connected device(s)
     # get model and serial number
-    model, options.serial = adb.get_device_info(options.serial, 0)
+    model, options.serial = adb.get_device_info(options.serial, options.debug)
     print(f"Run on {model} with serial {options.serial}")
     files, md5sums = find_media(options)
     files = filter_files(files, options)
