@@ -482,7 +482,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "--serial",
-        default="",
+        default=None,
         help="Serial number of the device",
     )
     parser.add_argument(
@@ -529,6 +529,10 @@ def main(argv):
     if options.local_workdir == "":
         options.local_workdir = f"quality.{options.corpus_dir.replace(',','-')}"
 
+    # Check connected device(s)
+    # get model and serial number
+    model, options.serial = adb.get_device_info(options.serial, 0)
+    print(f"Run on {model} with serial {options.serial}")
     files, md5sums = find_media(options)
     files = filter_files(files, options)
 
