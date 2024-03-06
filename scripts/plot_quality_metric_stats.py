@@ -17,6 +17,17 @@ import argparse
 sns.set_style("whitegrid")
 sns.set(rc={"xtick.bottom": True})
 
+def set_graph_props(g, args):
+    g.fig.set_dpi(args.dpi)
+    for axs in g.axes:
+        if not isinstance(axs, np.ndarray):
+            axs.grid(True, which="both", axis="both")
+        else:
+            for ax in axs:
+                ax.grid(True, which="both", axis="both")
+    if args.xlog:
+        plt.xscale("log")
+    plt.legend(ncols=2)
 
 def clean_filename(text):
     return text.strip().replace(" ", ".")
@@ -61,9 +72,7 @@ def plot_by(data, args):
                     height=graph_height,
                     aspect=aspect_ratio,
                 )
-                g.fig.set_dpi(args.dpi)
-                if args.xlog:
-                    plt.xscale("log")
+                set_graph_props(g, args)
                 plt.suptitle(f"{args.label}.{args.metric}.{source}")
                 plt.savefig(f"{clean_filename(args.label)}.{args.metric}.{source}.png")
                 plt.close()
@@ -82,9 +91,7 @@ def plot_by(data, args):
                 height=graph_height,
                 aspect=aspect_ratio,
             )
-            g.fig.set_dpi(args.dpi)
-            if args.xlog:
-                plt.xscale("log")
+            set_graph_props(g, args)
             plt.suptitle(f"{args.label}.{args.metric} by source")
             plt.savefig(f"{args.label}.{args.metric}.by_source.png")
             plt.close()
@@ -111,9 +118,7 @@ def plot_by(data, args):
                     height=graph_height,
                     aspect=aspect_ratio,
                 )
-                g.fig.set_dpi(args.dpi)
-                if args.xlog:
-                    plt.xscale("log")
+                set_graph_props(g, args)
                 plt.suptitle(f"{args.label}.{args.metric}.{codec}")
                 plt.savefig(f"{clean_filename(args.label)}.{args.metric}.{codec}.png")
                 plt.close()
@@ -130,12 +135,9 @@ def plot_by(data, args):
                 height=graph_height,
                 aspect=aspect_ratio,
             )
-            g.fig.set_dpi(args.dpi)
-            if args.xlog:
-                plt.xscale("log")
+            set_graph_props(g, args)
             plt.suptitle(f"{args.label} {args.metric} by codec")
             plt.savefig(f"{clean_filename(args.label)}.{args.metric}.by_codec.png")
-            plt.show()
             plt.close()
 
     elif args.split_by == "model":
@@ -155,9 +157,7 @@ def plot_by(data, args):
                     height=graph_height,
                     aspect=aspect_ratio,
                 )
-                g.fig.set_dpi(args.dpi)
-                if args.xlog:
-                    plt.xscale("log")
+                set_graph_props(g, args)
                 plt.suptitle(f"{args.label}.{args.metric}.{model}")
                 plt.savefig(f"{clean_filename(args.label)}.{args.metric}.{model}.png")
                 plt.close()
@@ -176,12 +176,9 @@ def plot_by(data, args):
                 height=graph_height,
                 aspect=aspect_ratio,
             )
-            g.fig.set_dpi(args.dpi)
-            if args.xlog:
-                plt.xscale("log")
+            set_graph_props(g, args)
             plt.suptitle(f"{args.label} {args.metric} by model")
             plt.savefig(f"{clean_filename(args.label)}.{args.metric}.by_model.png")
-            plt.show()
             plt.close()
     else:
 
@@ -207,10 +204,7 @@ def plot_by(data, args):
                     height=graph_height,
                     aspect=aspect_ratio,
                 )
-                g.fig.set_dpi(args.dpi)
-                if args.xlog:
-                    plt.xscale("log")
-                plt.legend(ncols=2)
+                set_graph_props(g, args)
                 plt.suptitle(f"{args.label} {args.metric} {height}")
                 plt.savefig(f"{clean_filename(args.label)}.{args.metric}.{height}.png")
                 plt.close()
@@ -229,10 +223,7 @@ def plot_by(data, args):
                 height=graph_height,
                 aspect=aspect_ratio,
             )
-            g.fig.set_dpi(args.dpi)
-            if args.xlog:
-                plt.xscale("log")
-            plt.legend(ncols=2)
+            set_graph_props(g, args)
             plt.suptitle(f"{args.label} {args.metric} by height")
             plt.savefig(f"{clean_filename(args.label)}.{args.metric}.by_height.png")
             plt.close()
