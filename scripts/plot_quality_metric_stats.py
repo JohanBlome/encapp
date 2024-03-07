@@ -17,6 +17,19 @@ import argparse
 sns.set_style("whitegrid")
 sns.set(rc={"xtick.bottom": True})
 
+
+metrics = [
+    "vmaf",
+    "psnr",
+    "ssim",
+    "bitrate",
+    "bitrate_ratio",
+    "vmaf_hm",
+    "psnr_u",
+    "psnr_v",
+]
+
+
 def set_graph_props(g, args):
     g.fig.set_dpi(args.dpi)
     for axs in g.axes:
@@ -28,6 +41,7 @@ def set_graph_props(g, args):
     if args.xlog:
         plt.xscale("log")
     plt.legend(ncols=2)
+
 
 def clean_filename(text):
     return text.strip().replace(" ", ".")
@@ -237,7 +251,12 @@ def main():
         help="Csv output file(s) from encapp_quality.py should be used. Multiple files will be merged.",
     )
     parser.add_argument("-l", "--label", help="", default=None)
-    parser.add_argument("-m", "--metric", help="", default="vmaf")
+    parser.add_argument(
+        "-m",
+        "--metric",
+        default="vmaf",
+        help=f"Metric to plot. Available {metrics}, default: vmaf",
+    )
     parser.add_argument("--bitrate_mode", default="", help="Filter for bitrate mode")
     parser.add_argument(
         "--codec",
@@ -327,16 +346,18 @@ def main():
         data_2 = data.loc[(data["height"].isin(sides)) | (data["width"].isin(sides))]
         data = pd.concat([data_1, data_2])
 
-    min_br = data["bitrate_bps"].min()
-    max_br = data["bitrate_bps"].max()
-    print(f"{min_br}, {max_br}")
-
     heights = data["height"].unique()
     codecs = np.unique(data["codec"])
     framerates = np.unique(data["framerate_fps"])
 
     data["bitrate Mbps"] = data["bitrate_bps"] / 1000000
     data["calculated bitrate Mbps"] = data["calculated_bitrate_bps"] / 1000000
+
+    if args.metric == "bitrate_ratio":
+        data["bitrate ratio"] = data["calculated_bitrate_bps"] / data["bitrate_bps"]
+        args.metric = "bitrate ratio"
+    if args.metric == "bitrate":
+        args.metric = "calculated bitrate Mbps"
 
     # Colors
     sources = data["source"].unique()
