@@ -40,7 +40,9 @@ def set_graph_props(g, args):
                 ax.grid(True, which="both", axis="both")
     if args.xlog:
         plt.xscale("log")
-    plt.legend(ncols=2)
+    if args.ylog:
+        plt.yscale("log")
+    plt.subplots_adjust(top=0.88)
 
 
 def clean_filename(text):
@@ -207,36 +209,70 @@ def plot_by(data, args):
         if args.separate:
             for height in data["height"].unique():
                 filt = data.loc[data["height"] == height]
+                if args.average:
+                    for framerate in data["framerate_fps"].unique():
+                        filt2 = filt.loc[filt["framerate_fps"] == framerate]
+                        g = sns.catplot(
+                            x=bitrate_column,
+                            y=args.metric,
+                            hue="codec",
+                            col="model",
+                            kind="box",
+                            data=filt2,
+                        )
+                        set_graph_props(g, args)
+                        plt.suptitle(
+                            f"{args.label} {args.metric} {height} @  {framerate} fps"
+                        )
+                        plt.savefig(
+                            f"{clean_filename(args.label)}.{args.metric}.{height}.{framerate}fps.png"
+                        )
+                        plt.close()
+
+                else:
+                    g = sns.relplot(
+                        x=bitrate_column,
+                        y=args.metric,
+                        hue="source",
+                        style="codec",
+                        data=filt,
+                        col="framerate_fps",
+                        kind="line",
+                        height=graph_height,
+                        aspect=aspect_ratio,
+                    )
+                    set_graph_props(g, args)
+                    plt.suptitle(f"{args.label} {args.metric} {height}")
+                    plt.savefig(
+                        f"{clean_filename(args.label)}.{args.metric}.{height}.png"
+                    )
+                    plt.close()
+
+        else:
+            g = None
+            if args.average:
+                g = sns.catplot(
+                    x=bitrate_column,
+                    y=args.metric,
+                    hue=hue,
+                    col="model",
+                    kind="box",
+                    data=data,
+                )
+            else:
+                split_num = len(data["height"].unique())
                 g = sns.relplot(
                     x=bitrate_column,
                     y=args.metric,
                     hue="source",
                     style="codec",
-                    data=filt,
-                    col="framerate_fps",
+                    data=data,
+                    col="height",
+                    row="framerate_fps",
                     kind="line",
                     height=graph_height,
                     aspect=aspect_ratio,
                 )
-                set_graph_props(g, args)
-                plt.suptitle(f"{args.label} {args.metric} {height}")
-                plt.savefig(f"{clean_filename(args.label)}.{args.metric}.{height}.png")
-                plt.close()
-
-        else:
-            split_num = len(data["height"].unique())
-            g = sns.relplot(
-                x=bitrate_column,
-                y=args.metric,
-                hue="source",
-                style="codec",
-                data=data,
-                col="height",
-                row="framerate_fps",
-                kind="line",
-                height=graph_height,
-                aspect=aspect_ratio,
-            )
             set_graph_props(g, args)
             plt.suptitle(f"{args.label} {args.metric} by height")
             plt.savefig(f"{clean_filename(args.label)}.{args.metric}.by_height.png")
@@ -294,6 +330,16 @@ def main():
     parser.add_argument(
         "--xlog", action="store_true", help="Plot x axis with log scale."
     )
+    parser.add_argument(
+        "--ylog", action="store_true", help="Plot y axis with log scale."
+    )
+    parser.add_argument(
+        "--average", action="store_true", help="Plot average of the metric"
+    )
+    parser.add_argument(
+        "--scale_by_bitrate", action="store_true", help="Scale metric by bitrate ratio"
+    )
+
     parser.add_argument("--graph_size", default="9x9")
     parser.add_argument("--dpi", type=int, default=100)
 
@@ -326,7 +372,8 @@ def main():
     # todo: check this filter
     if len(args.source) > 0:
         sources = args.source.replace(",", "|")
-        data = data[data["source"].str.contains(sources)]
+        print(f"{sources}")
+        data = data[data["reference_file"].str.contains(sources)]
 
     data["source"] = data.apply(
         lambda row: row["reference_file"].split("/")[-1].split(".")[0], axis=1
@@ -351,10 +398,16 @@ def main():
     framerates = np.unique(data["framerate_fps"])
 
     data["bitrate Mbps"] = data["bitrate_bps"] / 1000000
-    data["calculated bitrate Mbps"] = data["calculated_bitrate_bps"] / 1000000
+    data["calculated bitrate Mbps"] = (data["calculated_bitrate_bps"] / 1000000).round(
+        1
+    )
+    data["bitrate ratio"] = data["calculated_bitrate_bps"] / data["bitrate_bps"]
+
+    if args.scale_by_bitrate:
+        data[f"scaled {args.metric}"] = data[args.metric] / data["bitrate ratio"]
+        args.metric = f"scaled {args.metric}"
 
     if args.metric == "bitrate_ratio":
-        data["bitrate ratio"] = data["calculated_bitrate_bps"] / data["bitrate_bps"]
         args.metric = "bitrate ratio"
     if args.metric == "bitrate":
         args.metric = "calculated bitrate Mbps"
