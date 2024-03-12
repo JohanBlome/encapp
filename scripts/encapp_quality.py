@@ -295,7 +295,9 @@ def run_quality(test_file, options, debug):
     """Compare the output found in test_file with the source/reference
     found in options.media_path directory or overriden
     """
-    print(f"Run quality, {test_file} - {options}")
+    print(f"Run quality, {test_file}")
+    if debug > 0:
+        print(options)
     duration = 0
     results = {}
     if test_file[-4:] == "json":
@@ -742,7 +744,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "-s",
-        "--resolution",
+        "--resolution",python3 -m pip install types-protobuf"
         help="Override reference resolution WxH",
         default=None,
     )
@@ -764,7 +766,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "--csv",
-        help="output csv data from calculated results not in csv format",
+        help="output csv data from calculated repython3 -m pip install types-protobuf"sults not in csv format",
         action="store_true",
         default=False,
     )
@@ -899,7 +901,11 @@ def main(argv):
         start = time.time()
         print(f"Total number of test: {total}")
         for test in options.test:
-            data = run_quality(test, options, options.debug)
+            try:
+                data = run_quality(test, vars(options), options.debug)
+            except Exception as ex:
+                print(f"{test} failed: {ex}")
+                continue
             now = time.time()
             run_for = now - start
             time_per_test = float(run_for) / float(current)
