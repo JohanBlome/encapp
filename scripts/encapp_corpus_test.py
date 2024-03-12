@@ -87,6 +87,18 @@ def verify_source_file(filepath, mediastore):
     return
 
 
+def clear_files(options):
+    adb.remove_files_using_regex(
+        options.serial, "encapp_.*", options.device_workdir, options.debug
+    )
+    adb.remove_files_using_regex(
+        options.serial, ".*pbtxt$", options.device_workdir, options.debug
+    )
+    adb.remove_files_using_regex(
+        options.serial, ".*[yuv|raw]$", options.device_workdir, options.debug
+    )
+
+
 def run_encapp(files, md5sums, options):
     # Download files if not present, in the future check md5sum
 
@@ -108,6 +120,8 @@ def run_encapp(files, md5sums, options):
     i_frame_interval = 3
     for counter, filepath in enumerate(files):
         print(f"Running {counter + 1}/{len(files)}")
+        if options.clear_files:
+            clear_files(options)
         test_path = f"/tmp/_encapp.pbtxt"
         test = tests_definition.Test()
         encapp.remove_encapp_gen_files(options.serial)
@@ -137,7 +151,8 @@ def run_encapp(files, md5sums, options):
         test.input.resolution = resolution
         test.input.framerate = framerate
         test.input.pix_fmt = tests_definition.Input.PixFmt.Value(options.pix_fmt)
-
+        if options.realtime:
+            test.input.realtime = True
         # check bitrate ladder
         bitrates = encapp.parse_bitrate_field(options.bitrate)
 
@@ -165,6 +180,8 @@ def run_encapp(files, md5sums, options):
                 debug=options.debug,
             )
 
+    if options.clear_files:
+        clear_files(options)
     # Done with the encoding
     # Find all output json file (let us check the number as well).
     json_files = glob.glob(f"{local_workdir}/encapp_*.json")
@@ -526,6 +543,16 @@ def get_options(argv):
         dest="debug",
         default=0,
         help="Increase verbosity (use multiple times for more)",
+    )
+    parser.add_argument(
+        "--clear_files",
+        action="store_true",
+        help="For memory challenged devices clear files before running.",
+    )
+    parser.add_argument(
+        "--realtime",
+        action="store_true",
+        help="Run in realtime and not as fast as possible.",
     )
 
     return parser.parse_args(argv[1:])
