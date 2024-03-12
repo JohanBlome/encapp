@@ -329,7 +329,8 @@ def run_quality(test_file, options, debug):
             # get the reference dirname from the test path
             reference_dirname = os.path.dirname(test_file)
         reference_pathname = os.path.join(reference_dirname, results.get("sourcefile"))
-
+    else:
+        reference_pathname = options["override_reference"]
     # For raw we assume the source is the same resolution as the media
     # For surface transcoding look at decoder_media_format
 
