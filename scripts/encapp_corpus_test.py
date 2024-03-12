@@ -524,7 +524,7 @@ def get_options(argv):
         "--debug",
         action="count",
         dest="debug",
-        default=default_values["debug"],
+        default=0,
         help="Increase verbosity (use multiple times for more)",
     )
 
