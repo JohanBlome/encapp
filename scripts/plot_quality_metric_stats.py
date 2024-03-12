@@ -202,7 +202,7 @@ def plot_by(data, args):
         style = "codec"
         size = "model"
         if len(data["model"]) > 1:
-            style = "mode"
+            style = "model"
             size = "codec"
 
         # implicit by height
@@ -254,7 +254,7 @@ def plot_by(data, args):
                 g = sns.catplot(
                     x=bitrate_column,
                     y=args.metric,
-                    hue=hue,
+                    hue="codec",
                     col="model",
                     kind="box",
                     data=data,
@@ -264,8 +264,8 @@ def plot_by(data, args):
                 g = sns.relplot(
                     x=bitrate_column,
                     y=args.metric,
-                    hue="source",
-                    style="codec",
+                    hue=hue,
+                    style=style,
                     data=data,
                     col="height",
                     row="framerate_fps",
@@ -366,7 +366,7 @@ def main():
         data = data.loc[data["codec"].str.contains(codecs)]
 
     if len(args.framerate) > 0:
-        framerates = [float(x) for x in args.framerate.split("|")]
+        framerates = [float(x) for x in args.framerate.split(",")]
         data = data.loc[data["framerate_fps"].isin(framerates)]
 
     # todo: check this filter
