@@ -766,7 +766,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "--csv",
-        help="output csv data from calculated repython3 -m pip install types-protobuf"sults not in csv format",
+        help="output csv data from calculated results not in csv format",
         action="store_true",
         default=False,
     )
