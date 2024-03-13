@@ -744,7 +744,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "-s",
-        "--resolution",python3 -m pip install types-protobuf"
+        "--resolution",
         help="Override reference resolution WxH",
         default=None,
     )
