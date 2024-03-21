@@ -28,6 +28,7 @@ import encapp
 INDEX_FILE_NAME = ".encapp_index"
 DEBUG = 0
 
+
 def getProperties(options, json):
     data = getData(options, True)
     _, filename = os.path.split(json)
@@ -80,7 +81,7 @@ def indexDirectory(options, recursive):
             platform = device_info.get("props", {}).get("ro.board.platform", "")
             serial = device_info.get("props", {}).get("ro.serialno", "")
         except Exception as exc:
-            if DEBUG >  0:
+            if DEBUG > 0:
                 print("json " + filename + ", load device data failed: " + str(exc))
 
         try:
@@ -155,7 +156,7 @@ def derive_values(data):
         if "x" in resolution:
             width, height = resolution.split("x")
         else:
-            width=height=-1;
+            width = height = -1
         width_list.append(width)
         height_list.append(height)
     data["resolution"] = resolution_list
@@ -168,9 +169,11 @@ def derive_values(data):
 
 def force_options(data, options):
     if options.codec:
-        for val in data['configure.codec']:
+        for val in data["configure.codec"]:
             print(f"{val}")
-        data = data.loc[data["configure.codec"].str.contains(options.codec, case=False, na=False)]
+        data = data.loc[
+            data["configure.codec"].str.contains(options.codec, case=False, na=False)
+        ]
     if options.bitrate:
         ranges = options.bitrate.split("-")
         vals = []
@@ -229,7 +232,7 @@ def main():
     parser.add_argument("-i", "--index", action="store_true")
     parser.add_argument("-v", "--video", action="store_true")
     parser.add_argument("-p", "--print_data", action="store_true")
-    parser.add_argument("-d", "--debug", action="count", default = 0)
+    parser.add_argument("-d", "--debug", action="count", default=0)
 
     options = parser.parse_args()
     DEBUG = options.debug
@@ -251,7 +254,20 @@ def main():
         ]
     )
     if options.print_data:
-        print(data[["filename", "encodedfile", "configure.codec", "configure.iFrameInterval", "framerate", "height", "configure.bitrate","meanbitrate"]])
+        print(
+            data[
+                [
+                    "filename",
+                    "encodedfile",
+                    "configure.codec",
+                    "configure.iFrameInterval",
+                    "framerate",
+                    "height",
+                    "configure.bitrate",
+                    "meanbitrate",
+                ]
+            ]
+        )
     else:
         files = data["filename"].values
         for fl in files:
