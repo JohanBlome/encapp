@@ -677,9 +677,9 @@ def update_media(test, options):
             pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
-        output[
-            "output_filepath"
-        ] = f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
+        output["output_filepath"] = (
+            f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
+        )
         replace["input"] = input
         replace["output"] = output
 

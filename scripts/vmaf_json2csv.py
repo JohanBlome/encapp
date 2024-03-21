@@ -27,7 +27,9 @@ def process_infile(infile, outfile, debug):
     with open(infile, "r") as fin:
         json_text = fin.read()
     json_dict = json.loads(json_text)
-    vmaf_info = pandas.DataFrame({"frame_num": list(d["frameNum"] for d in json_dict["frames"])})
+    vmaf_info = pandas.DataFrame(
+        {"frame_num": list(d["frameNum"] for d in json_dict["frames"])}
+    )
     for key in json_dict["frames"][0]["metrics"].keys():
         vmaf_info[key] = list(d["metrics"][key] for d in json_dict["frames"])
 
@@ -125,11 +127,12 @@ def main(argv):
     # print results
     if options.debug > 0:
         print(options)
-    
+
     if options.infile is not None:
         process_infile(options.infile, options.outfile, options.debug)
     else:
         print("Input file is missing.")
+
 
 if __name__ == "__main__":
     # at least the CLI program name: (CLI) execution
