@@ -60,7 +60,7 @@ def check_md5sum(sourcefile, mediastore):
 def video_to_yuv(input_filepath, output_filepath, pix_fmt):
     # lazy but let us skip transcodig if the target is already there...
     if not os.path.exists(output_filepath):
-        cmd = f"ffmpeg -y -hide_banner -i {input_filepath} -pix_fmt {pix_fmt} {output_filepath}"
+        cmd = f"ffmpeg -y -loglevel error -hide_banner -i {input_filepath} -pix_fmt {pix_fmt} {output_filepath}"
         ret, stdout, stderr = adb.run_cmd(cmd, debug=0)
         if ret != 0:
             print(f"Error: {stderr}")
@@ -116,10 +116,14 @@ def run_encapp(files, md5sums, options):
         with open(destination, "wb") as f:
             f.write(file.content)
 
+    failed_tests = []
     # TODO: setting
     i_frame_interval = 3
     for counter, filepath in enumerate(files):
         print(f"Running {counter + 1}/{len(files)}")
+        if counter < options.skip:
+            print(f"Skip file: {filepath}")
+            continue
         if options.clear_files:
             clear_files(options)
         test_path = f"/tmp/_encapp.pbtxt"
@@ -179,9 +183,8 @@ def run_encapp(files, md5sums, options):
                 split=False,
                 debug=options.debug,
             )
-
-    if options.clear_files:
-        clear_files(options)
+        if options.clear_files:
+            clear_files(options)
     # Done with the encoding
     # Find all output json file (let us check the number as well).
     json_files = glob.glob(f"{local_workdir}/encapp_*.json")
@@ -553,6 +556,12 @@ def get_options(argv):
         "--realtime",
         action="store_true",
         help="Run in realtime and not as fast as possible.",
+    )
+    parser.add_argument(
+        "--skip",
+        type=int,
+        default=0,
+        help="Skip the first N files. If a file crashes the device, it can be skipped",
     )
 
     return parser.parse_args(argv[1:])
