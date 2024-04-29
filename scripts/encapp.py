@@ -541,6 +541,8 @@ def run_codec_tests_file(
         files_to_push |= {protobuf_txt_filepath}
         if options.dry_run:
             # Do nothing here
+            if debug:
+                print("Dry run - do nothing")
             return None, None
         else:
             return run_codec_tests(
@@ -677,9 +679,9 @@ def update_media(test, options):
             pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
-        output[
-            "output_filepath"
-        ] = f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
+        output["output_filepath"] = (
+            f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
+        )
         replace["input"] = input
         replace["output"] = output
 
@@ -1428,7 +1430,7 @@ def get_options(argv):
         help="store all input and generated file in one folder",
     )
     parser.add_argument(
-        "--dry_run",
+        "--dry-run",
         action="store_true",
         dest="dry_run",
         default=False,
@@ -1523,6 +1525,9 @@ def process_options(options):
 
 
 def verify_app_version(json_files):
+    if not json_files:
+        return
+
     for fl in json_files:
         with open(fl) as f:
             try:
