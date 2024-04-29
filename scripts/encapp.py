@@ -140,6 +140,12 @@ FFPROBE_FIELDS = {
 }
 
 
+def get_pix_fmt(numerical_id):
+    return next(
+        key for key, value in PIX_FMT_TYPES_VALUES.items() if value == numerical_id
+    )
+
+
 def parse_resolution(resolution):
     reg = "([0-9]*).([0-9]*)"
     match = re.search(reg, resolution)
@@ -658,7 +664,8 @@ def update_media(test, options):
         if in_pix_fmt != out_pix_fmt:
             reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
         reason = reason.strip()
-        print(f"Transcode raw input: {test.input.filepath} {reason = }")
+        if options.debug > 0:
+            print(f"Transcode raw input: {test.input.filepath} {reason = }")
         replace = {}
         input = {}
         output = {}
@@ -793,7 +800,7 @@ def update_codec_test(
             input = {}
             input["pix_fmt"] = "rgba"
             options["input"] = input
-        d = process_input_path(test.input.filepath, options)
+        d = process_input_path(test.input.filepath, options, test.input)
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
         test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
@@ -1192,6 +1199,8 @@ def codec_test(options, model, serial, debug):
     protobuf_txt_filepath = options.configfile
     check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug)
 
+    print(protobuf_txt_filepath)
+    print(options)
     # run the codec test
     return run_codec_tests_file(
         protobuf_txt_filepath, model, serial, local_workdir, options, debug
@@ -1509,6 +1518,7 @@ def process_options(options):
         if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
             input_filepath
         ):
+            print(f"Process derived values {options=}")
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
             if "input" in options:
@@ -1543,7 +1553,7 @@ def verify_app_version(json_files):
                 print(f"File {fl} failed to be read")
 
 
-def process_input_path(input_filepath, replace, debug=0):
+def process_input_path(input_filepath, replace, test_input, debug=0):
     # Raw input?
     if encapp_tool.ffutils.video_is_raw(input_filepath):
         settings = {}
@@ -1591,6 +1601,20 @@ def process_input_path(input_filepath, replace, debug=0):
     else:
         # decode encoded video (the encoder wants raw video)
         videofile_config = encapp_tool.ffutils.get_video_info(input_filepath)
+
+        # First check if we have settings in the test
+        resolution = None
+        framerate = None
+        pix_fmt = None
+
+        if test_input:
+            if test_input.resolution:
+                resolution = test_input.resolution
+            if test_input.framerate:
+                framerate = test_input.framerate
+            if test_input.pix_fmt:
+                pix_fmt = get_pix_fmt(test_input.pix_fmt)
+
         if replace is not None:
             # check whether the user has a preferred raw format
             pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
@@ -1599,9 +1623,13 @@ def process_input_path(input_filepath, replace, debug=0):
             framerate = videofile_config["framerate"]
             extension = PIX_FMT_TYPES[pix_fmt]
         else:
-            pix_fmt = PREFERRED_PIX_FMT
-            resolution = f"{videofile_config['width']}x{videofile_config['height']}"
-            framerate = videofile_config["framerate"]
+            if not pix_fmt:
+                pix_fmt = PREFERRED_PIX_FMT
+
+            if not resolution:
+                resolution = f"{videofile_config['width']}x{videofile_config['height']}"
+            if not framerate:
+                framerate = videofile_config["framerate"]
             extension = PIX_FMT_TYPES[pix_fmt]
 
         # get raw filepath
