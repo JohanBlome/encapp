@@ -642,7 +642,6 @@ def update_media(test, options):
     replace = getattr(options, "replace", {})
     input_repl = replace.get("input", {})
     out_pix_fmt = input_repl.get("pix_fmt", in_pix_fmt)
-
     if len(out_res) == 0:
         out_res = in_res
     if out_rate == 0:
@@ -656,6 +655,19 @@ def update_media(test, options):
         or in_rate != out_rate
         or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
     ):
+        # one more thing to check, if nv21 or rgba only transcode if source is y4m
+        if (
+            (
+                out_pix_fmt == PIX_FMT_TYPES_VALUES["nv21"]
+                or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
+            )
+            and test.configure.surface
+            and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+        ):
+            if options.debug > 0:
+                print("Skip raw transcoding.")
+                return
+
         reason = ""
         if in_res != out_res:
             reason = f" res ({in_res} != {out_res})"
@@ -674,9 +686,21 @@ def update_media(test, options):
         input["pix_fmt"] = tests_definitions.Input.PixFmt.Name(in_pix_fmt)
         input["resolution"] = in_res
         input["framerate"] = in_rate
+
+        if (
+            out_pix_fmt == PIX_FMT_TYPES_VALUES["nv21"]
+            or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
+        ) and test.configure.surface:
+            print("Attention.")
+            print(
+                "Raw nv21/rgba to a surface will scale on device using the Android default surface scaling"
+            )
+            out_res = in_res
+            out_rate = in_rate
+
         output["resolution"] = out_res
         output["framerate"] = out_rate
-        output["pix_fmt"] = out_pix_fmt
+        output["pix_fmt"] = get_pix_fmt(out_pix_fmt)
 
         extension = "raw"
         if output["pix_fmt"] == "rgba":
@@ -689,10 +713,11 @@ def update_media(test, options):
         output["output_filepath"] = (
             f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
         )
+        output["pix_fmt"] = pix_fmt
         replace["input"] = input
         replace["output"] = output
 
-        d = process_input_path(test.input.filepath, replace)
+        d = process_input_path(test.input.filepath, replace, test.input)
         # now both config and input should be the same i.e. matching config
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
@@ -794,12 +819,14 @@ def update_codec_test(
     # If no surface decode and no raw input, decode to raw
     if encapp_tool.ffutils.video_is_y4m(test.input.filepath):
         options = None
+        """
         if test.configure.surface:
-            # set pixel config to rgba
+            # set pixel config to nv21
             options = {}
             input = {}
-            input["pix_fmt"] = "rgba"
+            input["pix_fmt"] = "nv21"
             options["input"] = input
+        """
         d = process_input_path(test.input.filepath, options, test.input)
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
@@ -1199,8 +1226,6 @@ def codec_test(options, model, serial, debug):
     protobuf_txt_filepath = options.configfile
     check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug)
 
-    print(protobuf_txt_filepath)
-    print(options)
     # run the codec test
     return run_codec_tests_file(
         protobuf_txt_filepath, model, serial, local_workdir, options, debug
@@ -1518,7 +1543,6 @@ def process_options(options):
         if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
             input_filepath
         ):
-            print(f"Process derived values {options=}")
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
             if "input" in options:
