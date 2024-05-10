@@ -180,8 +180,6 @@ def force_options(data, options):
         for val in ranges:
             bitrate = encapp.convert_to_bps(val)
             vals.append(int(bitrate))
-
-        print(f"vals = {vals}")
         if len(vals) == 2:
             data = data.loc[
                 (data["configure.bitrate"] >= vals[0])
@@ -195,15 +193,14 @@ def force_options(data, options):
         data = data.loc[data["framerate"] == options.fps]
     if options.size:
         sizes = options.size.split("x")
-        print(f"sizes = {sizes}")
         if len(sizes) == 2:
             data = data.loc[
                 (data["width"] == int(sizes[0])) & (data["height"] == int(sizes[1]))
             ]
         else:
-            print(f"Filter on size: befeor = {len(data)}")
             data = data.loc[(data["width"] == sizes[0]) | (data["height"] == sizes[0])]
-        print(f"Filter on size: after = {len(data)}")
+    if options.reference:
+        data = data.loc[data["input.filepath"].str.contains(options.reference)]
     return data
 
 
@@ -228,6 +225,7 @@ def main():
     parser.add_argument("-b", "--bitrate", default=None)
     parser.add_argument("-g", "--gop", type=int, default=None)
     parser.add_argument("-f", "--fps", type=float, default=None)
+    parser.add_argument("-r", "--reference", type=str, default=None)
     parser.add_argument("--no_rec", action="store_true")
     parser.add_argument("-i", "--index", action="store_true")
     parser.add_argument("-v", "--video", action="store_true")
