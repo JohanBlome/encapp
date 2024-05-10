@@ -67,28 +67,29 @@ def calc_stats(pdata, options, label, print_text=False):
     mean_ratio = imean / pmean
     size_ratio = np.sum(iframes["size"]) / np.sum(pframes["size"])
 
-    print(f"ime,imx,imi = {imean}, {imax}, {imin}")
-    print(f"{len(pframes)}")
-    print("*** {:s} stats ***".format(label))
-    print("Frame count: {:f}".format(len(pdata)))
-    print("Duration: {:.3f} secs".format(total_duration))
-    print("Fps: {:.2f} fps".format(fps))
-    print("Bitrate {:.2f} kbps".format(8 * total_size / (total_duration * 1000)))
-    print(
-        "Iframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
-            int(imean), int(imax), int(imin)
+    if options.get("quiet", None) is None:
+        print(f"ime,imx,imi = {imean}, {imax}, {imin}")
+        print(f"{len(pframes)}")
+        print("*** {:s} stats ***".format(label))
+        print("Frame count: {:f}".format(len(pdata)))
+        print("Duration: {:.3f} secs".format(total_duration))
+        print("Fps: {:.2f} fps".format(fps))
+        print("Bitrate {:.2f} kbps".format(8 * total_size / (total_duration * 1000)))
+        print(
+            "Iframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
+                int(imean), int(imax), int(imin)
+            )
         )
-    )
-    print(
-        "Pframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
-            int(pmean), int(pmax), int(pmin)
+        print(
+            "Pframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
+                int(pmean), int(pmax), int(pmin)
+            )
         )
-    )
-    print("Iframe count: {:d}".format(iframe_cnt))
-    print("Pframe count: {:d}".format(pframe_cnt))
-    print("mean size iframe/pframe ratio: {:.2f}".format(mean_ratio))
-    print("total size iframe/pframe ratio: {:.2f}".format(size_ratio))
-    print("___")
+        print("Iframe count: {:d}".format(iframe_cnt))
+        print("Pframe count: {:d}".format(pframe_cnt))
+        print("mean size iframe/pframe ratio: {:.2f}".format(mean_ratio))
+        print("total size iframe/pframe ratio: {:.2f}".format(size_ratio))
+        print("___")
 
     """
     elif options.csv and print_text:
@@ -374,30 +375,29 @@ def run_quality(test_file, options, debug):
         print("All quality indicators already calculated for media, " f"{vmaf_file}")
     else:
         input_media_format = results.get("decoder_media_format")
-        raw = True
+        raw = encapp_tool.ffutils.video_is_raw(reference_pathname)
 
-        if options.get("pix_fmt", None):
-            pix_fmt = options.pix_fmt
-        else:
-            pix_fmt = test["input"]["pixFmt"]
-
-        if isinstance(input_media_format, str):
-            # surface mode
-            raw = False
-        else:
-            input_media_format = results.get("encoder_media_format")
-
-        if len(pix_fmt) == 0:
-            # See if source contains a clue
-            pix_fmt = "yuv420p"
-            if reference_pathname.find("yuv420p") > -1:
+        reference_info = None
+        if raw:
+            if options.get("pix_fmt", None):
+                pix_fmt = options.pix_fmt
+            else:
+                pix_fmt = test["input"]["pixFmt"]
+                input_media_format = results.get("encoder_media_format")
+            if len(pix_fmt) == 0:
+                # See if source contains a clue
                 pix_fmt = "yuv420p"
-            if reference_pathname.find("yvu420p") > -1:
-                pix_fmt = "yvu420p"
-            elif reference_pathname.find("nv12") > -1:
-                pix_fmt = "nv12"
-            elif reference_pathname.find("nv21") > -1:
-                pix_fmt = "nv21"
+                if reference_pathname.find("yuv420p") > -1:
+                    pix_fmt = "yuv420p"
+                if reference_pathname.find("yvu420p") > -1:
+                    pix_fmt = "yvu420p"
+                elif reference_pathname.find("nv12") > -1:
+                    pix_fmt = "nv12"
+                elif reference_pathname.find("nv21") > -1:
+                    pix_fmt = "nv21"
+
+        else:
+            reference_info = encapp_tool.ffutils.get_video_info(reference_pathname)
 
         output_media_format = results.get("encoder_media_format")
         output_width = -1
@@ -466,11 +466,15 @@ def run_quality(test_file, options, debug):
                 input_resolution = output_resolution
             else:
                 input_resolution = f"{input_width}x{input_height}"
+        elif reference_info:
+            input_resolution = f"{reference_info['width']}x{reference_info['height']}"
         else:
             input_resolution = output_resolution
 
         if options.get("framerate", None):
             input_framerate = options.framerate
+        elif reference_info:
+            input_framerate = reference_info["framerate"]
         elif (
             input_media_format is not None
             and input_media_format.get("framerate") is not None
@@ -531,8 +535,12 @@ def run_quality(test_file, options, debug):
         # We can choose to convert to the input framerate
         # Or convert to the output. This nomrally gives higher score to lower fps and process faster...
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
-        filter_cmd = f"[0:v]framerate={output_framerate}[d0];[d0]scale={input_width}:{input_height}[{diststream}];[1:v]framerate={output_framerate}[ref]{force_scale};[distorted][ref]"
-
+        crop = ""
+        if options.get("crop_input", None):
+            crop=f"crop={options.get('crop_input')},"
+        #filter_cmd = f"[0:v]framerate={output_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[1:v]framerate={output_framerate}[ref]{force_scale};[distorted][ref]"
+        filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
+        print(f"\nFPS -> {input_framerate}")
         # Do calculations
         if recalc or not os.path.exists(vmaf_file):
 
@@ -634,6 +642,9 @@ def run_quality(test_file, options, debug):
             framerate = video_info["framerate"]
             resolution = f'{video_info["width"]}x{video_info["height"]}'
             codec = video_info["codec-name"]
+
+        if reference_info:
+            filepath = reference_pathname
         # get the data from ffmpeg
         data = detailed_media_info(encodedfile, options)
         framecount = len(data)
@@ -755,6 +766,11 @@ def get_options(argv):
         default=None,
     )
     parser.add_argument(
+        "--crop_input",
+        help="If there is padding which is not automatically handled, crop: ACTUAL_W:ACTUAL_H'. It will assume that all cropping is right and bottom.",
+        default=None,
+    )
+    parser.add_argument(
         "-l",
         "--limit_length",
         help="Limit the verification length (both reference and source needs to be same length)",
@@ -822,6 +838,7 @@ def get_options(argv):
         help="Set a motion marker for the whole collection e.g. low, mid, high",
         default=None,
     )
+
 
     options = parser.parse_args()
 
