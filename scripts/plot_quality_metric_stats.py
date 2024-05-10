@@ -362,7 +362,7 @@ def plot_percentile(data, args):
     max_percentile = None
 
     # Draw the highest quality as a reference on all graphs
-    if args.high_reference:
+    if args.high_reference and len(resolutions) > 1:
         df = data.loc[
             (data[bitrate_label] == max_bitrate)
             & (data["resolution"] == max_resolution)
@@ -600,7 +600,8 @@ def main():
 
     args = parser.parse_args()
     data = pd.DataFrame()
-    label = f"{args.metric}_bitrate"
+    if not args.label:
+        args.label = f"{args.metric}_bitrate"
 
     # combine all files to single DataFrame
     if args.label:
