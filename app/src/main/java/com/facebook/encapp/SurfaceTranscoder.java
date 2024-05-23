@@ -582,11 +582,13 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
     public void stopAllActivity(){
         synchronized (mStopLock) {
-            Log.d(TAG, "Give me a sec, waiting for last encodings dec: " + mStats.getDecodedFrameCount() + " > enc: " + mStats.getEncodedFrameCount());
-            try {
-                mStopLock.wait(WAIT_TIME_SHORT_MS);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            if (mStats.getDecodedFrameCount() > mStats.getEncodedFrameCount()) {
+                Log.d(TAG, "Give me a sec, waiting for last encodings dec: " + mStats.getDecodedFrameCount() + " > enc: " + mStats.getEncodedFrameCount());
+                try {
+                    mStopLock.wait(WAIT_TIME_SHORT_MS);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
             mDone = true;
             mStats.stop();
