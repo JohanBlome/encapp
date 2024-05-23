@@ -235,11 +235,17 @@ class BufferDecoder extends Encoder {
                         inputDone = true;
                     }
                     if (chunkSize < 0) {
-                        mYuvReader.closeFile();
+                        if (mYuvReader != null) {
+                            mYuvReader.closeFile();
+                        }
                         currentLoop++;
-                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true)) {
+
+                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true) || mYuvReader == null) {
                             // Set EOS flag and call encoder
+                            Log.d(TAG, "*******************************");
                             Log.d(TAG, "End of stream");
+
+                            flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                             // End of stream -- send empty frame with EOS flag set.
                             mDecoder.queueInputBuffer(index, 0, 0, 0L,
                                     flags);
@@ -289,25 +295,27 @@ class BufferDecoder extends Encoder {
                 } else if(index >= 0) {
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         outputDone = true;
+                        Log.d(TAG, "Output EOS");
                     }
 
                     ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
-                    int limit = outputBuf.limit();
-                    if(limit != 0) {
-                        FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
-                        frameInfo.addInfo(latestFrameChanges);
-                        latestFrameChanges = null;
+                    if (outputBuf != null) {
+                        int limit = outputBuf.limit();
+                        if(limit != 0) {
+                            FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
+                            frameInfo.addInfo(latestFrameChanges);
+                            latestFrameChanges = null;
 
-                        outputBuf.position(info.offset);
-                        outputBuf.limit(info.offset + info.size);
-                        outputBuf.get(outData);
-                        if (mDecodeDump) {
-                            if (file.exists()) {
-                                fo.write(outData);
+                            outputBuf.position(info.offset);
+                            outputBuf.limit(info.offset + info.size);
+                            outputBuf.get(outData);
+                            if (mDecodeDump) {
+                                if (file.exists()) {
+                                    fo.write(outData);
+                                }
                             }
                         }
                     }
-
                     try {
                         mDecoder.releaseOutputBuffer(index, 0);
                     } catch (IllegalStateException isx) {
@@ -318,6 +326,8 @@ class BufferDecoder extends Encoder {
             }
         }
         if (mDecodeDump) fo.close();
+
+        Log.d(TAG, "Decoding done, leaving decoded: " + mStats.getDecodedFrameCount());
     }
 
     public void stopAllActivity(){}
