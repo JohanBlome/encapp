@@ -9,6 +9,9 @@ import typing
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
+IDB_BUNDLE_ID = "Meta.Encapp"
+IOS_VERSION_NAME = ""
+IOS_MAJOR_VERSION = -1
 
 
 def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
@@ -78,6 +81,14 @@ def get_device_info(
     if debug > 0:
         print(f"selecting device: serial: {serial} model: {model}")
 
+    if USE_IDB:
+        global IOS_VERSION, IOS_MAJOR_VERSION
+        IOS_VERSION = device_info[serial]["version"]
+        # iOS 17.3.1
+        m = re.search(r"([\d]+)\.([\d]+)\.([\d]+)", IOS_VERSION)
+        if m:
+            IOS_MAJOR_VERSION = int(m.group(1))
+
     return model, serial
 
 
@@ -93,14 +104,14 @@ def remove_files_using_regex(
         debug (int): Debug level
     """
     if USE_IDB:
-        cmd = f"idb file ls {location} --udid {serial}  --bundle-id Meta.Encapp"
+        cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
         for file in output_files:
             # remove the output
             print(f"Removing {counter}/{len(output_files)}", end="\r")
-            cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id Meta.Encapp"
+            cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
             run_cmd(cmd, debug)
             counter += 1
     else:
@@ -177,14 +188,23 @@ def get_app_pid(serial: str, package_name: str, debug=0):
         -1 if process not running; -2 if fail to process.
     """
     pid = -1
-    adb_cmd = f"adb -s {serial} shell pidof {package_name}"
-    ret, stdout, _ = run_cmd(adb_cmd, debug)
-    if ret is True and stdout:
-        try:
-            pid = int(stdout)
-        except ValueError:
-            print(f'Unable to cast stdout: "{stdout}" to int')
-            pid = -2
+    if USE_IDB:
+        # This is only for >= V17 but lower version do not need the pid (at this point)
+        cmd = f" xcrun devicectl device info processes --device  {serial} | grep Encapp.app"
+        ret, stdout, _ = run_cmd(cmd, debug)
+        if ret and stdout:
+            m = re.search(r"^[0-9]*", stdout)
+            if m:
+                pid = int(m.group(0))
+    else:
+        adb_cmd = f"adb -s {serial} shell pidof {package_name}"
+        ret, stdout, _ = run_cmd(adb_cmd, debug)
+        if ret is True and stdout:
+            try:
+                pid = int(stdout)
+            except ValueError:
+                print(f'Unable to cast stdout: "{stdout}" to int')
+                pid = -2
     return pid
 
 
@@ -302,7 +322,17 @@ def force_stop(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     if USE_IDB:
-        run_cmd(f"idb terminate --udid {serial}  Meta.Encapp", debug)
+        # for iso 17 devicectl needs to be used and it cannot terminate an application directly
+        # lookup pid and send sigterm
+        if IOS_MAJOR_VERSION < 17:
+            run_cmd(f"idb terminate --udid {serial}  {IDB_BUNDLE_ID}", debug)
+        else:
+            pid = get_app_pid(serial, package, debug)
+            if pid > 0:
+                run_cmd(
+                    f"xcrun devicectl device process signal --signal sigterm --device  {serial} --pid {pid}  ",
+                    debug,
+                )
     else:
         run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
 
@@ -494,7 +524,7 @@ def get_host_hash(filepath, debug):
 
 def file_exists_in_device(filename, serial, debug=False):
     if USE_IDB:
-        cmd = f"idb file ls /Documents --udid {serial}  --bundle-id Meta.Encapp"
+        cmd = f"idb file ls /Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
         return len(output_files) > 0
@@ -508,7 +538,7 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
     if USE_IDB and fast_copy:
         # TODO: fix
         basename = os.path.basename(device_filepath)
-        cmd = f"idb file ls Documents --udid {serial}  --bundle-id Meta.Encapp"
+        cmd = f"idb file ls Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(f"{basename}", stdout, re.MULTILINE)
         return len(output_files) > 0
@@ -548,7 +578,7 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
         ret, stdout, _ = run_cmd(
-            f"idb file push  {filepath} {device_workdir}/ --udid {serial} --bundle-id Meta.Encapp",
+            f"idb file push  {filepath} {device_workdir}/ --udid {serial} --bundle-id {IDB_BUNDLE_ID}",
             debug,
         )
         if not ret:
@@ -570,13 +600,13 @@ def pull_files_from_device(
 ) -> None:
 
     if USE_IDB:
-        cmd = f"idb file ls {location} --udid {serial}  --bundle-id Meta.Encapp"
+        cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
         for file in output_files:
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            cmd = f"idb file pull {location}/{file} .  --udid {serial}  --bundle-id Meta.Encapp"
+            cmd = f"idb file pull {location}/{file} .  --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
             run_cmd(cmd, debug)
             counter += 1
     else:
@@ -598,3 +628,8 @@ def set_idb_mode(mode):
 def is_using_idb():
     global USE_IDB
     return USE_IDB
+
+
+def set_bundleid(bundleid):
+    global IDB_BUNDLE_ID
+    IDB_BUNDLE_ID = bundleid
