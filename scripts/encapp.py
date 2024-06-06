@@ -141,6 +141,7 @@ FFPROBE_FIELDS = {
 
 
 def get_pix_fmt(numerical_id):
+    print("look for :", numerical_id)
     return next(
         key for key, value in PIX_FMT_TYPES_VALUES.items() if value == numerical_id
     )
@@ -721,7 +722,7 @@ def update_media(test, options):
 
         output["resolution"] = out_res
         output["framerate"] = out_rate
-        output["pix_fmt"] = get_pix_fmt(out_pix_fmt)
+        output["pix_fmt"] = out_pix_fmt
 
         extension = "raw"
         if output["pix_fmt"] == "rgba":
@@ -1683,7 +1684,6 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
                 framerate = test_input.framerate
             if test_input.pix_fmt:
                 pix_fmt = get_pix_fmt(test_input.pix_fmt)
-
         if replace is not None:
             # check whether the user has a preferred raw format
             pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
