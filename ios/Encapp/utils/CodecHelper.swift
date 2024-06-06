@@ -15,13 +15,14 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
     if status == noErr {
         let nsdict = dict! as NSDictionary
         for (key, value) in nsdict {
-            log.debug("Supported Key: \(key)")
+            log.debug("Supported Key: \(key) Val: \(value)")
             let d = value as? NSDictionary
             if d?["PropertyType"] != nil {
                 if d?["PropertyType"]! as? String == "Number"{
                     var propval: CFNumber!
                     status = VTSessionCopyProperty(compSession, key: key as! CFString, allocator: nil, valueOut: &propval)
                     if status == noErr{
+                        log.debug("---val: \(propval.debugDescription)")
                         statistics.addProp(name: key as! String, val: "\(propval!)")
                     }
                     
@@ -30,12 +31,14 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
                     status = VTSessionCopyProperty(compSession, key: key as! CFString, allocator: nil, valueOut: &propval)
                     if status == noErr && propval != nil{
                         let val = CFBooleanGetValue(propval!) ? "true" : "false"
+                        log.debug("---val: \(val)")
                         statistics.addProp(name: key as! String, val: val)
                     }
                 }  else if d?["PropertyType"]! as? String == "Enumeration"{
                     var propval: CFDictionary!
                     status = VTSessionCopyProperty(compSession, key: key as! CFString, allocator: nil, valueOut: &propval)
                     if status == noErr && propval != nil{
+                        log.debug("---val: \(propval.debugDescription)")
                         statistics.addProp(name: key as! String, val: "\(String(describing: propval))")
                     }
                 } else {
@@ -66,21 +69,23 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
         }
     }
     
-    if definition.input.hasRealtime {
-        status = 0
-        if definition.input.realtime {
-            status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
-        } else {
-            status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanFalse)
-        }
-        if status != 0 {
-            log.error("failed to set realtime, status: \(status)")
-        } else {
-            log.info("Succesfully set realtime property")
-        }
+    status = 0
+    if definition.input.hasRealtime && definition.input.realtime {
+        log.debug("Set realtime encode")
+        status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+    } else {
+        log.debug("Set non realtime encode")
+        status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanFalse)
     }
-    
-    
+    if status != 0 {
+        log.error("failed to set realtime, status: \(status)")
+    } else {
+        log.info("Succesfully set realtime property")
+    }
+
+    // Never drop frames (for now)
+    log.debug("Disable frame drops")
+    status = VTSessionSetProperty(compSession, key: "EnableFrameDropping" as CFString, value: kCFBooleanFalse)
     //TODO: Check this specific feature
     /*
     status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality, value: kCFBooleanFalse)

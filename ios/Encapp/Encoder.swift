@@ -107,10 +107,15 @@ class Encoder {
                 if sampleBuffer != nil && CMSampleBufferDataIsReady(sampleBuffer!) {
                     encoder.writeData(sampleBuffer: sampleBuffer!, infoFlags: infoFlags)
                 } else {
-                    encoder.fail(cause: "Sample buffer is not ok, \(sampleBuffer)")
+                    if (infoFlags.rawValue == VTEncodeInfoFlags.frameDropped.rawValue) {
+                        log.debug("Encoder dropped frame")
+                    } else if (infoFlags.rawValue == VTEncodeInfoFlags.asynchronous.rawValue) {
+                        log.debug("Aynchronous frame")
+                    } else {
+                        encoder.fail(cause: "Sample buffer is not ok, \(sampleBuffer.debugDescription), \(status) ")
+                    }
                 }
             }
-
 
             let encoderSpecification = [
                 kVTVideoEncoderSpecification_EnableLowLatencyRateControl: NSString(string: "true"),
@@ -137,7 +142,6 @@ class Encoder {
 
             // Configure encoder
             setVTEncodingSessionProperties(definition: definition, compSession: compSession)
-
             status = VTCompressionSessionPrepareToEncodeFrames(compSession)
             if status != 0 {
                 log.error("failed prepare for encode, status: \(status)")
@@ -172,7 +176,8 @@ class Encoder {
             splitname = outputPath.components(separatedBy: "/")
             statistics.setEncodedFile(filename: splitname[splitname.count - 1])
             
-            var lastNow = 0 as Int64
+            var lastNow = timeStampNs()
+            let realtime = definition.input.realtime
             if var stream: InputStream = InputStream(fileAtPath: fileURL.path) {
                 stream.open()
                 let pixelPool = VTCompressionSessionGetPixelBufferPool(compSession)
@@ -191,7 +196,7 @@ class Encoder {
                     if doneReading(test: definition, stream: stream, frame: framesAdded, time: currentTimeSec, loop: false) {
                         inputDone = true
                     }
-                    let size = queueInputBuffer(stream: stream, pixelPool: pixelPool!, frameSize: frameSize, realtime: definition.input.realtime)
+                    let size = queueInputBuffer(stream: stream, pixelPool: pixelPool!, frameSize: frameSize, realtime: realtime)
                     if size == -2 {
                         continue;
                     } else if (size <= 0 ) {
@@ -408,7 +413,7 @@ class Encoder {
     }
     
     func fail(cause: String) {
-        log.error("Encode faile: \(cause)")
-        inputDone = true
+        log.error("Encode failed: \(cause)")
+        //inputDone = true
     }
 }
