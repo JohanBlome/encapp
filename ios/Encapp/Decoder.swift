@@ -135,23 +135,21 @@ class Decoder {
                             lastTimeMs = sleepUntilNextFrame(lastTimeMs: lastTimeMs, frameDurationMs: frameDurationMs)
                         }
                         inputFrameCounter += 1
-                        do {
-                            statistics.startDecoding(pts: Int64((sampleBuffer?.presentationTimeStamp.seconds)! * 1000000.0))
-                            let status = VTDecompressionSessionDecodeFrame(compSession,
-                                                                           sampleBuffer: sampleBuffer!,
-                                                                           flags: decodeInfoFlags,
-                                                                           infoFlagsOut: &infoFlags,
-                                                                           outputHandler: decodeCallback)
-                        } catch {
-                            print("Error")
+                        guard (sampleBuffer?.presentationTimeStamp.seconds)!.isFinite else {
+                            log.debug("Decoder time is not finite, cannot decompress. Most likely end of stream.")
+                            return ""
                         }
-                        
+                        statistics.startDecoding(pts: Int64((sampleBuffer?.presentationTimeStamp.seconds)! * 1000000.0))
+                        let status = VTDecompressionSessionDecodeFrame(compSession,
+                                                                       sampleBuffer: sampleBuffer!,
+                                                                       flags: decodeInfoFlags,
+                                                                       infoFlagsOut: &infoFlags,
+                                                                       outputHandler: decodeCallback)
                     } else {
                         log.error("compsession or samplebuffer is nil")
                     }
                 }
             }
-               
         }
         
         statistics.stop()
