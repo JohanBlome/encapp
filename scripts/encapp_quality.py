@@ -495,11 +495,11 @@ def run_quality(test_file, options, debug):
                 reference_pathname = reference_pathname[:-3] + "raw"
             if not os.path.exists(reference_pathname):
                 print(f"Reference {reference_pathname} is unavailable")
-                exit(-1)
+                return
         distorted = encodedfile
         if not os.path.exists(distorted):
             print(f"Distorted {distorted} is unavailable")
-            exit(-1)
+            return
 
         if debug:
             print(
