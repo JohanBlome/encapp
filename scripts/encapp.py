@@ -141,7 +141,6 @@ FFPROBE_FIELDS = {
 
 
 def get_pix_fmt(numerical_id):
-    print("look for :", numerical_id)
     return next(
         key for key, value in PIX_FMT_TYPES_VALUES.items() if value == numerical_id
     )
