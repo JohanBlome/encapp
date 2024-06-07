@@ -723,6 +723,14 @@ def update_media(test, options):
         output["framerate"] = out_rate
         output["pix_fmt"] = out_pix_fmt
 
+        if (options.width_align > 0) or (options.height_align > 0):
+            width = int(out_res.split("x")[0])
+            height = int(out_res.split("x")[1])
+            wa = options.width_align if options.width_align > 0 else 0
+            ha = options.height_align if options.height_align > 0 else 0
+
+            output["hstride"] = width + (width % options.width_align)
+            output["vstride"] = height + (height % options.height_align)
         extension = "raw"
         if output["pix_fmt"] == "rgba":
             extension = "rgba"
@@ -1512,6 +1520,24 @@ def get_options(argv):
         default=None,
         help="Implicitly it will turn on IDB option",
     )
+    parser.add_argument(
+        "--width_align",
+        type=int,
+        default=-1,
+        help="Horizontal widht alignment in bits to calculate stride and add padding if converting to raw yuv",
+    )
+    parser.add_argument(
+        "--height_align",
+        type=int,
+        default=-1,
+        help="Vertical height alignment in bits to calculate and add padding if converting to raw yuv",
+    )
+    parser.add_argument(
+        "--dim_align",
+        type=int,
+        default=None,
+        help="Horizontal and vertical alignment in bits to calculate stride and add padding if converting to raw yuv",
+    )
 
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
@@ -1580,6 +1606,9 @@ def process_options(options):
             if os.path.exists(videofile)
             else f"file {videofile} is not readable"
         )
+    if options.dim_align:
+        options.width_align = options.dim_align
+        options.height_align = options.dim_align
 
     # 4. derive replace values
     if "input" in options.replace and "filepath" in options.replace["input"]:
@@ -1600,6 +1629,10 @@ def process_options(options):
                 options.pix_fmt = d["pix_fmt"]
             if "extension" in options:
                 options.extension = d["extension"]
+    # 5. check mediastore
+    if options.mediastore:
+        if not os.path.exists(options.mediastore):
+            os.mkdir(options.mediastore)
     return options
 
 
@@ -1659,6 +1692,12 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
             )
         else:
             print("Warning, transcoded file exists, assuming it is correct")
+
+        print("Update settings:", replace)
+        settings["resolution"] = replace.get("output", {}).get(
+            "resolution", replace.get("input", {}).get("resolution")
+        )
+
         # replace input and other derived values
         return {
             "filepath": output_filepath,

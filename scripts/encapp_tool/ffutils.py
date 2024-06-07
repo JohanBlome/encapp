@@ -79,8 +79,23 @@ def get_video_info(videofile, debug=0):
 
 
 def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
+    resolution = settings.get("output", {}).get(
+        "resolution", settings.get("input", {}).get("resolution")
+    )
+    width = int(resolution.split("x")[0])
+    height = int(resolution.split("x")[1])
+    stride = int(
+        settings.get("output", {}).get(
+            "stride", settings.get("input", {}).get("stride", width)
+        )
+    )
+
+    pad_w = stride - width
+    pad_h = height
+
     filter_cmd = (
         f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))},"
+        f"pad={pad_w}:{pad_h},"
         f"fps={str(settings.get('output', {}).get('framerate', settings.get('input', {}).get('framerate')))}"
     )
     if debug > 0:
