@@ -297,6 +297,10 @@ def run_quality(test_file, options, debug):
     found in options.media_path directory or overriden
     """
     print(f"Run quality, {test_file}")
+    if not os.path.exists(test_file):
+        print("File not found: " + test_file)
+        return
+
     if debug > 0:
         print(options)
     duration = 0
@@ -319,6 +323,7 @@ def run_quality(test_file, options, debug):
         device_info = {}
 
     reference_pathname = ""
+    reference_info = None
     reference_dirname = options.get("media_path", None)
     if options.get("guess_original", None):
         # g_mm_lc_720@30_nv12.yuv_448x240@7.0_nv12.raw -> g_mm_lc_720@30_nv12.yuv
@@ -537,8 +542,7 @@ def run_quality(test_file, options, debug):
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
         crop = ""
         if options.get("crop_input", None):
-            crop=f"crop={options.get('crop_input')},"
-        #filter_cmd = f"[0:v]framerate={output_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[1:v]framerate={output_framerate}[ref]{force_scale};[distorted][ref]"
+            crop = f"crop={options.get('crop_input')},"
         filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
         print(f"\nFPS -> {input_framerate}")
         # Do calculations
@@ -838,7 +842,6 @@ def get_options(argv):
         help="Set a motion marker for the whole collection e.g. low, mid, high",
         default=None,
     )
-
 
     options = parser.parse_args()
 
