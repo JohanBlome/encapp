@@ -275,7 +275,7 @@ public class Statistics {
         mDecoderName = decoderName;
     }
 
-    public void setEncoderIsHardwareAccelerated(boolean accelerated) { mIsDecoderHw = accelerated; }
+    public void setEncoderIsHardwareAccelerated(boolean accelerated) { mIsEncoderHw = accelerated; }
 
     public void setDecoderIsHardwareAccelerated(boolean accelerated) { mIsDecoderHw = accelerated; }
 
