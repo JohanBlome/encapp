@@ -663,19 +663,30 @@ def update_media(test, options):
     replace = getattr(options, "replace", {})
     input_repl = replace.get("input", {})
     out_pix_fmt = input_repl.get("pix_fmt", in_pix_fmt)
+
+    # if there are not settings for res and rate check the file itself
+    info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
+    if len(in_res) == 0:
+        in_res = f"{info['width']}x{info['height']}"
+    if in_rate <= 0:
+        in_rate = info["framerate"]
     if len(out_res) == 0:
         out_res = in_res
     if out_rate == 0:
         out_rate = in_rate
 
     if (
-        encapp_tool.ffutils.video_is_raw(test.input.filepath)
-        or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
-    ) and (
-        in_res != out_res
-        or in_rate != out_rate
-        or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
-    ):
+        (
+            encapp_tool.ffutils.video_is_raw(test.input.filepath)
+            or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+        )
+        and (
+            in_res != out_res
+            or in_rate != out_rate
+            or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
+        )
+    ) or options.raw:  # Always decode
+
         # one more thing to check, if nv21 or rgba only transcode if source is y4m
         if (
             (
@@ -696,6 +707,9 @@ def update_media(test, options):
             reason = f" rate ({in_rate} != {out_rate})"
         if in_pix_fmt != out_pix_fmt:
             reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
+        if options.raw:
+            reason = "Always decode to raw set"
+
         reason = reason.strip()
         if options.debug > 0:
             print(f"Transcode raw input: {test.input.filepath} {reason = }")
@@ -703,6 +717,15 @@ def update_media(test, options):
         input = {}
         output = {}
         basename = os.path.basename(test.input.filepath)
+
+        if in_res == "":
+            in_res = f"{info.get('width', -1)}x{info.get('height')}"
+        if in_rate == "":
+            in_rate = info.get("framerate")
+        if out_res == "":
+            out_res = in_res
+        if out_rate == "":
+            out_rate = in_rate
 
         input["pix_fmt"] = tests_definitions.Input.PixFmt.Name(in_pix_fmt)
         input["resolution"] = in_res
@@ -723,14 +746,19 @@ def update_media(test, options):
         output["framerate"] = out_rate
         output["pix_fmt"] = out_pix_fmt
 
+        stride = ""
         if (options.width_align > 0) or (options.height_align > 0):
             width = int(out_res.split("x")[0])
             height = int(out_res.split("x")[1])
-            wa = options.width_align if options.width_align > 0 else 0
-            ha = options.height_align if options.height_align > 0 else 0
-
-            output["hstride"] = width + (width % options.width_align)
-            output["vstride"] = height + (height % options.height_align)
+            wa = options.width_align if options.width_align > 0 else 1
+            ha = options.height_align if options.height_align > 0 else 1
+            if width % wa != 0:
+                width = (width // wa + 1) * wa
+            if height % ha:
+                height = (height // ha + 1) * ha
+            output["hstride"] = width
+            output["vstride"] = height
+            stride = f"str.{output['hstride']}x{output['vstride']}"
         extension = "raw"
         if output["pix_fmt"] == "rgba":
             extension = "rgba"
@@ -739,16 +767,23 @@ def update_media(test, options):
             pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
+
         output["output_filepath"] = (
-            f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}.{extension}"
+            f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}"
         )
+        if len(stride) > 0:
+            output["output_filepath"] += f"_{stride}"
+
+        output["output_filepath"] += f".{extension}"
         output["pix_fmt"] = pix_fmt
         replace["input"] = input
         replace["output"] = output
 
-        d = process_input_path(test.input.filepath, replace, test.input)
+        d = process_input_path(test.input.filepath, replace, test.input, options.debug)
         # now both config and input should be the same i.e. matching config
         test.input.resolution = d["resolution"]
+        # TODO: JOHAN - when to do this?
+        test.configure.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
         test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
         test.input.filepath = d["filepath"]
@@ -841,7 +876,7 @@ def update_codec_test(
                     # create the Message field
                     getattr(test, k1).SetInParent()
             except:
-                print(f"Something is wrong with {k1}, {k2} - {val}")
+                print(f"Something could be wrong with {k1}, {k2} - {val}")
                 continue
             setattr(getattr(test, k1), k2, val)
 
@@ -856,7 +891,35 @@ def update_codec_test(
             input["pix_fmt"] = "nv21"
             options["input"] = input
         """
-        d = process_input_path(test.input.filepath, options, test.input)
+
+        info = encapp_tool.ffutils.get_video_info(test.input.filepath)
+        replace["output"] = {}
+        if "configure" in replace:
+            replace["output"]["resolution"] = (
+                replace["configure"]["resolution"]
+                if "resolution" in replace["configure"]
+                and len(replace["configure"]["resolution"]) > 0
+                else (
+                    test.configure.resolution
+                    if len(test.configure.resolution) > 0
+                    else f"{info['width']}x{info['height']}"
+                )
+            )
+            replace["output"]["framerate"] = (
+                replace["configure"]["framerate"]
+                if "framerate" in replace["configure"]
+                else (
+                    test.configure.framerate
+                    if test.configure.framerate > 0
+                    else info["framerate"]
+                )
+            )
+            replace["output"]["pix_fmt"] = replace["input"]["pix_fmt"]
+        else:
+            replace["output"]["resolution"] = test.configure.resolution
+            replace["output"]["framerate"] = test.configure.framerate
+            replace["output"]["pix_fmt"] = test.input.pix_fmt
+        d = process_input_path(test.input.filepath, replace, test.input, 1)
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
         test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
@@ -1538,6 +1601,11 @@ def get_options(argv):
         default=None,
         help="Horizontal and vertical alignment in bits to calculate stride and add padding if converting to raw yuv",
     )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Always decode to raw format before pushing to device",
+    )
 
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
@@ -1617,6 +1685,7 @@ def process_options(options):
         if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
             input_filepath
         ):
+
             # replace input and other derived values
             d = process_input_path(input_filepath, options.replace, options.debug)
             if "input" in options:
@@ -1656,32 +1725,43 @@ def verify_app_version(json_files):
 
 
 def process_input_path(input_filepath, replace, test_input, debug=0):
-    # Raw input?
+    replace = replace.copy()
+    if replace is None:
+        print("Process input path with no replacement settings")
+        # TODO: just return? or throw error?
+    if "output" not in replace:
+        print("No output settings in replacement")
+        if "configure" in replace:
+            replace["output"] = replace["configure"]
+
+    # check whether the user has a preferred raw format
+    pix_fmt = replace.get("output", {}).get("pix_fmt", PREFERRED_PIX_FMT)
+    resolution = replace.get("output", {}).get("resolution", "")
+    framerate = replace.get("output", {}).get("framerate", -1)
+    extension = "yuv"
+
+    if "hstride" in replace.get("output", {}) and "vstride" in replace.get(
+        "output", {}
+    ):
+        # Need to replace width and height in the test definitions
+        resolution = f"{replace['output']['hstride']}x{replace['output']['vstride']}"
+    output_filepath = replace.get("output", {}).get(
+        "output_filepath",
+        f"{input_filepath}_{resolution}p{framerate}_{pix_fmt}.{extension}",
+    )
+    # get raw filepath
+    output_filepath = os.path.join(
+        tempfile.gettempdir(), os.path.basename(output_filepath)
+    )
+    if debug > 0:
+        print("***********")
+        print("input file will be transcoded")
+        print(f"resolution:  -> {resolution}")
+        print(f"framerate:  -> {framerate}")
+        print(f"pix_fmt: -> {pix_fmt}")
+        print("***********")
+
     if encapp_tool.ffutils.video_is_raw(input_filepath):
-        settings = {}
-        settings["pix_fmt"] = replace.get("output", {}).get(
-            "pix_fmt", replace.get("input", {}).get("pix_fmt")
-        )
-        settings["resolution"] = replace.get("output", {}).get(
-            "resolution", replace.get("input", {}).get("resolution")
-        )
-        settings["framerate"] = replace.get("output", {}).get(
-            "framerate", replace.get("input", {}).get("framerate")
-        )
-
-        if debug > 0:
-            print("***********")
-            print(f"raw input file {input_filepath} will be transcoded")
-            print(f"resolution:  -> {settings['resolution']}")
-            print(f"framerate:  -> {settings['framerate']}")
-            print(f"pix_fmt: -> {settings['pix_fmt'] =}")
-            print("***********")
-            print(f"{replace}")
-        output_filepath = replace.get("output", {}).get(
-            "output_filepath",
-            f"{input_filepath}_{settings['resolution']}p{settings['framerate']}_{settings['pix_fmt']}.raw",
-        )
-
         # lazy but let us skip transcodig if the target is already there...
         if not os.path.exists(output_filepath):
             encapp_tool.ffutils.ffmpeg_transcode_raw(
@@ -1691,85 +1771,24 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
                 debug,
             )
         else:
-            print("Warning, transcoded file exists, assuming it is correct")
-
-        print("Update settings:", replace)
-        settings["resolution"] = replace.get("output", {}).get(
-            "resolution", replace.get("input", {}).get("resolution")
-        )
-
-        # replace input and other derived values
-        return {
-            "filepath": output_filepath,
-            "resolution": settings["resolution"],
-            "pix_fmt": settings["pix_fmt"],
-            "framerate": settings["framerate"],
-        }
+            print(
+                f"Warning, transcoded file {output_filepath} exists, assuming it is correct"
+            )
 
     else:
-        # decode encoded video (the encoder wants raw video)
-        videofile_config = encapp_tool.ffutils.get_video_info(input_filepath)
-
-        # First check if we have settings in the test
-        resolution = None
-        framerate = None
-        pix_fmt = None
-
-        if test_input:
-            if test_input.resolution:
-                resolution = test_input.resolution
-            if test_input.framerate:
-                framerate = test_input.framerate
-            if test_input.pix_fmt:
-                pix_fmt = get_pix_fmt(test_input.pix_fmt)
-        if replace is not None:
-            # check whether the user has a preferred raw format
-            pix_fmt = replace.get("input", {}).get("pix_fmt", PREFERRED_PIX_FMT)
-            resolution = f'{videofile_config["width"]}x{videofile_config["height"]}'
-            # TODO: why not framerate?
-            framerate = videofile_config["framerate"]
-            extension = PIX_FMT_TYPES[pix_fmt]
-        else:
-            if not pix_fmt:
-                pix_fmt = PREFERRED_PIX_FMT
-
-            if not resolution:
-                resolution = f"{videofile_config['width']}x{videofile_config['height']}"
-            if not framerate:
-                framerate = videofile_config["framerate"]
-            extension = PIX_FMT_TYPES[pix_fmt]
-
-        # get raw filepath
-        input_filepath_raw = os.path.join(
-            tempfile.gettempdir(), os.path.basename(input_filepath)
-        )
-        input_filepath_raw += f".{resolution}"
-        input_filepath_raw += f".{framerate}"
-        input_filepath_raw += f".{pix_fmt}"
-        input_filepath_raw += f".{extension}"
-        if debug > 0:
-            print("***********")
-            print("input file will be transcoded")
-            print(f"resolution:  -> {resolution}")
-            print(f"framerate:  -> {framerate}")
-            print(f"pix_fmt: -> {pix_fmt}")
-            print("***********")
-
         encapp_tool.ffutils.ffmpeg_convert_to_raw(
             input_filepath,
-            input_filepath_raw,
-            pix_fmt,
-            resolution,
-            videofile_config["framerate"],
+            output_filepath,
+            replace,
             debug,
         )
         # replace input and other derived values
-        return {
-            "filepath": input_filepath_raw,
-            "resolution": resolution,
-            "pix_fmt": pix_fmt,
-            "framerate": framerate,
-        }
+    return {
+        "filepath": output_filepath,
+        "resolution": resolution,
+        "pix_fmt": pix_fmt,
+        "framerate": framerate,
+    }
 
 
 def main(argv):
