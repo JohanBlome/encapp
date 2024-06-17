@@ -60,7 +60,7 @@ class Encoder {
         statistics = Statistics(description: "raw encoder", test: definition);
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             log.info("Encode, current test definition = \n\(definition)")
-            
+
             // Check input
             let resolution = splitX(text: definition.input.resolution)
             let sourceWidth = resolution[0]
@@ -70,6 +70,13 @@ class Encoder {
             let height = Int((resolution[1] >> 1) << 1)
             inputFrameRate = (definition.input.hasFramerate) ? definition.input.framerate: 30.0
             outputFrameRate = (definition.configure.hasFramerate) ? definition.configure.framerate: inputFrameRate
+
+            if inputFrameRate <= 0 {
+                inputFrameRate = 30.0
+            }
+            if outputFrameRate <= 0  {
+                outputFrameRate = 30.0
+            }
             keepInterval = inputFrameRate / outputFrameRate;
             frameDurationUsec = calculateFrameTimingUsec(frameRate: outputFrameRate);
             inputFrameDurationUsec = calculateFrameTimingUsec(frameRate: inputFrameRate);
@@ -87,8 +94,9 @@ class Encoder {
             }
             let props = ListProps()
             let codecType = props.lookupCodectType(name: definition.configure.codec)
-            let codecId = props.getCodecNameFromType(encoderType: codecType)
-            statistics.setEncoderName(encoderName: codecId)
+            let codecId = props.getCodecIdFromType(encoderType: codecType)
+            let codecName = props.getCodecNameFromType(encoderType: codecType)
+            statistics.setEncoderName(encoderName: codecName)
         
             
             //output
@@ -117,8 +125,13 @@ class Encoder {
                 }
             }
 
+            log.debug("codecId: \(codecId)")
             let encoderSpecification = [
-                kVTVideoEncoderSpecification_EnableLowLatencyRateControl: NSString(string: "true"),
+                kVTVideoEncoderSpecification_EncoderID: NSString(string: codecId),
+                // The next property will disable any settings done at a later stage when it comes to frame order
+                // frame drops, latency etc.
+                //kVTVideoEncoderSpecification_EnableLowLatencyRateControl: NSString(string: "true"),
+                //TODO: profiles should be added.
                 //kVTCompressionPropertyKey_ProfileLevel: NSString(string: kVTProfileLevel_H264_High_AutoLevel),
             ]
             // Create session
@@ -239,7 +252,7 @@ class Encoder {
         }
         
         
-        log.info("Done, leaving encoder")
+        log.info("Done, leaving encoder, encoded: \(statistics.encodedFrames.count)")
         return ""
     }
     
