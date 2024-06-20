@@ -914,7 +914,7 @@ def update_codec_test(
                     else info["framerate"]
                 )
             )
-            replace["output"]["pix_fmt"] = replace["input"]["pix_fmt"]
+            replace["output"]["pix_fmt"] = replace.get("input",{}).get("pix_fmt", PREFERRED_PIX_FMT)
         else:
             replace["output"]["resolution"] = test.configure.resolution
             replace["output"]["framerate"] = test.configure.framerate
