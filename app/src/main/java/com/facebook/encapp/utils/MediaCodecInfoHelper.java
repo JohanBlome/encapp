@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import com.facebook.encapp.proto.Input.PixFmt;
+import com.facebook.encapp.proto.PixFmt;
 
 
 public class MediaCodecInfoHelper {
