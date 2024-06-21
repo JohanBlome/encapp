@@ -14,12 +14,22 @@ import pandas as pd
 import numpy as np
 
 import google.protobuf
-import proto.tests_pb2
 import encapp
 import encapp_search
+import encapp_tool
 import encapp_tool.adb_cmds
 import google.protobuf.json_format
-import proto.tests_pb2 as tests_definitions  # noqa: E402
+
+SCRIPT_ROOT_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
+)
+SCRIPT_PROTO_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+)
+sys.path.append(SCRIPT_ROOT_DIR)
+sys.path.append(SCRIPT_PROTO_DIR)
+import tests_pb2 as tests_definitions  # noqa: E402
+
 
 DEFAULT_TESTS = [
     "bitrate_buffer.pbtxt",
@@ -464,11 +474,11 @@ def parse_dynamic_settings(settings):
             serie = {}
             params[param.key] = serie
 
-        if param.type == proto.tests_pb2.DataValueType.Value("intType"):
+        if param.type == tests_definitions.DataValueType.Value("intType"):
             serie[param.framenum] = int(param.value)
-        if param.type == proto.tests_pb2.DataValueType.Value("floatType"):
+        if param.type == tests_definitions.DataValueType.Value("floatType"):
             serie[param.framenum] = float(param.value)
-        if param.type == proto.tests_pb2.DataValueType.Value("longType"):
+        if param.type == tests_definitions.DataValueType.Value("longType"):
             serie[param.framenum] = param.value
         else:
             serie[param.framenum] = param.value
