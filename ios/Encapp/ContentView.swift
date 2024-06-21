@@ -11,7 +11,7 @@ struct ContentView: View {
     @State private var logText: String = "test"
     @State private var logTests: String = "test"
 
-    
+
 
     var body: some View {
 #if os(iOS)
@@ -19,7 +19,7 @@ struct ContentView: View {
 #endif
         let main = EncappMain()
         main.run()
-        
+
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             DispatchQueue.main.async {
                 let text = log.logText()
@@ -28,17 +28,17 @@ struct ContentView: View {
                 } else {
                     logText = text
                 }
-                
+
             }
         }
-        
+
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
             DispatchQueue.main.async {
                 logTests = overview.testsLogText()
 
             }
         }
-          
+
         return TabView {
                 TextEditor(text: $logTests)
                     .disableAutocorrection(true)
@@ -50,7 +50,7 @@ struct ContentView: View {
                     .padding()
                     .border(Color.red)
                     .tabItem { Label("Log", systemImage: "tray.and.arrow.down.fill")}
-                    
+
                }
     }
 }

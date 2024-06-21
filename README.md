@@ -397,7 +397,7 @@ test {
 }
 '''
 
-And the qcom_hevc_360p_vbr,pbtxt 
+And the qcom_hevc_360p_vbr,pbtxt
 ```
 test {
     common {
@@ -405,7 +405,7 @@ test {
         description: "Bitrate buffer qc 360p"
     }
     configure {
-        codec: "c2.qti.hevc.encoder" 
+        codec: "c2.qti.hevc.encoder"
         resolution: "640x360"
         bitrate_mode: vbr
     }

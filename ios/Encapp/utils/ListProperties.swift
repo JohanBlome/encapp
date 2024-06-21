@@ -15,12 +15,12 @@ struct ListProps {
         print("Create encoder list")
         output.append("Encoders\n")
         let status = VTCopyVideoEncoderList(nil, &list)
-       
+
         if (status == 0) {
             let encoders = list as? Array<Any>
             for enc in encoders ?? []{
                 let encoder = enc    as! Dictionary<AnyHashable, AnyHashable>
-              
+
                 for item in encoder {
                     output.append("\(item.key): \(item.value)\n")
                 }
@@ -29,15 +29,15 @@ struct ListProps {
         } else {
             print("No list \(status)")
         }
-       
+
         //CFRelease(encoders)
         return output
     }
-    
+
     func getCodecIdFromType(encoderType: UInt32)->String {
         var list: CFArray!
         let status = VTCopyVideoEncoderList(nil, &list)
-       
+
         if (status == 0) {
             let encoders = list as? Array<Any>
             // First look for encoder name
@@ -51,11 +51,11 @@ struct ListProps {
         }
         return ""
     }
-    
+
     func getCodecNameFromType(encoderType: UInt32)->String {
         var list: CFArray!
         let status = VTCopyVideoEncoderList(nil, &list)
-       
+
         if (status == 0) {
             let encoders = list as? Array<Any>
             // First look for encoder name
@@ -69,11 +69,11 @@ struct ListProps {
         }
         return ""
     }
-    
+
     func lookupCodectType(name: String)->UInt32 {
         var list: CFArray!
         let status = VTCopyVideoEncoderList(nil, &list)
-       
+
         if (status == 0) {
             let encoders = list as? Array<Any>
             // First look for exact 'encoder id' match
@@ -84,7 +84,7 @@ struct ListProps {
                     log.info("Matched encoder id name: \(encoderId)")
                     return encoder["CodecType"] as! UInt32
                 }
-                
+
             }
             // Then look for partial matching encoder name
             for enc in encoders ?? []{
@@ -95,7 +95,7 @@ struct ListProps {
                     log.info("Matched encoder name: \(encoderName)")
                     return encoder["CodecType"] as! UInt32
                 }
-                
+
             }
             // Then look for 'codec name'
             for enc in encoders ?? []{
@@ -105,12 +105,12 @@ struct ListProps {
                     log.info("Matched codec name: \(codecName)")
                     return encoder["CodecType"] as! UInt32
                 }
-                
+
             }
         } else {
             print("No list \(status)")
         }
-        
+
         return 0;
     }
 }

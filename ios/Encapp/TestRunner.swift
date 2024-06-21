@@ -12,17 +12,17 @@ class TestRunner: Thread {
     var testsRunning = Array<Thread>()
     var isRunning = true
     var completion: ()->()?
-    
+
     init(filename: String, completion: @escaping ()->()) {
         self.filename = filename
         self.completion = completion
     }
-    
+
     override func main() { // Thread's starting point
         runTest()
     }
-    
-    
+
+
     func runTest() {
         log.info("Starting threaded test")
         let io = FileIO()
@@ -32,7 +32,7 @@ class TestRunner: Thread {
             log.error("No test, probably faulty path or definition")
             return
         }
-            
+
         var counter = 1
         for test in testsuite.test {
             let descr = "** Running \(counter)/\(testsuite.test.count), test: \(test.common.id)"
@@ -43,7 +43,7 @@ class TestRunner: Thread {
             if test.hasParallel {
                 for parallel in test.parallel.test {
                     let task = RunSingleTest(test: parallel, completion: completion)
-                    
+
                     testsRunning.append(task)
                     log.info("** start para")
                     task.start()
@@ -56,37 +56,37 @@ class TestRunner: Thread {
             log.info("** wait for completion")
             task.waitForCompletion()
             log.info("** Completed ")
-            
+
         }
         self.completion()
     }
-    
+
     func testDone(statistics: Statistics) {
         let data = statistics.getJson()
         let io = FileIO()
         io.writeData(filename:  "\(statistics.id!).json", data: data)
         log.info("Stats written for \(statistics.test.common.id)")
     }
-    
+
     func completion(singleTest: RunSingleTest) {
         log.info("Remove finished task \(singleTest.description), left: \(testsRunning.count)")
         testDone(statistics: singleTest.statistics)
         testsRunning.remove(at: testsRunning.firstIndex(of: singleTest)!)
     }
-    
+
     class RunSingleTest: Thread {
         var test: Test
         var done = false
         var completion: (RunSingleTest)->()
         var statistics: Statistics!
         var sem: DispatchSemaphore
-        
+
         init(test: Test, completion:  @escaping (RunSingleTest)->()) {
             self.test = test
             self.completion = completion
             self.sem = DispatchSemaphore(value: 0)
         }
-        
+
         override func main() { // Thread's starting point
             do {
                 //Decide what to do based on the source
@@ -106,7 +106,7 @@ class TestRunner: Thread {
                     log.info("\(result)")
                     log.info("Done testing: ")
                 }
-                
+
             }  catch {
                 log.error("Error running single test")
             }
@@ -114,7 +114,7 @@ class TestRunner: Thread {
             self.completion(self)
             sem.signal()
         }
-        
+
         func waitForCompletion() {
             if !done {
                 sem.wait()
