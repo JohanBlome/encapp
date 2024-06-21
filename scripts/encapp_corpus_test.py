@@ -5,13 +5,13 @@ import sys
 import requests
 import pathlib
 import os
+import encapp_tool
 import encapp_tool.adb_cmds as adb
 import encapp_tool.ffutils as ffutils
 import encapp
 import encapp_verify
 import encapp_quality
 import google.protobuf.json_format
-import proto.tests_pb2 as tests_definition  # noqa: E402
 import hashlib
 import pprint
 from google.protobuf import text_format
@@ -21,6 +21,16 @@ import re
 import glob
 import pandas as pd
 import itertools
+
+SCRIPT_ROOT_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
+)
+SCRIPT_PROTO_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+)
+sys.path.append(SCRIPT_ROOT_DIR)
+sys.path.append(SCRIPT_PROTO_DIR)
+import tests_pb2 as tests_definitions  # noqa: E402
 
 
 md5sums = {}
