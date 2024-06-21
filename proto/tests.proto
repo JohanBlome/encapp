@@ -18,16 +18,17 @@ enum DataValueType {
     longType = 3;
 }
 
+enum PixFmt {
+  yuv420p = 0;
+  yvu420p = 1;
+  nv12 = 2;
+  nv21 = 3;
+  rgba = 4;
+}
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
-  enum PixFmt {
-    yuv420p = 0;
-    yvu420p = 1;
-    nv12 = 2;
-    nv21 = 3;
-    rgba = 4;
-  }
   optional PixFmt pix_fmt = 3;
   optional float framerate = 4;
   optional int32 playout_frames = 5;

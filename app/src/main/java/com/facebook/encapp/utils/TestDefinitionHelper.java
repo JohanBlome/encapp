@@ -9,7 +9,7 @@ import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.Input;
-import com.facebook.encapp.proto.Input.PixFmt;
+import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 

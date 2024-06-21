@@ -731,7 +731,7 @@ def update_media(test, options):
         if out_rate == "":
             out_rate = in_rate
 
-        input["pix_fmt"] = tests_definitions.Input.PixFmt.Name(in_pix_fmt)
+        input["pix_fmt"] = tests_definitions.PixFmt.Name(in_pix_fmt)
         input["resolution"] = in_res
         input["framerate"] = in_rate
 
@@ -768,7 +768,7 @@ def update_media(test, options):
             extension = "rgba"
         pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
         if str(pix_fmt_id).isnumeric():
-            pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
+            pix_fmt = tests_definitions.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
 
@@ -866,7 +866,7 @@ def update_codec_test(
                 val = bool(val)
             # convert enum strings to integer
             if k1 == "input" and k2 == "pix_fmt":
-                val = tests_definitions.Input.PixFmt.Value(val)
+                val = tests_definitions.PixFmt.Value(val)
             if k1 == "configure" and k2 == "bitrate_mode":
                 val = tests_definitions.Configure.BitrateMode.Value(val)
             if k1 == "configure" and k2 == "color_standard":

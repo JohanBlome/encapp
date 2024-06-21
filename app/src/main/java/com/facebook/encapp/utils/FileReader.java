@@ -13,7 +13,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 
-import com.facebook.encapp.proto.Input.PixFmt;
+import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.utils.Assert;
 
 public class FileReader {

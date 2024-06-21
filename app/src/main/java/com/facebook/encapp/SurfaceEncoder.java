@@ -19,8 +19,8 @@ import android.util.Size;
 
 import androidx.annotation.NonNull;
 
+import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.proto.Input.PixFmt;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameswapControl;
