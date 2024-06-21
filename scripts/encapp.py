@@ -914,7 +914,9 @@ def update_codec_test(
                     else info["framerate"]
                 )
             )
-            replace["output"]["pix_fmt"] = replace.get("input",{}).get("pix_fmt", PREFERRED_PIX_FMT)
+            replace["output"]["pix_fmt"] = replace.get("input", {}).get(
+                "pix_fmt", PREFERRED_PIX_FMT
+            )
         else:
             replace["output"]["resolution"] = test.configure.resolution
             replace["output"]["framerate"] = test.configure.framerate
@@ -1327,6 +1329,36 @@ def codec_test(options, model, serial, debug):
         local_workdir = (
             f"{options.desc.replace(' ', '_')}_{model.replace(' ', '_')}_{dt_string}"
         )
+
+    # Create local_workdir
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
+    if len(options.configfile) > 1:
+        # merge the protobuf files
+        # First file will be the base
+        # For later definitions on the first test will be merged
+        # to all of the tests in the first prototbuf
+        # TODO: should parallels be considered?
+        test_suite = None
+        for proto in options.configfile:
+            tmp = tests_definitions.TestSuite()
+            with open(proto, "rb") as fd:
+                text_format.Merge(fd.read(), tmp)
+            if test_suite is None:
+                test_suite = tmp
+            elif len(test_suite.test):
+                for test in test_suite.test:
+                    if test is not None:
+                        test.MergeFrom(tmp.test[0])
+            else:
+                print("ERROR, first config file lacks a test")
+        basename = os.path.basename(options.configfile[0])
+        options.configfile = f"{local_workdir}/{basename}"
+        with open(options.configfile, "w") as f:
+            f.write(text_format.MessageToString(test_suite))
+    else:
+        options.configfile = options.configfile[0]
+
     if options.mediastore is None:
         options.mediastore = local_workdir
     # check the protobuf text is correct
@@ -1529,7 +1561,7 @@ def get_options(argv):
     parser.add_argument(
         "configfile",
         type=str,
-        nargs="?",
+        nargs="*",
         default=default_values["configfile"],
         metavar="input-config-file",
         help="input configuration file",
