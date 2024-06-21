@@ -12,7 +12,7 @@ struct FileIO {
         var text = ""
 
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-     
+
             let fileURL = dir.appendingPathComponent(filename)
             //reading
             do {
@@ -22,13 +22,13 @@ struct FileIO {
         }
         return text
     }
-    
+
     func writeData(filename: String, data: String) {
         guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             log.error("Failed to get the doument folder")
             return
         }
-        
+
         let outputURL = dir.appendingPathComponent(filename)
         try? FileManager.default.removeItem(atPath: outputURL.path)
         FileManager.default.createFile(atPath: outputURL.path, contents: nil)
@@ -38,7 +38,7 @@ struct FileIO {
             filehandle.closeFile()
             do {
                 try filehandle.close()
-                
+
             } catch {
                 log.info("filehandle close caused an error")
             }
@@ -46,7 +46,7 @@ struct FileIO {
             log.error("Failed to open filehandle \(outputURL)")
         }
     }
-    
+
     func writeArrayData(filename: String, data: [String]) {
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
 
@@ -62,10 +62,10 @@ struct FileIO {
 
         }
     }
-    
+
     func readTestDefinition(inputfile: String)->TestSuite{
         print("Read file \(inputfile)")
-        
+
         // Read testfile
         var tests = TestSuite()
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -79,11 +79,11 @@ struct FileIO {
             catch {/* error handling here */
                 log.error("Failed to read data: \(text)")
             }
-           
+
         }
         return tests
     }
-    
+
     func deleteFile(filename: String) {
         let fileManager = FileManager.default
         if let dir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -97,18 +97,18 @@ struct FileIO {
                 if files.count > 0 {
                     // Delete file
                     try fileManager.removeItem(at: fileURL)
-                    
+
                 } else {
                     print("File does not exist")
                 }
-            
+
             } catch {
                 log.error("Failed to remove: \(fileURL)")
             }
         }
     }
-    
-    
+
+
     func deleteEncappoutputFiles() {
         print("file exists? \(fileExist(filename: "running.lock"))")
         deleteFile(filename: "running.lock")
@@ -129,7 +129,7 @@ struct FileIO {
                         log.error("Failed to remove, \(error): \(file)")
                     }
                 }
-                
+
                 filt = files.filter{$0.absoluteString.contains(".json")}
                 for file in filt {
                     do {
@@ -143,7 +143,7 @@ struct FileIO {
             }
         }
     }
-    
+
     func fileExist(filename: String) -> Bool {
         let fileManager = FileManager.default
         if let dir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {

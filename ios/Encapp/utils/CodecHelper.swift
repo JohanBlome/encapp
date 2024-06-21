@@ -25,7 +25,7 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
                         log.debug("---val: \(propval.debugDescription)")
                         statistics.addProp(name: key as! String, val: "\(propval!)")
                     }
-                    
+
                 } else if d?["PropertyType"]! as? String == "Boolean"{
                     var propval: CFBoolean!
                     status = VTSessionCopyProperty(compSession, key: key as! CFString, allocator: nil, valueOut: &propval)
@@ -44,10 +44,10 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
                 } else {
                     log.error("Unhandled property: \(key) - \(String(describing: d))")
                 }
-               
+
             }
         }
-            
+
     } else {
         log.error("Failed to get props: \(status)")
     }
@@ -68,7 +68,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
             log.info("Succesfully set framereordering to \(val!.value)")
         }
     }
-    
+
     status = 0
     if definition.input.hasRealtime && definition.input.realtime {
         log.debug("Set realtime encode")
@@ -95,7 +95,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
         log.info("Succesfully set speed over quality quality")
     }
     */
-    
+
     //TODO: How to handle this one
     // for now, realtime tries to use a short buffer
     if definition.input.hasRealtime {
@@ -106,7 +106,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
             log.info("Succesfully set max 1 frame delay")
         }
     }
-    
+
     //TODO: profile support
     status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_H264_Main_AutoLevel as CFString)
     if status != 0 {
@@ -114,7 +114,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
     } else {
         log.info("Succesfully set profile")
     }
-    
+
    /* if #available(iOS 16.0, *) {
         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_ConstantBitRate, value: bitrate as CFTypeRef)
     } else {
@@ -133,19 +133,19 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
     if framerate == 0 {
         framerate = 30.0
     }
-    
+
     status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_ExpectedFrameRate, value: framerate as CFTypeRef)
     if status != 0 {
         log.error("failed to set framerate, status: \(status)")
     } else {
         log.info("Succesfully set expected framerate: \(framerate)")
     }
-    
+
     var keyframeIntervalSec = Int(definition.configure.iFrameInterval) //defined in secs
     if keyframeIntervalSec == 0 {
         keyframeIntervalSec = 10
     }
-    
+
 
     status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, value: keyframeIntervalSec as CFTypeRef)
     if status != 0 {
@@ -153,7 +153,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
     } else {
         log.info("Succesfully set key frame interval duration: \(keyframeIntervalSec)")
     }
-    
+
     let keyframeInterval = Float(keyframeIntervalSec) * framerate
     status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: (keyframeInterval) as CFTypeRef)
     if status != 0 {
@@ -161,15 +161,15 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
     } else {
         log.info("Succesfully set key frame interval: \(keyframeInterval)")
     }
-    
+
     var bitrate = magnitudeToInt(stringValue: definition.configure.bitrate)
     if bitrate == 0 {
         bitrate = 500000 //500kbps
     }
-    
-    
+
+
     setBitrate(compSession: compSession, bps: bitrate, cbr: definition.configure.bitrateMode == Configure.BitrateMode.cbr)
-    
+
    //TODO: temporal/hier layers
     if definition.configure.hasTsSchema {
         // If temporal layers are turned off we end up with only I frames. Default is on.
@@ -195,7 +195,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
          log.info("Succesfully set baselayer framerate: \(baseLayerFramerate)")
          }
          */
-        
+
         /*  } else {
          status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_AllowTemporalCompression, value: kCFBooleanFalse)
          if status != 0 {
@@ -205,7 +205,7 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
          }
          }*/
     }
-    
+
    /* status = VTSessionSetProperty(compSession, key: kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder, value: kCFBooleanTrue)
     if status != 0 {
         print("failed to set require hw acceleration, status: \(status)")
@@ -268,7 +268,7 @@ func isKnownEncodingExtension(videopath: String) -> Bool {
     } else {
         return false
     }
-    
+
 }
 
 

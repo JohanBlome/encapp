@@ -8,12 +8,12 @@
 import Foundation
 
 func splitX(text: String)-> [Int] {
-    
+
     let split = (text.lowercased()).components(separatedBy: "x")
     print("\(text) -> split: \(split)")
     let w = split[0]
     let h = split[1]
-   
+
     let output = [w,h]
     print("\(output)")
     return [Int(w) ?? 0, Int(h) ?? 0]
@@ -107,7 +107,7 @@ func doneReading(test: Test, stream: InputStream?, frame: Int, time: Float, loop
     }
     // do not stop the reader
     return false
-    
+
 }
 
 // Swift does not allow a name loopup (which Android and python does)

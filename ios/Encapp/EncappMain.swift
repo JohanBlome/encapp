@@ -23,7 +23,7 @@ class EncappMain {
             log.info("No command given")
             exit(1)
         }
-        
+
         // We are assuming things about the arguments depending on type
         let command = CommandLine.arguments[1] as String
         overview.updateTestsLog(text: "Running command: \'\(command)\'")
@@ -49,7 +49,7 @@ class EncappMain {
                 log.error("Command 'test' without test name")
                 completion()
             }
-          
+
             let testToRun = (CommandLine.arguments[2] as String).trimmingCharacters(in: .whitespacesAndNewlines)
             if !io.fileExist(filename: testToRun) {
                 log.error("Non existing test file: \(testToRun)")
@@ -62,7 +62,7 @@ class EncappMain {
         } else if command == "standby" {
            // This is only to keep the screen on while doing slow io
         }
-        
+
     }
 
     func completion() {
@@ -75,5 +75,5 @@ class EncappMain {
         sleep(1)
         exit(0)
     }
-    
+
 }

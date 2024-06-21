@@ -31,7 +31,7 @@ extension AVAssetTrack {
         return format
     }
 }
- 
+
 extension FourCharCode {
     // Create a string representation of a FourCC.
     func toString() -> String {
@@ -62,15 +62,15 @@ class Decoder {
     init(test: Test){
         self.definition = test
     }
-    
-    
-    
+
+
+
     func Decode() -> String {
         statistics = Statistics(description: "decoder", test: definition);
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             statistics = Statistics(description: "decoder", test: definition);
             log.info("Encode, current test definition = \n\(definition)")
-            
+
             // Filehandling
             let fileURL = dir.appendingPathComponent(definition.input.filepath)
             if FileManager.default.fileExists(atPath: fileURL.path) {
@@ -79,25 +79,25 @@ class Decoder {
                 log.error("Media file: \(fileURL.path) doe not exist")
                 return "Error: no media file"
             }
-            
+
             let source = try AVAsset(url: fileURL)
             let inputReader = try? AVAssetReader(asset:source)
-    
+
             let semaphore = DispatchSemaphore(value: 0)
             //Assume singel track
             //var tracks: AVAssetTrack?
-            
+
             Task {
                 let tracks =  try await source.load(.tracks)
                 trackOutput = AVAssetReaderTrackOutput(track: tracks[0], outputSettings: nil)
                 semaphore.signal()
             }
             semaphore.wait()
-            
+
             print("Continue")
             inputReader?.add(trackOutput)
             inputReader?.startReading()
-            
+
             // Callback
             let decodeCallback: VTDecompressionOutputHandler = { status, infoFlags, imageBuffer, presentationTs, duration in
                 self.statistics.stopDeccoding(pts: Int64(presentationTs.seconds * 1000000.0))
@@ -151,13 +151,13 @@ class Decoder {
                 }
             }
         }
-        
+
         statistics.stop()
         return ""
     }
-    
-    
-    
+
+
+
     func setupDecoder(sampleBuffer: CMSampleBuffer) {
         if sampleBuffer.formatDescription == nil {
             log.error("no format descritpion")
@@ -179,13 +179,13 @@ class Decoder {
                                                             imageBufferAttributes: imagerBufferAttributes as CFDictionary?,
                                                             outputCallback: nil,
                                                   decompressionSessionOut: compressionSessionOut)
-        
+
         if (status != noErr) {
         log.error("Failed to create encoder session, \(status) ")
             log.debug("Failed to create encoder session, \(status)")
             return
         }
-        
+
         compSession = compressionSessionOut.pointee
         log.info("comp: \(compSession.debugDescription)")
         var gpu: CFBoolean!
@@ -196,7 +196,7 @@ class Decoder {
             log.info("Gpu status: \(gpu)")
         }
 
-        
+
         logVTSessionProperties(statistics: statistics, compSession: compSession)
     }
 }
