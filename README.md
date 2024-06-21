@@ -373,6 +373,70 @@ Each setting consists of a pair `{FRAME_NUM, VALUE}`, where the VALUE can be an 
     }
 ```
 
+## 5.3 Combining test definitions
+
+Multiple test definitions can be set on the command line i.e.
+```
+$ ./scripts/encapp.py run tests/bitrate_buffer.pbtxt qcom_hevc_360p_vbr.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.y4m
+...
+
+Where the bitrate_buffer.pbtxt have the following definition:
+```
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate - buffer"
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "200 kbps"
+    }
+}
+'''
+
+And the qcom_hevc_360p_vbr,pbtxt 
+```
+test {
+    common {
+        id: "Android.hevc.360p"
+        description: "Bitrate buffer qc 360p"
+    }
+    configure {
+        codec: "c2.qti.hevc.encoder" 
+        resolution: "640x360"
+        bitrate_mode: vbr
+    }
+}
+'''
+
+When running the definitions will merge
+1) leftmost will have all its test definition merged with the topmost test in succequent definition
+2) rightmost has precedence and overwrite settings
+
+The output in the above example will be
+```
+test {
+  common {
+    id: "Android.hevc.360p"
+    description: "Bitrate buffer qc 360p"
+  }
+  input {
+    filepath: "/tmp/akiyo_qcif.y4m"
+  }
+  configure {
+    codec: "c2.qti.hevc.encoder"
+    bitrate: "200 kbps"
+    resolution: "640x360"
+    bitrate_mode: vbr
+  }
+}
+'''
+
+
+
 
 # 6. Navigating results
 
