@@ -28,8 +28,12 @@ import copy
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
 )
+SCRIPT_PROTO_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+)
 sys.path.append(SCRIPT_ROOT_DIR)
-import proto.tests_pb2 as tests_definitions  # noqa: E402
+sys.path.append(SCRIPT_PROTO_DIR)
+import tests_pb2 as tests_definitions  # noqa: E402
 
 
 RD_RESULT_FILE_NAME = "rd_results.json"
