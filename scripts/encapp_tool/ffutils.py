@@ -79,6 +79,7 @@ def get_video_info(videofile, debug=0):
 
 
 def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
+    print("\n\n*** ffmpeg_transcode_raw  {locals().items()=}")
     resolution = settings.get("output", {}).get(
         "resolution", settings.get("input", {}).get("resolution")
     )
@@ -91,7 +92,7 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
     )
     pad_h = int(
         settings.get("output", {}).get(
-            "vstride", settings.get("input", {}).get("vstride", width)
+            "vstride", settings.get("input", {}).get("vstride", height)
         )
     )
 
@@ -127,10 +128,13 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    print("Done\n*****\n")
     assert ret, f"error: ffmpeg returned {stderr}"
 
 
 def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
+    print(f"\n\n*** ffmpeg_convert_to_raw  {locals().items()=}")
+    
     resolution = settings.get("output", {}).get(
         "resolution", settings.get("input", {}).get("resolution")
     )
@@ -147,7 +151,8 @@ def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
         )
     )
 
-    filter_cmd = f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))}"
+    scaling_method = settings.get("scaler", "bicubic")
+    filter_cmd = f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))}:flags={scaling_method}"
 
     if hstride > 0 and vstride > 0:
         filter_cmd += f",pad={hstride}:{vstride}"
@@ -177,7 +182,9 @@ def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
 
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
+    print("cmd = ", cmd)
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    print("Done\n****\n")
     assert ret, f"error: ffmpeg returned {stderr}"
 
 

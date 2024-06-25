@@ -24,6 +24,38 @@ enum PixFmt {
   nv12 = 2;
   nv21 = 3;
   rgba = 4;
+  p010le = 54;
+}
+
+message Parameter {
+    optional string key = 1;
+    optional DataValueType type = 2;
+    optional string value = 3;
+    // For runtime purposes
+    optional int64 framenum = 4;
+}
+
+// Filter can explicitly specify the input and output pix_fmt
+// and sizes. If not specified, the input and output pix_fmt
+// is assumed to follow the input and the configuration respectively.
+message Filter {
+    optional string filepath = 1;
+    optional string method = 2;
+    optional PixFmt input_pix_fmt = 3;
+    optional PixFmt output_pix_fmt = 4;
+    optional string input_resolution = 5;
+    optional string output_resolution = 6;
+    repeated Parameter parameter = 7;
+}
+
+// Scaler is mainly used to flag scaling on device
+message Scaler {
+    optional Filter filter = 1;
+}
+
+message ProfileLevel {
+    optional int32 profile = 1;
+    optional int32 level = 2;
 }
 
 message Input {
@@ -38,12 +70,15 @@ message Input {
   optional bool show = 9;
 }
 
+// After input preprocess.
+// With no scaler there will be an
+// implicit scaler
+message PreProcess {
+    optional Filter filter = 1;
+    optional Scaler scaler = 2;
+}
+
 message Configure {
-  message Parameter {
-    optional string key = 1;
-    optional DataValueType type = 2;
-    optional string value = 3;
-  }
   repeated Parameter parameter = 1;
   // known shortcuts
   optional string codec = 2;
@@ -91,15 +126,10 @@ message Configure {
   optional int32 quality = 21;
   optional int32 complexity = 22;
   optional bool decode_dump = 23 [default = false];
+  optional ProfileLevel profile_level = 24;
 }
 
 message Runtime {
-  message Parameter {
-    optional int64 framenum = 1;
-    optional string key = 2;
-    optional DataValueType type = 3;
-    optional string value = 4;
-  }
   repeated Parameter parameter = 1;
   // known shortcuts
   message VideoBitrateParameter {
@@ -118,22 +148,11 @@ message Runtime {
 }
 
 message DecoderConfigure {
-  message Parameter {
-    optional string key = 1;
-    optional DataValueType type = 2;
-    optional string value = 3;
-  }
   repeated Parameter parameter = 1;
   optional string codec = 2;
 }
 
 message DecoderRuntime {
-  message Parameter {
-    optional int64 framenum = 1;
-    optional string key = 2;
-    optional DataValueType type = 3;
-    optional string value = 4;
-  }
   repeated Parameter parameter = 1;
 }
 
@@ -153,6 +172,7 @@ message Test {
   optional DecoderConfigure decoder_configure = 5;
   optional DecoderRuntime decoder_runtime = 6;
   optional Parallel parallel = 7;
+  optional PreProcess preprocess = 8;
 }
 
 message TestSuite {

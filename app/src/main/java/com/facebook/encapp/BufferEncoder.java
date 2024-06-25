@@ -1,6 +1,5 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
 import android.media.MediaCodec;
@@ -12,9 +11,18 @@ import android.util.Size;
 
 import androidx.annotation.NonNull;
 
+import com.facebook.encapp.proto.Filter;
+import com.facebook.encapp.proto.Input;
+import com.facebook.encapp.proto.Parameter;
+import com.facebook.encapp.proto.PixFmt;
+import com.facebook.encapp.proto.ProfileLevel;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
+import com.facebook.encapp.utils.RawFrameDefinition;
+import com.facebook.encapp.utils.RawFrameFilterJava;
+import com.facebook.encapp.utils.RawFrameFilterNative;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -22,9 +30,7 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
-import java.util.Hashtable;
 import java.util.Locale;
-import java.util.Set;
 
 
 /**
@@ -46,7 +52,7 @@ class BufferEncoder extends Encoder {
                 mTest = TestDefinitionHelper.updateBasicSettings(mTest);
             }
         } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
+            Log.e(TAG, "Test definition check Error: " + e.getMessage());
         }
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
@@ -59,8 +65,59 @@ class BufferEncoder extends Encoder {
         mFramesAdded = 0;
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
-        mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
-                sourceResolution.getHeight() * 1.5);
+        // TODO: other formats (i.e. rgba or yuv422, yuv444)
+        PixFmt inputFmt = mTest.getInput().getPixFmt();
+        mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
+        Log.d(TAG, "Frame size in bytes: " + mRefFramesizeInBytes);
+        Size targetResolution = SizeUtils.parseXString(mTest.getConfigure().getResolution());
+        if (targetResolution == null | targetResolution.equals(sourceResolution)) {
+            mTargetFramesizeInBytes = mRefFramesizeInBytes;
+        } else {
+            mTargetFramesizeInBytes = (int) (targetResolution.getWidth() *
+                    targetResolution.getHeight() * 1.5);
+            // TODO: Stride is missing...
+            mInputRawFrameDef = new RawFrameDefinition(sourceResolution.getWidth(), sourceResolution.getHeight(), sourceResolution.getWidth(), mTest.getInput().getPixFmt());
+            mOutputRawFrameDef = new RawFrameDefinition(targetResolution.getWidth(), targetResolution.getHeight(), targetResolution.getWidth(), mTest.getInput().getPixFmt());
+            mInputByteBuffer = ByteBuffer.allocateDirect(mRefFramesizeInBytes);
+            mOutputByteBuffer = ByteBuffer.allocateDirect(mTargetFramesizeInBytes);
+
+            if (mTest.getPreprocess().hasScaler() & !mTest.getPreprocess().getScaler().getFilter().getFilepath().toLowerCase().equals("ffmpeg")) {
+                Filter filterDef = mTest.getPreprocess().getScaler().getFilter();
+                String filterName = mTest.getPreprocess().getScaler().getFilter().getFilepath();
+                try {
+                    if (filterName.toLowerCase().equals("java")) {
+                        mFilter = new RawFrameFilterJava(filterName);
+                    } else {
+                        mFilter = new RawFrameFilterNative(filterName);
+                    }
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to create native filter: " + ex.getMessage());
+                }
+                Log.d(TAG, "Loaded: , version: " + mFilter.version());
+                Log.d(TAG, "library description:" + mFilter.description());
+                String method = filterDef.getMethod();
+                mFilter.setRawFrameDefinitions(mInputRawFrameDef, mOutputRawFrameDef);
+                String[] methods = mFilter.getAvailableMethods();
+                for (String method_ : methods) {
+                    Log.d(TAG, method_);
+                }
+                PixFmt[] supportedPixFmts = mFilter.supportedPixelFormats();
+                for (PixFmt fmt : supportedPixFmts) {
+                    Log.d(TAG, fmt.name());
+                }
+
+                mFilter.setMethod(method);
+                if (filterDef.getParameterCount() > 0) {
+                    Parameter[] params = new Parameter[filterDef.getParameterList().size()];
+                    filterDef.getParameterList().toArray(params);
+                    mFilter.setParameters(params);
+                }
+                mStats.addRawFrameFilter(mFilter);
+            } else {
+                // No filter defined, what to do now?
+                Log.d(TAG, "Input resolution differs from encoding resolution but no scaler set");
+            }
+        }
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
@@ -83,6 +140,12 @@ class BufferEncoder extends Encoder {
             mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
 
             mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+            if (mTest.getConfigure().getProfileLevel().getProfile() > 0) {
+                ProfileLevel pl = mTest.getConfigure().getProfileLevel();
+                mediaFormat.setInteger(MediaFormat.KEY_PROFILE, pl.getProfile());
+                mediaFormat.setInteger(MediaFormat.KEY_LEVEL, pl.getLevel());
+            }
+            //mediaFormat.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10);
             Log.d(TAG, "MediaFormat (mTest)");
             logMediaFormat(mediaFormat);
             setConfigureParams(mTest, mediaFormat);
@@ -126,7 +189,6 @@ class BufferEncoder extends Encoder {
         mKeepInterval = mReferenceFrameRate / mFrameRate;
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-
         Log.d(TAG, "Create muxer");
         mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
 
@@ -296,7 +358,9 @@ class BufferEncoder extends Encoder {
             }
         }
         mStats.stop();
-
+        if (mFilter != null) {
+            mFilter.release();
+        }
         Log.d(TAG, "Close muxer and streams");
         if (mCodec != null) {
             mCodec.stop();

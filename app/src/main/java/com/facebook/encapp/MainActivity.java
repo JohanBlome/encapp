@@ -88,7 +88,9 @@ public class MainActivity extends AppCompatActivity {
         return extension;
     }
 
+    public static Context mContext = null;
     private static String[] retrieveNotGrantedPermissions(Context context) {
+        mContext = context;
         ArrayList<String> nonGrantedPerms = new ArrayList<>();
         try {
             String[] manifestPerms = context.getPackageManager()

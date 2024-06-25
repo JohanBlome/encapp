@@ -157,6 +157,9 @@ public class MediaCodecInfoHelper {
                 return MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar;
             case PixFmt.rgba_VALUE:
                 return MediaCodecInfo.CodecCapabilities.COLOR_Format32bitARGB8888;
+            // Added in API level 33
+            case PixFmt.p010le_VALUE:
+                return 54;//MediaCodecInfo.CodecCapabilities.COLOR_FormatYUVP010;
             default:
                 throw new RuntimeException("unsupported pix_fmt: " + pix_fmt);
         }
@@ -390,6 +393,7 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+
     public static String profileLevelsToString(MediaCodecInfo.CodecProfileLevel[] color_profile_level, int indent) {
         String tab = getIndentation(indent);
         StringBuilder str = new StringBuilder();
@@ -419,7 +423,10 @@ public class MediaCodecInfoHelper {
         StringBuilder str = new StringBuilder();
 
         MediaCodecInfo.CodecCapabilities codec_capabilities = media_codec_info.getCapabilitiesForType(media_type);
-
+        MediaCodecInfo.VideoCapabilities video_capabilities = codec_capabilities.getVideoCapabilities();
+        if (video_capabilities == null) {
+            return "";
+        }
         str.append(tab + "media_type {\n");
         indent += 1;
         tab = getIndentation(indent);
@@ -682,4 +689,16 @@ public class MediaCodecInfoHelper {
         return m;
     }
     final public static Map<Integer, String> androidImageFormatTable = createAndroidImageFormatTable();
+
+    public static int frameSizeInBytes(PixFmt pix_fmt, int width, int height) {
+        switch (pix_fmt.getNumber()) {
+            case PixFmt.p010le_VALUE:
+                // 24bit per pixel
+                return width * height * 3;
+            default:
+                // 420 chroma compressed format
+                return (int)(Math.ceil(width * height * 1.5));
+        }
+    }
+
 }

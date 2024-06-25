@@ -1,0 +1,100 @@
+test {
+    common {
+        id: "Scale 1"
+        description: "Native nearest neigbor upscaling."
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    preprocess {
+        scaler {
+            filter {
+                # This will be a arm64 build - may not work everywere
+                filepath: "/tmp/libsimplescaler.so"
+                method: "neighbor"
+                parameter {
+                    key: "my_key"
+                    type: stringType
+                    value: "my_value"
+                }
+                parameter {
+                    key: "my_key2"
+                    type: floatType
+                    value: "99.5"
+                }
+            }
+        }
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "2Mbps"
+        resolution: "640x480"
+    }
+}
+test {
+    common {
+        id: "Scale 2"
+        description: "Java implementation of nearest neigbor upscaling."
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    preprocess {
+        scaler {
+            filter {
+                filepath: "java"
+                method: "neighbor"
+            }
+        }
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "2Mbps"
+        resolution: "640x480"
+    }
+}
+test {
+    common {
+        id: "Scale 3"
+        description: "FFmpeg nearest neigbor upscaling."
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    preprocess {
+        scaler {
+            filter {
+                filepath: "ffmpeg"
+                method: "neighbor"
+            }
+        }
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "2Mbps"
+        resolution: "640x480"
+    }
+}
+test {
+    common {
+        id: "Scale 4"
+        description: "FFmpeg bilinear upscaling."
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    preprocess {
+        scaler {
+            filter {
+                filepath: "ffmpeg"
+                method: "bilinear"
+            }
+        }
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "2Mbps"
+        resolution: "640x480"
+    }
+}
+
