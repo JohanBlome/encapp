@@ -498,10 +498,10 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
         for test in test_suite.test:
-            output_dir = f"{local_workdir}/{test.common.id}"
+            output_dir = f"{local_workdir}/{valid_path(test.common.id)}"
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
-            filename = f"{output_dir}/{test.common.id}.pbtxt"
+            filename = f"{output_dir}/{valid_path(test.common.id)}.pbtxt"
             with open(filename, "w") as f:
                 f.write(text_format.MessageToString(test))
             files_to_push |= {filename}
@@ -512,6 +512,12 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             f.write(text_format.MessageToString(test_suite))
         files_to_push |= {protobuf_txt_filepath}
     return test_suite, files_to_push, protobuf_txt_filepath
+
+
+def valid_path(text):
+    ret = re.sub('[ \/?*]', '.', text)
+    print(f"{text=} -> {ret=}")
+    return ret
 
 
 def run_codec_tests_file(
@@ -554,7 +560,7 @@ def run_codec_tests_file(
         for test in test_suite.test:
             suite = tests_definitions.TestSuite()
             suite.test.extend([test])
-            path = f"{local_workdir}/{test.common.id}.pbtxt"
+            path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
             with open(path, "w") as f:
                 f.write(text_format.MessageToString(suite))
             files_to_push |= {path}
@@ -564,7 +570,9 @@ def run_codec_tests_file(
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
-        protobuf_txt_filepath = f"{local_workdir}/{test.common.id}_aggr.pbtxt"
+        # If we are using the id - we need to replace characters that are problematic in
+        # a filepath (i.e. space)
+        protobuf_txt_filepath = f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
         if debug > 0:
@@ -1112,13 +1120,13 @@ def run_codec_tests(
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
             if encapp_tool.adb_cmds.USE_IDB:
-                protobuf_txt_filepath = f"{test.common.id}.pbtxt"
+                protobuf_txt_filepath = f"{valid_path(test.common.id)}.pbtxt"
             else:
-                protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
+                protobuf_txt_filepath = f"{device_workdir}/{valid_path(test.common.id)}.pbtxt"
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
             with open(tests_run, "a") as passed:
-                passed.write(f"{test.common.id}.pbtxt\n")
+                passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
 
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
@@ -1131,7 +1139,7 @@ def run_codec_tests(
                 try:
                     os.rename(
                         f"{local_workdir}/encapp.log",
-                        f"{local_workdir}/{test.common.id}.log",
+                        f"{local_workdir}/{valid_path(test.common.id)}.log",
                     )
                 except:
                     print("Changing name on the ios log file")
