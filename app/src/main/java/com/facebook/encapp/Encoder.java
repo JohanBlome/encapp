@@ -164,36 +164,15 @@ public abstract class Encoder {
         return mInitDone;
     }
 
-    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
-        if (!useStatId) {
-            Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-            mFilename = String.format(Locale.US, CliSettings.getWorkDir() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
-                    encoder.getCodecInfo().getName().toLowerCase(Locale.US),
-                    (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
-                    (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
-                    (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
-                    (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
-                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
-                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-        } else {
-            mFilename = mStats.getId() + ".mp4";
-        }
+    protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format) {
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
-        if (encoder.getCodecInfo().getName().toLowerCase(Locale.US).contains("vp")) {
-            if (!useStatId) {
-                mFilename = String.format(Locale.US, CliSettings.getWorkDir() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
-                        encoder.getCodecInfo().getName().toLowerCase(Locale.US),
-                        (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
-                        (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
-                        (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
-                        (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
-                        (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
-                        (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-            } else {
-                mFilename = mStats.getId() + ".webm";
-            }
+        mFilename = mStats.getId() + ".mp4";
+
+        if (encoder != null && encoder.getCodecInfo().getName().toLowerCase(Locale.US).contains("vp")) {
             type = MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM;
+            mFilename = mStats.getId() + ".webm";
         }
+
         try {
             String fullFilename = CliSettings.getWorkDir() + "/" + mFilename;
             Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + fullFilename);
@@ -204,7 +183,7 @@ public abstract class Encoder {
         }
 
         mStats.setEncodedfile(mFilename);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q & encoder != null) {
             mStats.setEncoderIsHardwareAccelerated(encoder.getCodecInfo().isHardwareAccelerated());
         }
         return mMuxer;

@@ -250,7 +250,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
             if (!mNoEncoding) {
                 Log.d(TAG, "Create muxer");
-                mMuxer = createMuxer(mCodec, format, true);
+                mMuxer = createMuxer(mCodec, format);
 
                 // This is needed.
                 boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");

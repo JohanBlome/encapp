@@ -648,7 +648,13 @@ public class MainActivity extends AppCompatActivity {
 
             } else {
                 Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
-                coder = new BufferEncoder(test);
+                if (test.getConfigure().getCodec().equals("ittiam_x264")){
+                    coder = new BufferX264Encoder(test);
+                } else if (test.getConfigure().getCodec().equals("x264")){
+                    coder = new SwLibEncoder(test);
+                } else {
+                    coder = new BufferEncoder(test);
+                }
             }
 
 
