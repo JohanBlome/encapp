@@ -27,6 +27,13 @@ enum PixFmt {
   p010le = 54;
 }
 
+message Parameter {
+    optional string key = 1;
+    optional DataValueType type = 2;
+    optional string value = 3;
+    // For runtime purposes
+    optional int64 framenum = 4;
+}
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -40,11 +47,6 @@ message Input {
 }
 
 message Configure {
-  message Parameter {
-    optional string key = 1;
-    optional DataValueType type = 2;
-    optional string value = 3;
-  }
   repeated Parameter parameter = 1;
   // known shortcuts
   optional string codec = 2;
@@ -95,12 +97,6 @@ message Configure {
 }
 
 message Runtime {
-  message Parameter {
-    optional int64 framenum = 1;
-    optional string key = 2;
-    optional DataValueType type = 3;
-    optional string value = 4;
-  }
   repeated Parameter parameter = 1;
   // known shortcuts
   message VideoBitrateParameter {
@@ -119,22 +115,11 @@ message Runtime {
 }
 
 message DecoderConfigure {
-  message Parameter {
-    optional string key = 1;
-    optional DataValueType type = 2;
-    optional string value = 3;
-  }
   repeated Parameter parameter = 1;
   optional string codec = 2;
 }
 
 message DecoderRuntime {
-  message Parameter {
-    optional int64 framenum = 1;
-    optional string key = 2;
-    optional DataValueType type = 3;
-    optional string value = 4;
-  }
   repeated Parameter parameter = 1;
 }
 

@@ -9,6 +9,7 @@ import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.Input;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
@@ -85,7 +86,7 @@ public class TestDefinitionHelper {
         }
 
         // set all the available values
-        for (Configure.Parameter param : config.getParameterList()) {
+        for (Parameter param : config.getParameterList()) {
             switch (param.getType().getNumber()) {
                 case DataValueType.floatType_VALUE:
                     float fval = Float.parseFloat(param.getValue());
@@ -222,9 +223,9 @@ public class TestDefinitionHelper {
     public static void setDecoderConfigureParams(Test mTest, MediaFormat format) {
         DecoderConfigure config = mTest.getDecoderConfigure();
 
-        List<DecoderConfigure.Parameter> params = config.getParameterList();
+        List<Parameter> params = config.getParameterList();
         Log.d(TAG, "Set decoder config: " + params);
-        for (DecoderConfigure.Parameter param : params) {
+        for (Parameter param : params) {
             switch (param.getType().getNumber()) {
                 case DataValueType.intType_VALUE:
                     format.setInteger(param.getKey(), Integer.parseInt(param.getValue()));

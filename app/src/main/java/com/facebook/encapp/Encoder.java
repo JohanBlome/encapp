@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.Assert;
@@ -278,8 +279,8 @@ public abstract class Encoder {
     }
 
     protected void setConfigureParams(Test test, MediaFormat format) {
-        List<Configure.Parameter> params = test.getConfigure().getParameterList();
-        for (Configure.Parameter param : params) {
+        List<Parameter> params = test.getConfigure().getParameterList();
+        for (Parameter param : params) {
             switch (param.getType().getNumber()) {
                 case DataValueType.stringType_VALUE:
                     format.setString(param.getKey(), param.getValue());
@@ -345,7 +346,7 @@ public abstract class Encoder {
             }
         }
 
-        for (Runtime.Parameter param : mRuntimeParams.getParameterList()) {
+        for (Parameter param : mRuntimeParams.getParameterList()) {
             if (param.getFramenum() == frame) {
                 Log.d(TAG, "Set runtime parameter @ " + frame + " key: " + param.getKey() + ", " + param.getType() + ", " + param.getValue());
                 switch (param.getType().getNumber()) {
