@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderRuntime;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
@@ -309,7 +310,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         if (mDecoderRuntimeParams == null) return;
         Bundle bundle = new Bundle();
 
-        for (DecoderRuntime.Parameter param : mDecoderRuntimeParams.getParameterList()) {
+        for (Parameter param : mDecoderRuntimeParams.getParameterList()) {
             if (param.getFramenum() == frame) {
                 switch (param.getType().getNumber()) {
                     case DataValueType.floatType_VALUE:

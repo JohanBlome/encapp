@@ -157,6 +157,58 @@ struct Common {
   fileprivate var _start: String? = nil
 }
 
+struct Parameter {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var key: String {
+    get {return _key ?? String()}
+    set {_key = newValue}
+  }
+  /// Returns true if `key` has been explicitly set.
+  var hasKey: Bool {return self._key != nil}
+  /// Clears the value of `key`. Subsequent reads from it will return its default value.
+  mutating func clearKey() {self._key = nil}
+
+  var type: DataValueType {
+    get {return _type ?? .stringType}
+    set {_type = newValue}
+  }
+  /// Returns true if `type` has been explicitly set.
+  var hasType: Bool {return self._type != nil}
+  /// Clears the value of `type`. Subsequent reads from it will return its default value.
+  mutating func clearType() {self._type = nil}
+
+  var value: String {
+    get {return _value ?? String()}
+    set {_value = newValue}
+  }
+  /// Returns true if `value` has been explicitly set.
+  var hasValue: Bool {return self._value != nil}
+  /// Clears the value of `value`. Subsequent reads from it will return its default value.
+  mutating func clearValue() {self._value = nil}
+
+  /// For runtime purposes
+  var framenum: Int64 {
+    get {return _framenum ?? 0}
+    set {_framenum = newValue}
+  }
+  /// Returns true if `framenum` has been explicitly set.
+  var hasFramenum: Bool {return self._framenum != nil}
+  /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
+  mutating func clearFramenum() {self._framenum = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _key: String? = nil
+  fileprivate var _type: DataValueType? = nil
+  fileprivate var _value: String? = nil
+  fileprivate var _framenum: Int64? = nil
+}
+
 struct Input {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -263,7 +315,7 @@ struct Configure {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var parameter: [Configure.Parameter] {
+  var parameter: [Parameter] {
     get {return _storage._parameter}
     set {_uniqueStorage()._parameter = newValue}
   }
@@ -591,47 +643,6 @@ struct Configure {
 
   }
 
-  struct Parameter {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var key: String {
-      get {return _key ?? String()}
-      set {_key = newValue}
-    }
-    /// Returns true if `key` has been explicitly set.
-    var hasKey: Bool {return self._key != nil}
-    /// Clears the value of `key`. Subsequent reads from it will return its default value.
-    mutating func clearKey() {self._key = nil}
-
-    var type: DataValueType {
-      get {return _type ?? .stringType}
-      set {_type = newValue}
-    }
-    /// Returns true if `type` has been explicitly set.
-    var hasType: Bool {return self._type != nil}
-    /// Clears the value of `type`. Subsequent reads from it will return its default value.
-    mutating func clearType() {self._type = nil}
-
-    var value: String {
-      get {return _value ?? String()}
-      set {_value = newValue}
-    }
-    /// Returns true if `value` has been explicitly set.
-    var hasValue: Bool {return self._value != nil}
-    /// Clears the value of `value`. Subsequent reads from it will return its default value.
-    mutating func clearValue() {self._value = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _key: String? = nil
-    fileprivate var _type: DataValueType? = nil
-    fileprivate var _value: String? = nil
-  }
-
   init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
@@ -662,7 +673,7 @@ struct Runtime {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var parameter: [Runtime.Parameter] = []
+  var parameter: [Parameter] = []
 
   var videoBitrate: [Runtime.VideoBitrateParameter] = []
 
@@ -673,57 +684,6 @@ struct Runtime {
   var requestSync: [Int64] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  struct Parameter {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var framenum: Int64 {
-      get {return _framenum ?? 0}
-      set {_framenum = newValue}
-    }
-    /// Returns true if `framenum` has been explicitly set.
-    var hasFramenum: Bool {return self._framenum != nil}
-    /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
-    mutating func clearFramenum() {self._framenum = nil}
-
-    var key: String {
-      get {return _key ?? String()}
-      set {_key = newValue}
-    }
-    /// Returns true if `key` has been explicitly set.
-    var hasKey: Bool {return self._key != nil}
-    /// Clears the value of `key`. Subsequent reads from it will return its default value.
-    mutating func clearKey() {self._key = nil}
-
-    var type: DataValueType {
-      get {return _type ?? .stringType}
-      set {_type = newValue}
-    }
-    /// Returns true if `type` has been explicitly set.
-    var hasType: Bool {return self._type != nil}
-    /// Clears the value of `type`. Subsequent reads from it will return its default value.
-    mutating func clearType() {self._type = nil}
-
-    var value: String {
-      get {return _value ?? String()}
-      set {_value = newValue}
-    }
-    /// Returns true if `value` has been explicitly set.
-    var hasValue: Bool {return self._value != nil}
-    /// Clears the value of `value`. Subsequent reads from it will return its default value.
-    mutating func clearValue() {self._value = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _framenum: Int64? = nil
-    fileprivate var _key: String? = nil
-    fileprivate var _type: DataValueType? = nil
-    fileprivate var _value: String? = nil
-  }
 
   /// known shortcuts
   struct VideoBitrateParameter {
@@ -797,7 +757,7 @@ struct DecoderConfigure {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var parameter: [DecoderConfigure.Parameter] = []
+  var parameter: [Parameter] = []
 
   var codec: String {
     get {return _codec ?? String()}
@@ -810,47 +770,6 @@ struct DecoderConfigure {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  struct Parameter {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var key: String {
-      get {return _key ?? String()}
-      set {_key = newValue}
-    }
-    /// Returns true if `key` has been explicitly set.
-    var hasKey: Bool {return self._key != nil}
-    /// Clears the value of `key`. Subsequent reads from it will return its default value.
-    mutating func clearKey() {self._key = nil}
-
-    var type: DataValueType {
-      get {return _type ?? .stringType}
-      set {_type = newValue}
-    }
-    /// Returns true if `type` has been explicitly set.
-    var hasType: Bool {return self._type != nil}
-    /// Clears the value of `type`. Subsequent reads from it will return its default value.
-    mutating func clearType() {self._type = nil}
-
-    var value: String {
-      get {return _value ?? String()}
-      set {_value = newValue}
-    }
-    /// Returns true if `value` has been explicitly set.
-    var hasValue: Bool {return self._value != nil}
-    /// Clears the value of `value`. Subsequent reads from it will return its default value.
-    mutating func clearValue() {self._value = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _key: String? = nil
-    fileprivate var _type: DataValueType? = nil
-    fileprivate var _value: String? = nil
-  }
-
   init() {}
 
   fileprivate var _codec: String? = nil
@@ -861,60 +780,9 @@ struct DecoderRuntime {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var parameter: [DecoderRuntime.Parameter] = []
+  var parameter: [Parameter] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  struct Parameter {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var framenum: Int64 {
-      get {return _framenum ?? 0}
-      set {_framenum = newValue}
-    }
-    /// Returns true if `framenum` has been explicitly set.
-    var hasFramenum: Bool {return self._framenum != nil}
-    /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
-    mutating func clearFramenum() {self._framenum = nil}
-
-    var key: String {
-      get {return _key ?? String()}
-      set {_key = newValue}
-    }
-    /// Returns true if `key` has been explicitly set.
-    var hasKey: Bool {return self._key != nil}
-    /// Clears the value of `key`. Subsequent reads from it will return its default value.
-    mutating func clearKey() {self._key = nil}
-
-    var type: DataValueType {
-      get {return _type ?? .stringType}
-      set {_type = newValue}
-    }
-    /// Returns true if `type` has been explicitly set.
-    var hasType: Bool {return self._type != nil}
-    /// Clears the value of `type`. Subsequent reads from it will return its default value.
-    mutating func clearType() {self._type = nil}
-
-    var value: String {
-      get {return _value ?? String()}
-      set {_value = newValue}
-    }
-    /// Returns true if `value` has been explicitly set.
-    var hasValue: Bool {return self._value != nil}
-    /// Clears the value of `value`. Subsequent reads from it will return its default value.
-    mutating func clearValue() {self._value = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _framenum: Int64? = nil
-    fileprivate var _key: String? = nil
-    fileprivate var _type: DataValueType? = nil
-    fileprivate var _value: String? = nil
-  }
 
   init() {}
 }
@@ -1035,21 +903,18 @@ struct TestSuite {
 extension DataValueType: @unchecked Sendable {}
 extension PixFmt: @unchecked Sendable {}
 extension Common: @unchecked Sendable {}
+extension Parameter: @unchecked Sendable {}
 extension Input: @unchecked Sendable {}
 extension Configure: @unchecked Sendable {}
 extension Configure.BitrateMode: @unchecked Sendable {}
 extension Configure.ColorStandard: @unchecked Sendable {}
 extension Configure.ColorRange: @unchecked Sendable {}
 extension Configure.ColorTransfer: @unchecked Sendable {}
-extension Configure.Parameter: @unchecked Sendable {}
 extension Runtime: @unchecked Sendable {}
-extension Runtime.Parameter: @unchecked Sendable {}
 extension Runtime.VideoBitrateParameter: @unchecked Sendable {}
 extension Runtime.DynamicFramerateParameter: @unchecked Sendable {}
 extension DecoderConfigure: @unchecked Sendable {}
-extension DecoderConfigure.Parameter: @unchecked Sendable {}
 extension DecoderRuntime: @unchecked Sendable {}
-extension DecoderRuntime.Parameter: @unchecked Sendable {}
 extension Parallel: @unchecked Sendable {}
 extension Serial: @unchecked Sendable {}
 extension Test: @unchecked Sendable {}
@@ -1127,6 +992,60 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if lhs._description_p != rhs._description_p {return false}
     if lhs._operation != rhs._operation {return false}
     if lhs._start != rhs._start {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "Parameter"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "key"),
+    2: .same(proto: "type"),
+    3: .same(proto: "value"),
+    4: .same(proto: "framenum"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._key) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._value) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self._framenum) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._key {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._type {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._value {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._framenum {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Parameter, rhs: Parameter) -> Bool {
+    if lhs._key != rhs._key {return false}
+    if lhs._type != rhs._type {return false}
+    if lhs._value != rhs._value {return false}
+    if lhs._framenum != rhs._framenum {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1245,7 +1164,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   ]
 
   fileprivate class _StorageClass {
-    var _parameter: [Configure.Parameter] = []
+    var _parameter: [Parameter] = []
     var _codec: String? = nil
     var _encode: Bool? = nil
     var _surface: Bool? = nil
@@ -1494,54 +1413,6 @@ extension Configure.ColorTransfer: SwiftProtobuf._ProtoNameProviding {
   ]
 }
 
-extension Configure.Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Configure.protoMessageName + ".Parameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "key"),
-    2: .same(proto: "type"),
-    3: .same(proto: "value"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._key) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._key {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._type {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._value {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Configure.Parameter, rhs: Configure.Parameter) -> Bool {
-    if lhs._key != rhs._key {return false}
-    if lhs._type != rhs._type {return false}
-    if lhs._value != rhs._value {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Runtime"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -1593,60 +1464,6 @@ extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if lhs.drop != rhs.drop {return false}
     if lhs.dynamicFramerate != rhs.dynamicFramerate {return false}
     if lhs.requestSync != rhs.requestSync {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Runtime.Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Runtime.protoMessageName + ".Parameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "framenum"),
-    2: .same(proto: "key"),
-    3: .same(proto: "type"),
-    4: .same(proto: "value"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self._framenum) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._key) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._framenum {
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._key {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._type {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._value {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Runtime.Parameter, rhs: Runtime.Parameter) -> Bool {
-    if lhs._framenum != rhs._framenum {return false}
-    if lhs._key != rhs._key {return false}
-    if lhs._type != rhs._type {return false}
-    if lhs._value != rhs._value {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1778,54 +1595,6 @@ extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension DecoderConfigure.Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = DecoderConfigure.protoMessageName + ".Parameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "key"),
-    2: .same(proto: "type"),
-    3: .same(proto: "value"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._key) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._key {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._type {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._value {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: DecoderConfigure.Parameter, rhs: DecoderConfigure.Parameter) -> Bool {
-    if lhs._key != rhs._key {return false}
-    if lhs._type != rhs._type {return false}
-    if lhs._value != rhs._value {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "DecoderRuntime"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -1853,60 +1622,6 @@ extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
   static func ==(lhs: DecoderRuntime, rhs: DecoderRuntime) -> Bool {
     if lhs.parameter != rhs.parameter {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension DecoderRuntime.Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = DecoderRuntime.protoMessageName + ".Parameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "framenum"),
-    2: .same(proto: "key"),
-    3: .same(proto: "type"),
-    4: .same(proto: "value"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self._framenum) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._key) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._framenum {
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._key {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._type {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._value {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: DecoderRuntime.Parameter, rhs: DecoderRuntime.Parameter) -> Bool {
-    if lhs._framenum != rhs._framenum {return false}
-    if lhs._key != rhs._key {return false}
-    if lhs._type != rhs._type {return false}
-    if lhs._value != rhs._value {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
