@@ -1,0 +1,16 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_192x160.p010le.yuv"
+        resolution: "192x160"
+        pix_fmt: p010le
+        framerate: 30
+    }
+    common {
+        id: "bitrate_buffer_p010le"
+        description: "Verify encoding bitrate for p010le using raw buffer"
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"
+        bitrate: "200 kbps"
+    }
+}

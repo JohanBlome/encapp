@@ -12,9 +12,11 @@ import android.util.Size;
 
 import androidx.annotation.NonNull;
 
+import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -58,9 +60,8 @@ class BufferEncoder extends Encoder {
         mSkipped = 0;
         mFramesAdded = 0;
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
-        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
-        mRefFramesizeInBytes = (int) (sourceResolution.getWidth() *
-                sourceResolution.getHeight() * 1.5);
+        PixFmt inputFmt = mTest.getInput().getPixFmt();
+        mRefFramesizeInBytes =  mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {

@@ -20,7 +20,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-enum DataValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
+enum DataValueType: SwiftProtobuf.Enum {
   typealias RawValue = Int
   case stringType // = 0
   case intType // = 1
@@ -52,13 +52,22 @@ enum DataValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PixFmt: SwiftProtobuf.Enum, Swift.CaseIterable {
+#if swift(>=4.2)
+
+extension DataValueType: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+#endif  // swift(>=4.2)
+
+enum PixFmt: SwiftProtobuf.Enum {
   typealias RawValue = Int
   case yuv420P // = 0
   case yvu420P // = 1
   case nv12 // = 2
   case nv21 // = 3
   case rgba // = 4
+  case p010Le // = 54
 
   init() {
     self = .yuv420P
@@ -71,6 +80,7 @@ enum PixFmt: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 2: self = .nv12
     case 3: self = .nv21
     case 4: self = .rgba
+    case 54: self = .p010Le
     default: return nil
     }
   }
@@ -82,12 +92,21 @@ enum PixFmt: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .nv12: return 2
     case .nv21: return 3
     case .rgba: return 4
+    case .p010Le: return 54
     }
   }
 
 }
 
-struct Common: Sendable {
+#if swift(>=4.2)
+
+extension PixFmt: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+#endif  // swift(>=4.2)
+
+struct Common {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -138,7 +157,7 @@ struct Common: Sendable {
   fileprivate var _start: String? = nil
 }
 
-struct Input: Sendable {
+struct Input {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -239,7 +258,7 @@ struct Input: Sendable {
   fileprivate var _show: Bool? = nil
 }
 
-struct Configure: @unchecked Sendable {
+struct Configure {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -450,7 +469,7 @@ struct Configure: @unchecked Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum BitrateMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  enum BitrateMode: SwiftProtobuf.Enum {
     typealias RawValue = Int
     case cq // = 0
     case vbr // = 1
@@ -482,7 +501,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorStandard: SwiftProtobuf.Enum, Swift.CaseIterable {
+  enum ColorStandard: SwiftProtobuf.Enum {
     typealias RawValue = Int
     case bt601Pal // = 2
     case bt601Ntsc // = 4
@@ -514,7 +533,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorRange: SwiftProtobuf.Enum, Swift.CaseIterable {
+  enum ColorRange: SwiftProtobuf.Enum {
     typealias RawValue = Int
     case full // = 1
     case limited // = 2
@@ -540,7 +559,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorTransfer: SwiftProtobuf.Enum, Swift.CaseIterable {
+  enum ColorTransfer: SwiftProtobuf.Enum {
     typealias RawValue = Int
     case linear // = 1
     case sdrVideo // = 3
@@ -572,7 +591,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  struct Parameter: Sendable {
+  struct Parameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -618,7 +637,27 @@ struct Configure: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct Runtime: Sendable {
+#if swift(>=4.2)
+
+extension Configure.BitrateMode: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+extension Configure.ColorStandard: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+extension Configure.ColorRange: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+extension Configure.ColorTransfer: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+#endif  // swift(>=4.2)
+
+struct Runtime {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -635,7 +674,7 @@ struct Runtime: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  struct Parameter: Sendable {
+  struct Parameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -687,7 +726,7 @@ struct Runtime: Sendable {
   }
 
   /// known shortcuts
-  struct VideoBitrateParameter: Sendable {
+  struct VideoBitrateParameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -719,7 +758,7 @@ struct Runtime: Sendable {
     fileprivate var _bitrate: String? = nil
   }
 
-  struct DynamicFramerateParameter: Sendable {
+  struct DynamicFramerateParameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -753,7 +792,7 @@ struct Runtime: Sendable {
   init() {}
 }
 
-struct DecoderConfigure: Sendable {
+struct DecoderConfigure {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -771,7 +810,7 @@ struct DecoderConfigure: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  struct Parameter: Sendable {
+  struct Parameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -817,7 +856,7 @@ struct DecoderConfigure: Sendable {
   fileprivate var _codec: String? = nil
 }
 
-struct DecoderRuntime: Sendable {
+struct DecoderRuntime {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -826,7 +865,7 @@ struct DecoderRuntime: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  struct Parameter: Sendable {
+  struct Parameter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -880,7 +919,7 @@ struct DecoderRuntime: Sendable {
   init() {}
 }
 
-struct Parallel: Sendable {
+struct Parallel {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -892,7 +931,7 @@ struct Parallel: Sendable {
   init() {}
 }
 
-struct Serial: Sendable {
+struct Serial {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -904,7 +943,7 @@ struct Serial: Sendable {
   init() {}
 }
 
-struct Test: @unchecked Sendable {
+struct Test {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -979,7 +1018,7 @@ struct Test: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct TestSuite: Sendable {
+struct TestSuite {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -991,6 +1030,31 @@ struct TestSuite: Sendable {
 
   init() {}
 }
+
+#if swift(>=5.5) && canImport(_Concurrency)
+extension DataValueType: @unchecked Sendable {}
+extension PixFmt: @unchecked Sendable {}
+extension Common: @unchecked Sendable {}
+extension Input: @unchecked Sendable {}
+extension Configure: @unchecked Sendable {}
+extension Configure.BitrateMode: @unchecked Sendable {}
+extension Configure.ColorStandard: @unchecked Sendable {}
+extension Configure.ColorRange: @unchecked Sendable {}
+extension Configure.ColorTransfer: @unchecked Sendable {}
+extension Configure.Parameter: @unchecked Sendable {}
+extension Runtime: @unchecked Sendable {}
+extension Runtime.Parameter: @unchecked Sendable {}
+extension Runtime.VideoBitrateParameter: @unchecked Sendable {}
+extension Runtime.DynamicFramerateParameter: @unchecked Sendable {}
+extension DecoderConfigure: @unchecked Sendable {}
+extension DecoderConfigure.Parameter: @unchecked Sendable {}
+extension DecoderRuntime: @unchecked Sendable {}
+extension DecoderRuntime.Parameter: @unchecked Sendable {}
+extension Parallel: @unchecked Sendable {}
+extension Serial: @unchecked Sendable {}
+extension Test: @unchecked Sendable {}
+extension TestSuite: @unchecked Sendable {}
+#endif  // swift(>=5.5) && canImport(_Concurrency)
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
@@ -1010,6 +1074,7 @@ extension PixFmt: SwiftProtobuf._ProtoNameProviding {
     2: .same(proto: "nv12"),
     3: .same(proto: "nv21"),
     4: .same(proto: "rgba"),
+    54: .same(proto: "p010le"),
   ]
 }
 
@@ -1204,15 +1269,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _complexity: Int32? = nil
     var _decodeDump: Bool? = nil
 
-    #if swift(>=5.10)
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
+    static let defaultInstance = _StorageClass()
 
     private init() {}
 
@@ -1940,15 +1997,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
     var _decoderRuntime: DecoderRuntime? = nil
     var _parallel: Parallel? = nil
 
-    #if swift(>=5.10)
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
+    static let defaultInstance = _StorageClass()
 
     private init() {}
 

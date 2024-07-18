@@ -24,6 +24,7 @@ enum PixFmt {
   nv12 = 2;
   nv21 = 3;
   rgba = 4;
+  p010le = 54;
 }
 
 message Input {
