@@ -156,7 +156,7 @@ def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
         "framerate", settings.get("input", {}).get("framerate")
     )
 
-    if framerate and framerate > 0:
+    if framerate and float(framerate) > 0:
         filter_cmd = filter_cmd + f",fps={framerate}"
 
     if debug > 0:

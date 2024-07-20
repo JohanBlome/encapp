@@ -399,6 +399,10 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
     # update subtests
     for subtest in test.parallel.test:
         update_file_paths(subtest, device_workdir)
+    # if custom encoder update name
+    if test.configure.codec and test.configure.codec[-3:] == ".so":
+        basename = os.path.basename(test.configure.codec)
+        test.configure.codec = f"{device_workdir}/{basename}"
     # camera tests do not need any input file paths
     if test.input.filepath == "camera":
         return
@@ -411,6 +415,7 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
 
 
 def get_media_files(test, all_files):
+    # TODO: remove?
     if test.input.filepath != "camera":
         name = os.path.basename(test.input.filepath)
         if name not in all_files:
@@ -421,14 +426,19 @@ def get_media_files(test, all_files):
     return
 
 
-def add_media_files(test, files_to_push):
+def add_files_to_push(test, files_to_push):
+    # Check customencoder
+    if test.configure.codec and test.configure.codec[-3:] == ".so":
+        full_path = os.path.expanduser(test.configure.codec)
+        if full_path not in files_to_push:
+            files_to_push.add(full_path)
     if test.input.filepath != "camera":
         full_path = os.path.expanduser(test.input.filepath)
         if full_path not in files_to_push:
             files_to_push.add(full_path)
     for subtest in test.parallel.test:
         if subtest.input.filepath != "camera":
-            add_media_files(subtest, files_to_push)
+            add_files_to_push(subtest, files_to_push)
     return
 
 
@@ -483,7 +493,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
     for test in test_suite.test:
-        add_media_files(test, files_to_push)
+        add_files_to_push(test, files_to_push)
 
     # 3. save the media files
     for filepath in files_to_push:
@@ -517,6 +527,12 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             f.write(text_format.MessageToString(test_suite))
         files_to_push |= {protobuf_txt_filepath}
     return test_suite, files_to_push, protobuf_txt_filepath
+
+
+def valid_path(text):
+    ret = re.sub("[ \/?*]", ".", text)
+    print(f"{text=} -> {ret=}")
+    return ret
 
 
 def run_codec_tests_file(
@@ -569,6 +585,8 @@ def run_codec_tests_file(
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
+        # If we are using the id - we need to replace characters that are problematic in
+        # a filepath (i.e. space)
         protobuf_txt_filepath = (
             f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
         )
@@ -596,6 +614,10 @@ def run_codec_tests_file(
                 options.split,
                 debug,
             )
+    else:
+        print(
+            f"Apparently something is not quite right, check the test definition: {test_suite=}"
+        )
 
 
 def abort_test(local_workdir, message):
@@ -809,13 +831,21 @@ def update_codec_test(
     replace,
     mediastore,
     is_parallel=False,
+    debug=0,
 ):
     # save the main test id
     if test.parallel:
         subtests = test.parallel.test
         for subtest in subtests:
             update_codec_test(
-                subtest, test, local_workdir, device_workdir, replace, mediastore, True
+                subtest,
+                test,
+                local_workdir,
+                device_workdir,
+                replace,
+                mediastore,
+                True,
+                debug,
             )
 
     # 1. update the tests with the CLI parameters
@@ -1000,11 +1030,23 @@ def update_codec_test(
 # Note that update may include adding new tests (e.g. if bitrate is
 # defined as a (from, to, step) tuple instead of a single value).
 def update_codec_testsuite(
-    test_suite, updated_test_suite, local_workdir, device_workdir, replace, mediastore
+    test_suite,
+    updated_test_suite,
+    local_workdir,
+    device_workdir,
+    replace,
+    mediastore,
+    debug=0,
 ):
     for test in test_suite.test:
         update_codec_test(
-            test, updated_test_suite, local_workdir, device_workdir, replace, mediastore
+            test,
+            updated_test_suite,
+            local_workdir,
+            device_workdir,
+            replace,
+            mediastore,
+            debug,
         )
 
     return updated_test_suite
@@ -1138,6 +1180,7 @@ def run_codec_tests(
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
 
+        print("Run single test")
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
@@ -1348,10 +1391,7 @@ def set_idb_mode(mode):
     default_values["device_workdir"] = get_device_dir()
 
 
-def get_options(argv):
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=FlexiFormatter
-    )
+def add_args(parser):
     parser.add_argument(
         "-v",
         "--version",
@@ -1603,6 +1643,14 @@ def get_options(argv):
         help="Always decode to raw format before pushing to device",
     )
 
+
+def get_options(argv):
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=FlexiFormatter
+    )
+
+    add_args(parser)
+
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
     if options.version:
@@ -1685,19 +1733,25 @@ def process_options(options):
         if input_filepath != "camera" and encapp_tool.ffutils.video_is_y4m(
             input_filepath
         ):
+            test_suite = tests_definitions.TestSuite()
+            for test in test_suite.test:
+                with open(options.configfile, "rb") as fd:
+                    text_format.Merge(fd.read(), test_suite)
 
-            # replace input and other derived values
-            d = process_input_path(input_filepath, options.replace, options.debug)
-            if "input" in options:
-                options.input = d["input"]
-            if "framerate" in options:
-                options.framerate = d["framerate"]
-            if "resolution" in options:
-                options.resolution = d["resolution"]
-            if "pix_fmt" in options:
-                options.pix_fmt = d["pix_fmt"]
-            if "extension" in options:
-                options.extension = d["extension"]
+                # replace input and other derived values
+                d = process_input_path(
+                    input_filepath, options.replace, test, options.debug
+                )
+                if "input" in options:
+                    options.input = d["input"]
+                if "framerate" in options:
+                    options.framerate = d["framerate"]
+                if "resolution" in options:
+                    options.resolution = d["resolution"]
+                if "pix_fmt" in options:
+                    options.pix_fmt = d["pix_fmt"]
+                if "extension" in options:
+                    options.extension = d["extension"]
     # 5. check mediastore
     if options.mediastore:
         if not os.path.exists(options.mediastore):

@@ -1,0 +1,25 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate - buffer"
+    }
+    configure {
+        codec: "/tmp/libnativeencoder.so"
+        bitrate: "500 kbps"
+        bitrate_mode: cbr
+        i_frame_interval: 10
+        parameter {
+            key: "tune"
+            type: stringType
+            value: "zerolatency"
+        }
+        parameter {
+            key: "preset"
+            type: stringType
+            value: "medium"
+        }
+    }
+}

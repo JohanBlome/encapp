@@ -44,16 +44,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
-import android.media.MediaCodec;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
@@ -647,11 +643,8 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } else {
-                Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
-                if (test.getConfigure().getCodec().equals("ittiam_x264")){
-                    coder = new BufferX264Encoder(test);
-                } else if (test.getConfigure().getCodec().equals("x264")){
-                    coder = new SwLibEncoder(test);
+                if (test.getConfigure().getCodec().endsWith(".so")){
+                    coder = new CustomEncoder(test, this.getFilesDir().getPath());
                 } else {
                     coder = new BufferEncoder(test);
                 }

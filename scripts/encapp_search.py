@@ -22,6 +22,7 @@ import json
 import os
 import pandas as pd
 import re
+import numpy as np
 
 import encapp
 
@@ -170,7 +171,7 @@ def derive_values(data):
         resolution = c_resolution if not None and not "nan" else i_resolution
         resolution_list.append(resolution)
         width = height = 0
-        if "x" in resolution:
+        if type(resolution) == type(str) and "x" in resolution:
             width, height = resolution.split("x")
         else:
             width = height = -1
@@ -180,7 +181,11 @@ def derive_values(data):
     data["width"] = width_list
     data["height"] = height_list
     data["configure.bitrate"] = data["configure.bitrate"].apply(
-        lambda x: encapp.convert_to_bps(x)
+        lambda x: (
+            encapp.convert_to_bps(x)
+            if type(x) == type(str)
+            else 0 if np.isnan(0) else x
+        )
     )
 
 

@@ -5,6 +5,7 @@ import java.util.Dictionary;
 
 public class FrameInfo {
     long mPts;
+    long mDts;
     long mSize;
     long mProcessTime;
     long mStartTime;
