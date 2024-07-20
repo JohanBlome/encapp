@@ -578,7 +578,7 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
         ret, stdout, _ = run_cmd(
-            f"idb file push  {filepath} {device_workdir}/ --udid {serial} --bundle-id {IDB_BUNDLE_ID}",
+            f"idb file push  '{filepath}' {device_workdir}/ --udid {serial} --bundle-id {IDB_BUNDLE_ID}",
             debug,
         )
         if not ret:
@@ -588,7 +588,7 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
         ret, stdout, _ = run_cmd(
-            f"adb -s {serial} push {filepath} {device_workdir}/", debug
+            f"adb -s {serial} push '{filepath}' {device_workdir}/", debug
         )
         if not ret:
             print(f'error: copying "{filepath}": {stdout}')

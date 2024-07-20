@@ -68,7 +68,9 @@ public class FileReader {
         if (byteBuffer.hasArray()) {
             byte[] bytes = byteBuffer.array();
             try {
-                int read = mBis.read(bytes, 0, bytes.length);
+                Log.d(TAG, "Read: "  + size + ", buff size = " + byteBuffer.limit());
+                //TODO: why? Maybe read the smallest
+                int read = mBis.read(bytes, 0, size);
                 return read;
             } catch (IOException e) {
                 e.printStackTrace();

@@ -12,6 +12,7 @@ import com.facebook.encapp.proto.Input;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 
 import java.util.List;
@@ -209,6 +210,7 @@ public class TestDefinitionHelper {
         if (!config.hasColorFormat()) {
             PixFmt pix_fmt = input.getPixFmt();
             int color_format = MediaCodecInfoHelper.mapEncappPixFmtToAndroidColorFormat(pix_fmt);
+            Log.d(TAG, "Set color format to " + pix_fmt.name());
             config.setColorFormat(color_format);
         }
 

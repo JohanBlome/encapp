@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Vector;
 
 public class Statistics {
     final static String TAG = "encapp.statistics";
@@ -48,6 +49,8 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
+
+    private Vector<RawFrameFilter> mRawFrameFilters = new Vector<>();
 
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
@@ -396,8 +399,19 @@ public class Statistics {
             json.put("encodedfile", mEncodedfile);
             String[] tmp = mTest.getInput().getFilepath().split("/");
             json.put("sourcefile", tmp[tmp.length - 1]);
-
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
+            if (mRawFrameFilters.size() > 0) {
+                JSONArray jsonArray = new JSONArray();
+                for (RawFrameFilter filter : mRawFrameFilters) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("filter", filter.filterpath());
+                    obj.put("description", filter.description());
+                    obj.put("version", filter.version());
+                    jsonArray.put(obj);
+                }
+
+                json.put("raw_filter", jsonArray);
+            }
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder", mDecoderName);
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));
@@ -520,4 +534,8 @@ public class Statistics {
         Log.d(TAG, "Done written stats report: " + mId);
     }
 
+
+    public void addRawFrameFilter(RawFrameFilter filter) {
+        mRawFrameFilters.add(filter);
+    }
 }

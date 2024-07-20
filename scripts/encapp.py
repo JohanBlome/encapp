@@ -390,6 +390,7 @@ def verify_video_size(videofile, resolution):
     return False
 
 
+# Updates filepath in the test definitions so that the path are visible to the runnign app
 def update_file_paths(test, device_workdir=default_values["device_workdir"]):
     # update subtests
     for subtest in test.parallel.test:
@@ -404,26 +405,47 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
     else:
         test.input.filepath = f"{device_workdir}/{basename}"
 
+    if test.preprocess.HasField("filter"):
+        if test.preprocess.filter.filter_process == tests_definitions.FilterProcess.binary:
+            basename = os.path.basename(test.preprocess.filter.filepath)
+            if encapp_tool.adb_cmds.USE_IDB:
+                test.preprocess.filter.filepath = basename
+            else:
+                test.preprocess.filter.filepath = f"{device_workdir}/{basename}"
 
-def get_media_files(test, all_files):
+
+def get_files_to_push(test, all_files):
     if test.input.filepath != "camera":
         name = os.path.basename(test.input.filepath)
         if name not in all_files:
             all_files.add(name)
+
+    if len(test.preprocess.filter.filepath) > 0:
+        name = os.path.basename(test.preprocess.filter.filepath)
+        if name not in all_files:
+            all_files.add(name)
+
     for subtest in test.parallel.test:
         if subtest.input.filepath != "camera":
-            get_media_files(subtest, all_files)
+            get_files_to_push(subtest, all_files)
     return
 
 
-def add_media_files(test, files_to_push):
+def add_files_to_push(test, files_to_push):
     if test.input.filepath != "camera":
         full_path = os.path.expanduser(test.input.filepath)
         if full_path not in files_to_push:
             files_to_push.add(full_path)
+    # if binary filter, add it to device
+    if test.preprocess.HasField("filter"):
+        if test.preprocess.filter.filter_process == tests_definitions.FilterProcess.binary:
+            basename = os.path.basename(test.preprocess.filter.filepath)
+
+            if test.preprocess.filter.filepath not in files_to_push:
+                files_to_push.add(test.preprocess.filter.filepath)
     for subtest in test.parallel.test:
         if subtest.input.filepath != "camera":
-            add_media_files(subtest, files_to_push)
+            add_files_to_push(subtest, files_to_push)
     return
 
 
@@ -453,6 +475,8 @@ def parse_multiply(multiply):
 
 
 def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
+    if options.debug > 0:
+        print("Read and update proto, save files needed to be pushed")
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
@@ -460,6 +484,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     with open(protobuf_txt_filepath, "rb") as fd:
         text_format.Merge(fd.read(), test_suite)
 
+    # update test to the cli options e.g. codec, input file etc
     updated_test_suite = tests_definitions.TestSuite()
     update_codec_testsuite(
         test_suite,
@@ -478,7 +503,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
     for test in test_suite.test:
-        add_media_files(test, files_to_push)
+        add_files_to_push(test, files_to_push)
 
     # 3. save the media files
     for filepath in files_to_push:
@@ -511,6 +536,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
         files_to_push |= {protobuf_txt_filepath}
+
     return test_suite, files_to_push, protobuf_txt_filepath
 
 
@@ -532,7 +558,9 @@ def run_codec_tests_file(
             template = test
             counts = definition[0] + 1
             if definition[1] is not None and len(definition[1]) > 0:
-                # Read the file and setup
+                # Read the file and setup.
+                # the update will push files to the device that are needed and replace filepaths
+                # so they point to the actual pushed files.
                 (
                     tmpsuite,
                     add_files_to_push,
@@ -559,12 +587,14 @@ def run_codec_tests_file(
                 f.write(text_format.MessageToString(suite))
             files_to_push |= {path}
     # Save the complete test if updated
+    if debug > 0:
+        print(f"Write updated tests: {updated=}")
     if updated:
         # remove any older pbtxt in existence
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
-        protobuf_txt_filepath = f"{local_workdir}/{test.common.id}_aggr.pbtxt"
+        protobuf_txt_filepath = clean_filepath(f"{local_workdir}/{test.common.id}_aggr.pbtxt")
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
         if debug > 0:
@@ -589,6 +619,13 @@ def run_codec_tests_file(
                 options.split,
                 debug,
             )
+    else:
+        print(f"Apparently something is not quite right, check the test definition: {test_suite=}");
+
+def clean_filepath(filepath):
+    repl = {"&": ".", "#": ".", " ":"_", "*":"."}
+    ret = "".join([repl.get(c, c) for c in filepath])
+    return ret
 
 
 def abort_test(local_workdir, message):
@@ -658,6 +695,12 @@ def parse_framerate_field(framerate):
     return [framerate]
 
 
+def match_raw_settings(resolution1, resolution2, pixelformat1, pixelformat2, framerate1, framerate2):
+    return resolution1.eq
+
+
+# Preprocess media files to be pushed
+# Prepare the input so it matches the processing to be done on the device
 def update_media(test, options):
     in_res = test.input.resolution
     in_rate = test.input.framerate
@@ -667,8 +710,13 @@ def update_media(test, options):
     replace = getattr(options, "replace", {})
     input_repl = replace.get("input", {})
     out_pix_fmt = input_repl.get("pix_fmt", in_pix_fmt)
+    debug = options.debug
+    input = {}
+    output = {}
 
-    # if there are not settings for res and rate check the file itself
+    if debug > 0:
+        print(f"Update media: \n{test.input}")
+    # if there are no settings for res and rate check the file itself
     info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
     if len(in_res) == 0:
         in_res = f"{info['width']}x{info['height']}"
@@ -679,7 +727,41 @@ def update_media(test, options):
     if out_rate == 0:
         out_rate = in_rate
 
-    if (
+
+    basename = os.path.basename(test.input.filepath)
+    input["filepath"] = test.input.filepath
+    input["pix_fmt"] = tests_definitions.PixFmt.Name(in_pix_fmt)
+    input["resolution"] = in_res
+    input["framerate"] = in_rate
+
+    
+    output["pix_fmt"] = tests_definitions.PixFmt.Name(out_pix_fmt)
+    output["resolution"] = out_res
+    output["framerate"] = out_rate
+    output["filepath"] = f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{output['pix_fmt']}.yuv"
+    if debug > 0:
+        print(f"Input settings: {input}")
+        print(f"Output settings: {output}")
+
+    # If there is a filter and the filter output correlates to the configured settings
+    if test.preprocess.HasField("filter"):
+        # If the filter does process on host run it. For device filter, relay it.
+        # Assume input to encoder (configure definition) will be the output settings
+        # in the filter (if present)
+        # This means that if the settings differ after this stage an implicit scaling will take place.
+
+        if test.preprocess.filter.filter_process == tests_definitions.FilterProcess.ffmpeg:
+            # Run this processing now.
+            # method in this case is the filter to run i.e. scale
+            # get settings from params
+            encapp_tool.ffutils.ffmpeg_convert_to_raw_run_filter(input, output, test.preprocess.filter)
+            
+            # Switch over output to input parameters
+            test.input.filepath = output["filepath"]
+            test.input.resolution = output["resolution"]
+            test.input.framerate = output["framerate"]
+            test.input.pix_fmt = output["pix_fmt"]
+    elif(
         (
             encapp_tool.ffutils.video_is_raw(test.input.filepath)
             or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
@@ -720,7 +802,6 @@ def update_media(test, options):
         replace = {}
         input = {}
         output = {}
-        basename = os.path.basename(test.input.filepath)
 
         if in_res == "":
             in_res = f"{info.get('width', -1)}x{info.get('height')}"
@@ -783,7 +864,7 @@ def update_media(test, options):
         replace["input"] = input
         replace["output"] = output
 
-        d = process_input_path(test.input.filepath, replace, test.input, options.debug)
+        d = process_input_path(test.input.filepath, replace, test, options.debug)
         # now both config and input should be the same i.e. matching config
         test.input.resolution = d["resolution"]
         # TODO: JOHAN - when to do this?
@@ -804,13 +885,17 @@ def update_codec_test(
     replace,
     mediastore,
     is_parallel=False,
+    debug = 0,
 ):
+    if debug > 0:
+        print("Update codec test")
+
     # save the main test id
     if test.parallel:
         subtests = test.parallel.test
         for subtest in subtests:
             update_codec_test(
-                subtest, test, local_workdir, device_workdir, replace, mediastore, True
+                subtest, test, local_workdir, device_workdir, replace, mediastore, True, debug
             )
 
     # 1. update the tests with the CLI parameters
@@ -898,7 +983,16 @@ def update_codec_test(
 
         info = encapp_tool.ffutils.get_video_info(test.input.filepath)
         replace["output"] = {}
-        if "configure" in replace:
+        # If we have a preprocess def containgin a scaler we scale on target
+        # TODO:
+        if test.preprocess.HasField("filter") and test.preprocess.filter.filter_process != tests_definitions.FilterProcess.ffmpeg:
+            # convert to yuv
+            if debug > 0:
+                print("Scale input on target: ", info)
+            replace["output"]["resolution"] = f"{info['width']}x{info['height']}"
+            replace["output"]["framerate"] = info["framerate"]
+            replace["output"]["pix_fmt"] = "yuv420p"
+        elif "configure" in replace:
             replace["output"]["resolution"] = (
                 replace["configure"]["resolution"]
                 if "resolution" in replace["configure"]
@@ -925,7 +1019,7 @@ def update_codec_test(
             replace["output"]["resolution"] = test.configure.resolution
             replace["output"]["framerate"] = test.configure.framerate
             replace["output"]["pix_fmt"] = test.input.pix_fmt
-        d = process_input_path(test.input.filepath, replace, test.input, 1)
+        d = process_input_path(test.input.filepath, replace, test, 1)
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
         test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
@@ -960,6 +1054,7 @@ def update_codec_test(
                         device_workdir,
                         rep_copy,
                         mediastore,
+                        debug,
                     )
             return
         else:
@@ -992,6 +1087,7 @@ def update_codec_test(
                         device_workdir,
                         rep_copy,
                         mediastore,
+                        debug,
                     )
             return
         else:
@@ -1027,6 +1123,7 @@ def update_codec_test(
                         device_workdir,
                         rep_copy,
                         mediastore,
+                        debug,
                     )
             return
         else:
@@ -1042,11 +1139,11 @@ def update_codec_test(
 # Note that update may include adding new tests (e.g. if bitrate is
 # defined as a (from, to, step) tuple instead of a single value).
 def update_codec_testsuite(
-    test_suite, updated_test_suite, local_workdir, device_workdir, replace, mediastore
+    test_suite, updated_test_suite, local_workdir, device_workdir, replace, mediastore, debug = 0,
 ):
     for test in test_suite.test:
         update_codec_test(
-            test, updated_test_suite, local_workdir, device_workdir, replace, mediastore
+            test, updated_test_suite, local_workdir, device_workdir, replace, mediastore, debug,
         )
 
     return updated_test_suite
@@ -1065,6 +1162,8 @@ def run_codec_tests(
     split=False,
     debug=False,
 ):
+    if debug:
+        print("\n-------------------\nRun codec tests")
     global default_values
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
@@ -1094,14 +1193,12 @@ def run_codec_tests(
                         continue
             ignore_results = False
             files = set()
-            get_media_files(test, files)
+            get_files_to_push(test, files)
             for filepath in files:
-                print(f"Copy file to device work dir: {device_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
                     f"{mediastore}/{filepath}", serial, device_workdir, fast_copy, debug
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
-                print(f"Push test defs: lw = {local_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
                     f"{local_workdir}/{test.common.id}.pbtxt",
                     serial,
@@ -1388,10 +1485,7 @@ def set_idb_mode(mode):
     default_values["device_workdir"] = get_device_dir()
 
 
-def get_options(argv):
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=FlexiFormatter
-    )
+def add_args(parser):
     parser.add_argument(
         "-v",
         "--version",
@@ -1441,7 +1535,6 @@ def get_options(argv):
         % (" | ".join("{}: {}".format(k, v) for k, v in FUNC_CHOICES.items())),
         help="function arg",
     )
-
     # generic replacement mechanism
     class ReplaceAction(argparse.Action):
         def __call__(self, parser, options, values, option_string=None):
@@ -1643,6 +1736,13 @@ def get_options(argv):
         help="Always decode to raw format before pushing to device",
     )
 
+def get_options(argv):
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=FlexiFormatter
+    )
+
+    add_args(parser)
+
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
     if options.version:
@@ -1723,7 +1823,7 @@ def process_options(options):
         ):
 
             # replace input and other derived values
-            d = process_input_path(input_filepath, options.replace, options.debug)
+            d = process_input_path(input_filepath, options.replace, test, options.debug)
             if "input" in options:
                 options.input = d["input"]
             if "framerate" in options:
@@ -1760,7 +1860,8 @@ def verify_app_version(json_files):
                 print(f"File {fl} failed to be read")
 
 
-def process_input_path(input_filepath, replace, test_input, debug=0):
+def process_input_path(input_filepath, replace, test, debug=0):
+    test_input = test.input
     replace = replace.copy()
     if replace is None:
         print("Process input path with no replacement settings")
@@ -1789,6 +1890,11 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
     output_filepath = os.path.join(
         tempfile.gettempdir(), os.path.basename(output_filepath)
     )
+
+    # make sure all is set
+    if "pix_fmt" not in replace["output"]:
+        replace["output"]["pix_fmt"] = pix_fmt
+
     if debug > 0:
         print("***********")
         print("input file will be transcoded")
@@ -1797,7 +1903,13 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
         print(f"pix_fmt: -> {pix_fmt}")
         print("***********")
 
-    if encapp_tool.ffutils.video_is_raw(input_filepath):
+    if test.preprocess.HasField("filter") and \
+        test.preprocess.filter.filter_process == tests_definitions.FilterProcess.ffmpeg:
+        # Transcode when running the filter
+        # reset output
+        output_filepath = input_filepath
+
+    elif encapp_tool.ffutils.video_is_raw(input_filepath):
         # lazy but let us skip transcodig if the target is already there...
         if not os.path.exists(output_filepath):
             encapp_tool.ffutils.ffmpeg_transcode_raw(
@@ -1829,6 +1941,7 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
 
 def main(argv):
     options = get_options(argv)
+
     options = process_options(options)
 
     if options.version:
@@ -1899,7 +2012,6 @@ def main(argv):
         assert (
             options.configfile is not None
         ), "error: need a valid input configuration file"
-
         # first clear out old result
         remove_encapp_gen_files(serial, options.device_workdir, options.debug)
         result_ok, result_json = codec_test(options, model, serial, options.debug)

@@ -1,9 +1,7 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
-import android.graphics.ImageFormat;
 import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -12,7 +10,6 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.util.Log;
 import android.os.SystemClock;
 import androidx.annotation.NonNull;
@@ -22,13 +19,15 @@ import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.Assert;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
+import com.facebook.encapp.utils.RawFrameDefinition;
+import com.facebook.encapp.utils.RawFrameFilter;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 
@@ -36,10 +35,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -63,6 +60,15 @@ public abstract class Encoder {
     protected int mFramesAdded = 0;
     // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
     protected int mRefFramesizeInBytes = (int) (1280 * 720 * 1.5);
+    protected int mTargetFramesizeInBytes = (int) (1280 * 720 * 1.5);
+
+    protected RawFrameFilter mFilter = null;
+
+    protected ByteBuffer mInputByteBuffer = null;
+    protected ByteBuffer mOutputByteBuffer = null;
+    protected RawFrameDefinition mInputRawFrameDef = null;
+    protected RawFrameDefinition mOutputRawFrameDef = null;
+
     protected boolean mWriteFile = true;
     protected Statistics mStats;
     protected String mFilename;
@@ -423,7 +429,27 @@ public abstract class Encoder {
             // copy a frame to the ByteBuffer
             //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying " + size + " bytes to the ByteBuffer");
             byteBuffer.clear();
-            read = fileReader.fillBuffer(byteBuffer, size);
+            if (mInputByteBuffer == null) {
+                read = fileReader.fillBuffer(byteBuffer, size);
+            } else {
+                try {
+                    mInputByteBuffer.clear();
+                    read = fileReader.fillBuffer(mInputByteBuffer, size);
+                    if (read > 0) {
+                        mOutputByteBuffer.clear();
+                        byte[] ina = mInputByteBuffer.array();
+                        byte[] ota = mOutputByteBuffer.array();
+                        mFilter.processFrame(ina, ota);
+                        byteBuffer.put(mOutputByteBuffer);
+                        size = mTargetFramesizeInBytes;//mOutputByteBuffer.limit();
+                        read = size;
+                    }
+                }
+                catch (Exception ex){
+                    Log.d(TAG, "ex = " + ex.getMessage());
+                }
+            }
+
         }
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
         // set any runtime parameters for this frame

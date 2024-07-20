@@ -106,6 +106,50 @@ extension PixFmt: CaseIterable {
 
 #endif  // swift(>=4.2)
 
+enum FilterProcess: SwiftProtobuf.Enum {
+  typealias RawValue = Int
+
+  /// A binary filter is a filter that will be
+  /// provided, build for the specific platform
+  /// and have a filepath in the Filter message
+  case binary // = 0
+
+  /// This is a filter that will be run on the host using ffmpeg
+  /// Settings in parameter.
+  case ffmpeg // = 1
+  case java // = 2
+
+  init() {
+    self = .binary
+  }
+
+  init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .binary
+    case 1: self = .ffmpeg
+    case 2: self = .java
+    default: return nil
+    }
+  }
+
+  var rawValue: Int {
+    switch self {
+    case .binary: return 0
+    case .ffmpeg: return 1
+    case .java: return 2
+    }
+  }
+
+}
+
+#if swift(>=4.2)
+
+extension FilterProcess: CaseIterable {
+  // Support synthesized by the compiler.
+}
+
+#endif  // swift(>=4.2)
+
 struct Common {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -209,6 +253,128 @@ struct Parameter {
   fileprivate var _framenum: Int64? = nil
 }
 
+/// Filter can explicitly specify the input and output pix_fmt
+/// and sizes. If not specified, the input and output pix_fmt
+/// is assumed to follow the input and the configuration respectively.
+struct Filter {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var filterProcess: FilterProcess {
+    get {return _filterProcess ?? .binary}
+    set {_filterProcess = newValue}
+  }
+  /// Returns true if `filterProcess` has been explicitly set.
+  var hasFilterProcess: Bool {return self._filterProcess != nil}
+  /// Clears the value of `filterProcess`. Subsequent reads from it will return its default value.
+  mutating func clearFilterProcess() {self._filterProcess = nil}
+
+  var filepath: String {
+    get {return _filepath ?? String()}
+    set {_filepath = newValue}
+  }
+  /// Returns true if `filepath` has been explicitly set.
+  var hasFilepath: Bool {return self._filepath != nil}
+  /// Clears the value of `filepath`. Subsequent reads from it will return its default value.
+  mutating func clearFilepath() {self._filepath = nil}
+
+  /// This is a name identifying a specific filter
+  /// if the code contains more than one
+  var method: String {
+    get {return _method ?? String()}
+    set {_method = newValue}
+  }
+  /// Returns true if `method` has been explicitly set.
+  var hasMethod: Bool {return self._method != nil}
+  /// Clears the value of `method`. Subsequent reads from it will return its default value.
+  mutating func clearMethod() {self._method = nil}
+
+  var inputPixFmt: PixFmt {
+    get {return _inputPixFmt ?? .yuv420P}
+    set {_inputPixFmt = newValue}
+  }
+  /// Returns true if `inputPixFmt` has been explicitly set.
+  var hasInputPixFmt: Bool {return self._inputPixFmt != nil}
+  /// Clears the value of `inputPixFmt`. Subsequent reads from it will return its default value.
+  mutating func clearInputPixFmt() {self._inputPixFmt = nil}
+
+  var outputPixFmt: PixFmt {
+    get {return _outputPixFmt ?? .yuv420P}
+    set {_outputPixFmt = newValue}
+  }
+  /// Returns true if `outputPixFmt` has been explicitly set.
+  var hasOutputPixFmt: Bool {return self._outputPixFmt != nil}
+  /// Clears the value of `outputPixFmt`. Subsequent reads from it will return its default value.
+  mutating func clearOutputPixFmt() {self._outputPixFmt = nil}
+
+  var inputResolution: String {
+    get {return _inputResolution ?? String()}
+    set {_inputResolution = newValue}
+  }
+  /// Returns true if `inputResolution` has been explicitly set.
+  var hasInputResolution: Bool {return self._inputResolution != nil}
+  /// Clears the value of `inputResolution`. Subsequent reads from it will return its default value.
+  mutating func clearInputResolution() {self._inputResolution = nil}
+
+  /// If the outputfilter resolution satisfies the encoder configured
+  /// resolution this filter will act as a scaler
+  var outputResolution: String {
+    get {return _outputResolution ?? String()}
+    set {_outputResolution = newValue}
+  }
+  /// Returns true if `outputResolution` has been explicitly set.
+  var hasOutputResolution: Bool {return self._outputResolution != nil}
+  /// Clears the value of `outputResolution`. Subsequent reads from it will return its default value.
+  mutating func clearOutputResolution() {self._outputResolution = nil}
+
+  /// Arbitrary settings for the filter
+  var parameter: [Parameter] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _filterProcess: FilterProcess? = nil
+  fileprivate var _filepath: String? = nil
+  fileprivate var _method: String? = nil
+  fileprivate var _inputPixFmt: PixFmt? = nil
+  fileprivate var _outputPixFmt: PixFmt? = nil
+  fileprivate var _inputResolution: String? = nil
+  fileprivate var _outputResolution: String? = nil
+}
+
+struct ProfileLevel {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var profile: Int32 {
+    get {return _profile ?? 0}
+    set {_profile = newValue}
+  }
+  /// Returns true if `profile` has been explicitly set.
+  var hasProfile: Bool {return self._profile != nil}
+  /// Clears the value of `profile`. Subsequent reads from it will return its default value.
+  mutating func clearProfile() {self._profile = nil}
+
+  var level: Int32 {
+    get {return _level ?? 0}
+    set {_level = newValue}
+  }
+  /// Returns true if `level` has been explicitly set.
+  var hasLevel: Bool {return self._level != nil}
+  /// Clears the value of `level`. Subsequent reads from it will return its default value.
+  mutating func clearLevel() {self._level = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _profile: Int32? = nil
+  fileprivate var _level: Int32? = nil
+}
+
 struct Input {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -308,6 +474,30 @@ struct Input {
   fileprivate var _realtime: Bool? = nil
   fileprivate var _stoptimeSec: Float? = nil
   fileprivate var _show: Bool? = nil
+}
+
+/// Preprocess input
+/// Depending on FilterProcess it can happen on 
+/// host or on device
+struct PreProcess {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var filter: Filter {
+    get {return _filter ?? Filter()}
+    set {_filter = newValue}
+  }
+  /// Returns true if `filter` has been explicitly set.
+  var hasFilter: Bool {return self._filter != nil}
+  /// Clears the value of `filter`. Subsequent reads from it will return its default value.
+  mutating func clearFilter() {self._filter = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _filter: Filter? = nil
 }
 
 struct Configure {
@@ -518,6 +708,15 @@ struct Configure {
   var hasDecodeDump: Bool {return _storage._decodeDump != nil}
   /// Clears the value of `decodeDump`. Subsequent reads from it will return its default value.
   mutating func clearDecodeDump() {_uniqueStorage()._decodeDump = nil}
+
+  var profileLevel: ProfileLevel {
+    get {return _storage._profileLevel ?? ProfileLevel()}
+    set {_uniqueStorage()._profileLevel = newValue}
+  }
+  /// Returns true if `profileLevel` has been explicitly set.
+  var hasProfileLevel: Bool {return _storage._profileLevel != nil}
+  /// Clears the value of `profileLevel`. Subsequent reads from it will return its default value.
+  mutating func clearProfileLevel() {_uniqueStorage()._profileLevel = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -879,6 +1078,15 @@ struct Test {
   /// Clears the value of `parallel`. Subsequent reads from it will return its default value.
   mutating func clearParallel() {_uniqueStorage()._parallel = nil}
 
+  var preprocess: PreProcess {
+    get {return _storage._preprocess ?? PreProcess()}
+    set {_uniqueStorage()._preprocess = newValue}
+  }
+  /// Returns true if `preprocess` has been explicitly set.
+  var hasPreprocess: Bool {return _storage._preprocess != nil}
+  /// Clears the value of `preprocess`. Subsequent reads from it will return its default value.
+  mutating func clearPreprocess() {_uniqueStorage()._preprocess = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -902,9 +1110,13 @@ struct TestSuite {
 #if swift(>=5.5) && canImport(_Concurrency)
 extension DataValueType: @unchecked Sendable {}
 extension PixFmt: @unchecked Sendable {}
+extension FilterProcess: @unchecked Sendable {}
 extension Common: @unchecked Sendable {}
 extension Parameter: @unchecked Sendable {}
+extension Filter: @unchecked Sendable {}
+extension ProfileLevel: @unchecked Sendable {}
 extension Input: @unchecked Sendable {}
+extension PreProcess: @unchecked Sendable {}
 extension Configure: @unchecked Sendable {}
 extension Configure.BitrateMode: @unchecked Sendable {}
 extension Configure.ColorStandard: @unchecked Sendable {}
@@ -940,6 +1152,14 @@ extension PixFmt: SwiftProtobuf._ProtoNameProviding {
     3: .same(proto: "nv21"),
     4: .same(proto: "rgba"),
     54: .same(proto: "p010le"),
+  ]
+}
+
+extension FilterProcess: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    0: .same(proto: "binary"),
+    1: .same(proto: "ffmpeg"),
+    2: .same(proto: "java"),
   ]
 }
 
@@ -1051,6 +1271,126 @@ extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
+extension Filter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "Filter"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .standard(proto: "filter_process"),
+    2: .same(proto: "filepath"),
+    3: .same(proto: "method"),
+    4: .standard(proto: "input_pix_fmt"),
+    5: .standard(proto: "output_pix_fmt"),
+    6: .standard(proto: "input_resolution"),
+    7: .standard(proto: "output_resolution"),
+    8: .same(proto: "parameter"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self._filterProcess) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._filepath) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._method) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._inputPixFmt) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._outputPixFmt) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._inputResolution) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._outputResolution) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.parameter) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._filterProcess {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._filepath {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._method {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._inputPixFmt {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._outputPixFmt {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._inputResolution {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._outputResolution {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    if !self.parameter.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.parameter, fieldNumber: 8)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Filter, rhs: Filter) -> Bool {
+    if lhs._filterProcess != rhs._filterProcess {return false}
+    if lhs._filepath != rhs._filepath {return false}
+    if lhs._method != rhs._method {return false}
+    if lhs._inputPixFmt != rhs._inputPixFmt {return false}
+    if lhs._outputPixFmt != rhs._outputPixFmt {return false}
+    if lhs._inputResolution != rhs._inputResolution {return false}
+    if lhs._outputResolution != rhs._outputResolution {return false}
+    if lhs.parameter != rhs.parameter {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension ProfileLevel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "ProfileLevel"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "profile"),
+    2: .same(proto: "level"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self._profile) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self._level) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._profile {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._level {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: ProfileLevel, rhs: ProfileLevel) -> Bool {
+    if lhs._profile != rhs._profile {return false}
+    if lhs._level != rhs._level {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Input"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -1135,6 +1475,42 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
   }
 }
 
+extension PreProcess: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PreProcess"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "filter"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._filter) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._filter {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PreProcess, rhs: PreProcess) -> Bool {
+    if lhs._filter != rhs._filter {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -1161,6 +1537,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     21: .same(proto: "quality"),
     22: .same(proto: "complexity"),
     23: .standard(proto: "decode_dump"),
+    24: .standard(proto: "profile_level"),
   ]
 
   fileprivate class _StorageClass {
@@ -1187,6 +1564,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _quality: Int32? = nil
     var _complexity: Int32? = nil
     var _decodeDump: Bool? = nil
+    var _profileLevel: ProfileLevel? = nil
 
     static let defaultInstance = _StorageClass()
 
@@ -1216,6 +1594,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _quality = source._quality
       _complexity = source._complexity
       _decodeDump = source._decodeDump
+      _profileLevel = source._profileLevel
     }
   }
 
@@ -1257,6 +1636,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         case 21: try { try decoder.decodeSingularInt32Field(value: &_storage._quality) }()
         case 22: try { try decoder.decodeSingularInt32Field(value: &_storage._complexity) }()
         case 23: try { try decoder.decodeSingularBoolField(value: &_storage._decodeDump) }()
+        case 24: try { try decoder.decodeSingularMessageField(value: &_storage._profileLevel) }()
         default: break
         }
       }
@@ -1338,6 +1718,9 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._decodeDump {
         try visitor.visitSingularBoolField(value: v, fieldNumber: 23)
       } }()
+      try { if let v = _storage._profileLevel {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1370,6 +1753,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._quality != rhs_storage._quality {return false}
         if _storage._complexity != rhs_storage._complexity {return false}
         if _storage._decodeDump != rhs_storage._decodeDump {return false}
+        if _storage._profileLevel != rhs_storage._profileLevel {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1701,6 +2085,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
     5: .standard(proto: "decoder_configure"),
     6: .standard(proto: "decoder_runtime"),
     7: .same(proto: "parallel"),
+    8: .same(proto: "preprocess"),
   ]
 
   fileprivate class _StorageClass {
@@ -1711,6 +2096,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
     var _decoderConfigure: DecoderConfigure? = nil
     var _decoderRuntime: DecoderRuntime? = nil
     var _parallel: Parallel? = nil
+    var _preprocess: PreProcess? = nil
 
     static let defaultInstance = _StorageClass()
 
@@ -1724,6 +2110,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
       _decoderConfigure = source._decoderConfigure
       _decoderRuntime = source._decoderRuntime
       _parallel = source._parallel
+      _preprocess = source._preprocess
     }
   }
 
@@ -1749,6 +2136,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._decoderConfigure) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._decoderRuntime) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._parallel) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._preprocess) }()
         default: break
         }
       }
@@ -1782,6 +2170,9 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
       try { if let v = _storage._parallel {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
+      try { if let v = _storage._preprocess {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1798,6 +2189,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
         if _storage._decoderConfigure != rhs_storage._decoderConfigure {return false}
         if _storage._decoderRuntime != rhs_storage._decoderRuntime {return false}
         if _storage._parallel != rhs_storage._parallel {return false}
+        if _storage._preprocess != rhs_storage._preprocess {return false}
         return true
       }
       if !storagesAreEqual {return false}

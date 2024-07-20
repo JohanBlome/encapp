@@ -393,6 +393,7 @@ public class MediaCodecInfoHelper {
         return str.toString();
     }
 
+
     public static String profileLevelsToString(MediaCodecInfo.CodecProfileLevel[] color_profile_level, int indent) {
         String tab = getIndentation(indent);
         StringBuilder str = new StringBuilder();
@@ -422,7 +423,10 @@ public class MediaCodecInfoHelper {
         StringBuilder str = new StringBuilder();
 
         MediaCodecInfo.CodecCapabilities codec_capabilities = media_codec_info.getCapabilitiesForType(media_type);
-
+        MediaCodecInfo.VideoCapabilities video_capabilities = codec_capabilities.getVideoCapabilities();
+        if (video_capabilities == null) {
+            return "";
+        }
         str.append(tab + "media_type {\n");
         indent += 1;
         tab = getIndentation(indent);
@@ -686,15 +690,14 @@ public class MediaCodecInfoHelper {
     }
     final public static Map<Integer, String> androidImageFormatTable = createAndroidImageFormatTable();
 
-        public static int frameSizeInBytes(PixFmt pix_fmt, int width, int height) {
-            switch (pix_fmt.getNumber()) {
-                    case PixFmt.p010le_VALUE:
-                        // 24bit per pixel
-                        return width * height * 3;
-                    default:
-                        // 420 chroma compressed format
-                        return (int)(Math.ceil(width * height * 1.5));
-            }
+    public static int frameSizeInBytes(PixFmt pix_fmt, int width, int height) {
+        switch (pix_fmt.getNumber()) {
+            case PixFmt.p010le_VALUE:
+                // 24bit per pixel
+                return width * height * 3;
+            default:
+                // 420 chroma compressed format
+                return (int)(Math.ceil(width * height * 1.5));
         }
-
+    }
 }

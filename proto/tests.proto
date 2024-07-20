@@ -27,6 +27,17 @@ enum PixFmt {
   p010le = 54;
 }
 
+enum FilterProcess {
+    // A binary filter is a filter that will be
+    // provided, build for the specific platform
+    // and have a filepath in the Filter message
+    binary = 0;
+    // This is a filter that will be run on the host using ffmpeg
+    // Settings in parameter.
+    ffmpeg = 1;
+    java = 2;
+}
+
 message Parameter {
     optional string key = 1;
     optional DataValueType type = 2;
@@ -34,6 +45,31 @@ message Parameter {
     // For runtime purposes
     optional int64 framenum = 4;
 }
+
+// Filter can explicitly specify the input and output pix_fmt
+// and sizes. If not specified, the input and output pix_fmt
+// is assumed to follow the input and the configuration respectively.
+message Filter {
+    optional FilterProcess filter_process = 1;
+    optional string filepath = 2;
+    // This is a name identifying a specific filter
+    // if the code contains more than one
+    optional string method = 3;
+    optional PixFmt input_pix_fmt = 4;
+    optional PixFmt output_pix_fmt = 5;
+    optional string input_resolution = 6;
+    // If the outputfilter resolution satisfies the encoder configured
+    // resolution this filter will act as a scaler
+    optional string output_resolution = 7;
+    // Arbitrary settings for the filter
+    repeated Parameter parameter = 8;
+}
+
+message ProfileLevel {
+    optional int32 profile = 1;
+    optional int32 level = 2;
+}
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -44,6 +80,13 @@ message Input {
   optional bool realtime = 7;
   optional float stoptime_sec = 8;
   optional bool show = 9;
+}
+
+// Preprocess input
+// Depending on FilterProcess it can happen on 
+// host or on device
+message PreProcess {
+    optional Filter filter = 1;
 }
 
 message Configure {
@@ -94,6 +137,7 @@ message Configure {
   optional int32 quality = 21;
   optional int32 complexity = 22;
   optional bool decode_dump = 23 [default = false];
+  optional ProfileLevel profile_level = 24;
 }
 
 message Runtime {
@@ -139,6 +183,7 @@ message Test {
   optional DecoderConfigure decoder_configure = 5;
   optional DecoderRuntime decoder_runtime = 6;
   optional Parallel parallel = 7;
+  optional PreProcess preprocess = 8;
 }
 
 message TestSuite {
