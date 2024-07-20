@@ -162,11 +162,12 @@ public class Statistics {
         mLoad.stop();
     }
 
-    public void startEncodingFrame(long pts, int originalFrame) {
+    public FrameInfo startEncodingFrame(long pts, int originalFrame) {
         FrameInfo frame = new FrameInfo(pts, originalFrame);
         frame.start();
         mEncodingFrames.add(frame);
         mEncodingProcessingFrames += 1;
+        return frame;
     }
 
     public FrameInfo stopEncodingFrame(long pts, long size, boolean isIFrame) {
@@ -520,4 +521,8 @@ public class Statistics {
         Log.d(TAG, "Done written stats report: " + mId);
     }
 
+
+    public void updateTest(Test test) {
+        mTest = test;
+    }
 }

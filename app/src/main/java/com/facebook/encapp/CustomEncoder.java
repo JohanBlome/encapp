@@ -3,10 +3,8 @@ package com.facebook.encapp;
 import static com.facebook.encapp.utils.TestDefinitionHelper.magnitudeToInt;
 
 import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.media.MediaMuxer;
-import android.os.Environment;
+import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 
@@ -14,18 +12,26 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.Parameter;
+import com.facebook.encapp.proto.PixFmt;
+import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameInfo;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
+import com.facebook.encapp.utils.StringParameter;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
 
@@ -34,28 +40,55 @@ import java.util.Vector;
  * Created by jobl on 2018-02-27.
  */
 
-class SwLibEncoder extends Encoder {
+class CustomEncoder extends Encoder {
     protected static final String TAG = "encapp.buffer_x264_encoder";
 
-    static{
-        try {
-            Log.d(TAG, "Loading nativeencoder");
-            System.loadLibrary("nativeencoder");
-        } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Failed to load library: " + e.getMessage());
-        }
-    }
-
-    public static native int initEncoder(Parameter[] parameters, int width, int height, int colorSpace, int bitDepth);
+    public static native int initEncoder(Parameter[] parameters, int width, int height, int colorFormat, int bitDepth);
     public static native byte[] getHeader();
     // TODO: can the size, color and bitdepth change runtime?
-    public static native int encode(byte[] input, byte[] output, int width, int height, int colorSpace, int bitDepth);
+    public static native int encode(byte[] input, byte[] output, FrameInfo info);
+
+    public static native StringParameter[] getAllEncoderSettings();
+
+    public static native void updateSettings(Parameter[] parameters);
     public static native void close();
 
 
-    public SwLibEncoder(Test test) {
+    public CustomEncoder(Test test, String filesDir) {
         super(test);
         mStats = new Statistics("raw encoder", mTest);
+        // Load lib
+        String name = mTest.getConfigure().getCodec();
+        File lib = new File(name);
+        name = lib.getName();
+        String targetPath =  filesDir + "/" + name;
+        try {
+            Log.d(TAG, "Load native library: " + name);
+            BufferedInputStream bis = new BufferedInputStream(new FileInputStream(lib));
+
+            FileOutputStream fos = new FileOutputStream(targetPath);
+            byte[] tmp = new byte[1024];
+            int read = Integer.MAX_VALUE;
+            while(read > 0) {
+                read = bis.read(tmp);
+                if (read > 0) {
+                    fos.write(tmp, 0, read);
+                }
+            }
+            bis.close();
+            fos.close();
+
+        } catch (FileNotFoundException e) {
+            Log.d(TAG, "File not found: " + e.getMessage());
+        } catch (IOException e) {
+            Log.d(TAG, "Ioxceptionen. " + e.getMessage());
+        }
+        try {
+            Log.d(TAG, "Loading nativeencoder");
+            System.load(targetPath);
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "Failed to load library, " + name + ", " + targetPath + ": " + e.getMessage());
+        }
     }
 
     private long computePresentationTimeUs(int frameIndex) {
@@ -128,6 +161,38 @@ class SwLibEncoder extends Encoder {
         return false;
     }
 
+
+    public void setRuntimeParameters(int frame) {
+        // go through all runtime settings and see which are due
+        if (mRuntimeParams == null) return;
+        Vector<Parameter> params = new Vector();
+
+        for (Runtime.VideoBitrateParameter bitrate : mRuntimeParams.getVideoBitrateList()) {
+            if (bitrate.getFramenum() == frame) {
+                params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
+                break;
+            }
+        }
+
+        for (Long sync : mRuntimeParams.getRequestSyncList()) {
+            if (sync == frame) {
+                params.add(Parameter.newBuilder().setKey("request-sync").setValue(String.valueOf("")).setType(DataValueType.stringType).build());
+                break;
+            }
+        }
+
+        for (Parameter param : mRuntimeParams.getParameterList()) {
+            if (param.getFramenum() == frame) {
+                Log.d(TAG, "Set runtime parameter @ " + frame + " key: " + param.getKey() + ", " + param.getType() + ", " + param.getValue());
+                // Easy everything (for now) is str
+            }
+        }
+
+        Parameter[] param_buffer = new Parameter[params.size()];
+        params.toArray(param_buffer);
+        updateSettings(param_buffer);
+    }
+
     public String start() {
         Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
         try {
@@ -142,8 +207,6 @@ class SwLibEncoder extends Encoder {
         if (mTest.getInput().hasRealtime())
             mRealtime = mTest.getInput().getRealtime();
 
-        boolean useImage = false;
-
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
         mSkipped = 0;
@@ -151,32 +214,32 @@ class SwLibEncoder extends Encoder {
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         mRefFramesizeInBytes = (int) (sourceResolution.getWidth() * sourceResolution.getHeight() * 1.5);
         mYuvReader = new FileReader();
+        //TODO: fix looping
         int playoutframes = mTest.getInput().getPlayoutFrames();
 
-        String preset = "fast";//mTest.getEncoderX264().getPreset();
         int width = sourceResolution.getWidth();
         int height = sourceResolution.getHeight();
-        int colorSpace = 2;//mTest.getEncoderX264().getColorSpace();
-        int bitdepth = 8;//mTest.getEncoderX264().getBitdepth();
+        int pixelformat = mTest.getInput().getPixFmt().getNumber();
+        int bitdepth = (pixelformat == PixFmt.p010le.getNumber())? 10: 8;
         int bitrate = magnitudeToInt(mTest.getConfigure().getBitrate());
-        int bitrateMode = mTest.getConfigure().getBitrateMode().getNumber();
+        int bitratemode = mTest.getConfigure().getBitrateMode().getNumber();
+        int iframeinterval =  mTest.getConfigure().getIFrameInterval();
 
         float crf = 23.0f;
-
-
+        Log.d(TAG, width + "x" + height + ",  pixelformat: " + pixelformat + ", bitdepth:" + bitdepth + ", bitrate_mode:" + bitratemode + ", bitrate: " + bitrate + ", iframeinterval: "+ iframeinterval);
         // Create params for this
-        // TODO: Translate from mediaformat into this (for common settings).
-        Vector<Parameter> params = new Vector<>();
-        params.add(Parameter.newBuilder().setKey("preset").setValue("fast").setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("tune").setValue("psnr").setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("i_threads").setValue("1").setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("i_width").setValue(String.valueOf(width)).setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("i_height").setValue(String.valueOf(height)).setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("i_csp").setValue(String.valueOf(colorSpace)).setType(DataValueType.stringType).build());
-        params.add(Parameter.newBuilder().setKey("i_bitdepth").setValue(String.valueOf(bitdepth)).setType(DataValueType.stringType).build());
 
-        params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
 
+        // Caching vital values and see if they can be set runtime.
+        Vector<Parameter> params = new Vector(mTest.getConfigure().getParameterList());
+        // This one needs to be set as a native param.
+        try {
+            params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
+            params.add(Parameter.newBuilder().setKey("bitrate_mode").setValue(String.valueOf(bitratemode)).setType(DataValueType.stringType).build());
+            params.add(Parameter.newBuilder().setKey("i_frame_interval").setValue(String.valueOf(iframeinterval)).setType(DataValueType.stringType).build());
+        } catch (Exception ex) {
+            Log.d(TAG, "Exception: " + ex);
+        }
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
             return "Could not open file";
         }
@@ -219,13 +282,24 @@ class SwLibEncoder extends Encoder {
 
             Parameter[] param_buffer = new Parameter[params.size()];
             params.toArray(param_buffer);
-            //TODO: We are setting width, height etc twice.
-            int status = initEncoder(param_buffer, width, height, colorSpace, bitdepth);
+            int status = initEncoder(param_buffer, width, height, pixelformat, bitdepth);
+            StringParameter[] settings_ = getAllEncoderSettings();
+            //add generic parameters to mTest, this way it can bre exactly reproduced (?) - in the case x264: no
+            ArrayList<Parameter> param_list = new ArrayList<>();
+            for (StringParameter par: settings_) {
+                param_list.add(par.getParameter());
+            }
+
+            // TODO: where to save this information
+            mTest = mTest.toBuilder().setConfigure(mTest.getConfigure().toBuilder().addAllParameter(param_list)).build();
+            Log.d(TAG, "Updated test: " + mTest);
+            mStats.updateTest(mTest);
             if (status != 0) {
                 Log.e(TAG, "Init failed");
                 return "";
             }
             headerArray = getHeader();
+            FrameInfo info;
             while (!input_done || !output_done) {
                 try {
                     long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
@@ -245,12 +319,22 @@ class SwLibEncoder extends Encoder {
                             continue;
                         }
 
-                        outputBufferSize = encode(yuvData, outputBuffer, width, height, colorSpace, bitdepth);
+                        long pts = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+                        info = mStats.startEncodingFrame(pts, mFramesAdded);
+                        // Let us read the setting in native and force key frame if set here.
+                        // If (for some reason a key frame is not produced it will be updated in the native code
+                        //info.isIFrame(true);
+                        outputBufferSize = encode(yuvData, outputBuffer, info);
+                        // Look at nal type as well, not just key frame?
+                        // To ms?
+                        mStats.stopEncodingFrame(info.getPts() , info.getSize(), info.isIFrame());
                         if (outputBufferSize == 0) {
                             return "Failed to encode frame";
+                        } else if (outputBufferSize == -1) {
+                            return "Encoder not started";
                         }
-                        mFramesAdded++;
                         currentFramePosition += frameSize;
+                        mFramesAdded++;
                     } catch (IOException e) {
                         e.printStackTrace();
                         return e.getMessage();
@@ -266,10 +350,10 @@ class SwLibEncoder extends Encoder {
                         MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
                         format.setInteger(MediaFormat.KEY_WIDTH, width);
                         format.setInteger(MediaFormat.KEY_HEIGHT, height);
-                        format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
-                        format.setInteger(MediaFormat.KEY_FRAME_RATE, 50);
-                        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+                        format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
+                        format.setFloat(MediaFormat.KEY_FRAME_RATE, 30);//mFrameRate);
+                        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, 20);//MediaCodecInfoHelper.mapEncappPixFmtToAndroidColorFormat(PixFmt.forNumber(pixelformat)));
+                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3);//iframeinterval);//TODO:
 
                         byte[][] spsPps = extractSpsPps(headerArray);
 
@@ -287,8 +371,9 @@ class SwLibEncoder extends Encoder {
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     bufferInfo.offset = 0;
                     bufferInfo.size = outputBufferSize;
-                    bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+                    bufferInfo.presentationTimeUs = info.getPts();
 
+                    //TODO: we get this from FrameInfo instead
                     boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
 

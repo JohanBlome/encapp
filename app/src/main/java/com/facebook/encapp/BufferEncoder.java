@@ -133,7 +133,7 @@ class BufferEncoder extends Encoder {
         // Log format
         Log.d(TAG, "Actual check of some formats after first mediaformat update.");
         Log.d(TAG, MediaCodecInfoHelper.mediaFormatToString(outputFormat));
-        mMuxer = createMuxer(mCodec, outputFormat, true);
+        mMuxer = createMuxer(mCodec, outputFormat);
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
