@@ -584,6 +584,10 @@ def main(argv):
         options.local_workdir = f"quality.{options.corpus_dir.replace(',','-')}"
 
     # Check connected device(s)
+    if options.serial is None and "ANDROID_SERIAL" in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ["ANDROID_SERIAL"]
+
     # get model and serial number
     model, options.serial = adb.get_device_info(options.serial, options.debug)
     print(f"Run on {model} with serial {options.serial}")
