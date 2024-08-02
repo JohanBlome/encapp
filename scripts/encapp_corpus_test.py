@@ -254,9 +254,9 @@ def run_encapp(files, md5sums, options):
 
 
 def find_links(text, path):
-    y4mreg = 'href="(?P<y4m>[\w_\-\/.]*.y4m)"'
-    md5sumreg = 'href="(?P<md5sum>[\w_\-\/.]*[.y4m]?.md5)"'
-    folderreg = 'href="(?P<folder>[\w_\-\/.]*)\/"'
+    y4mreg = r'href="(?P<y4m>[\w_\-\/.]*.y4m)"'
+    md5sumreg = r'href="(?P<md5sum>[\w_\-\/.]*[.y4m]?.md5)"'
+    folderreg = r'href="(?P<folder>[\w_\-\/.]*)\/"'
 
     files = []
     folders = []
