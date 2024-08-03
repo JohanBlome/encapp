@@ -116,7 +116,7 @@ def calc_stats(pdata, options, label, print_text=False):
     return frame_count, total_duration, fps
 
 
-def detailed_media_info(inputfile, options):
+def detailed_media_info(inputfile, options, debug):
     # read file
     pdata = pd.DataFrame()
     data = []
@@ -153,16 +153,17 @@ def detailed_media_info(inputfile, options):
         color_transfer=reserved
         chroma_location=left
         """
-        command = "echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > " + name
-        os.system(command)
-        command = (
+        # write the CSV header
+        shell_cmd = f"echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > {name}"
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+        # run the ffprobe command
+        shell_cmd = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
             "pkt_duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
-            + inputfile
-            + "  >>  "
-            + name
+            f"{inputfile} >> {name}"
         )
-        os.system(command)
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+        # process data
         alt_dur = 1.0 / 29.97
         counter = 0
         time_error = False
@@ -650,7 +651,7 @@ def run_quality(test_file, options, debug):
         if reference_info:
             filepath = reference_pathname
         # get the data from ffmpeg
-        data = detailed_media_info(encodedfile, options)
+        data = detailed_media_info(encodedfile, options, debug)
         framecount = len(data)
         iframes = data.loc[data["iframe"] == 1]
         pframes = data.loc[data["iframe"] == 0]
