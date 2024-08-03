@@ -173,8 +173,8 @@ def detailed_media_info(inputfile, options, debug):
         first_pts = -1
         pts = 0
         recalc_duration = False
-        with open(name, "r") as csvfile:
-            datareader = csv.reader(csvfile, delimiter=",")
+        with open(name, "r") as fd:
+            datareader = csv.reader(fd, delimiter=",")
             for row in datareader:
                 try:
                     is_iframe = int(row[0])
@@ -242,9 +242,8 @@ def detailed_media_info(inputfile, options, debug):
 def parse_quality_vmaf(vmaf_file):
     """Parse log/output files and return quality score"""
     vmaf = -1
-    with open(vmaf_file) as input_file:
-        data = json.load(input_file)
-        input_file.close()
+    with open(vmaf_file) as fd:
+        data = json.load(fd)
         vmaf = data["pooled_metrics"]["vmaf"]["mean"]
         vmaf_hm = data["pooled_metrics"]["vmaf"]["harmonic_mean"]
         vmaf_min = data["pooled_metrics"]["vmaf"]["min"]
@@ -255,10 +254,10 @@ def parse_quality_vmaf(vmaf_file):
 def parse_quality_ssim(ssim_file):
     """Parse log/output files and return quality score"""
     ssim = -1
-    with open(ssim_file) as input_file:
+    with open(ssim_file) as fd:
         line = " "
         while len(line) > 0:
-            line = input_file.readline()
+            line = fd.readline()
             match = re.search(SSIM_RE, line)
             if match:
                 ssim = round(float(match.group(1)), 2)
@@ -273,10 +272,10 @@ def parse_quality_psnr(psnr_file):
     psnr_u = -1
     psnr_v = -1
 
-    with open(psnr_file) as input_file:
+    with open(psnr_file) as fd:
         line = " "
         while len(line) > 0:
-            line = input_file.readline()
+            line = fd.readline()
             match = re.search(PSNR_RE, line)
             if match:
                 psnr = round(float(match.group("psnr_avg")), 2)
@@ -308,8 +307,8 @@ def run_quality(test_file, options, debug):
     results = {}
     if test_file[-4:] == "json":
         # read test file results
-        with open(test_file, "r") as input_file:
-            results = json.load(input_file)
+        with open(test_file, "r") as fd:
+            results = json.load(fd)
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}")
@@ -318,8 +317,8 @@ def run_quality(test_file, options, debug):
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
     if os.path.exists(device_info_file):
-        with open(device_info_file, "r") as input_file:
-            device_info = json.load(input_file)
+        with open(device_info_file, "r") as fd:
+            device_info = json.load(fd)
     else:
         device_info = {}
 
