@@ -25,6 +25,8 @@ PSNR_RE = re.compile(
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
+VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
+
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -241,14 +243,26 @@ def detailed_media_info(inputfile, options, debug):
 
 def parse_quality_vmaf(vmaf_file):
     """Parse log/output files and return quality score"""
-    vmaf = -1
     with open(vmaf_file) as fd:
         data = json.load(fd)
-        vmaf = data["pooled_metrics"]["vmaf"]["mean"]
-        vmaf_hm = data["pooled_metrics"]["vmaf"]["harmonic_mean"]
-        vmaf_min = data["pooled_metrics"]["vmaf"]["min"]
-        vmaf_max = data["pooled_metrics"]["vmaf"]["max"]
-    return vmaf, vmaf_hm, vmaf_min, vmaf_max
+    vmaf_dict = {
+        "mean": data["pooled_metrics"]["vmaf"]["mean"],
+        "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
+        "min": data["pooled_metrics"]["vmaf"]["min"],
+        "max": data["pooled_metrics"]["vmaf"]["max"],
+    }
+    # get per-frame VMAF values
+    vmaf_list = np.array(
+        list(data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"])))
+    )
+    # add some percentiles
+    vmaf_dict.update(
+        {
+            f"p{percentile}": np.percentile(vmaf_list, percentile)
+            for percentile in VMAF_PERCENTILE_LIST
+        }
+    )
+    return vmaf_dict
 
 
 def parse_quality_ssim(ssim_file):
@@ -587,7 +601,7 @@ def run_quality(test_file, options, debug):
             os.remove(distorted)
 
     if os.path.exists(vmaf_file):
-        vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
+        vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
 
@@ -700,20 +714,21 @@ def run_quality(test_file, options, debug):
             "pframes": f"{len(pframes)}",
             "iframe_size_bytes": f"{iframes_size}",
             "pframe_size_bytes": f"{pframes_size}",
-            "vmaf": f"{vmaf}",
-            "vmaf_hm": f"{vmaf_hm}",
-            "vmaf_min": f"{vmaf_min}",
-            "vmaf_max": f"{vmaf_max}",
-            "ssim": f"{ssim}",
-            "psnr": f"{psnr}",
-            "psnr_y": f"{psnr_y}",
-            "psnr_u": f"{psnr_u}",
-            "psnr_v": f"{psnr_v}",
-            "testfile": f"{test_file}",
-            "reference_file": f"{filepath}",
-            "source_complexity": source_complexity,
-            "source_motions": source_motion,
         }
+        quality_dict.update({f"vmaf_{k}": v for k, v in vmaf_dict.items()})
+        quality_dict.update(
+            {
+                "ssim": f"{ssim}",
+                "psnr": f"{psnr}",
+                "psnr_y": f"{psnr_y}",
+                "psnr_u": f"{psnr_u}",
+                "psnr_v": f"{psnr_v}",
+                "testfile": f"{test_file}",
+                "reference_file": f"{filepath}",
+                "source_complexity": source_complexity,
+                "source_motions": source_motion,
+            }
+        )
         return quality_dict
     return None
 
