@@ -137,7 +137,7 @@ def run_encapp(files, md5sums, options):
         if options.clear_files:
             clear_files(options)
         test_path = f"/tmp/_encapp.pbtxt"
-        test = tests_definition.Test()
+        test = tests_definitions.Test()
         encapp.remove_encapp_gen_files(options.serial)
 
         # check in mediastore
@@ -158,20 +158,20 @@ def run_encapp(files, md5sums, options):
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
         test.configure.i_frame_interval = i_frame_interval
         test.configure.codec = options.codec
-        test.configure.bitrate_mode = tests_definition.Configure.BitrateMode.Value(
+        test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
             "cbr"
         )
         test.input.filepath = f"{options.device_workdir}/{yuvfile}"
         test.input.resolution = resolution
         test.input.framerate = framerate
-        test.input.pix_fmt = tests_definition.Input.PixFmt.Value(options.pix_fmt)
+        test.input.pix_fmt = tests_definitions.Input.PixFmt.Value(options.pix_fmt)
         if options.realtime:
             test.input.realtime = True
         # check bitrate ladder
         bitrates = encapp.parse_bitrate_field(options.bitrate)
 
         for bitrate in bitrates:
-            testsuite = tests_definition.TestSuite()
+            testsuite = tests_definitions.TestSuite()
             test_to_run = copy.deepcopy(test)
             test_to_run.configure.bitrate = str(bitrate)
 
