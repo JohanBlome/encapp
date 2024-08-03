@@ -2,8 +2,11 @@
 
 import re
 import os
+import glob
 import hashlib
 import subprocess
+import tempfile
+import time
 import typing
 
 
@@ -12,6 +15,9 @@ USE_IDB = False
 IDB_BUNDLE_ID = "Meta.Encapp"
 IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
+
+# size for split adb push
+MAX_SIZE_BYTES = 20000000
 
 
 def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
@@ -587,12 +593,67 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
-        ret, stdout, _ = run_cmd(
-            f"adb -s {serial} push {filepath} {device_workdir}/", debug
+        # push the file
+        ret = push_file_to_device_android(filepath, serial, device_workdir, debug)
+    return ret
+
+
+def push_file_to_device_android(
+    filepath, serial, device_workdir, debug, max_size_bytes=MAX_SIZE_BYTES
+):
+    # 0. try a one-off copy
+    cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    if ret:
+        return ret
+    print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
+    if max_size_bytes == 0:
+        return ret
+    # 1. try split copy
+    print(f'warning: trying split push for "{filepath}"')
+    # 1.1. split filepath in pieces
+    prefix = tempfile.NamedTemporaryFile(prefix="split.").name + "."
+    cmd = f"split -b {max_size_bytes} {filepath} {prefix}"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    assert ret, f"error: cannot split {filepath}"
+    # 1.2. push all pieces one by one
+    split_pieces = glob.glob(f"{prefix}*")
+    for split_piece in split_pieces:
+        time.sleep(1)
+        ret = push_file_to_device_android(
+            split_piece, serial, device_workdir, debug, max_size_bytes=0
         )
         if not ret:
-            print(f'error: copying "{filepath}": {stdout}')
-    return ret
+            print(f'error: cannot copy "{split_piece}": {stdout=} {stderr=}')
+            return ret
+    # 1.3. cat all pieces together
+    device_split_pieces = list(
+        os.path.join(device_workdir, os.path.basename(split_piece))
+        for split_piece in split_pieces
+    )
+    device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
+    cmd = f"adb -s {serial} shell 'cat {' '.join(device_split_pieces)} > {device_filepath}'"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    if not ret:
+        print(f"error: cannot cat split pieces together: {stdout=} {stderr=}")
+        return ret
+    # 1.4. check the final file is ok
+    cmd = f"md5sum {filepath}"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    assert ret, f"error: cannot md5sum {filepath}"
+    local_md5sum = stdout.split()[0]
+    cmd = f"adb -s {serial} shell md5sum {device_filepath}"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    assert ret, f"error: cannot md5sum {device_filepath}"
+    device_md5sum = stdout.split()[0]
+    if local_md5sum != device_md5sum:
+        print(
+            f"error: push file was broken: md5sum's differ {local_md5sum}!={device_md5sum}"
+        )
+    # 1.5. clean up the split pieces at the device
+    cmd = f"adb -s {serial} shell rm {' '.join(device_split_pieces)}"
+    ret, stdout, stderr = run_cmd(cmd, debug)
+    return True
 
 
 def pull_files_from_device(
