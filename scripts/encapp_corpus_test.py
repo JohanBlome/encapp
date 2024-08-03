@@ -164,7 +164,7 @@ def run_encapp(files, md5sums, options):
         test.input.filepath = f"{options.device_workdir}/{yuvfile}"
         test.input.resolution = resolution
         test.input.framerate = framerate
-        test.input.pix_fmt = tests_definitions.Input.PixFmt.Value(options.pix_fmt)
+        test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
         if options.realtime:
             test.input.realtime = True
         # check bitrate ladder
