@@ -158,8 +158,11 @@ def run_encapp(files, md5sums, options):
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
         test.configure.i_frame_interval = i_frame_interval
         test.configure.codec = options.codec
+        bitrate_mode_str = (
+            options.bitrate_mode if options.bitrate_mode is not None else "cbr"
+        )
         test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
-            "cbr"
+            bitrate_mode_str
         )
         test.input.filepath = f"{options.device_workdir}/{yuvfile}"
         test.input.resolution = resolution
@@ -446,6 +449,14 @@ def get_options(argv):
         1. a single number (e.g. "100 kbps")
         2. a list (e.g. "100kbps,200kbps")
         3. a range (e.g. "100k-1M-100k") (start-stop-step)""",
+    )
+    parser.add_argument(
+        "--bitrate-mode",
+        type=str,
+        dest="bitrate_mode",
+        default=None,
+        metavar="bitrate_mode",
+        help="override bitrate mode",
     )
     parser.add_argument(
         "-fps",
