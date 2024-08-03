@@ -154,12 +154,12 @@ def detailed_media_info(inputfile, options, debug):
         chroma_location=left
         """
         # write the CSV header
-        shell_cmd = f"echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > {name}"
+        shell_cmd = f"echo 'key_frame,pts_time,duration_time,pkt_size' > {name}"
         encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         # run the ffprobe command
         shell_cmd = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
-            "pkt_duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
+            "duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
             f"{inputfile} >> {name}"
         )
         encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
