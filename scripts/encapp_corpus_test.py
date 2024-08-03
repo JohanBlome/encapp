@@ -201,55 +201,23 @@ def run_encapp(files, md5sums, options):
     quality_options = {}
     quality_options["media_path"] = options.mediastore
     result = []
+    df = None
     for file in json_files:
-        tmp = encapp_quality.run_quality(file, quality_options, debug=options.debug)
-        # The parsing could have failed and it will be None or empty
-        if tmp:
-            if len(tmp[0]) > 0:
-                result.append(tmp)
+        quality_dict = encapp_quality.run_quality(
+            file, quality_options, debug=options.debug
+        )
+        if quality_dict is None:
+            # parsing has failed (None)
+            continue
+        if df is None:
+            df = pd.DataFrame(columns=quality_dict.keys())
+        df.loc[df.size] = quality_dict.values()
 
-    FIELD_LIST = [
-        "media",
-        "description",
-        "id",
-        "model",
-        "platform",
-        "serial",
-        "codec",
-        "bitrate_mode",
-        "quality",  # cq setting
-        "gop_sec",
-        "framerate_fps",
-        "width",
-        "height",
-        "bitrate_bps",
-        "meanbitrate_bps",
-        "mean_bpp",
-        "calculated_bitrate_bps",
-        "framecount",
-        "size_bytes",
-        "iframes",
-        "pframes",
-        "iframe_size_bytes",
-        "pframe_size_bytes",
-        "vmaf",
-        "vmaf_hm",
-        "vmaf_min",
-        "vmaf_max",
-        "ssim",
-        "psnr",
-        "psnr_y",
-        "psnr_u",
-        "psnr_v",
-        "testfile",
-        "reference_file",
-        "source_complexity",
-        "source_motions",
-    ]
-    df = pd.DataFrame(result, columns=FIELD_LIST)
+    if df is None:
+        print(f"error no valid results")
+        sys.exit(-1)
     if options.output_csv == "":
         options.output_csv = f"{local_workdir}/encapp_quality.csv"
-
     df.to_csv(options.output_csv, index=False)
 
 
