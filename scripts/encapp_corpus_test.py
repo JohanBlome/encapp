@@ -246,11 +246,11 @@ def run_encapp(files, md5sums, options):
         "source_complexity",
         "source_motions",
     ]
-    data = pd.DataFrame(result, columns=FIELD_LIST)
+    df = pd.DataFrame(result, columns=FIELD_LIST)
     if options.output_csv == "":
         options.output_csv = f"{local_workdir}/encapp_quality.csv"
 
-    data.to_csv(options.output_csv, index=False)
+    df.to_csv(options.output_csv, index=False)
 
 
 def find_links(text, path):
