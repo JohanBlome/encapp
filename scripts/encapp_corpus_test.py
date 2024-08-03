@@ -429,8 +429,9 @@ def find_media(options):
     folders = []
     md5sums = []
     for directory in options.corpus_dir.split(","):
-
-        if directory[:4] == "http":
+        if os.path.isfile(directory):
+            files.append(directory)
+        elif directory[:4] == "http":
             list_path(directory, files, folders, md5sums, debug=1)
         else:
             folder_files = glob.glob(f"{directory}/*.y4m")
