@@ -118,7 +118,7 @@ def calc_stats(pdata, options, label, print_text=False):
 
 def detailed_media_info(inputfile, options, debug):
     # read file
-    pdata = pd.DataFrame()
+    df = pd.DataFrame()
     data = []
 
     name = inputfile + ".frames.csv"
@@ -230,13 +230,13 @@ def detailed_media_info(inputfile, options, debug):
                 counter += 1
 
         labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
-        pdata = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
+        df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
-        pdata.to_csv(name)
+        df.to_csv(name)
     else:
-        pdata = pd.read_csv(name)
-    calc_stats(pdata, options, inputfile, True)
-    return pdata
+        df = pd.read_csv(name)
+    calc_stats(df, options, inputfile, True)
+    return df
 
 
 def parse_quality_vmaf(vmaf_file):
@@ -299,7 +299,7 @@ def run_quality(test_file, options, debug):
     print(f"Run quality, {test_file}")
     if not os.path.exists(test_file):
         print("File not found: " + test_file)
-        return
+        return None
 
     if debug > 0:
         print(options)
@@ -312,7 +312,7 @@ def run_quality(test_file, options, debug):
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}")
-            return
+            return None
 
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
@@ -351,13 +351,13 @@ def run_quality(test_file, options, debug):
 
     if len(encodedfile) <= 0:
         print(f"No file: {encodedfile}")
-        return
+        return None
     if len(directory) > 0:
         encodedfile = f"{directory}/{encodedfile}"
 
     if (len(encodedfile) == 0) or (not os.path.exists(encodedfile)):
         print(f"ERROR! Encoded file name is missing, {encodedfile}")
-        return
+        return None
     vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
@@ -495,11 +495,11 @@ def run_quality(test_file, options, debug):
                 reference_pathname = reference_pathname[:-3] + "raw"
             if not os.path.exists(reference_pathname):
                 print(f"Reference {reference_pathname} is unavailable")
-                return
+                return None
         distorted = encodedfile
         if not os.path.exists(distorted):
             print(f"Distorted {distorted} is unavailable")
-            return
+            return None
 
         if debug:
             print(
@@ -650,10 +650,10 @@ def run_quality(test_file, options, debug):
         if reference_info:
             filepath = reference_pathname
         # get the data from ffmpeg
-        data = detailed_media_info(encodedfile, options, debug)
-        framecount = len(data)
-        iframes = data.loc[data["iframe"] == 1]
-        pframes = data.loc[data["iframe"] == 0]
+        ffmpeg_data = detailed_media_info(encodedfile, options, debug)
+        framecount = len(ffmpeg_data)
+        iframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 1]
+        pframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 0]
         iframeinterval = video_info["duration"] / len(iframes)
 
         if len(iframes) > 0:
@@ -676,46 +676,46 @@ def run_quality(test_file, options, debug):
         # calculate the bits/pixel from the meanbitrate
         width, height = [int(x) for x in resolution.split("x")]
         mean_bpp = (1.0 * meanbitrate) / (framerate * width * height)
-        data = (
-            f"{encodedfile}",
-            f"{description}",
-            f"{id}",
-            f"{model}",
-            f"{platform}",
-            f"{serial}",
-            f"{codec}",
-            f"{bitratemode}",
-            f"{quality}",
-            f"{iframeinterval}",
-            f"{framerate}",
-            f"{width}",
-            f"{height}",
-            f"{encapp.convert_to_bps(bitrate)}",
-            f"{meanbitrate}",
-            f"{mean_bpp}",
-            f"{calculated_bitrate}",
-            f"{framecount}",
-            f"{file_size}",
-            f"{len(iframes)}",
-            f"{len(pframes)}",
-            f"{iframes_size}",
-            f"{pframes_size}",
-            f"{vmaf}",
-            f"{vmaf_hm}",
-            f"{vmaf_min}",
-            f"{vmaf_max}",
-            f"{ssim}",
-            f"{psnr}",
-            f"{psnr_y}",
-            f"{psnr_u}",
-            f"{psnr_v}",
-            f"{test_file}",
-            f"{filepath}",
-            source_complexity,
-            source_motion,
-        )
-        return data
-    return []
+        quality_dict = {
+            "media": f"{encodedfile}",
+            "description": f"{description}",
+            "id": f"{id}",
+            "model": f"{model}",
+            "platform": f"{platform}",
+            "serial": f"{serial}",
+            "codec": f"{codec}",
+            "bitrate_mode": f"{bitratemode}",
+            "quality": f"{quality}",  # cq setting
+            "gop_sec": f"{iframeinterval}",
+            "framerate_fps": f"{framerate}",
+            "width": f"{width}",
+            "height": f"{height}",
+            "bitrate_bps": f"{encapp.convert_to_bps(bitrate)}",
+            "meanbitrate_bps": f"{meanbitrate}",
+            "mean_bpp": f"{mean_bpp}",
+            "calculated_bitrate_bps": f"{calculated_bitrate}",
+            "framecount": f"{framecount}",
+            "size_bytes": f"{file_size}",
+            "iframes": f"{len(iframes)}",
+            "pframes": f"{len(pframes)}",
+            "iframe_size_bytes": f"{iframes_size}",
+            "pframe_size_bytes": f"{pframes_size}",
+            "vmaf": f"{vmaf}",
+            "vmaf_hm": f"{vmaf_hm}",
+            "vmaf_min": f"{vmaf_min}",
+            "vmaf_max": f"{vmaf_max}",
+            "ssim": f"{ssim}",
+            "psnr": f"{psnr}",
+            "psnr_y": f"{psnr_y}",
+            "psnr_u": f"{psnr_u}",
+            "psnr_v": f"{psnr_v}",
+            "testfile": f"{test_file}",
+            "reference_file": f"{filepath}",
+            "source_complexity": source_complexity,
+            "source_motions": source_motion,
+        }
+        return quality_dict
+    return None
 
 
 def get_options(argv):
@@ -866,78 +866,40 @@ def main(argv):
     a csv with relevant data
     """
     options = get_options(argv)
-
-    FIELD_LIST = [
-        "media",
-        "description",
-        "id",
-        "model",
-        "platform",
-        "serial",
-        "codec",
-        "bitrate_mode",
-        "quality",  # cq setting
-        "gop_sec",
-        "framerate_fps",
-        "width",
-        "height",
-        "bitrate_bps",
-        "meanbitrate_bps",
-        "mean_bpp",
-        "calculated_bitrate_bps",
-        "framecount",
-        "size_bytes",
-        "iframes",
-        "pframes",
-        "iframe_size_bytes",
-        "pframe_size_bytes",
-        "vmaf",
-        "vmaf_hm",
-        "vmaf_min",
-        "vmaf_max",
-        "ssim",
-        "psnr",
-        "psnr_y",
-        "psnr_u",
-        "psnr_v",
-        "testfile",
-        "reference_file",
-        "source_complexity",
-        "source_motions",
-    ]
-
+    # run all the tests
+    current = 1
+    total = len(options.test)
+    print(f"Total number of tests: {total}")
+    df = None
+    start = time.time()
+    for test in options.test:
+        try:
+            quality_dict = run_quality(test, vars(options), options.debug)
+        except Exception as ex:
+            print(f"{test} failed: {ex}")
+            continue
+        now = time.time()
+        run_for = now - start
+        time_per_test = float(run_for) / float(current)
+        time_left = round(time_per_test * (total - current))
+        time_left_m = int(time_left / 60)
+        time_left_s = int(time_left) % 60
+        print(
+            f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
+        )
+        current += 1
+        if quality_dict is None:
+            # invalid test result
+            continue
+        if df is None:
+            df = pd.DataFrame(columns=quality_dict.keys())
+        df.loc[df.size] = quality_dict.values()
+    # write data to csv file
     mode = "a"
     if options.header:
         print("WARNING! Write header implies clearing the file.")
         mode = "w"
-
-    with open(options.output, mode) as fd:
-        writer = csv.writer(fd)
-        if options.header:
-            writer.writerow(FIELD_LIST)
-
-        current = 1
-        total = len(options.test)
-        start = time.time()
-        print(f"Total number of test: {total}")
-        for test in options.test:
-            try:
-                data = run_quality(test, vars(options), options.debug)
-            except Exception as ex:
-                print(f"{test} failed: {ex}")
-                continue
-            now = time.time()
-            run_for = now - start
-            time_per_test = float(run_for) / float(current)
-            time_left = round(time_per_test * (total - current))
-            time_left_m = int(time_left / 60)
-            time_left_s = int(time_left) % 60
-            print(
-                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
-            )
-            current += 1
-            if data is not None and len(data) > 0:
-                writer.writerow(data)
+    df.to_csv(options.output, mode=mode, index=False, header=options.header)
 
 
 if __name__ == "__main__":
