@@ -26,6 +26,19 @@ SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
 VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
+if sys.platform == "linux" or sys.platform == "linux2":
+    # linux
+    VMAF_MODEL_DIR = "/usr/share/model"
+elif sys.platform == "darwin":
+    # OS X
+    VMAF_MODEL_DIR = "/opt/homebrew/Cellar/libvmaf/3.0.0/share/libvmaf/model"
+elif sys.platform == "win32":
+    # Windows
+    VMAF_MODEL_DIR = "/usr/share/model"
+
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_4k_v0.6.1.json"
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1.json"
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1neg.json"
 
 
 def calc_stats(pdata, options, label, print_text=False):
@@ -569,8 +582,13 @@ def run_quality(test_file, options, debug):
                 f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
                 "-filter_complex "
                 f'"{filter_cmd}libvmaf=log_path={vmaf_file}:'
-                'n_threads=16:log_fmt=json" -f null - 2>&1 '
+                "n_threads=16:log_fmt=json"
             )
+            if os.path.isfile(VMAF_MODEL):
+                shell_cmd += f":model=path={VMAF_MODEL}"
+            else:
+                print(f"warn: cannot find VMAF model {VMAF_MODEL}. Using default model")
+            shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f"vmaf already calculated for media, {vmaf_file}")
@@ -730,6 +748,7 @@ def run_quality(test_file, options, debug):
             }
         )
         return quality_dict
+    print("error: no vmaf data")
     return None
 
 
