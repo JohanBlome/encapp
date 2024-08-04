@@ -25,6 +25,21 @@ PSNR_RE = re.compile(
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
+VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
+if sys.platform == "linux" or sys.platform == "linux2":
+    # linux
+    VMAF_MODEL_DIR = "/usr/share/model"
+elif sys.platform == "darwin":
+    # OS X
+    VMAF_MODEL_DIR = "/opt/homebrew/Cellar/libvmaf/3.0.0/share/libvmaf/model"
+elif sys.platform == "win32":
+    # Windows
+    VMAF_MODEL_DIR = "/usr/share/model"
+
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_4k_v0.6.1.json"
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1.json"
+VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1neg.json"
+
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -116,9 +131,9 @@ def calc_stats(pdata, options, label, print_text=False):
     return frame_count, total_duration, fps
 
 
-def detailed_media_info(inputfile, options):
+def detailed_media_info(inputfile, options, debug):
     # read file
-    pdata = pd.DataFrame()
+    df = pd.DataFrame()
     data = []
 
     name = inputfile + ".frames.csv"
@@ -153,16 +168,17 @@ def detailed_media_info(inputfile, options):
         color_transfer=reserved
         chroma_location=left
         """
-        command = "echo 'key_frame,pts_time,pkt_duration_time,pkt_size' > " + name
-        os.system(command)
-        command = (
+        # write the CSV header
+        shell_cmd = f"echo 'key_frame,pts_time,duration_time,pkt_size' > {name}"
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+        # run the ffprobe command
+        shell_cmd = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
-            "pkt_duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
-            + inputfile
-            + "  >>  "
-            + name
+            "duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
+            f"{inputfile} >> {name}"
         )
-        os.system(command)
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+        # process data
         alt_dur = 1.0 / 29.97
         counter = 0
         time_error = False
@@ -172,8 +188,8 @@ def detailed_media_info(inputfile, options):
         first_pts = -1
         pts = 0
         recalc_duration = False
-        with open(name, "r") as csvfile:
-            datareader = csv.reader(csvfile, delimiter=",")
+        with open(name, "r") as fd:
+            datareader = csv.reader(fd, delimiter=",")
             for row in datareader:
                 try:
                     is_iframe = int(row[0])
@@ -229,35 +245,46 @@ def detailed_media_info(inputfile, options):
                 counter += 1
 
         labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
-        pdata = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
+        df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
-        pdata.to_csv(name)
+        df.to_csv(name)
     else:
-        pdata = pd.read_csv(name)
-    calc_stats(pdata, options, inputfile, True)
-    return pdata
+        df = pd.read_csv(name)
+    calc_stats(df, options, inputfile, True)
+    return df
 
 
 def parse_quality_vmaf(vmaf_file):
     """Parse log/output files and return quality score"""
-    vmaf = -1
-    with open(vmaf_file) as input_file:
-        data = json.load(input_file)
-        input_file.close()
-        vmaf = data["pooled_metrics"]["vmaf"]["mean"]
-        vmaf_hm = data["pooled_metrics"]["vmaf"]["harmonic_mean"]
-        vmaf_min = data["pooled_metrics"]["vmaf"]["min"]
-        vmaf_max = data["pooled_metrics"]["vmaf"]["max"]
-    return vmaf, vmaf_hm, vmaf_min, vmaf_max
+    with open(vmaf_file) as fd:
+        data = json.load(fd)
+    vmaf_dict = {
+        "mean": data["pooled_metrics"]["vmaf"]["mean"],
+        "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
+        "min": data["pooled_metrics"]["vmaf"]["min"],
+        "max": data["pooled_metrics"]["vmaf"]["max"],
+    }
+    # get per-frame VMAF values
+    vmaf_list = np.array(
+        list(data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"])))
+    )
+    # add some percentiles
+    vmaf_dict.update(
+        {
+            f"p{percentile}": np.percentile(vmaf_list, percentile)
+            for percentile in VMAF_PERCENTILE_LIST
+        }
+    )
+    return vmaf_dict
 
 
 def parse_quality_ssim(ssim_file):
     """Parse log/output files and return quality score"""
     ssim = -1
-    with open(ssim_file) as input_file:
+    with open(ssim_file) as fd:
         line = " "
         while len(line) > 0:
-            line = input_file.readline()
+            line = fd.readline()
             match = re.search(SSIM_RE, line)
             if match:
                 ssim = round(float(match.group(1)), 2)
@@ -272,10 +299,10 @@ def parse_quality_psnr(psnr_file):
     psnr_u = -1
     psnr_v = -1
 
-    with open(psnr_file) as input_file:
+    with open(psnr_file) as fd:
         line = " "
         while len(line) > 0:
-            line = input_file.readline()
+            line = fd.readline()
             match = re.search(PSNR_RE, line)
             if match:
                 psnr = round(float(match.group("psnr_avg")), 2)
@@ -299,7 +326,7 @@ def run_quality(test_file, options, debug):
     print(f"Run quality, {test_file}")
     if not os.path.exists(test_file):
         print("File not found: " + test_file)
-        return
+        return None
 
     if debug > 0:
         print(options)
@@ -307,18 +334,18 @@ def run_quality(test_file, options, debug):
     results = {}
     if test_file[-4:] == "json":
         # read test file results
-        with open(test_file, "r") as input_file:
-            results = json.load(input_file)
+        with open(test_file, "r") as fd:
+            results = json.load(fd)
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}")
-            return
+            return None
 
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
     if os.path.exists(device_info_file):
-        with open(device_info_file, "r") as input_file:
-            device_info = json.load(input_file)
+        with open(device_info_file, "r") as fd:
+            device_info = json.load(fd)
     else:
         device_info = {}
 
@@ -351,13 +378,13 @@ def run_quality(test_file, options, debug):
 
     if len(encodedfile) <= 0:
         print(f"No file: {encodedfile}")
-        return
+        return None
     if len(directory) > 0:
         encodedfile = f"{directory}/{encodedfile}"
 
     if (len(encodedfile) == 0) or (not os.path.exists(encodedfile)):
         print(f"ERROR! Encoded file name is missing, {encodedfile}")
-        return
+        return None
     vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
@@ -495,11 +522,11 @@ def run_quality(test_file, options, debug):
                 reference_pathname = reference_pathname[:-3] + "raw"
             if not os.path.exists(reference_pathname):
                 print(f"Reference {reference_pathname} is unavailable")
-                return
+                return None
         distorted = encodedfile
         if not os.path.exists(distorted):
             print(f"Distorted {distorted} is unavailable")
-            return
+            return None
 
         if debug:
             print(
@@ -555,8 +582,13 @@ def run_quality(test_file, options, debug):
                 f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
                 "-filter_complex "
                 f'"{filter_cmd}libvmaf=log_path={vmaf_file}:'
-                'n_threads=16:log_fmt=json" -f null - 2>&1 '
+                "n_threads=16:log_fmt=json"
             )
+            if os.path.isfile(VMAF_MODEL):
+                shell_cmd += f":model=path={VMAF_MODEL}"
+            else:
+                print(f"warn: cannot find VMAF model {VMAF_MODEL}. Using default model")
+            shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f"vmaf already calculated for media, {vmaf_file}")
@@ -587,7 +619,7 @@ def run_quality(test_file, options, debug):
             os.remove(distorted)
 
     if os.path.exists(vmaf_file):
-        vmaf, vmaf_hm, vmaf_min, vmaf_max = parse_quality_vmaf(vmaf_file)
+        vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
 
@@ -650,10 +682,10 @@ def run_quality(test_file, options, debug):
         if reference_info:
             filepath = reference_pathname
         # get the data from ffmpeg
-        data = detailed_media_info(encodedfile, options)
-        framecount = len(data)
-        iframes = data.loc[data["iframe"] == 1]
-        pframes = data.loc[data["iframe"] == 0]
+        ffmpeg_data = detailed_media_info(encodedfile, options, debug)
+        framecount = len(ffmpeg_data)
+        iframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 1]
+        pframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 0]
         iframeinterval = video_info["duration"] / len(iframes)
 
         if len(iframes) > 0:
@@ -676,46 +708,48 @@ def run_quality(test_file, options, debug):
         # calculate the bits/pixel from the meanbitrate
         width, height = [int(x) for x in resolution.split("x")]
         mean_bpp = (1.0 * meanbitrate) / (framerate * width * height)
-        data = (
-            f"{encodedfile}",
-            f"{description}",
-            f"{id}",
-            f"{model}",
-            f"{platform}",
-            f"{serial}",
-            f"{codec}",
-            f"{bitratemode}",
-            f"{quality}",
-            f"{iframeinterval}",
-            f"{framerate}",
-            f"{width}",
-            f"{height}",
-            f"{encapp.convert_to_bps(bitrate)}",
-            f"{meanbitrate}",
-            f"{mean_bpp}",
-            f"{calculated_bitrate}",
-            f"{framecount}",
-            f"{file_size}",
-            f"{len(iframes)}",
-            f"{len(pframes)}",
-            f"{iframes_size}",
-            f"{pframes_size}",
-            f"{vmaf}",
-            f"{vmaf_hm}",
-            f"{vmaf_min}",
-            f"{vmaf_max}",
-            f"{ssim}",
-            f"{psnr}",
-            f"{psnr_y}",
-            f"{psnr_u}",
-            f"{psnr_v}",
-            f"{test_file}",
-            f"{filepath}",
-            source_complexity,
-            source_motion,
+        quality_dict = {
+            "media": f"{encodedfile}",
+            "description": f"{description}",
+            "id": f"{id}",
+            "model": f"{model}",
+            "platform": f"{platform}",
+            "serial": f"{serial}",
+            "codec": f"{codec}",
+            "bitrate_mode": f"{bitratemode}",
+            "quality": f"{quality}",  # cq setting
+            "gop_sec": f"{iframeinterval}",
+            "framerate_fps": f"{framerate}",
+            "width": f"{width}",
+            "height": f"{height}",
+            "bitrate_bps": f"{encapp.convert_to_bps(bitrate)}",
+            "meanbitrate_bps": f"{meanbitrate}",
+            "mean_bpp": f"{mean_bpp}",
+            "calculated_bitrate_bps": f"{calculated_bitrate}",
+            "framecount": f"{framecount}",
+            "size_bytes": f"{file_size}",
+            "iframes": f"{len(iframes)}",
+            "pframes": f"{len(pframes)}",
+            "iframe_size_bytes": f"{iframes_size}",
+            "pframe_size_bytes": f"{pframes_size}",
+        }
+        quality_dict.update({f"vmaf_{k}": v for k, v in vmaf_dict.items()})
+        quality_dict.update(
+            {
+                "ssim": f"{ssim}",
+                "psnr": f"{psnr}",
+                "psnr_y": f"{psnr_y}",
+                "psnr_u": f"{psnr_u}",
+                "psnr_v": f"{psnr_v}",
+                "testfile": f"{test_file}",
+                "reference_file": f"{filepath}",
+                "source_complexity": source_complexity,
+                "source_motions": source_motion,
+            }
         )
-        return data
-    return []
+        return quality_dict
+    print("error: no vmaf data")
+    return None
 
 
 def get_options(argv):
@@ -866,78 +900,40 @@ def main(argv):
     a csv with relevant data
     """
     options = get_options(argv)
-
-    FIELD_LIST = [
-        "media",
-        "description",
-        "id",
-        "model",
-        "platform",
-        "serial",
-        "codec",
-        "bitrate_mode",
-        "quality",  # cq setting
-        "gop_sec",
-        "framerate_fps",
-        "width",
-        "height",
-        "bitrate_bps",
-        "meanbitrate_bps",
-        "mean_bpp",
-        "calculated_bitrate_bps",
-        "framecount",
-        "size_bytes",
-        "iframes",
-        "pframes",
-        "iframe_size_bytes",
-        "pframe_size_bytes",
-        "vmaf",
-        "vmaf_hm",
-        "vmaf_min",
-        "vmaf_max",
-        "ssim",
-        "psnr",
-        "psnr_y",
-        "psnr_u",
-        "psnr_v",
-        "testfile",
-        "reference_file",
-        "source_complexity",
-        "source_motions",
-    ]
-
+    # run all the tests
+    current = 1
+    total = len(options.test)
+    print(f"Total number of tests: {total}")
+    df = None
+    start = time.time()
+    for test in options.test:
+        try:
+            quality_dict = run_quality(test, vars(options), options.debug)
+        except Exception as ex:
+            print(f"{test} failed: {ex}")
+            continue
+        now = time.time()
+        run_for = now - start
+        time_per_test = float(run_for) / float(current)
+        time_left = round(time_per_test * (total - current))
+        time_left_m = int(time_left / 60)
+        time_left_s = int(time_left) % 60
+        print(
+            f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
+        )
+        current += 1
+        if quality_dict is None:
+            # invalid test result
+            continue
+        if df is None:
+            df = pd.DataFrame(columns=quality_dict.keys())
+        df.loc[df.size] = quality_dict.values()
+    # write data to csv file
     mode = "a"
     if options.header:
         print("WARNING! Write header implies clearing the file.")
         mode = "w"
-
-    with open(options.output, mode) as fd:
-        writer = csv.writer(fd)
-        if options.header:
-            writer.writerow(FIELD_LIST)
-
-        current = 1
-        total = len(options.test)
-        start = time.time()
-        print(f"Total number of test: {total}")
-        for test in options.test:
-            try:
-                data = run_quality(test, vars(options), options.debug)
-            except Exception as ex:
-                print(f"{test} failed: {ex}")
-                continue
-            now = time.time()
-            run_for = now - start
-            time_per_test = float(run_for) / float(current)
-            time_left = round(time_per_test * (total - current))
-            time_left_m = int(time_left / 60)
-            time_left_s = int(time_left) % 60
-            print(
-                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
-            )
-            current += 1
-            if data is not None and len(data) > 0:
-                writer.writerow(data)
+    df.to_csv(options.output, mode=mode, index=False, header=options.header)
 
 
 if __name__ == "__main__":

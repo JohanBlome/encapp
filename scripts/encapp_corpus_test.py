@@ -137,7 +137,7 @@ def run_encapp(files, md5sums, options):
         if options.clear_files:
             clear_files(options)
         test_path = f"/tmp/_encapp.pbtxt"
-        test = tests_definition.Test()
+        test = tests_definitions.Test()
         encapp.remove_encapp_gen_files(options.serial)
 
         # check in mediastore
@@ -158,20 +158,23 @@ def run_encapp(files, md5sums, options):
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
         test.configure.i_frame_interval = i_frame_interval
         test.configure.codec = options.codec
-        test.configure.bitrate_mode = tests_definition.Configure.BitrateMode.Value(
-            "cbr"
+        bitrate_mode_str = (
+            options.bitrate_mode if options.bitrate_mode is not None else "cbr"
+        )
+        test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
+            bitrate_mode_str
         )
         test.input.filepath = f"{options.device_workdir}/{yuvfile}"
         test.input.resolution = resolution
         test.input.framerate = framerate
-        test.input.pix_fmt = tests_definition.Input.PixFmt.Value(options.pix_fmt)
+        test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
         if options.realtime:
             test.input.realtime = True
         # check bitrate ladder
         bitrates = encapp.parse_bitrate_field(options.bitrate)
 
         for bitrate in bitrates:
-            testsuite = tests_definition.TestSuite()
+            testsuite = tests_definitions.TestSuite()
             test_to_run = copy.deepcopy(test)
             test_to_run.configure.bitrate = str(bitrate)
 
@@ -201,62 +204,30 @@ def run_encapp(files, md5sums, options):
     quality_options = {}
     quality_options["media_path"] = options.mediastore
     result = []
+    df = None
     for file in json_files:
-        tmp = encapp_quality.run_quality(file, quality_options, debug=options.debug)
-        # The parsing could have failed and it will be None or empty
-        if tmp:
-            if len(tmp[0]) > 0:
-                result.append(tmp)
+        quality_dict = encapp_quality.run_quality(
+            file, quality_options, debug=options.debug
+        )
+        if quality_dict is None:
+            # parsing has failed (None)
+            continue
+        if df is None:
+            df = pd.DataFrame(columns=quality_dict.keys())
+        df.loc[df.size] = quality_dict.values()
 
-    FIELD_LIST = [
-        "media",
-        "description",
-        "id",
-        "model",
-        "platform",
-        "serial",
-        "codec",
-        "bitrate_mode",
-        "quality",  # cq setting
-        "gop_sec",
-        "framerate_fps",
-        "width",
-        "height",
-        "bitrate_bps",
-        "meanbitrate_bps",
-        "mean_bpp",
-        "calculated_bitrate_bps",
-        "framecount",
-        "size_bytes",
-        "iframes",
-        "pframes",
-        "iframe_size_bytes",
-        "pframe_size_bytes",
-        "vmaf",
-        "vmaf_hm",
-        "vmaf_min",
-        "vmaf_max",
-        "ssim",
-        "psnr",
-        "psnr_y",
-        "psnr_u",
-        "psnr_v",
-        "testfile",
-        "reference_file",
-        "source_complexity",
-        "source_motions",
-    ]
-    data = pd.DataFrame(result, columns=FIELD_LIST)
+    if df is None:
+        print(f"error no valid results")
+        sys.exit(-1)
     if options.output_csv == "":
         options.output_csv = f"{local_workdir}/encapp_quality.csv"
-
-    data.to_csv(options.output_csv, index=False)
+    df.to_csv(options.output_csv, index=False)
 
 
 def find_links(text, path):
-    y4mreg = 'href="(?P<y4m>[\w_\-\/.]*.y4m)"'
-    md5sumreg = 'href="(?P<md5sum>[\w_\-\/.]*[.y4m]?.md5)"'
-    folderreg = 'href="(?P<folder>[\w_\-\/.]*)\/"'
+    y4mreg = r'href="(?P<y4m>[\w_\-\/.]*.y4m)"'
+    md5sumreg = r'href="(?P<md5sum>[\w_\-\/.]*[.y4m]?.md5)"'
+    folderreg = r'href="(?P<folder>[\w_\-\/.]*)\/"'
 
     files = []
     folders = []
@@ -429,8 +400,9 @@ def find_media(options):
     folders = []
     md5sums = []
     for directory in options.corpus_dir.split(","):
-
-        if directory[:4] == "http":
+        if os.path.isfile(directory):
+            files.append(directory)
+        elif directory[:4] == "http":
             list_path(directory, files, folders, md5sums, debug=1)
         else:
             folder_files = glob.glob(f"{directory}/*.y4m")
@@ -477,6 +449,14 @@ def get_options(argv):
         1. a single number (e.g. "100 kbps")
         2. a list (e.g. "100kbps,200kbps")
         3. a range (e.g. "100k-1M-100k") (start-stop-step)""",
+    )
+    parser.add_argument(
+        "--bitrate-mode",
+        type=str,
+        dest="bitrate_mode",
+        default=None,
+        metavar="bitrate_mode",
+        help="override bitrate mode",
     )
     parser.add_argument(
         "-fps",
@@ -584,6 +564,10 @@ def main(argv):
         options.local_workdir = f"quality.{options.corpus_dir.replace(',','-')}"
 
     # Check connected device(s)
+    if options.serial is None and "ANDROID_SERIAL" in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ["ANDROID_SERIAL"]
+
     # get model and serial number
     model, options.serial = adb.get_device_info(options.serial, options.debug)
     print(f"Run on {model} with serial {options.serial}")
