@@ -323,6 +323,7 @@ def run_quality(test_file, options, debug):
     """Compare the output found in test_file with the source/reference
     found in options.media_path directory or overriden
     """
+    global VMAF_MODEL
     print(f"Run quality, {test_file}")
     if not os.path.exists(test_file):
         print("File not found: " + test_file)
@@ -591,7 +592,7 @@ def run_quality(test_file, options, debug):
             if os.path.isfile(VMAF_MODEL):
                 shell_cmd += f":model=path={VMAF_MODEL}"
             else:
-                print(f"warn: cannot find VMAF model {VMAF_MODEL}. Using default model")
+                print(f"\n***\nwarn: cannot find VMAF model {VMAF_MODEL}. Using default model\n***")
             shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
