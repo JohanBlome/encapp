@@ -584,6 +584,10 @@ def run_quality(test_file, options, debug):
                 f'"{filter_cmd}libvmaf=log_path={vmaf_file}:'
                 "n_threads=16:log_fmt=json"
             )
+            # Allow for an environment variable
+            if os.environ.get("VMAF_MODEL_PATH", None):
+                print("Environment VMAF_PATH override model")
+                VMAF_MODEL = os.environ.get("VMAF_MODEL_PATH")
             if os.path.isfile(VMAF_MODEL):
                 shell_cmd += f":model=path={VMAF_MODEL}"
             else:
