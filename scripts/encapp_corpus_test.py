@@ -109,9 +109,30 @@ def clear_files(options):
     )
 
 
+def merge_options(options, test_path, video_path):
+    # merge options with defaults
+    encapp_options = encapp.get_options(["", "run", "test"])
+    options_vars = vars(options)
+    # Add func
+    options_vars["func"] = "run"
+    # Add test
+    if options_vars["template"] is None:
+        options_vars["configfile"] = [test_path]
+    else:
+        options_vars["configfile"] = []
+        for template in options_vars["template"]:
+            options_vars["configfile"].append(template)
+        options_vars["configfile"].append(test_path)
+    # Add media
+    options_vars["videofile"] = video_path
+    for key in vars(encapp_options):
+        if key not in options_vars:
+            options_vars[key] = getattr(encapp_options, key)
+    options = argparse.Namespace(**options_vars)
+    return options
+
 def run_encapp(files, md5sums, options):
     # Download files if not present, in the future check md5sum
-
     debug = True
     local_workdir = f"{options.local_workdir}"
     os.makedirs(local_workdir, exist_ok=True)
@@ -151,7 +172,7 @@ def run_encapp(files, md5sums, options):
         framerate = int(round(float(videoinfo["framerate"]), 0))
         resolution = f"{videoinfo['width']}x{videoinfo['height']}"
         yuvfile = f"{videoname}.yuv"
-        video_to_yuv(f"{filepath}", f"{options.mediastore}/{yuvfile}", options.pix_fmt)
+        #video_to_yuv(f"{filepath}", f"{options.mediastore}/{yuvfile}", options.pix_fmt)
         # set all settings
 
         test.common.id = f"aoc ctc: {videoname}"
@@ -164,7 +185,7 @@ def run_encapp(files, md5sums, options):
         test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
             bitrate_mode_str
         )
-        test.input.filepath = f"{options.device_workdir}/{yuvfile}"
+        test.input.filepath = filepath #f"{options.device_workdir}/{yuvfile}"
         test.input.resolution = resolution
         test.input.framerate = framerate
         test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
@@ -183,19 +204,8 @@ def run_encapp(files, md5sums, options):
             with open(test_path, "w") as f:
                 f.write(text_format.MessageToString(testsuite))
 
-            encapp.run_codec_tests(
-                testsuite,
-                [f"{options.mediastore}/{yuvfile}", test_path],
-                "model",
-                options.serial,
-                options.mediastore,
-                local_workdir,
-                options.device_workdir,
-                ignore_results=False,
-                fast_copy=True,
-                split=False,
-                debug=options.debug,
-            )
+            options = merge_options(options, test_path, filepath)
+            encapp.codec_test(options, None, options.serial, options.debug)
         if options.clear_files:
             clear_files(options)
     # Done with the encoding
@@ -552,6 +562,31 @@ def get_options(argv):
         type=int,
         default=0,
         help="Skip the first N files. If a file crashes the device, it can be skipped",
+    )
+    parser.add_argument(
+        "--width_align",
+        type=int,
+        default=-1,
+        help="Horizontal widht alignment in bits to calculate stride and add padding if converting to raw yuv",
+    )
+    parser.add_argument(
+        "--height_align",
+        type=int,
+        default=-1,
+        help="Vertical height alignment in bits to calculate and add padding if converting to raw yuv",
+    )
+    parser.add_argument(
+        "--dim_align",
+        type=int,
+        default=None,
+        help="Horizontal and vertical alignment in bits to calculate stride and add padding if converting to raw yuv",
+    )
+    parser.add_argument(
+        "--template",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Test definition template, will be merged with the generated test definition",
     )
 
     return parser.parse_args(argv[1:])

@@ -198,6 +198,12 @@ def wait_for_exit(serial, debug=0):
         print("\n\n*** Done waiting **\n\n")
 
 
+def valid_path(text):
+    ret = re.sub("[ \/?*]", ".", text)
+    print(f"{text=} -> {ret=}")
+    return ret
+
+
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
     if debug > 0:
         print(f"running test: {protobuf_txt_filepath}")
@@ -498,10 +504,10 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
         for test in test_suite.test:
-            output_dir = f"{local_workdir}/{test.common.id}"
+            output_dir = f"{local_workdir}/{valid_path(test.common.id)}"
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
-            filename = f"{output_dir}/{test.common.id}.pbtxt"
+            filename = f"{output_dir}/{valid_path(test.common.id)}.pbtxt"
             with open(filename, "w") as f:
                 f.write(text_format.MessageToString(test))
             files_to_push |= {filename}
@@ -554,7 +560,7 @@ def run_codec_tests_file(
         for test in test_suite.test:
             suite = tests_definitions.TestSuite()
             suite.test.extend([test])
-            path = f"{local_workdir}/{test.common.id}.pbtxt"
+            path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
             with open(path, "w") as f:
                 f.write(text_format.MessageToString(suite))
             files_to_push |= {path}
@@ -564,7 +570,9 @@ def run_codec_tests_file(
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
-        protobuf_txt_filepath = f"{local_workdir}/{test.common.id}_aggr.pbtxt"
+        protobuf_txt_filepath = (
+            f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
+        )
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
         if debug > 0:
@@ -678,19 +686,17 @@ def update_media(test, options):
         out_res = in_res
     if out_rate == 0:
         out_rate = in_rate
-
     if (
         (
             encapp_tool.ffutils.video_is_raw(test.input.filepath)
-            or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+            and (
+                in_res != out_res
+                or in_rate != out_rate
+                or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
+            )
         )
-        and (
-            in_res != out_res
-            or in_rate != out_rate
-            or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
-        )
+        or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
     ) or options.raw:  # Always decode
-
         # one more thing to check, if nv21 or rgba only transcode if source is y4m
         if (
             (
@@ -884,53 +890,6 @@ def update_codec_test(
                 continue
             setattr(getattr(test, k1), k2, val)
 
-    # If no surface decode and no raw input, decode to raw
-    if encapp_tool.ffutils.video_is_y4m(test.input.filepath):
-        options = None
-        """
-        if test.configure.surface:
-            # set pixel config to nv21
-            options = {}
-            input = {}
-            input["pix_fmt"] = "nv21"
-            options["input"] = input
-        """
-
-        info = encapp_tool.ffutils.get_video_info(test.input.filepath)
-        replace["output"] = {}
-        if "configure" in replace:
-            replace["output"]["resolution"] = (
-                replace["configure"]["resolution"]
-                if "resolution" in replace["configure"]
-                and len(replace["configure"]["resolution"]) > 0
-                else (
-                    test.configure.resolution
-                    if len(test.configure.resolution) > 0
-                    else f"{info['width']}x{info['height']}"
-                )
-            )
-            replace["output"]["framerate"] = (
-                replace["configure"]["framerate"]
-                if "framerate" in replace["configure"]
-                else (
-                    test.configure.framerate
-                    if test.configure.framerate > 0
-                    else info["framerate"]
-                )
-            )
-            replace["output"]["pix_fmt"] = replace.get("input", {}).get(
-                "pix_fmt", PREFERRED_PIX_FMT
-            )
-        else:
-            replace["output"]["resolution"] = test.configure.resolution
-            replace["output"]["framerate"] = test.configure.framerate
-            replace["output"]["pix_fmt"] = test.input.pix_fmt
-        d = process_input_path(test.input.filepath, replace, test.input, 1)
-        test.input.resolution = d["resolution"]
-        test.input.framerate = d["framerate"]
-        test.input.pix_fmt = PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
-        test.input.filepath = d["filepath"]
-
     # replace values from CLI options
     # Let us run the resolution first since that will create generated media
     resolution_str = replace.get("configure", {}).get("resolution", "")
@@ -1088,7 +1047,7 @@ def run_codec_tests(
             if os.path.exists(tests_run):
                 with open(tests_run, "r+") as passed:
                     data = passed.read()
-                    if f"{test.common.id}.pbtxt" in data:
+                    if f"{valid_path(test.common.id)}.pbtxt" in data:
                         print("Test already done, moving on.")
                         ignore_results = True
                         continue
@@ -1103,7 +1062,7 @@ def run_codec_tests(
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
                 print(f"Push test defs: lw = {local_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{local_workdir}/{test.common.id}.pbtxt",
+                    f"{local_workdir}/{valid_path(test.common.id)}.pbtxt",
                     serial,
                     device_workdir,
                     fast_copy,
@@ -1112,13 +1071,15 @@ def run_codec_tests(
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
             if encapp_tool.adb_cmds.USE_IDB:
-                protobuf_txt_filepath = f"{test.common.id}.pbtxt"
+                protobuf_txt_filepath = f"{valid_path(test.common.id)}.pbtxt"
             else:
-                protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
+                protobuf_txt_filepath = (
+                    f"{device_workdir}/{valid_path(test.common.id)}.pbtxt"
+                )
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
             with open(tests_run, "a") as passed:
-                passed.write(f"{test.common.id}.pbtxt\n")
+                passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
 
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
