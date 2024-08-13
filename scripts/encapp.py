@@ -1728,14 +1728,24 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
         # TODO: just return? or throw error?
     if "output" not in replace:
         print("No output settings in replacement")
-        if "configure" in replace:
-            replace["output"] = replace["configure"]
+        replace["output"] = {}
 
     # check whether the user has a preferred raw format
     pix_fmt = replace.get("output", {}).get("pix_fmt", PREFERRED_PIX_FMT)
     resolution = replace.get("output", {}).get("resolution", "")
     framerate = replace.get("output", {}).get("framerate", -1)
     extension = "yuv"
+
+    info = encapp_tool.ffutils.get_video_info(input_filepath, debug)
+    if len(resolution) == 0:
+        # Get from input
+        resolution = f"{info['width']}x{info['height']}"
+        replace["output"]["resolution"] = resolution
+    if framerate <= 0:
+        framerate = info["framerate"]
+        replace["output"]["framerate"] = framerate
+    if "pix_fmt" not in replace["output"]:
+        replace["output"]["pix_fmt"] = info["pix-fmt"]
 
     if "hstride" in replace.get("output", {}) and "vstride" in replace.get(
         "output", {}
