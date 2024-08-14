@@ -199,8 +199,7 @@ def wait_for_exit(serial, debug=0):
 
 
 def valid_path(text):
-    ret = re.sub("[ \/?*]", ".", text)
-    print(f"{text=} -> {ret=}")
+    ret = re.sub("[ \/?*:%&{}$!+|=<>#]", ".", text)
     return ret
 
 
