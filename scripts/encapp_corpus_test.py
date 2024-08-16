@@ -125,11 +125,13 @@ def merge_options(options, test_path, video_path):
         options_vars["configfile"].append(test_path)
     # Add media
     options_vars["videofile"] = video_path
+    options_vars["fast_copy"] = True
     for key in vars(encapp_options):
         if key not in options_vars:
             options_vars[key] = getattr(encapp_options, key)
     options = argparse.Namespace(**options_vars)
     return options
+
 
 def run_encapp(files, md5sums, options):
     # Download files if not present, in the future check md5sum
@@ -172,33 +174,31 @@ def run_encapp(files, md5sums, options):
         framerate = int(round(float(videoinfo["framerate"]), 0))
         resolution = f"{videoinfo['width']}x{videoinfo['height']}"
         yuvfile = f"{videoname}.yuv"
-        #video_to_yuv(f"{filepath}", f"{options.mediastore}/{yuvfile}", options.pix_fmt)
-        # set all settings
 
-        test.common.id = f"aoc ctc: {videoname}"
+        test.common.id = f"{options.label} - {videoname}"
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
         test.configure.i_frame_interval = i_frame_interval
         test.configure.codec = options.codec
-        bitrate_mode_str = (
-            options.bitrate_mode if options.bitrate_mode is not None else "cbr"
-        )
-        test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
-            bitrate_mode_str
-        )
-        test.input.filepath = filepath #f"{options.device_workdir}/{yuvfile}"
+
+        if options.bitrate_mode is not None:
+            test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
+                options.bitrate_mode
+            )
+        test.input.filepath = filepath
         test.input.resolution = resolution
         test.input.framerate = framerate
         test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
         if options.realtime:
             test.input.realtime = True
-        # check bitrate ladder
-        bitrates = encapp.parse_bitrate_field(options.bitrate)
 
-        for bitrate in bitrates:
+        if options.bitrate is None:
+            if options.template is None:
+                print("Test configuration is not complete, missing bitrate")
+                exit(1)
+
+            # Assume that the template contains everythng we need.
             testsuite = tests_definitions.TestSuite()
             test_to_run = copy.deepcopy(test)
-            test_to_run.configure.bitrate = str(bitrate)
-
             testsuite.test.append(test_to_run)
 
             with open(test_path, "w") as f:
@@ -206,6 +206,23 @@ def run_encapp(files, md5sums, options):
 
             options = merge_options(options, test_path, filepath)
             encapp.codec_test(options, None, options.serial, options.debug)
+
+        else:
+            # check bitrate ladder
+            bitrates = encapp.parse_bitrate_field(options.bitrate)
+
+            for bitrate in bitrates:
+                testsuite = tests_definitions.TestSuite()
+                test_to_run = copy.deepcopy(test)
+                test_to_run.configure.bitrate = str(bitrate)
+
+                testsuite.test.append(test_to_run)
+
+                with open(test_path, "w") as f:
+                    f.write(text_format.MessageToString(testsuite))
+
+                options = merge_options(options, test_path, filepath)
+                encapp.codec_test(options, None, options.serial, options.debug)
         if options.clear_files:
             clear_files(options)
     # Done with the encoding
@@ -451,7 +468,7 @@ def get_options(argv):
     parser.add_argument(
         "-r",
         "--bitrate",
-        default="100k,200k,500k,750k,1M,1.5M,2M,4M,10M",
+        default=None,
         type=str,
         dest="bitrate",
         metavar="input-video-bitrate",
@@ -588,6 +605,26 @@ def get_options(argv):
         default=None,
         help="Test definition template, will be merged with the generated test definition",
     )
+    parser.add_argument(
+        "-l",
+        "--label",
+        type=str,
+        default="encapp corpus test",
+        help="Label for the test cases",
+    )
+    parser.add_argument(
+        "--idb",
+        action="store_true",
+        dest="idb",
+        default=False,
+        help="Run on ios using idb",
+    )
+    parser.add_argument(
+        "--bundleid",
+        type=str,
+        default=None,
+        help="Implicitly it will turn on IDB option",
+    )
 
     return parser.parse_args(argv[1:])
 
@@ -595,17 +632,30 @@ def get_options(argv):
 def main(argv):
 
     options = get_options(argv)
+    encapp.process_target_options(options)
+
+    """
     if options.local_workdir == "":
         options.local_workdir = f"quality.{options.corpus_dir.replace(',','-')}"
 
+    if options.bundleid:
+        encapp_tool.adb_cmds.set_bundleid(options.bundleid)
+        options.idb = True
+
+    encapp_tool.adb_cmds.set_idb_mode(options.idb)
     # Check connected device(s)
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
-
+    """
     # get model and serial number
     model, options.serial = adb.get_device_info(options.serial, options.debug)
+    model = ""
     print(f"Run on {model} with serial {options.serial}")
+    if options.serial is None or len(options.serial) == 0:
+        print("No device connected")
+        return 1
+
     files, md5sums = find_media(options)
     files = filter_files(files, options)
 

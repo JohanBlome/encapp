@@ -1618,8 +1618,7 @@ def get_options(argv):
     return options
 
 
-def process_options(options):
-    # 0. Set device type and workdir
+def process_target_options(options):
     if options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
@@ -1634,6 +1633,10 @@ def process_options(options):
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
 
+
+def process_options(options):
+    process_target_options(options)
+    # 0. Set device type and workdir
     # 2. process replacement shortcuts
     SHORTCUT_LIST = {
         # '-i', type=str, dest='videofile',
