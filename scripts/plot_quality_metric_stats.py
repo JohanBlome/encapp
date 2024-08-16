@@ -20,7 +20,8 @@ sns.set(rc={"xtick.bottom": True})
 sns.color_palette("dark")
 
 metrics = [
-    "vmaf",
+    "vmaf_mean",
+    "vmaf_pX",
     "psnr",
     "ssim",
     "bitrate",
@@ -209,6 +210,10 @@ def plot_by(data, args):
         size = "model"
         if len(data["model"]) > 1:
             style = "model"
+            size = "codec"
+        if args.split_on_datasource:
+            style = "data source"
+            hue = "source"
             size = "codec"
 
         # implicit by height
@@ -520,8 +525,8 @@ def main():
     parser.add_argument(
         "-m",
         "--metric",
-        default="vmaf",
-        help=f"Metric to plot. Available {metrics}, default: vmaf",
+        default="vmaf_mean",
+        help=f"Metric to plot. Available {metrics}, default: vmaf_mean",
     )
     parser.add_argument("--bitrate_mode", default="", help="Filter for bitrate mode")
     parser.add_argument(
@@ -547,10 +552,10 @@ def main():
     parser.add_argument(
         "--split_by",
         default="",
-        help="Split graph into multiple by 'source', 'description', 'model', 'codec'",
+        help="Split graph into multiple by 'source', 'description', 'model', 'codec', 'datasource'",
     )
     parser.add_argument(
-        "--separate", action="store_true", help="Write all graphs a single plots"
+        "--separate", action="store_true", help="Write all graphs as single plots"
     )
     parser.add_argument(
         "--output_bitrate",
@@ -594,6 +599,11 @@ def main():
     parser.add_argument(
         "--bitrate_magnitude", default="k", help="Represent bps as 'k' or 'M'bps"
     )
+    parser.add_argument(
+        "--split_on_datasource",
+        action="store_true",
+        help="Treat separate input files as separaters",
+    )
 
     parser.add_argument("--graph_size", default="9x9")
     parser.add_argument("--dpi", type=int, default=100)
@@ -612,6 +622,7 @@ def main():
             sys.exit(1)
         else:
             tmp = pd.read_csv(file)
+            tmp["data source"] = file
             data = pd.concat([data, tmp])
 
     data.reset_index(drop=True, inplace=True)
