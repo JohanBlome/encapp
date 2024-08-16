@@ -534,7 +534,7 @@ def get_options(argv):
         "--device-workdir",
         type=str,
         dest="device_workdir",
-        default="/sdcard/",
+        default=None,
         metavar="device_workdir",
         help="work (storage) directory on device",
     )
@@ -634,20 +634,9 @@ def main(argv):
     options = get_options(argv)
     encapp.process_target_options(options)
 
-    """
     if options.local_workdir == "":
         options.local_workdir = f"quality.{options.corpus_dir.replace(',','-')}"
 
-    if options.bundleid:
-        encapp_tool.adb_cmds.set_bundleid(options.bundleid)
-        options.idb = True
-
-    encapp_tool.adb_cmds.set_idb_mode(options.idb)
-    # Check connected device(s)
-    if options.serial is None and "ANDROID_SERIAL" in os.environ:
-        # read serial number from ANDROID_SERIAL env variable
-        options.serial = os.environ["ANDROID_SERIAL"]
-    """
     # get model and serial number
     model, options.serial = adb.get_device_info(options.serial, options.debug)
     model = ""

@@ -1024,6 +1024,7 @@ def run_codec_tests(
     debug=False,
 ):
     global default_values
+    print(f"\n\n******* workdir = {device_workdir} ****\n\n")
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
 
@@ -1619,10 +1620,11 @@ def get_options(argv):
 
 
 def process_target_options(options):
+    global default_values
     if options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
-    encapp_tool.adb_cmds.set_idb_mode(options.idb)
+    set_idb_mode(options.idb)
     default_values["device_workdir"] = get_device_dir()
 
     if ("device_workdir" not in options) or (options.device_workdir is None):
