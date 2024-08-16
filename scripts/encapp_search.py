@@ -90,6 +90,24 @@ def indexDirectory(options, recursive):
             with open(filename) as f:
                 data = json.load(f)
                 key_list, val_list = dict_flatten(data["test"])
+                # The key list can vary and we are only interested in a few key aspects
+                # so we will only keep the common keys
+                keys = [
+                    "input.resolution",
+                    "input.framerate",
+                    "configure.codec",
+                    "configure.bitrate",
+                    "configure.resolution",
+                    "configure.framerate",
+                    "configure.iFrameInterval",
+                ]
+
+                vals = [
+                    (key, val) for key, val in zip(key_list, val_list) if key in keys
+                ]
+                # sort vals
+                vals = sorted(vals, key=lambda x: keys.index(x[0]))
+                vals = [val for key, val in vals]
                 settings.append(
                     [
                         model,
@@ -97,17 +115,16 @@ def indexDirectory(options, recursive):
                         serial,
                         filename,
                         data["encodedfile"],
-                        *val_list,
+                        *vals,
                         data["meanbitrate"],
                     ]
                 )
         except Exception as exc:
             if DEBUG > 0:
                 print("json " + filename + ", load experiment data failed: " + str(exc))
-
     labels = (
         ["model", "platform", "serial", "filename", "encodedfile"]
-        + key_list
+        + keys
         + ["meanbitrate"]
     )
     pdata = pd.DataFrame.from_records(settings, columns=labels, coerce_float=True)
