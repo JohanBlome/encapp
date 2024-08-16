@@ -111,16 +111,18 @@ func doneReading(test: Test, stream: InputStream?, frame: Int, time: Float, loop
 }
 
 // Swift does not allow a name loopup (which Android and python does)
-func pixFmtToString(format:  Input.PixFmt) -> String{
+func pixFmtToString(format:  PixFmt) -> String{
     switch format {
-    case Input.PixFmt.nv12:
+    case PixFmt.nv12:
         return "nv12"
-    case Input.PixFmt.rgba:
+    case PixFmt.rgba:
         return "rgba"
-    case Input.PixFmt.yuv420P:
+    case PixFmt.yuv420P:
         return "yuv420p"
-    case Input.PixFmt.nv21:
+    case PixFmt.nv21:
         return "nv21"
+    default:
+        return "unknown"
     }
 }
 
