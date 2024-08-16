@@ -169,7 +169,6 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
 
 
     setBitrate(compSession: compSession, bps: bitrate, cbr: definition.configure.bitrateMode == Configure.BitrateMode.cbr)
-
    //TODO: temporal/hier layers
     if definition.configure.hasTsSchema {
         // If temporal layers are turned off we end up with only I frames. Default is on.
@@ -179,31 +178,21 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
         } else {
             log.info("Succesfully enabled temporal layers")
         }
-        /*
-         let bitrateRatio = 0.1
-         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerBitRateFraction, value: bitrateRatio as CFTypeRef)
-         if status != 0 {
-         log.error("failed to set baselayer bitrate fraction, status: \(status)")
-         } else {
-         log.info("Succesfully set baselayer bitrate fraction: \(bitrateRatio)")
-         }
-         let baseLayerFramerate = 1.0
-         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerFrameRate , value: baseLayerFramerate as CFTypeRef)
-         if status != 0 {
-         log.error("failed to set baselayer framerate, status: \(status)")
-         } else {
-         log.info("Succesfully set baselayer framerate: \(baseLayerFramerate)")
-         }
-         */
-
-        /*  } else {
-         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_AllowTemporalCompression, value: kCFBooleanFalse)
-         if status != 0 {
-         log.error("failed to disable temporal layers, status: \(status)")
-         } else {
-         log.info("Succesfully disabled temporal layers")
-         }
-         }*/
+        // Seen in other hw
+        let bitrateRatio = 0.35
+        status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerBitRateFraction, value: bitrateRatio as CFTypeRef)
+        if status != 0 {
+            log.error("failed to set baselayer bitrate fraction, status: \(status)")
+        } else {
+            log.info("Succesfully set baselayer bitrate fraction: \(bitrateRatio)")
+        }
+        let baseLayerFramerate = 0.5
+        status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerFrameRateFraction , value: baseLayerFramerate as CFTypeRef)
+        if status != 0 {
+            log.error("failed to set baselayer framerate, status: \(status)")
+        } else {
+            log.info("Succesfully set baselayer framerate: \(baseLayerFramerate)")
+        }
     }
 
    /* status = VTSessionSetProperty(compSession, key: kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder, value: kCFBooleanTrue)
