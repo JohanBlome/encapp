@@ -129,12 +129,15 @@ class BufferEncoder extends Encoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-
+        MediaFormat outputFormat = mCodec.getOutputFormat();
+        // Log format
+        Log.d(TAG, "Actual check of some formats after first mediaformat update.");
+        Log.d(TAG, MediaCodecInfoHelper.mediaFormatToString(outputFormat));
+        mMuxer = createMuxer(mCodec, outputFormat, true);
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
-            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mVideoTrack = mMuxer.addTrack(outputFormat);
             mMuxer.start();
         }
 
