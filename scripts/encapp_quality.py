@@ -61,26 +61,47 @@ def calc_stats(pdata, options, label, print_text=False):
         fps += len(fdata) / fduration
 
     fps = fps / len(files)
-    iframes = pdata.loc[pdata["iframe"] == 1]
+    keyframes = pdata.loc[pdata["key_frame"] == 1]
+    keyframes_cnt = len(keyframes)
+    iframes = pdata.loc[pdata["pict_type"] == "I"]
     iframe_cnt = len(iframes)
-    pframes = pdata.loc[pdata["iframe"] != 1]
+    pframes = pdata.loc[pdata["pict_type"] == "P"]
     pframe_cnt = len(pframes)
+    bframes = pdata.loc[pdata["pict_type"] == "B"]
+    bframe_cnt = len(bframes)
+
     iframes = iframes.fillna(0)
     pframes = pframes.fillna(0)
+    bframes = bframes.fillna(0)
 
-    imean = 0
-    pmean = 0
-    imax = imin = pmax = pmin = 0
+    kmean = imean = pmean = bmean = 0
+    kmax = imax = pmax = bmax = 0
+    kmin = imin = pmin = bmin = 0
+
+    if len(keyframes["size"]) > 0:
+        kmean = np.mean(keyframes["size"])
+        kmax = np.max(keyframes["size"])
+        kmin = np.min(keyframes["size"])
+
     if len(iframes["size"]) > 0:
         imean = np.mean(iframes["size"])
         imax = np.max(iframes["size"])
         imin = np.min(iframes["size"])
+
     if len(pframes["size"]) > 0:
         pmean = np.mean(pframes["size"])
         pmax = np.max(pframes["size"])
         pmin = np.min(pframes["size"])
-    mean_ratio = imean / pmean
-    size_ratio = np.sum(iframes["size"]) / np.sum(pframes["size"])
+
+    if len(bframes["size"]) > 0:
+        bmean = np.mean(bframes["size"])
+        bmax = np.max(bframes["size"])
+        bmin = np.min(bframes["size"])
+
+    mean_ratio = imean / (pmean + bmean) / 2
+    size_ratio = np.sum(iframes["size"]) / (
+        np.sum(pframes["size"]) + np.sum(bframes["size"])
+    )
 
     if options.get("quiet", None) is None:
         print(f"ime,imx,imi = {imean}, {imax}, {imin}")
@@ -90,6 +111,12 @@ def calc_stats(pdata, options, label, print_text=False):
         print("Duration: {:.3f} secs".format(total_duration))
         print("Fps: {:.2f} fps".format(fps))
         print("Bitrate {:.2f} kbps".format(8 * total_size / (total_duration * 1000)))
+
+        print(
+            "keyframes (mean, max, min): {:d}, {:d}, {:d}".format(
+                int(kmean), int(kmax), int(kmin)
+            )
+        )
         print(
             "Iframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
                 int(imean), int(imax), int(imin)
@@ -100,8 +127,16 @@ def calc_stats(pdata, options, label, print_text=False):
                 int(pmean), int(pmax), int(pmin)
             )
         )
+        print(
+            "Bframes (mean, max, min): {:d}, {:d}, {:d} bytes".format(
+                int(bmean), int(bmax), int(bmin)
+            )
+        )
+
+        print("Kframe count: {:d}".format(keyframes_cnt))
         print("Iframe count: {:d}".format(iframe_cnt))
         print("Pframe count: {:d}".format(pframe_cnt))
+        print("Bframe count: {:d}".format(bframe_cnt))
         print("mean size iframe/pframe ratio: {:.2f}".format(mean_ratio))
         print("total size iframe/pframe ratio: {:.2f}".format(size_ratio))
         print("___")
@@ -169,12 +204,14 @@ def detailed_media_info(inputfile, options, debug):
         chroma_location=left
         """
         # write the CSV header
-        shell_cmd = f"echo 'key_frame,pts_time,duration_time,pkt_size' > {name}"
+        shell_cmd = (
+            f"echo 'key_frame,pts_time,duration_time,pkt_size,pict_type' > {name}"
+        )
         encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         # run the ffprobe command
         shell_cmd = (
             "ffprobe -select_streams v -show_frames -show_entries frame=pts_time,"
-            "duration_time,pkt_size,key_frame -v quiet -of csv='p=0' "
+            "duration_time,pkt_size,key_frame,pict_type -v quiet -of csv='p=0' "
             f"{inputfile} >> {name}"
         )
         encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
@@ -193,6 +230,7 @@ def detailed_media_info(inputfile, options, debug):
             for row in datareader:
                 try:
                     is_iframe = int(row[0])
+                    pict_type = row[4]
                     try:
                         dur = float(row[2])
                     except Exception as ex:
@@ -233,6 +271,7 @@ def detailed_media_info(inputfile, options, debug):
                             [
                                 inputfile,
                                 is_iframe,
+                                pict_type,
                                 pts,
                                 dur,
                                 frame_size,
@@ -244,7 +283,7 @@ def detailed_media_info(inputfile, options, debug):
                     print(str(e) + ", row = " + str(row))
                 counter += 1
 
-        labels = ["file", "iframe", "pts", "duration", "size", "kbps"]
+        labels = ["file", "key_frame", "pict_type", "pts", "duration", "size", "kbps"]
         df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
         df.to_csv(name)
@@ -592,7 +631,9 @@ def run_quality(test_file, options, debug):
             if os.path.isfile(VMAF_MODEL):
                 shell_cmd += f":model=path={VMAF_MODEL}"
             else:
-                print(f"\n***\nwarn: cannot find VMAF model {VMAF_MODEL}. Using default model\n***")
+                print(
+                    f"\n***\nwarn: cannot find VMAF model {VMAF_MODEL}. Using default model\n***"
+                )
             shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
@@ -689,13 +730,18 @@ def run_quality(test_file, options, debug):
         # get the data from ffmpeg
         ffmpeg_data = detailed_media_info(encodedfile, options, debug)
         framecount = len(ffmpeg_data)
-        iframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 1]
-        pframes = ffmpeg_data.loc[ffmpeg_data["iframe"] == 0]
+        iframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "I"]
+        pframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "P"]
+        bframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "B"]
         iframeinterval = video_info["duration"] / len(iframes)
 
+        iframe_size = pframes_size = bframes_size = 0
         if len(iframes) > 0:
             iframes_size = iframes["size"].mean()
-        pframes_size = pframes["size"].mean()
+        if len(pframes) > 0:
+            pframes_size = pframes["size"].mean()
+        if len(bframes) > 0:
+            bframes_size = bframes["size"].mean()
         calculated_bitrate = int((file_size * 8 * framerate) / framecount)
         source_complexity = ""
         source_motion = ""
@@ -704,11 +750,8 @@ def run_quality(test_file, options, debug):
         if options.get("mark_motion", None):
             source_motion = options.mark_motion
 
-        if len(results) > 0:
-            frames = pd.DataFrame(results["frames"])
-            iframes = frames.loc[frames["iframe"] == 1]
-            pframes = frames.loc[frames["iframe"] == 0]
-        else:
+        if len(results) == 0:
+            # something is wrong...
             meanbitrate = bitrate = calculated_bitrate
         # calculate the bits/pixel from the meanbitrate
         width, height = [int(x) for x in resolution.split("x")]
@@ -735,8 +778,10 @@ def run_quality(test_file, options, debug):
             "size_bytes": f"{file_size}",
             "iframes": f"{len(iframes)}",
             "pframes": f"{len(pframes)}",
+            "bframes": f"{len(bframes)}",
             "iframe_size_bytes": f"{iframes_size}",
             "pframe_size_bytes": f"{pframes_size}",
+            "bframe_size_bytes": f"{bframes_size}",
         }
         quality_dict.update({f"vmaf_{k}": v for k, v in vmaf_dict.items()})
         quality_dict.update(
@@ -928,7 +973,7 @@ def main(argv):
         )
         current += 1
         if quality_dict is None:
-            # invalid test result
+            continue
             continue
         if df is None:
             df = pd.DataFrame(columns=quality_dict.keys())
@@ -936,7 +981,7 @@ def main(argv):
     # write data to csv file
     mode = "a"
     if options.header:
-        print("WARNING! Write header implies clearing the file.")
+        mode = "w"
         mode = "w"
     df.to_csv(options.output, mode=mode, index=False, header=options.header)
 
