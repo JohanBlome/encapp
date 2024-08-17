@@ -1024,7 +1024,6 @@ def run_codec_tests(
     debug=False,
 ):
     global default_values
-    print(f"\n\n******* workdir = {device_workdir} ****\n\n")
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
 
