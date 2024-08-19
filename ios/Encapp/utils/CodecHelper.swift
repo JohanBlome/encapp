@@ -56,9 +56,9 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
 
 func setVTEncodingSessionProperties(definition: Test, compSession: VTCompressionSession) {
     var status = Int32(0)
-    // b frame support, default is on but let us check the requested setting
+    // b frame support, default is on but let us check the requested settings
     let params = definition.configure.parameter
-    if params.contains( where: {$0.key ==  "max-bframes"}) {
+    if params.contains( where: {$0.key ==  "max-bframes"})  {
         let val = params.first( where: {$0.key == "max-bframes"})
         let bframe = ((Int(val!.value) ?? 0) > 0)
         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_AllowFrameReordering, value: bframe as CFTypeRef)
@@ -167,17 +167,22 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
         bitrate = 500000 //500kbps
     }
 
+    // If temporal layers are turned off we end up with only I frames. Default is on.
+    // We probably never want only I frames
+    /*
+    status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_AllowTemporalCompression, value: kCFBooleanTrue)
+    if status != 0 {
+        log.error("failed to enable temporal layers, status: \(status)")
+    } else {
+        log.info("Succesfully enabled temporal layers")
+    }
+     */
 
     setBitrate(compSession: compSession, bps: bitrate, cbr: definition.configure.bitrateMode == Configure.BitrateMode.cbr)
    //TODO: temporal/hier layers
+    log.info("Check ts schema:")
     if definition.configure.hasTsSchema {
-        // If temporal layers are turned off we end up with only I frames. Default is on.
-        status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_AllowTemporalCompression, value: kCFBooleanTrue)
-        if status != 0 {
-            log.error("failed to enable temporal layers, status: \(status)")
-        } else {
-            log.info("Succesfully enabled temporal layers")
-        }
+        log.info("Have schema, set props")
         // Seen in other hw
         let bitrateRatio = 0.35
         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerBitRateFraction, value: bitrateRatio as CFTypeRef)
@@ -189,10 +194,20 @@ func setVTEncodingSessionProperties(definition: Test, compSession: VTCompression
         let baseLayerFramerate = 0.5
         status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerFrameRateFraction , value: baseLayerFramerate as CFTypeRef)
         if status != 0 {
-            log.error("failed to set baselayer framerate, status: \(status)")
+            log.error("failed to set baselayer framerate fraction, status: \(status)")
+            // Try something else
+            let baseLayerFramerate = 15
+            status = VTSessionSetProperty(compSession, key: kVTCompressionPropertyKey_BaseLayerFrameRate , value: baseLayerFramerate as CFTypeRef)
+            if status != 0 {
+                log.error("failed to set baselayer framerate, status: \(status)")
+            } else {
+                log.info("Succesfully set baselayer framerate: \(baseLayerFramerate)")
+            }
         } else {
-            log.info("Succesfully set baselayer framerate: \(baseLayerFramerate)")
+            log.info("Succesfully set baselayer framerate fraction: \(baseLayerFramerate)")
         }
+    } else {
+        log.info("No temporal layers")
     }
 
    /* status = VTSessionSetProperty(compSession, key: kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder, value: kCFBooleanTrue)
