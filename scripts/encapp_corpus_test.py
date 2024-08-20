@@ -151,7 +151,6 @@ def run_encapp(files, md5sums, options):
 
     failed_tests = []
     # TODO: setting
-    i_frame_interval = 3
     for counter, filepath in enumerate(files):
         print(f"Running {counter + 1}/{len(files)}")
         if counter < options.skip:
@@ -177,9 +176,7 @@ def run_encapp(files, md5sums, options):
 
         test.common.id = f"{options.label} - {videoname}"
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
-        test.configure.i_frame_interval = i_frame_interval
         test.configure.codec = options.codec
-
         if options.bitrate_mode is not None:
             test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
                 options.bitrate_mode
