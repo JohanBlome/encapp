@@ -10,6 +10,7 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -35,6 +36,7 @@ import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.OutputMultiplier;
+import com.facebook.encapp.utils.PowerLoad;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
@@ -58,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
     MemoryLoad mMemLoad;
+
+    PowerLoad mPowerLoad;
     Stack<Encoder> mEncoderList = new Stack<>();
     CameraSource mCameraSource = null;
     OutputMultiplier mCameraSourceMultiplier;
@@ -126,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         mVsyncHandler = new VsyncHandler();
         mVsyncHandler.start();
         //setContentView(R.layout.activity_main);
@@ -231,6 +236,7 @@ public class MainActivity extends AppCompatActivity {
     public void exit() {
         Log.d(TAG, "Finish and remove");
         mMemLoad.stop();
+        mPowerLoad.stop();
         finishAndRemoveTask();
         Process.killProcess(Process.myPid());
         Log.d(TAG, "EXIT");
@@ -271,7 +277,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
+        mPowerLoad = new PowerLoad(this);
         mMemLoad.start();
+        mPowerLoad.start();
         if (mExtraData.containsKey(CliSettings.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(CliSettings.TEST_UI_HOLD_TIME_SEC, "0"));
         }
