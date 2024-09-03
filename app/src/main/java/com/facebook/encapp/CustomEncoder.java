@@ -263,8 +263,12 @@ class CustomEncoder extends Encoder {
             }
         }
         mStats.start();
-
-        mMuxer = createMuxer(null, mediaFormat);
+        if (mTest.getConfigure().getCodec().contains("libencodeyuv")) {
+            params.add(Parameter.newBuilder().setKey("inputfile").setValue(mTest.getInput().getFilepath()).setType(DataValueType.stringType).build());
+            params.add(Parameter.newBuilder().setKey("outputfile").setValue("/data/data/com.facebook.encapp/" + mStats.getId() + ".mp4").setType(DataValueType.stringType).build());
+        } else {
+            mMuxer = createMuxer(null, mediaFormat);
+        }
         try {
             int currentFramePosition = 0;
             boolean input_done = false;
@@ -284,18 +288,26 @@ class CustomEncoder extends Encoder {
             params.toArray(param_buffer);
             int status = initEncoder(param_buffer, width, height, pixelformat, bitdepth);
             StringParameter[] settings_ = getAllEncoderSettings();
-            //add generic parameters to mTest, this way it can bre exactly reproduced (?) - in the case x264: no
-            ArrayList<Parameter> param_list = new ArrayList<>();
-            for (StringParameter par: settings_) {
-                param_list.add(par.getParameter());
-            }
+            if (settings_ != null && settings_.length > 0) {
+                //add generic parameters to mTest, this way it can bre exactly reproduced (?) - in the case x264: no
+                ArrayList<Parameter> param_list = new ArrayList<>();
+                for (StringParameter par : settings_) {
+                    param_list.add(par.getParameter());
+                }
 
-            // TODO: where to save this information
-            mTest = mTest.toBuilder().setConfigure(mTest.getConfigure().toBuilder().addAllParameter(param_list)).build();
-            Log.d(TAG, "Updated test: " + mTest);
-            mStats.updateTest(mTest);
+                // TODO: where to save this information
+                mTest = mTest.toBuilder().setConfigure(mTest.getConfigure().toBuilder().addAllParameter(param_list)).build();
+                Log.d(TAG, "Updated test: " + mTest);
+                mStats.updateTest(mTest);
+            }
             if (status != 0) {
                 Log.e(TAG, "Init failed");
+                return "";
+            }
+            if (mTest.getConfigure().getCodec().contains("libencodeyuv")) {
+                //Run
+                status = encode(null, null, null);
+                Log.d(TAG, "Encode: " + status);
                 return "";
             }
             headerArray = getHeader();

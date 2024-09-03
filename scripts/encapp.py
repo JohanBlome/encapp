@@ -296,6 +296,72 @@ def collect_results(
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
+
+            # HACK!!! parse file and see if it is libencodeyuv.so
+            # read test file results
+            with open(f"{local_workdir}/{file}", "r") as fd:
+                results = json.load(fd)
+
+            test = results.get("test")
+
+            encoder_settings = test.get("configure")
+            if "encodeyuv" in encoder_settings.get("codec"):
+                input_settings = test.get("input")
+                bitrate = parse_bitrate_field(encoder_settings.get("bitrate"))[0]
+                resolution = input_settings.get("resolution").split("x")
+                # name is different in json...
+                bitrate_mode = encoder_settings.get("bitrateMode", "cbr")
+                # No support for cq or vbr
+                if bitrate_mode != "cbr":
+                    bitrate_mode = "jcq"  # ???
+
+                # TODO: there is a bug pix_fmt vs pixFmt
+                pixelformat = input_settings.get("pixFmt", "YUV420P")
+
+                if pixelformat == "yuv420p":
+                    pixelformat = "YUV420P"
+                elif pixelformat == "p010le":
+                    pixelformat = "P010"
+
+                parameters = encoder_settings.get("parameter", [])
+                qpi_min = -1
+                qpi_max = -1
+                qpp_min = -1
+                qpp_max = -1
+                for param in parameters:
+                    if param.get("key") == "video-qp-i-min":
+                        qpi_min = int(param.get("value"))
+                    elif param.get("key") == "video-qp-i-max":
+                        qpi_max = int(param.get("value"))
+                    elif param.get("key") == "video-qp-p-min":
+                        print("WARNING, qp p is not used")
+                        qpp_min = int(param.get("value"))
+                    elif param.get("key") == "video-qp-p-max":
+                        print("WARNING, qp p is not used")
+                        qpp_max = int(param.get("value"))
+                # ignore qpp
+                qpmin_ = ""
+                qpmax_ = ""
+                if qpi_min > -1:
+                    qpmin_ = f"--qp-min {qpi_min} "
+                if qpi_max > -1:
+                    qpmax_ = f"--qp-max {qpi_max} "
+
+                name = f"{device_workdir}/{os.path.basename(file)[:-4]}mp4"
+                print(f"encodeYUV run adb, output = {name}")
+                cmd = (
+                    f"adb -s {serial} shell encodeYUV --format {pixelformat} "
+                    f"-W {resolution[0]} -H {resolution[1]} -b {bitrate} "
+                    f"{qpmin_} {qpmax_} "
+                    f"--rc {bitrate_mode} "
+                    f"-i {input_settings.get('filepath')} "
+                    f"-o {name}"
+                )
+                encapp_tool.adb_cmds.run_cmd(cmd, debug)
+                # pull output (if possible)
+                cmd = f"adb -s {serial} pull {name} " f"{local_workdir}"
+                encapp_tool.adb_cmds.run_cmd(cmd, debug)
+
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"

@@ -1,0 +1,14 @@
+test {
+    input {
+        pix_fmt: p010le
+    }
+    common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate using encodeYUV with p010`"
+    }
+    configure {
+        codec: "/tmp/libencodeyuv.so"
+        bitrate: "2000 kbps"
+    }
+
+}

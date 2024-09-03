@@ -1,0 +1,14 @@
+test {
+        filepath: "/tmp/akiyo_qcif.y4m"
+        pix_fmt: yuv420p
+    }
+    common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate using encodeYUV with yuv420p"
+    }
+    configure {
+        codec: "/tmp/libencodeyuv.so"
+        bitrate: "2000 kbps"
+    }
+
+}

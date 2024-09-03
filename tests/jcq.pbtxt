@@ -1,0 +1,26 @@
+test {
+  configure {
+    parameter {
+      key: "video-qp-i-min"
+      type: intType
+      value: "27"
+    }
+    parameter {
+      key: "video-qp-i-max"
+      type: intType
+      value: "38"
+    }
+    parameter {
+      key: "video-qp-p-min"
+      type: intType
+      value: "27"
+    }
+    parameter {
+      key: "video-qp-p-max"
+      type: intType
+      value: "38"
+    }
+    bitrate: "8M"
+    bitrate_mode: vbr
+  }
+}
