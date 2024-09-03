@@ -176,7 +176,8 @@ def run_encapp(files, md5sums, options):
 
         test.common.id = f"{options.label} - {videoname}"
         test.common.description = f"Encoding test {videoname} {resolution}@{framerate}"
-        test.configure.codec = options.codec
+        if options.codec is not None:
+            test.configure.codec = options.codec
         if options.bitrate_mode is not None:
             test.configure.bitrate_mode = tests_definitions.Configure.BitrateMode.Value(
                 options.bitrate_mode
@@ -184,7 +185,8 @@ def run_encapp(files, md5sums, options):
         test.input.filepath = filepath
         test.input.resolution = resolution
         test.input.framerate = framerate
-        test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
+        if options.pix_fmt is not None:
+            test.input.pix_fmt = tests_definitions.PixFmt.Value(options.pix_fmt)
         if options.realtime:
             test.input.realtime = True
 
@@ -510,7 +512,7 @@ def get_options(argv):
         "--pix_fmt",
         type=str,
         dest="pix_fmt",
-        default="nv12",
+        default=None,
         metavar="pix_fmt",
         help="wanted pix fmt for the encoder",
     )
