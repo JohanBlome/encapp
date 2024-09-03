@@ -516,7 +516,8 @@ def run_quality(test_file, options, debug):
         if options.get("limit_length", -1) > 0:
             duration = float(options.limit_length)
         if output_framerate is None or output_framerate == 0:
-            output_framerate = f'{video_info["framerate"]}'
+            if video_info is not None:
+                output_framerate = f"{video_info.get('framerate', 30)}"
         if media_res != None and output_resolution != media_res:
             print("Warning. Discrepancy in resolutions for output")
             print(f"Json {output_resolution}, media {media_res}")
