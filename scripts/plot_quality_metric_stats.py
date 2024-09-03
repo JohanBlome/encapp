@@ -1,18 +1,14 @@
 #!/usr/local/bin/python3
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 import os.path as path
 import argparse
 import sys
 import json
-import os
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import math
-import re
-import argparse
 import itertools as it
 
 sns.set_style("whitegrid")
@@ -80,6 +76,10 @@ def plot_by(data, args):
         if len(data["model"]) > 1:
             hue = "model"
             size = args.use_dimension
+        if args.split_on_datasource:
+            style = "codec"
+            hue = "data source"
+            size = "model"
 
         if args.separate:
             for source in data["source"].unique():
@@ -204,7 +204,6 @@ def plot_by(data, args):
             plt.savefig(f"{clean_filename(label)}.{args.metric}.by_model.png")
             plt.close()
     else:
-
         hue = "source"
         style = "codec"
         size = "model"
@@ -347,7 +346,6 @@ def find_mean_max_examples_per_file(data, args):
 
 
 def plot_percentile(data, args):
-
     bitrate_label = f"bitrate {args.bitrate_magnitude}bps"
     framerates = data["framerate_fps"].unique()
     data.sort_values("pixel_count", inplace=True)
@@ -604,6 +602,11 @@ def main():
         action="store_true",
         help="Treat separate input files as separaters",
     )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="Plot difference between two or more series, first one being the source",
+    )
 
     parser.add_argument("--graph_size", default="9x9")
     parser.add_argument("--dpi", type=int, default=100)
@@ -626,7 +629,7 @@ def main():
             data = pd.concat([data, tmp])
 
     data.reset_index(drop=True, inplace=True)
-    data.to_csv("all_quality_data.csv")
+    data.to_csv(f"{args.label}_all_quality_data.csv")
     if len(args.bitrate_mode) > 0:
         data = data.loc[data["bitrate_mode"] == args.bitrate_mode]
 
@@ -653,7 +656,7 @@ def main():
 
     if len(args.resolution) > 0:
         resolutions = args.resolution.split(",")
-        sides = [int(x) for x in resolutions if not "x" in x]
+        sides = [int(x) for x in resolutions if "x" not in x]
         resolutions_ = [x for x in resolutions if "x" in x]
         resolutions = "|".join(resolutions_)
         data_1 = pd.DataFrame()
@@ -703,6 +706,51 @@ def main():
         args.metric = "bitrate ratio"
     if args.metric == "bitrate":
         args.metric = f"calculated bitrate {args.bitrate_magnitude}bps"
+
+    datasources = data["data source"].unique()
+    if args.diff:
+        # diff all the quality metrics according to bitrate, diff on source or data source
+        if args.split_on_datasource:
+            # sort on source
+            ref = datasources[0]
+            # If missing bitrate interpolate
+            data_1 = data.loc[data["data source"] == ref]
+            for ds in datasources[1:]:
+                for bitrate in data_1["bitrate_bps"].unique():
+                    data_2 = data.loc[
+                        (data["data source"] == ds) & (data["bitrate_bps"] == bitrate)
+                    ]
+                    for source in data_1["source"].unique():
+                        data_2_ = data_2.loc[data["source"] == source]
+                        val = [np.nan]
+                        if len(data_2) > 0:
+                            ref_val = data_1.loc[
+                                (data_1["bitrate_bps"] == bitrate)
+                                & (data_1["source"] == source),
+                                args.metric,
+                            ].values
+                            if len(ref_val) > 0:
+                                val = data_2_[args.metric].values - ref_val[0]
+                            else:
+                                val = [np.nan] * len(data_2_)
+
+                        data.loc[
+                            (data["data source"] == ds)
+                            & (data["source"] == source)
+                            & (data["bitrate_bps"] == bitrate),
+                            args.metric,
+                        ] = val
+            for bitrate in data_1["bitrate_bps"].unique():
+                data.loc[
+                    (data["data source"] == ref) & (data["bitrate_bps"] == bitrate),
+                    args.metric,
+                ] = 0
+
+    if args.split_on_datasource:
+        data["data source"] = data["data source"].astype("category")
+        data["data source"] = data["data source"].cat.set_categories(datasources)
+        # keep same hue for similarly names data sources
+        data = data.sort_values("data source")
 
     # Colors
     sources = data["source"].unique()
