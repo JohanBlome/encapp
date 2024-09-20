@@ -147,6 +147,16 @@ struct Common {
   /// Clears the value of `start`. Subsequent reads from it will return its default value.
   mutating func clearStart() {self._start = nil}
 
+  /// template or specific name for output file(s)
+  var outputFilename: String {
+    get {return _outputFilename ?? String()}
+    set {_outputFilename = newValue}
+  }
+  /// Returns true if `outputFilename` has been explicitly set.
+  var hasOutputFilename: Bool {return self._outputFilename != nil}
+  /// Clears the value of `outputFilename`. Subsequent reads from it will return its default value.
+  mutating func clearOutputFilename() {self._outputFilename = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -155,6 +165,7 @@ struct Common {
   fileprivate var _description_p: String? = nil
   fileprivate var _operation: String? = nil
   fileprivate var _start: String? = nil
+  fileprivate var _outputFilename: String? = nil
 }
 
 struct Parameter {
@@ -950,6 +961,7 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     2: .same(proto: "description"),
     3: .same(proto: "operation"),
     4: .same(proto: "start"),
+    5: .standard(proto: "output_filename"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -962,6 +974,7 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       case 2: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._operation) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._start) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._outputFilename) }()
       default: break
       }
     }
@@ -984,6 +997,9 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._start {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._outputFilename {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -992,6 +1008,7 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if lhs._description_p != rhs._description_p {return false}
     if lhs._operation != rhs._operation {return false}
     if lhs._start != rhs._start {return false}
+    if lhs._outputFilename != rhs._outputFilename {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
