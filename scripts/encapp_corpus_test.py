@@ -226,7 +226,7 @@ def run_encapp(files, md5sums, options):
             clear_files(options)
     # Done with the encoding
     # Find all output json file (let us check the number as well).
-    json_files = glob.glob(f"{local_workdir}/encapp_*.json")
+    json_files = glob.glob(f"{local_workdir}/*.json")
     quality_options = {}
     quality_options["media_path"] = options.mediastore
     result = []
@@ -375,7 +375,6 @@ def filter_files_on_name(files, options):
 
 def filter_files(files, options):
     if options.resolution is None and options.framerate is None:
-        print("Filter none")
         return files
 
     for folder in options.corpus_dir:

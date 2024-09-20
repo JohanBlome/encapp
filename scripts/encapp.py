@@ -24,6 +24,7 @@ import encapp_tool.app_utils
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import copy
+import random
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -251,9 +252,25 @@ def collect_results(
     else:
         cmd = f"adb -s {serial} shell ls {device_workdir}/"
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
-    output_files = re.findall(
+
+    # If we have a output_filename template in the test we need to check the begining
+    test_suite = tests_definitions.TestSuite()
+    local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
+    with open(local_path, "rb") as fd:
+        text_format.Merge(fd.read(), test_suite)
+
+    output_files = []
+    for test in test_suite.test:
+        print(test)
+        if test.common and test.common.output_filename:
+            filename = test.common.output_filename
+            print(f"looking for {filename}")
+            output_files += re.findall(f"{filename}.*", stdout, re.MULTILINE)
+
+    output_files += re.findall(
         encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE
     )
+
     if encapp_tool.adb_cmds.USE_IDB:
         # Set app in standby so screen is not locked
         if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
@@ -467,6 +484,64 @@ def parse_multiply(multiply):
     return definition
 
 
+def update_fileoutput_names(test):
+    """Upate output file name is existing according to placeholders
+    Example: output_filename: "[input.filepath].[configure.bitrate].[XXX]"
+    Where the input.filepath will set the basename from the test def and
+    the bitrate will be set from the configure.bitrate.
+    XXX means three random bytes in hex format.
+    """
+    if test.common.output_filename is not None:
+        # Check if we have any placeholders
+        reg = r"\[[\w.]*\]"
+        filename = test.common.output_filename
+        while True:
+            m = re.search(reg, filename)
+
+            if m:
+                text = m.group(0)[1:-1]
+                # check if match only contains X
+                m2 = re.search(r"X*", text)
+
+                if len(m2.group(0)) > 0:
+                    # create random byte values and print as hex
+                    nbr = len(m2.group(0))
+                    hex = "".join(
+                        [random.choice("0123456789abcdef") for i in range(nbr)]
+                    )
+                    filename = filename.replace(m.group(0), hex)
+                else:
+                    # split at .
+                    parts = text.split(".")
+                    value = ""
+                    if hasattr(test, parts[0]):
+                        comp = getattr(test, parts[0])
+                        if hasattr(comp, parts[1]):
+                            # If float and has not fractional part make it int
+                            value = ""
+                            value_ = getattr(comp, parts[1])
+                            if isinstance(value_, float) and value_.is_integer():
+                                value_ = int(value_)
+                            value = str(value_)
+                            # special case is filepaths (windows?)
+                            if "/" in value or "\\" in value:
+                                value = os.path.basename(value)
+                                # however, at this stage we may have a conversion
+                                # and we are more likely interested in the first part
+                                extensions = [".mp4", ".y4m", ".mov", ".raw", ".yuv"]
+                                for ex in extensions:
+                                    if ex in value:
+                                        lindex = value.index(ex)
+                                        if lindex > 0:
+                                            value = value[0:lindex]
+                    filename = filename.replace(m.group(0), value)
+
+            else:
+                break
+    if len(filename) > 0:
+        test.common.output_filename = filename
+
+
 def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
@@ -508,6 +583,10 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     for test in test_suite.test:
         update_file_paths(test, options.device_workdir)
 
+    # 4.b Update outputfile name (if present)
+    for test in test_suite.test:
+        update_fileoutput_names(test)
+
     # 5. save the full protobuf text file(s)
     if options.split:
         # (a) one pbtxt file per subtest
@@ -531,7 +610,6 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
 
 def valid_path(text):
     ret = re.sub("[ \/?*]", ".", text)
-    print(f"{text=} -> {ret=}")
     return ret
 
 
@@ -923,7 +1001,6 @@ def update_codec_test(
     # Let us run the resolution first since that will create generated media
     resolution_str = replace.get("configure", {}).get("resolution", "")
     if len(resolution_str) > 0:
-
         # update the resolution
         resolution_list = parse_resolution_field(resolution_str)
         if len(resolution_list) > 1:
@@ -937,7 +1014,6 @@ def update_codec_test(
                 ntest.common.id = test.common.id + f".{resolution}"
                 ntest.configure.resolution = str(resolution)
                 if not is_parallel:
-
                     # remove the options already taken care of
                     rep_copy = copy.deepcopy(replace)
                     rep_copy["configure"]["resolution"] = ""

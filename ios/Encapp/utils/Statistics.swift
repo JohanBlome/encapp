@@ -33,7 +33,11 @@ class Statistics {
         self.decodedFrames = Array<FrameInfo>()
         self.props = Array<JsonProperties>()
         date = Date();
-        id = "encapp_\(UUID().uuidString)"
+        if test.hasCommon && test.common.hasOutputFilename {
+            id = test.common.outputFilename
+        } else {
+            id = "encapp_\(UUID().uuidString)"
+        }
     }
 
     func start() {

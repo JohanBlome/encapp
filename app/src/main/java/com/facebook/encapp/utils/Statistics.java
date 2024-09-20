@@ -121,7 +121,12 @@ public class Statistics {
         mDecodingFrames = new HashMap<>(20);
         mTest = test;
         mStartDate = new Date();
-        mId = "encapp_" + UUID.randomUUID().toString();
+        // if no output filename use uuid
+        if (mTest.hasCommon() && mTest.getCommon().hasOutputFilename()) {
+            mId = mTest.getCommon().getOutputFilename();
+        } else {
+            mId = "encapp_" + UUID.randomUUID().toString();
+        }
     }
 
     public void setAppVersion(String mAppVersion) {

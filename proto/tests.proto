@@ -9,6 +9,12 @@ message Common {
   optional string description = 2;
   optional string operation = 3;
   optional string start = 4;
+  // template or specific name for output file(s)
+  // Placeholder markers are [] 
+  // e.g. [common.id].[input.resolution].[configuration.bitrate]-[XXXX]
+  // X is a substitution marker for A random hex number (1-f)
+  // If not set the filename will be encapp_uuid
+  optional string output_filename = 5;
 }
 
 enum DataValueType {
