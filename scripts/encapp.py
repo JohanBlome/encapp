@@ -528,7 +528,14 @@ def update_fileoutput_names(test):
                                 value = os.path.basename(value)
                                 # however, at this stage we may have a conversion
                                 # and we are more likely interested in the first part
-                                extensions = [".mp4", ".y4m", ".mov", ".raw", ".yuv"]
+                                extensions = [
+                                    ".mp4",
+                                    ".y4m",
+                                    ".mov",
+                                    ".raw",
+                                    ".yuv",
+                                    ".ivf",
+                                ]
                                 for ex in extensions:
                                     if ex in value:
                                         lindex = value.index(ex)
