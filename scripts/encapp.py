@@ -200,7 +200,7 @@ def wait_for_exit(serial, debug=0):
 
 
 def valid_path(text):
-    ret = re.sub("[ \/?*:%&{}$!+|=<>#]", ".", text)
+    ret = re.sub(r"[ \/?*:%&{}$!+|=<>#]", ".", text)
     return ret
 
 
@@ -616,7 +616,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
 
 
 def valid_path(text):
-    ret = re.sub("[ \/?*]", ".", text)
+    ret = re.sub(r"[ \/?*]", ".", text)
     return ret
 
 
