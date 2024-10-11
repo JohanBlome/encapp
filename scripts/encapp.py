@@ -1549,6 +1549,7 @@ def add_args(parser):
     # replacement shortcuts
     parser.add_argument(
         "-i",
+        "--videofile",
         type=str,
         dest="videofile",
         default=default_values["videofile"],
