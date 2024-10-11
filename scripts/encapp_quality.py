@@ -26,19 +26,9 @@ SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
 VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
-if sys.platform == "linux" or sys.platform == "linux2":
-    # linux
-    VMAF_MODEL_DIR = "/usr/share/model"
-elif sys.platform == "darwin":
-    # OS X
-    VMAF_MODEL_DIR = "/opt/homebrew/Cellar/libvmaf/3.0.0/share/libvmaf/model"
-elif sys.platform == "win32":
-    # Windows
-    VMAF_MODEL_DIR = "/usr/share/model"
 
-VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_4k_v0.6.1.json"
-VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1.json"
-VMAF_MODEL = f"{VMAF_MODEL_DIR}/vmaf_v0.6.1neg.json"
+vmaf_models = ["vmaf_4k_v0.6.1", "vmaf_v0.6.1", "vmaf_v0.6.1neg"]
+VMAF_MODEL = vmaf_models[2]
 
 
 def calc_stats(pdata, options, label, print_text=False):
@@ -626,15 +616,13 @@ def run_quality(test_file, options, debug):
                 "n_threads=16:log_fmt=json"
             )
             # Allow for an environment variable
+            model = ""
             if os.environ.get("VMAF_MODEL_PATH", None):
                 print("Environment VMAF_PATH override model")
-                VMAF_MODEL = os.environ.get("VMAF_MODEL_PATH")
-            if os.path.isfile(VMAF_MODEL):
-                shell_cmd += f":model=path={VMAF_MODEL}"
+                model = "path=" + os.environ.get("VMAF_MODEL_PATH")
             else:
-                print(
-                    f"\n***\nwarn: cannot find VMAF model {VMAF_MODEL}. Using default model\n***"
-                )
+                model = f"'version={VMAF_MODEL}'"
+            shell_cmd += f":model={model}"
             shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
@@ -927,6 +915,11 @@ def get_options(argv):
         help="Set a motion marker for the whole collection e.g. low, mid, high",
         default=None,
     )
+    parser.add_argument(
+        "--vmaf_model",
+        help=f"Override the vmaf model, models: {vmaf_models}, default is {VMAF_MODEL}",
+        default=VMAF_MODEL,
+    )
 
     options = parser.parse_args()
 
@@ -950,7 +943,10 @@ def main(argv):
     """Calculate video quality properties (vmaf/ssim/psnr) and write
     a csv with relevant data
     """
+    global VMAF_MODEL
     options = get_options(argv)
+    VMAF_MODEL = options.vmaf_model
+
     # run all the tests
     current = 1
     total = len(options.test)
