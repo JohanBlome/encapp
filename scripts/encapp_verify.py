@@ -683,7 +683,7 @@ def check_mean_bitrate_deviation(resultpath):
     ]
     data = pd.DataFrame.from_records(bitrate_error, columns=labels, coerce_float=True)
 
-    return
+    return data
 
 
 def check_framerate_deviation(resultpath):
@@ -862,37 +862,7 @@ def print_partial_result(header, partial_result):
 
 def get_options(argv):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--serial", help="Android device serial number")
-    parser.add_argument(
-        "-d",
-        "--debug",
-        action="count",
-        dest="debug",
-        default=0,
-        help="Increase verbosity (use multiple times for more)",
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_const",
-        dest="debug",
-        const=-1,
-        help="Zero verbosity",
-    )
-    parser.add_argument(
-        "-w",
-        "--local-workdir",
-        type=str,
-        dest="local_workdir",
-        default="encapp_verify",
-        metavar="local_workdir",
-        help="work (storage) directory on local host",
-    )
-    parser.add_argument(
-        "-i",
-        "--videofile",
-        help="Replace all test defined sources with input",
-        default=None,
-    )
+    encapp.add_args(parser)
     parser.add_argument(
         "--is",
         "--input_res",
@@ -923,14 +893,12 @@ def get_options(argv):
         help="Override output fps",
         default=None,
     )
-    parser.add_argument("-c", "--codec", help="Override encoder", default=None)
     parser.add_argument(
         "-t",
         "--test",
         nargs="+",
     )
     parser.add_argument(
-        "-r",
         "--result",
         nargs="+",
     )
@@ -939,13 +907,6 @@ def get_options(argv):
         nargs="?",
         help="Set acceptance lmit on bitrate in percentage",
         default=10,
-    )
-    parser.add_argument(
-        "--idb",
-        action="store_true",
-        dest="idb",
-        default=False,
-        help="Run on ios using idb",
     )
 
     options = parser.parse_args(argv[1:])
@@ -973,7 +934,7 @@ def main(argv):
     temporal_string = ""
     ltr_string = ""
     framerate_string = ""
-    local_workdir = options.local_workdir
+    local_workdir = options.local_workdir or "encapp_verify"
     if options.result is not None:
         results = []
         for file in options.result:
@@ -1018,9 +979,9 @@ def main(argv):
                 print(f"removed path: {encapp_search.INDEX_FILE_NAME}")
 
             settings = encapp.get_options(["", "run", ""])
-            settings.configfile = test_path
+            settings.configfile = [test_path]
             settings.debug = options.debug
-            settings.videofile = options.videofile
+            settings.videofile = options.replace["input"]["filepath"]
             settings.encoder = options.codec
             settings.input_resolution = options.input_res
             settings.output_resolution = options.output_res
@@ -1029,12 +990,12 @@ def main(argv):
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
             print(f"{options.device_workdir} (dev dir)")
-            result = encapp.codec_test(settings, model, serial, settings.debug)
+            result_ok, result = encapp.codec_test(settings, model, serial, settings.debug)
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
             ltr_string += check_long_term_ref(result)
-            framerate_string += check_framerate_deviation(result)
+            framerate_string += check_framerate_deviation(result)[0]
 
     result_string += print_partial_result("Verify bitrate accuracy", bitrate_string)
     result_string += print_partial_result("Verify framerate accuracy", framerate_string)
