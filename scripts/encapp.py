@@ -18,6 +18,7 @@ import tempfile
 import time
 import datetime
 from google.protobuf import text_format
+import google.protobuf.descriptor_pool as descriptor_pool
 
 import encapp_tool
 import encapp_tool.app_utils
@@ -623,6 +624,9 @@ def valid_path(text):
 def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
+    protobuf_txt_filepath = createTestsFromDefinitionExpansionPath(
+        protobuf_txt_filepath, local_workdir
+    )
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
     test_suite, files_to_push, protobuf_txt_filepath = read_and_update_proto(
@@ -631,6 +635,7 @@ def run_codec_tests_file(
 
     # multiply tests per request
     parallel_defs = parse_multiply(options.multiply)
+
     additional = tests_definitions.Parallel()
     updated = False
     for test in test_suite.test:
@@ -711,6 +716,108 @@ def abort_test(local_workdir, message):
     print(message)
     # shutil.rmtree(local_workdir)
     sys.exit(-1)
+
+
+def createTestsFromDefinitionExpansionPath(protobuf_txt_filepath, local_workdir):
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
+
+    test_suite = tests_definitions.TestSuite()
+    with open(protobuf_txt_filepath, "rb") as fd:
+        text_format.Merge(fd.read(), test_suite)
+
+    test_suite_ = createTestsFromDefinitionExpansion(test_suite)
+    # check if they are the same, if so do nothing
+    # if (test_suite_.equals(test_suite)):
+    #    return protobuf_txt_filepath
+
+    # write in the workdir
+    basename = os.path.basename(protobuf_txt_filepath)
+    filepath = f"{local_workdir}/expanded_{basename}"
+    with open(filepath, "w") as f:
+        f.write(text_format.MessageToString(test_suite_))
+
+    return filepath
+
+
+def lookup_message_by_name(message, submessage_name):
+    if hasattr(message, submessage_name):
+        return getattr(message, submessage_name)
+    else:
+        return None
+
+
+def multiplyTestsWithItems(test, parent, setting, expanded):
+    tests = []
+    for item in expanded:
+        ntest = tests_definitions.Test()
+        ntest.CopyFrom(test)
+        submessage = lookup_message_by_name(ntest, parent)
+        if submessage:
+            setattr(submessage, setting, str(item))
+
+        tests.append(ntest)
+    return tests
+
+
+def updateSingleSetting(tests, parent, settings_name, expanded):
+    updated = []
+    for test in tests:
+        tests_ = multiplyTestsWithItems(test, parent, settings_name, expanded)
+        if tests_:
+            updated.extend(tests_)
+    return updated
+
+
+# Takes a test definition and looks through all settins
+# every expanded setting will create copies of the previous
+def createTestsFromDefinitionExpansion(testsuite):
+    # First we may have multiple tests already (ouch)
+    # They will be handled as separate cases
+
+    updated_testsuite = tests_definitions.TestSuite()
+    # updated_testsuite.test = tests_definitions.Test
+    for test in testsuite.test:
+        tests = [test]
+        fields = [[descr.name, val] for descr, val in test.ListFields()]
+        for field in fields:
+            parent = None
+            for item in field:
+                if not parent:
+                    parent = item
+                else:
+                    settings = [val for val in item.ListFields()]
+                    for setting in settings:
+                        expanded = expandRanges(setting[1])
+                        if tests:
+                            if len(expanded) > 1:
+                                tests_ = updateSingleSetting(
+                                    tests, parent, setting[0].name, expanded
+                                )
+                                if tests_:
+                                    tests = tests_
+        updated_testsuite.test.extend(tests)
+
+    return updated_testsuite
+
+
+# Same as the bitrate expanding i.e
+# start-stop-step,start2-stop2-step2,val3,val4
+def expandRanges(definition):
+    result = []
+    try:
+        for item in definition.split(","):
+            if "-" in item:
+                ranges = item.split("-")
+                # filter endings
+                # if bitrate or k,M it will be converted
+                start, stop, step = [convert_to_bps(it) for it in ranges]
+                result.extend(list(range(start, stop + 1, step)))
+            else:
+                result.append(item)
+        return result
+    except:
+        return []
 
 
 # produce a list of bitrates from a CLI spec. Options are:
