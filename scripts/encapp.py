@@ -991,6 +991,10 @@ def update_media(test, options):
         else:
             pix_fmt = pix_fmt_id
 
+        # Special case. Transcoding on device with not specific pixel format set, force nv21.
+        if test.configure.surface:
+            pix_fmt = "nv21"
+
         output["output_filepath"] = (
             f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}"
         )
@@ -2004,6 +2008,7 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
         "output_filepath",
         f"{input_filepath}_{resolution}p{framerate}_{pix_fmt}.{extension}",
     )
+
     # get raw filepath
     output_filepath = os.path.join(
         tempfile.gettempdir(), os.path.basename(output_filepath)
@@ -2031,6 +2036,7 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
             )
 
     else:
+        print(f"{output_filepath=}")
         encapp_tool.ffutils.ffmpeg_convert_to_raw(
             input_filepath,
             output_filepath,

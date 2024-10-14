@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 """
-    Verify tests
+Verify tests
 """
+
 import argparse
 import datetime
 import json
@@ -981,7 +982,9 @@ def main(argv):
             settings = encapp.get_options(["", "run", ""])
             settings.configfile = [test_path]
             settings.debug = options.debug
-            settings.videofile = options.replace["input"]["filepath"]
+
+            if "input" in options.replace:
+                settings.videofile = options.replace["input"]["filepath"]
             settings.encoder = options.codec
             settings.input_resolution = options.input_res
             settings.output_resolution = options.output_res
@@ -990,7 +993,9 @@ def main(argv):
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
             print(f"{options.device_workdir} (dev dir)")
-            result_ok, result = encapp.codec_test(settings, model, serial, settings.debug)
+            result_ok, result = encapp.codec_test(
+                settings, model, serial, settings.debug
+            )
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)
