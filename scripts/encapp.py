@@ -145,6 +145,22 @@ FFPROBE_FIELDS = {
     "duration": "duration",
 }
 
+video_extensions = [
+    ".mp4",
+    ".y4m",
+    ".mov",
+    ".raw",
+    ".yuv",
+    ".ivf",
+]
+
+
+def isVideoExtension(filename):
+    ending = f".{filename.rsplit('.')[-1]}"
+    if ending is not None and ending in video_extensions:
+        return True
+    return False
+
 
 def get_pix_fmt(numerical_id):
     return next(
@@ -529,15 +545,7 @@ def update_fileoutput_names(test):
                                 value = os.path.basename(value)
                                 # however, at this stage we may have a conversion
                                 # and we are more likely interested in the first part
-                                extensions = [
-                                    ".mp4",
-                                    ".y4m",
-                                    ".mov",
-                                    ".raw",
-                                    ".yuv",
-                                    ".ivf",
-                                ]
-                                for ex in extensions:
+                                for ex in video_extensions:
                                     if ex in value:
                                         lindex = value.index(ex)
                                         if lindex > 0:
@@ -788,9 +796,13 @@ def createTestsFromDefinitionExpansion(testsuite):
                 else:
                     settings = [val for val in item.ListFields()]
                     for setting in settings:
-                        expanded = expandRanges(setting[1])
+                        # special case: input file
+                        if parent == "input" and setting[0].name == "filepath":
+                            expanded = expand_filepath(setting[1])
+                        else:
+                            expanded = expandRanges(setting[1])
                         if tests:
-                            if len(expanded) > 1:
+                            if len(expanded) > 0:
                                 tests_ = updateSingleSetting(
                                     tests, parent, setting[0].name, expanded
                                 )
@@ -801,6 +813,26 @@ def createTestsFromDefinitionExpansion(testsuite):
     return updated_testsuite
 
 
+def expand_filepath(path):
+    # Allow regexp on filenam
+    basename = os.path.basename(path)
+    folder = os.path.dirname(path)
+    folder = os.path.expanduser(folder)
+    video_files = []
+    for root, _dirs, files in os.walk(folder):
+        for file in files:
+            if isVideoExtension(file):
+                if len(basename) > 0:
+                    m = re.search(basename, file)
+                    if m:
+                        file = f"{folder}/{m.group(0)}"
+                    else:
+                        continue
+                video_files.append(file)
+
+    return video_files
+
+
 # Same as the bitrate expanding i.e
 # start-stop-step,start2-stop2-step2,val3,val4
 def expandRanges(definition):
@@ -809,6 +841,9 @@ def expandRanges(definition):
         for item in definition.split(","):
             if "-" in item:
                 ranges = item.split("-")
+                if len(ranges) == 1:
+                    # do nothing
+                    return []
                 # filter endings
                 # if bitrate or k,M it will be converted
                 start, stop, step = [convert_to_bps(it) for it in ranges]
@@ -2036,7 +2071,6 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
             )
 
     else:
-        print(f"{output_filepath=}")
         encapp_tool.ffutils.ffmpeg_convert_to_raw(
             input_filepath,
             output_filepath,
@@ -2060,8 +2094,16 @@ def main(argv):
         print("version: %s" % encapp_tool.__version__)
         sys.exit(0)
 
+    serial = ""
     # get model and serial number
-    model, serial = encapp_tool.adb_cmds.get_device_info(options.serial, options.debug)
+    if options.dry_run:
+        model = "dry run"
+        options.seral = "dry run"
+    else:
+        # get model and serial number
+        model, serial = encapp_tool.adb_cmds.get_device_info(
+            options.serial, options.debug
+        )
 
     # install app
     if options.func == "install" or options.install:
@@ -2110,10 +2152,11 @@ def main(argv):
         )
         return
 
-    # ensure the app is correctly installed
-    assert encapp_tool.app_utils.install_ok(serial, options.debug), (
-        "Apps not installed in %s" % serial
-    )
+    if not options.dry_run:
+        # ensure the app is correctly installed
+        assert encapp_tool.app_utils.install_ok(serial, options.debug), (
+            "Apps not installed in %s" % serial
+        )
 
     # run function
     if options.func == "list":
@@ -2125,11 +2168,12 @@ def main(argv):
             options.configfile is not None
         ), "error: need a valid input configuration file"
 
-        # first clear out old result
-        remove_encapp_gen_files(serial, options.device_workdir, options.debug)
+        if not options.dry_run:
+            # first clear out old result
+            remove_encapp_gen_files(serial, options.device_workdir, options.debug)
         result_ok, result_json = codec_test(options, model, serial, options.debug)
 
-        if not options.ignore_results:
+        if not options.ignore_results and not options.dry_run:
             verify_app_version(result_json)
         if not result_ok:
             sys.exit(-1)
