@@ -152,6 +152,7 @@ video_extensions = [
     ".raw",
     ".yuv",
     ".ivf",
+    ".mkv",
 ]
 
 
@@ -159,6 +160,7 @@ def isVideoExtension(filename):
     ending = f".{filename.rsplit('.')[-1]}"
     if ending is not None and ending in video_extensions:
         return True
+
     return False
 
 
@@ -814,10 +816,15 @@ def createTestsFromDefinitionExpansion(testsuite):
 
 
 def expand_filepath(path):
-    # Allow regexp on filenam
-    basename = os.path.basename(path)
-    folder = os.path.dirname(path)
-    folder = os.path.expanduser(folder)
+    # Check if path is a folder
+    basename = ""
+    folder = ""
+    path = os.path.expanduser(path)
+    if os.path.isdir(path):
+        folder = path
+    else:
+        basename = os.path.basename(path)
+        folder = os.path.dirname(path)
     video_files = []
     for root, _dirs, files in os.walk(folder):
         for file in files:
@@ -825,9 +832,11 @@ def expand_filepath(path):
                 if len(basename) > 0:
                     m = re.search(basename, file)
                     if m:
-                        file = f"{folder}/{m.group(0)}"
+                        file = f"{root}/{m.group(0)}"
                     else:
                         continue
+                else:
+                    file = f"{root}/{file}"
                 video_files.append(file)
 
     return video_files
