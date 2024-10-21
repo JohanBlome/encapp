@@ -280,10 +280,8 @@ def collect_results(
 
     output_files = []
     for test in test_suite.test:
-        print(test)
         if test.common and test.common.output_filename:
             filename = test.common.output_filename
-            print(f"looking for {filename}")
             output_files += re.findall(f"{filename}.*", stdout, re.MULTILINE)
 
     output_files += re.findall(
@@ -799,13 +797,20 @@ def createTestsFromDefinitionExpansion(testsuite):
                 else:
                     settings = [val for val in item.ListFields()]
                     for setting in settings:
+                        force_update = False
                         # special case: input file
                         if parent == "input" and setting[0].name == "filepath":
-                            expanded = expand_filepath(setting[1])
+                            # If the filepath match _exactly_ one file, leave it at that.
+                            path = os.path.expanduser(setting[1])
+                            if os.path.exists(path):
+                                expanded = [path]
+                            else:
+                                expanded = expand_filepath(path)
+                            force_update = True
                         else:
                             expanded = expandRanges(setting[1])
                         if tests:
-                            if len(expanded) > 0:
+                            if len(expanded) > 1 or force_update:
                                 tests_ = updateSingleSetting(
                                     tests, parent, setting[0].name, expanded
                                 )
@@ -820,7 +825,6 @@ def expand_filepath(path):
     # Check if path is a folder
     basename = ""
     folder = ""
-    path = os.path.expanduser(path)
     if os.path.isdir(path):
         folder = path
     else:
@@ -1336,12 +1340,10 @@ def run_codec_tests(
             files = set()
             get_media_files(test, files)
             for filepath in files:
-                print(f"Copy file to device work dir: {device_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
                     f"{mediastore}/{filepath}", serial, device_workdir, fast_copy, debug
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
-                print(f"Push test defs: lw = {local_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
                     f"{local_workdir}/{valid_path(test.common.id)}.pbtxt",
                     serial,
