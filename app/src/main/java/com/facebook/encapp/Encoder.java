@@ -175,7 +175,7 @@ public abstract class Encoder {
 
         try {
             String fullFilename = CliSettings.getWorkDir() + "/" + mFilename;
-            Log.d(TAG, "Create mMuxer with type " + type + " and filename: " + fullFilename);
+            Log.d(TAG, "***** Create mMuxer with type " + type + " and filename: " + fullFilename + "*******");
             mMuxer = new MediaMuxer(fullFilename, type);
         } catch (IOException e) {
             Log.d(TAG, "FAILED Create mMuxer with type " + type + " and filename: " + mFilename);

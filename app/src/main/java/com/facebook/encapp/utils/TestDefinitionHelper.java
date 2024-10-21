@@ -19,6 +19,91 @@ import java.util.List;
 
 public class TestDefinitionHelper {
     private static final String TAG = "encapp";
+
+    public static MediaFormat mergeEncoderSettings(Test test, MediaFormat mediaFormat) {
+        Configure config = test.getConfigure();
+        Input input = test.getInput();
+        // optional config parameters
+        if (config.hasBitrate()) {
+            String bitrate  = config.getBitrate();
+            mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, magnitudeToInt(bitrate));
+        }
+        if (input.hasFramerate()) {
+            float framerate  = input.getFramerate();
+            mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, framerate);
+        }
+        // good default: MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+        if (config.hasBitrateMode()) {
+            int bitrateMode = config.getBitrateMode().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+        }
+        // check if there is a durationUs value
+        if (config.hasDurationUs()) {
+            long duration_us = config.getDurationUs();
+            mediaFormat.setLong(MediaFormat.KEY_DURATION, duration_us);
+        }
+        // check if there is a quality value
+        if (config.hasQuality()) {
+            int quality = config.getQuality();
+            mediaFormat.setInteger(MediaFormat.KEY_QUALITY, quality);
+        }
+        // check if there is a complexity value
+        if (config.hasComplexity()) {
+            int complexity = config.getComplexity();
+            mediaFormat.setInteger(MediaFormat.KEY_COMPLEXITY, complexity);
+        }
+        // check if there is an i-frame-interval value
+        //if (config.hasIFrameInterval()) {
+            int iFrameInterval  = config.getIFrameInterval();
+            mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
+        //}
+        // color parameters
+        if (config.hasColorFormat()) {
+            int colorFormat  = config.getColorFormat();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
+        }
+        // good default: MediaFormat.COLOR_RANGE_LIMITED
+        if (config.hasColorRange()) {
+            int colorRange  = config.getColorRange().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_RANGE, colorRange);
+        }
+        // good default: MediaFormat.COLOR_TRANSFER_SDR_VIDEO
+        if (config.hasColorTransfer()) {
+            int colorTransfer  = config.getColorTransfer().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, colorTransfer);
+        }
+        // good default: MediaFormat.COLOR_STANDARD_BT709
+        if (config.hasColorStandard()) {
+            int colorStandard  = config.getColorStandard().getNumber();
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_STANDARD, colorStandard);
+        }
+
+        // set all the available values
+        for (Parameter param : config.getParameterList()) {
+            switch (param.getType().getNumber()) {
+                case DataValueType.floatType_VALUE:
+                    float fval = Float.parseFloat(param.getValue());
+                    mediaFormat.setFloat(param.getKey(), fval);
+                    break;
+                case DataValueType.intType_VALUE:
+                    int ival = TestDefinitionHelper.magnitudeToInt(param.getValue());
+                    mediaFormat.setInteger(param.getKey(), ival);
+                    break;
+                case DataValueType.longType_VALUE:
+                    long lval = Long.parseLong(param.getValue());
+                    mediaFormat.setLong(param.getKey(), lval);
+                    break;
+                case DataValueType.stringType_VALUE:
+                    mediaFormat.setString(param.getKey(), param.getValue());
+                    break;
+                default:
+                    ///Should not be here
+            }
+        }
+        return mediaFormat;
+    }
+
+
     public static MediaFormat buildMediaFormat(Test test) {
         Configure config = test.getConfigure();
         Input input = test.getInput();
@@ -174,15 +259,17 @@ public class TestDefinitionHelper {
         // make sure the input is well-defined
         Input.Builder input = test.getInput().toBuilder();
         // default configure.encode value is True
-        if (!config.hasEncode() || (config.getEncode() == true)) {
+        Log.d(TAG, "Filepath:" + input.getFilepath());
+        if (!config.hasEncode() || (config.getEncode() == true) && !(input.getFilepath().endsWith(".mp4"))) {
             if (!input.hasResolution()) {
-                throw new RuntimeException("No valid resolution on input settings");
+               // throw new RuntimeException("No valid resolution on input settings");
             }
             if (!input.hasPixFmt()) {
-                throw new RuntimeException("No valid pixel format on input settings");
+               // throw new RuntimeException("No valid pixel format on input settings");
             }
             if (!input.hasFramerate()) {
-                throw new RuntimeException("No valid framerate on input settings");
+                //:w
+                // throw new RuntimeException("No valid framerate on input settings");
             }
         }
         return true;

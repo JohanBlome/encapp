@@ -617,6 +617,8 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Decode only, use view size");
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
+                } else if(test.getInput().getDeviceDecode() && !test.getConfigure().getSurface()) {
+                    coder = new BufferTranscoder(test);
                 } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] BufferDecode test");
                     coder = new BufferDecoder(test);

@@ -785,6 +785,7 @@ def createTestsFromDefinitionExpansion(testsuite):
     # First we may have multiple tests already (ouch)
     # They will be handled as separate cases
 
+    force_update = False
     updated_testsuite = tests_definitions.TestSuite()
     # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
@@ -962,6 +963,7 @@ def update_media(test, options):
             )
             and test.configure.surface
             and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+            or test.input.device_decode
         ):
             if options.debug > 0:
                 print("Skip raw transcoding.")

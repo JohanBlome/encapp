@@ -1,5 +1,6 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.frameSizeInBytes;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
 import android.graphics.SurfaceTexture;
@@ -9,20 +10,22 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
-import android.os.SystemClock;
+
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderRuntime;
+import com.facebook.encapp.proto.Input;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
-import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -33,21 +36,22 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
 import java.util.Locale;
+import java.util.Stack;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
-    private final String TAG = "encapp.surface_transcoder";
+public class BufferTranscoder extends Encoder  {
+    private final String TAG = "encapp.buffer_transcoder";
 
     private final SourceReader mSourceReader;
+    private final EncoderWriter mEncoderWriter;
+    private final Stack<Integer> mEncoderInputBuffers = new Stack<>();
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     DecoderRuntime mDecoderRuntimeParams;
-    OutputMultiplier mOutputMult = null;
     double mLoopTime = 0;
     int mCurrentLoop = 1;
     long mPtsOffset = 0;
     long mLastPtsUs = -1;
-    boolean mNoEncoding = false;
     private FrameswapControl mFrameSwapSurface;
     private VsyncHandler mVsyncHandler;
     Object mSyncLock = new Object();
@@ -57,67 +61,54 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     boolean mDone = false;
     Object mStopLock = new Object();
 
-    public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
-        super(test);
-        mOutputMult = multiplier;
-        mSourceReader = new SourceReader();
-        mVsyncHandler = vsyncHandler;
-        mStats = new Statistics("surface encoder", mTest);
-    }
+    int mWidth = -1;
+    int mHeight = -1;
+    int mInputWidth = -1;
+    int mInputHeight = -1;
+    int mXStride = -1;
+    int mYStride = -1; // Plane alignment
 
-    public SurfaceTranscoder(Test test, VsyncHandler vsyncHandler) {
+    public BufferTranscoder(Test test) {
         super(test);
-        mOutputMult = new OutputMultiplier(vsyncHandler);
         mSourceReader = new SourceReader();
-        mVsyncHandler = vsyncHandler;
-        mStats = new Statistics("surface encoder", mTest);
+        mEncoderWriter = new EncoderWriter();
+
+        mStats = new Statistics("buffer encoder", mTest);
     }
 
 
     public String start() {
-        if (mTest.getConfigure().hasEncode()) {
-            mNoEncoding = !mTest.getConfigure().getEncode();
-        }
-        if (mNoEncoding) {
-            Log.d(TAG, "**** Surface Decode, no encode ***");
-            mStable = true;
-        } else {
-            Log.d(TAG, "**** Surface Transcode - " + mTest.getCommon().getDescription() + " ***");
-        }
+        Log.d(TAG, "**** Buffer Transcode - " + mTest.getCommon().getDescription() + " ***");
 
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
 
-        checkRealtime();
-        if (mRealtime) {
-            mVsyncHandler.addListener(this);
-        }
-
         mFrameRate = mTest.getConfigure().getFramerate();
-        Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
-        mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
+        mWriteFile = true; // No point in being here unless we write...
 
         mYuvReader = new FileReader();
         if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
             return "Could not open file";
         }
+
+        // Get source track
         mExtractor = new MediaExtractor();
         MediaFormat inputFormat = null;
         try {
             mExtractor.setDataSource(mTest.getInput().getFilepath());
-            int trackNum = 0;
             int tracks = mExtractor.getTrackCount();
+            int sourceTrack = 0;
             for (int track = 0; track < tracks; track++) {
                 inputFormat = mExtractor.getTrackFormat(track);
                 if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
                         inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
-                    trackNum = track;
+                    sourceTrack = track;
                 }
             }
-            mExtractor.selectTrack(trackNum);
-            inputFormat = mExtractor.getTrackFormat(trackNum);
+            mExtractor.selectTrack(sourceTrack);
+            inputFormat = mExtractor.getTrackFormat(sourceTrack);
             Log.d(TAG, "Extractor input format");
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
@@ -148,12 +139,28 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             Log.e(TAG, "Error: " + e.getMessage());
         }
 
+        if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
+            mInputWidth = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
+        }
+        if (inputFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
+            mInputHeight = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        }
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
-        int width = res.getWidth();
-        int height = res.getHeight();
+        mWidth = res.getWidth();
+        mHeight = res.getHeight();
+        Log.d(TAG, "mWidht x mHeight " + mWidth + " x " + mHeight);
+        if (mWidth <= 0) {
+            mWidth = mInputWidth;
+        }
+        if (mHeight <= 0) {
+            mHeight = mInputHeight;
+        }
         // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
-        mRefFramesizeInBytes = (int) (width * height * 1.5);
+        mRefFramesizeInBytes = (int) (mWidth * mHeight * 1.5);
 
+        int align = 32;
+        mXStride = (mWidth % align != 0)? (mWidth/align + 1) * align: mWidth;
+        mYStride = (mHeight % align != 0)? (mHeight/align + 1) * align: mHeight;
         mReferenceFrameRate = mTest.getInput().getFramerate();
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
@@ -165,117 +172,91 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
         mKeepInterval = mReferenceFrameRate / mFrameRate;
 
-        if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
-            width = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
-        }
-        if (inputFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
-            height = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
-        }
+
         // If needed set the output
-        Log.d(TAG, "Start decoder, output size is WxH = " + width + "x" + height);
-        mOutputMult.confirmSize(width, height);
+        Log.d(TAG, "Start decoder, output size is WxH = " + mWidth + "x" + mHeight);
         MediaFormat format;
+        if (mTest.getConfigure().getMime().length() == 0) {
+            Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
+            try {
+                mTest = setCodecNameAndIdentifier(mTest);
+            } catch (Exception e) {
+                return e.getMessage();
+            }
+            Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
+        }
+        Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
         try {
-            if (!mNoEncoding) {
-                if (mTest.getConfigure().getMime().length() == 0) {
-                    Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
-                    try {
-                        mTest = setCodecNameAndIdentifier(mTest);
-                    } catch (Exception e) {
-                        return e.getMessage();
-                    }
-                    Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
-                }
-                Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
-                mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
-            } else {
-                mStats.setCodec(Statistics.NA);
-            }
+            mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-            //Use same color settings as the input
-            Log.d(TAG, "Check decoder settings");
-            format = TestDefinitionHelper.buildMediaFormat(mTest);
-            Log.d(TAG, "Check created encoder format");
-            logMediaFormat(format);
-            Log.d(TAG, "Set color format");
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+        //Use same color settings as the input
+        Log.d(TAG, "Check decoder settings");
+        format = TestDefinitionHelper.buildMediaFormat(mTest);
+        Log.d(TAG, "Check created encoder format");
+        logMediaFormat(format);
 
-            if (!mNoEncoding) {
-                mOutputMult.setName("ST_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
-            } else {
-                mOutputMult.setName("ST_" + mTest.getInput().getFilepath() + "_dec-" + inputFormat.getString(MediaFormat.KEY_MIME));
-            }
-            if (!mNoEncoding) {
+        int defaultColor = format.getInteger(MediaFormat.KEY_COLOR_FORMAT);
+        Log.d(TAG, "Decoder default color: " + defaultColor);
+        setConfigureParams(mTest, format);
+        //TODO: color handling
 
-                setConfigureParams(mTest, format);
-                mCodec.setCallback(new EncoderCallbackHandler());
-                mCodec.configure(
-                        format,
-                        null /* surface */,
-                        null /* crypto */,
-                        MediaCodec.CONFIGURE_FLAG_ENCODE);
-                Log.d(TAG, "Check input format after encoder is configured");
-                logMediaFormat(mCodec.getInputFormat());
-                mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
-            }
+        String mime = inputFormat.getString(MediaFormat.KEY_MIME);
+        int matchingColor = getMatchingColor(mCodec, mDecoder, mime, defaultColor);
+        inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
+        mCodec.setCallback(new EncoderCallbackHandler());
+        Log.d(TAG, "Check input format before config decoder");
+        TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
+        mDecoder.setCallback(new DecoderCallbackHandler());
 
-            Log.d(TAG, "Check input format before config decoder");
-            TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
-            mDecoder.setCallback(new DecoderCallbackHandler());
-            mSurface = mOutputMult.getInputSurface();
-            if (mSurface == null) {
-                mSurfaceTexture = new SurfaceTexture(false);
-                mSurface = new Surface(mSurfaceTexture);
-            }
-            mDecoder.configure(inputFormat, mSurface, null, 0);
+        mDecoder.configure(inputFormat, null, null, 0);
 
-            Log.d(TAG, "Start decoder");
-            mDecoder.start();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
-            } else {
-                mStats.setDecoder(mDecoder.getCodecInfo().getName());
-            }
+        Log.d(TAG, "Start decoder");
+        mDecoder.start();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
+        } else {
+            mStats.setDecoder(mDecoder.getCodecInfo().getName());
+        }
 
-            mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
-            if (!mNoEncoding) {
-                mStats.setEncoderMediaFormat(mCodec.getInputFormat());
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    mStats.setCodec(mCodec.getCanonicalName());
-                } else {
-                    mStats.setCodec(mCodec.getName());
-                }
-            }
+        mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
+        //mStats.setEncoderMediaFormat(mCodec.getInputFormat());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mStats.setCodec(mCodec.getCanonicalName());
+        } else {
+            mStats.setCodec(mCodec.getName());
+        }
 
+    try {
+        MediaFormat mediaFormat = mDecoder.getOutputFormat();
+        Log.d(TAG, "Decoder output format");
+        logMediaFormat(mediaFormat);
+        mediaFormat = TestDefinitionHelper.mergeEncoderSettings(mTest, mediaFormat);
+        //TODO: color handling
+        // The decoder must output same colorformat as input. QC hw encoder does not take same pix fmt android sw decoder.
+        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
+        mCodec.configure(
+                mediaFormat,
+                null /* surface */,
+                null /* crypto */,
+                MediaCodec.CONFIGURE_FLAG_ENCODE);
+        Log.d(TAG, "Check input format after encoder is configured");
+        logMediaFormat(mCodec.getInputFormat());
 
-            if (!mNoEncoding) {
-                Log.d(TAG, "Create muxer");
-                mMuxer = createMuxer(mCodec, format);
-
-                // This is needed.
-                boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
-                if (isVP) {
-                    mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
-                    mMuxer.start();
-                }
-            }
-
-            if (!mNoEncoding) {
-                try {
-                    Log.d(TAG, "Start encoder");
-                    mCodec.start();
-                } catch (Exception ex) {
-                    Log.e(TAG, "Start failed: " + ex.getMessage());
-                    return "Start encoding failed";
-                }
-            }
-
-        } catch (IOException iox) {
-            Log.e(TAG, "Failed to create codec: " + iox.getMessage());
-            return "Failed to create codec";
+        mMuxer = createMuxer(mCodec, mediaFormat);
+        try {
+            Log.d(TAG, "Start encoder");
+            mCodec.start();
+        } catch (Exception ex) {
+            Log.e(TAG, "Start failed: " + ex.getMessage());
+            //return "Start encoding failed";
+        }
+            // This is needed.
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
-            return "Failed to create codec";
+            //return "Failed to create codec";
         }
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -289,6 +270,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             }
         }
         Log.d(TAG, mTest.getCommon().getId() + " - Start source reader");
+        mEncoderWriter.start();
         mSourceReader.start();
         mStats.start();
         try {
@@ -339,10 +321,40 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
     }
 
+
+    public int getMatchingColor(MediaCodec first, MediaCodec second, String mime, int preferred) {
+
+        MediaCodecInfo encInfo = mCodec.getCodecInfo();
+        MediaCodecInfo decInfo = mDecoder.getCodecInfo();
+
+        MediaCodecInfo.CodecCapabilities encCaps = encInfo.getCapabilitiesForType(mime);
+        MediaCodecInfo.CodecCapabilities decCaps = decInfo.getCapabilitiesForType(mime);
+
+        int match = -1;
+        for (int col:encCaps.colorFormats) {
+            for (int decCol:decCaps.colorFormats) {
+                if (( col == decCol)) {
+                    match = col;
+                }
+                if (match == preferred) {
+                    return match;
+                }
+            }
+        }
+
+        if (match == -1)
+            Log.e(TAG, "Failed to find a matching pixel format");
+        return match;
+    }
+
+
     public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
         try {
             if (encoder) {
-                codec.releaseOutputBuffer(index, true);
+                mEncoderInputBuffers.push(index);
+                synchronized (mEncoderInputBuffers) {
+                    mEncoderInputBuffers.notifyAll();
+                }
             } else {
                 mSourceReader.addBuffer(index);
             }
@@ -356,7 +368,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     MediaFormat currentMediaFormat;
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
         if (encoder) {
-            codec.releaseOutputBuffer(index, true);
+            // Should not get here _ever_. Handled by data writer
         } else {
             long timestamp = info.presentationTimeUs;
 
@@ -375,63 +387,44 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 currentMediaFormat = newFormat;
                 mInFramesCount++;
                 long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
-                if (!mNoEncoding) {
-                    if (mFirstFrameTimestampUsec == timestamp ) {
-                        // Request key frame
-                        Log.d(TAG, "Request key frame");
-                        Bundle bundle = new Bundle();
-                        bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                        if (mCodec != null) {
-                            mCodec.setParameters(bundle);
-                        }
+                if (mFirstFrameTimestampUsec == timestamp ) {
+                    // Request key frame
+                    Bundle bundle = new Bundle();
+                    bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
+                    if (mCodec != null) {
+                        mCodec.setParameters(bundle);
                     }
-                    setRuntimeParameters(mInFramesCount);
-                    mDropNext = dropFrame(mInFramesCount);
-                    mDropNext |= dropFromDynamicFramerate(mInFramesCount);
-                    updateDynamicFramerate(mInFramesCount);
-                    //Check time, if to far off drop frame, minimize the drops so something is show.
-                    long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
+                }
+                setRuntimeParameters(mInFramesCount);
+                mDropNext = dropFrame(mInFramesCount);
+                mDropNext |= dropFromDynamicFramerate(mInFramesCount);
+                updateDynamicFramerate(mInFramesCount);
+                //Check time, if to far off drop frame, minimize the drops so something is show.
+                long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                    mCurrentTimeSec = diffUsec/1000000.0f;
-                    if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
-                        if (mDropcount < mFrameRate) {
-                            Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
-                            mDropNext = true;
-                            mDropcount++;
-                        } else {
-                            mDropcount = 0;
-                        }
-                    }
-                    if (mDropNext) {
-                        mSkipped++;
-                        mDropNext = false;
-                        codec.releaseOutputBuffer(index, false);
+                mCurrentTimeSec = diffUsec/1000000.0f;
+                if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
+                    if (mDropcount < mFrameRate) {
+                        Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
+                        mDropNext = true;
+                        mDropcount++;
                     } else {
-                        mStats.startEncodingFrame(ptsUsec, mInFramesCount);
-                        mFramesAdded++;
-                        mOutputMult.newFrameAvailableInBuffer(codec, index, info);
+                        mDropcount = 0;
                     }
+                }
+                if (mDropNext) {
+                    mSkipped++;
+                    mDropNext = false;
+                    codec.releaseOutputBuffer(index, false);
                 } else {
-                    mCurrentTimeSec = diffUsec/1000000.0f;
-                    //info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
-                    long diff =(diffUsec - timestamp);
-                    if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
-                        long now = SystemClock.elapsedRealtimeNanos();
-                         ;if (mDropcount < mFrameRate) {
-                            Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
-                            mDropNext = false;//true;
-                            mDropcount++;
-                        } else {
-                            mDropcount = 0;
-                            info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
-                        }
-                    }
-                    //mCurrentTimeSec = timestamp/1000000.0;
-                    if (mDropNext) {
-                        codec.releaseOutputBuffer(index, false);
+                    mStats.startEncodingFrame(ptsUsec, mInFramesCount);
+                    mFramesAdded++;
 
-                    } else {
-                        mOutputMult.newFrameAvailableInBuffer(codec, index, info);
+                    ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
+                    if (index >= 0 && outputBuf != null) {
+
+                        // add buffer to encoderwriter
+                        mEncoderWriter.addBuffer(new FrameBuffer(mDecoder, index, info));
                     }
                 }
             } else {
@@ -441,30 +434,17 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
     }
 
-    public OutputMultiplier getOutputMultiplier() {
-        return mOutputMult;
-    }
-
-    @Override
-    public void vsync(long frameTimeNs) {
-        synchronized (mSyncLock) {
-            mVsyncTimeNs = frameTimeNs;
-            mSyncLock.notifyAll();
-        }
-    }
-
     private class SourceReader extends Thread {
         ConcurrentLinkedQueue<Integer> mDecoderBuffers = new ConcurrentLinkedQueue<>();
 
         @Override
         public void run() {
             Dictionary<String, Object> latestFrameChanges;
-            Log.d(TAG, "Start Source reader.");
             while (!mDone) {
                 while (mDecoderBuffers.size() > 0 && !mDone) {
                     if (mInFramesCount % 100 == 0 && MainActivity.isStable()) {
-                        Log.d(TAG, mTest.getCommon().getId() + " - "  + (mNoEncoding ? "Decoder: " : "Transcoder: ") +
-                                "frames: " + mFramesAdded +
+                        Log.d(TAG, mTest.getCommon().getId()  +
+                                " frames: " + mFramesAdded +
                                 " inframes: " + mInFramesCount +
                                 " current_loop: " + mCurrentLoop +
                                 " current_time: " + mCurrentTimeSec);
@@ -535,7 +515,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                             mDone = true;
                         }
                     }
-                    //Log.d(TAG, "Set lastpts = " + ptsUsec/1000 +" ms" + ", ptsOffset = " + mPtsOffset);
                     mLastPtsUs = ptsUsec;
                 }
             }
@@ -548,6 +527,78 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             }
         }
     }
+
+
+    private class EncoderWriter extends Thread {
+        ConcurrentLinkedQueue<FrameBuffer> mDecoderBuffers = new ConcurrentLinkedQueue<>();
+
+        @Override
+        public void run() {
+            while (!mDone) {
+                if (mDecoderBuffers.size() == 0) {
+                    synchronized (mDecoderBuffers) {
+                        try {
+                            mDecoderBuffers.wait();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                FrameBuffer frameBuffer = mDecoderBuffers.remove();
+                Integer encBufferIndex = -1;
+                synchronized (mEncoderInputBuffers) {
+                    if (mEncoderInputBuffers.size() == 0) {
+                        try {
+                            mEncoderInputBuffers.wait();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    if (mEncoderInputBuffers.size() > 0) {
+                        encBufferIndex = mEncoderInputBuffers.pop();
+                    } else {
+                        encBufferIndex = -1;
+                    }
+
+                    if (encBufferIndex >= 0) {
+                        ByteBuffer inputBuffer = mCodec.getInputBuffer(encBufferIndex);
+
+                        // We proably cannot change the size if it is wrong (needs to be done when configuring the encoder
+                        ByteBuffer decoderBuffer = mDecoder.getOutputBuffer(frameBuffer.mBufferId);
+                        // We need to align the planes if Qualcomm, worst case copy line by line
+                        //inputBuffer.put(decoderBuffer);
+                        if (mXStride != mWidth) {
+                            // Copy per line
+                        }
+                        if (mYStride != mHeight) {
+                            // Align luma plane
+                            int lumaAlignedSize = mXStride * mYStride;
+                            int lumaSize = mWidth * mHeight;
+                            int limit = decoderBuffer.limit();
+                            decoderBuffer.limit(lumaSize);
+                            inputBuffer.put(decoderBuffer);
+                            decoderBuffer.position(lumaSize);
+                            decoderBuffer.limit(limit);
+                            inputBuffer.position(lumaAlignedSize);
+                            inputBuffer.put(decoderBuffer);
+                        }
+                        mCodec.queueInputBuffer(encBufferIndex, 0 /* offset */, decoderBuffer.limit(), frameBuffer.getTimestampUs() /* timeUs */, frameBuffer.mInfo.flags);
+
+                        mDecoder.releaseOutputBuffer(frameBuffer.mBufferId, false);
+                    }
+                }
+            }
+        }
+
+        public void addBuffer(FrameBuffer frameBuffer) {
+            synchronized (mDecoderBuffers) {
+                mDecoderBuffers.add(frameBuffer);
+                mDecoderBuffers.notifyAll();
+            }
+        }
+    }
+
+
 
 
     public  long sleepUntilNextFrameSynched() {
@@ -638,20 +689,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                 Log.e(TAG, "Illegal state Failed to shut down:" + iex.getStackTrace().toString());
             }
 
-            if (mVsyncHandler != null)
-                mVsyncHandler.removeListener(this);
-
-            if (mFrameSwapSurface != null && mOutputMult != null) {
-                mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
-            }
-
-            if (mSurfaceTexture != null) {
-                mSurfaceTexture.release();
-            }
-            if (mSurface != null) {
-                mSurface.release();
-            }
-
             if (mExtractor != null)
                 mExtractor.release();
             Log.d(TAG, "Stop writer");
@@ -660,13 +697,11 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     }
 
     public void release() {
-        Log.d(TAG, (mNoEncoding ? "Decoder: " : "Transcoder: ") +
-                "\nRelease output for " + mTest.getCommon().getId() + " " +
+        Log.d(TAG,"\nRelease output for " + mTest.getCommon().getId() + " " +
                 "frames: " + mFramesAdded +
                 " inframes: " + mInFramesCount +
                 " current_loop: " + mCurrentLoop +
                 " current_time: " + mCurrentTimeSec);
 
-        mOutputMult.stopAndRelease();
     }
 }

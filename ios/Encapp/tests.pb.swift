@@ -148,6 +148,10 @@ struct Common {
   mutating func clearStart() {self._start = nil}
 
   /// template or specific name for output file(s)
+  /// Placeholder markers are [] 
+  /// e.g. [common.id].[input.resolution].[configuration.bitrate]-[XXXX]
+  /// X is a substitution marker for A random hex number (1-f)
+  /// If not set the filename will be encapp_uuid
   var outputFilename: String {
     get {return _outputFilename ?? String()}
     set {_outputFilename = newValue}
@@ -306,6 +310,15 @@ struct Input {
   /// Clears the value of `show`. Subsequent reads from it will return its default value.
   mutating func clearShow() {self._show = nil}
 
+  var deviceDecode: Bool {
+    get {return _deviceDecode ?? false}
+    set {_deviceDecode = newValue}
+  }
+  /// Returns true if `deviceDecode` has been explicitly set.
+  var hasDeviceDecode: Bool {return self._deviceDecode != nil}
+  /// Clears the value of `deviceDecode`. Subsequent reads from it will return its default value.
+  mutating func clearDeviceDecode() {self._deviceDecode = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -319,6 +332,7 @@ struct Input {
   fileprivate var _realtime: Bool? = nil
   fileprivate var _stoptimeSec: Float? = nil
   fileprivate var _show: Bool? = nil
+  fileprivate var _deviceDecode: Bool? = nil
 }
 
 struct Configure {
@@ -1080,6 +1094,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     7: .same(proto: "realtime"),
     8: .standard(proto: "stoptime_sec"),
     9: .same(proto: "show"),
+    10: .standard(proto: "device_decode"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1097,6 +1112,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
       case 7: try { try decoder.decodeSingularBoolField(value: &self._realtime) }()
       case 8: try { try decoder.decodeSingularFloatField(value: &self._stoptimeSec) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self._show) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self._deviceDecode) }()
       default: break
       }
     }
@@ -1134,6 +1150,9 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     try { if let v = self._show {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 9)
     } }()
+    try { if let v = self._deviceDecode {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1147,6 +1166,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     if lhs._realtime != rhs._realtime {return false}
     if lhs._stoptimeSec != rhs._stoptimeSec {return false}
     if lhs._show != rhs._show {return false}
+    if lhs._deviceDecode != rhs._deviceDecode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

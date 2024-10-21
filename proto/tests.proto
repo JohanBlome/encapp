@@ -50,6 +50,7 @@ message Input {
   optional bool realtime = 7;
   optional float stoptime_sec = 8;
   optional bool show = 9;
+  optional bool device_decode = 10;
 }
 
 message Configure {
