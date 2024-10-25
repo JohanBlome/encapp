@@ -121,7 +121,13 @@ public class BufferTranscoder extends Encoder  {
                 //TODO: throw error on failed lookup
                 //mTest = setCodecNameAndIdentifier(mTest);
                 Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
-                mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
+                try {
+                    mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to create decoder");
+                    return "Failed to create decoder.";
+                }
+
             } else {
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
@@ -204,7 +210,7 @@ public class BufferTranscoder extends Encoder  {
         //TODO: color handling
 
         String mime = inputFormat.getString(MediaFormat.KEY_MIME);
-        int matchingColor = getMatchingColor(mCodec, mDecoder, mime, defaultColor);
+        int matchingColor = getMatchingColor(mCodec, mDecoder, defaultColor);
         inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
         mCodec.setCallback(new EncoderCallbackHandler());
         Log.d(TAG, "Check input format before config decoder");
@@ -322,13 +328,15 @@ public class BufferTranscoder extends Encoder  {
     }
 
 
-    public int getMatchingColor(MediaCodec first, MediaCodec second, String mime, int preferred) {
-
+    public int getMatchingColor(MediaCodec first, MediaCodec second, int preferred) {
         MediaCodecInfo encInfo = mCodec.getCodecInfo();
         MediaCodecInfo decInfo = mDecoder.getCodecInfo();
-
-        MediaCodecInfo.CodecCapabilities encCaps = encInfo.getCapabilitiesForType(mime);
-        MediaCodecInfo.CodecCapabilities decCaps = decInfo.getCapabilitiesForType(mime);
+        MediaCodecInfo.CodecCapabilities encCaps;
+        MediaCodecInfo.CodecCapabilities decCaps;
+        String encType = encInfo.getSupportedTypes()[0];
+        String decType = decInfo.getSupportedTypes()[0];
+        encCaps = encInfo.getCapabilitiesForType(encType);
+        decCaps = decInfo.getCapabilitiesForType(decType);
 
         int match = -1;
         for (int col:encCaps.colorFormats) {
@@ -565,22 +573,29 @@ public class BufferTranscoder extends Encoder  {
 
                         // We proably cannot change the size if it is wrong (needs to be done when configuring the encoder
                         ByteBuffer decoderBuffer = mDecoder.getOutputBuffer(frameBuffer.mBufferId);
-                        // We need to align the planes if Qualcomm, worst case copy line by line
-                        //inputBuffer.put(decoderBuffer);
-                        if (mXStride != mWidth) {
-                            // Copy per line
-                        }
-                        if (mYStride != mHeight) {
-                            // Align luma plane
-                            int lumaAlignedSize = mXStride * mYStride;
-                            int lumaSize = mWidth * mHeight;
-                            int limit = decoderBuffer.limit();
-                            decoderBuffer.limit(lumaSize);
+                        if ( decoderBuffer.limit() == inputBuffer.limit()) {
                             inputBuffer.put(decoderBuffer);
-                            decoderBuffer.position(lumaSize);
-                            decoderBuffer.limit(limit);
-                            inputBuffer.position(lumaAlignedSize);
-                            inputBuffer.put(decoderBuffer);
+                        } else {
+                            // We need to align the planes if Qualcomm, worst case copy line by line
+                            //inputBuffer.put(decoderBuffer);
+                            if (mXStride != mWidth) {
+                                // Copy per line
+                                Log.d(TAG, "X stride not implemented (yet)");
+                            }
+
+                            // If the buffer sizes are the same stringin is taken car of elsewhere
+                            if (mYStride != mHeight) {
+                                // Align luma plane
+                                int lumaAlignedSize = mXStride * mYStride;
+                                int lumaSize = mWidth * mHeight;
+                                int limit = decoderBuffer.limit();
+                                decoderBuffer.limit(lumaSize);
+                                inputBuffer.put(decoderBuffer);
+                                decoderBuffer.position(lumaSize);
+                                decoderBuffer.limit(limit);
+                                inputBuffer.position(lumaAlignedSize);
+                                inputBuffer.put(decoderBuffer);
+                            }
                         }
                         mCodec.queueInputBuffer(encBufferIndex, 0 /* offset */, decoderBuffer.limit(), frameBuffer.getTimestampUs() /* timeUs */, frameBuffer.mInfo.flags);
 
