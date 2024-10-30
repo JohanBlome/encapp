@@ -4,6 +4,22 @@ option java_multiple_files = true;
 option java_package = "com.facebook.encapp.proto";
 option java_outer_classname = "TestDefinition";
 
+message TestSetup {
+  // Instead of setting device workdir on the cli it can be defined here
+  optional string device_workdir = 1;
+  optional string local_workdir = 2;
+  optional string serial = 3;
+  // Default is adb, set it to idb for Apple
+  optional string device_cmd = 4;
+  // If a different command is needed to start the device app it can be defined here
+  // e.g. "appXYZ -r " + "DEF.pbtxt"
+  // "Needs to be self contained, i.e. paths etc, defined in the protobuf
+  optional string run_cmd = 5;
+  optional bool separate_sources = 6;
+  // Place to store temporary files
+  optional string mediastore = 7;
+}
+
 message Common {
   optional string id = 1;
   optional string description = 2;
@@ -146,6 +162,7 @@ message Test {
   optional DecoderConfigure decoder_configure = 5;
   optional DecoderRuntime decoder_runtime = 6;
   optional Parallel parallel = 7;
+  optional TestSetup test_setup = 8;
 }
 
 message TestSuite {

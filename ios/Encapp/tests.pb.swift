@@ -106,6 +106,93 @@ extension PixFmt: CaseIterable {
 
 #endif  // swift(>=4.2)
 
+struct TestSetup {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Instead of setting device workdir on the cli it can be defined here
+  var deviceWorkdir: String {
+    get {return _deviceWorkdir ?? String()}
+    set {_deviceWorkdir = newValue}
+  }
+  /// Returns true if `deviceWorkdir` has been explicitly set.
+  var hasDeviceWorkdir: Bool {return self._deviceWorkdir != nil}
+  /// Clears the value of `deviceWorkdir`. Subsequent reads from it will return its default value.
+  mutating func clearDeviceWorkdir() {self._deviceWorkdir = nil}
+
+  var localWorkdir: String {
+    get {return _localWorkdir ?? String()}
+    set {_localWorkdir = newValue}
+  }
+  /// Returns true if `localWorkdir` has been explicitly set.
+  var hasLocalWorkdir: Bool {return self._localWorkdir != nil}
+  /// Clears the value of `localWorkdir`. Subsequent reads from it will return its default value.
+  mutating func clearLocalWorkdir() {self._localWorkdir = nil}
+
+  var serial: String {
+    get {return _serial ?? String()}
+    set {_serial = newValue}
+  }
+  /// Returns true if `serial` has been explicitly set.
+  var hasSerial: Bool {return self._serial != nil}
+  /// Clears the value of `serial`. Subsequent reads from it will return its default value.
+  mutating func clearSerial() {self._serial = nil}
+
+  /// Default is adb, set it to idb for Apple
+  var deviceCmd: String {
+    get {return _deviceCmd ?? String()}
+    set {_deviceCmd = newValue}
+  }
+  /// Returns true if `deviceCmd` has been explicitly set.
+  var hasDeviceCmd: Bool {return self._deviceCmd != nil}
+  /// Clears the value of `deviceCmd`. Subsequent reads from it will return its default value.
+  mutating func clearDeviceCmd() {self._deviceCmd = nil}
+
+  /// If a different command is needed to start the device app it can be defined here
+  /// e.g. "appXYZ -r " + "DEF.pbtxt"
+  /// "Needs to be self contained, i.e. paths etc, defined in the protobuf
+  var runCmd: String {
+    get {return _runCmd ?? String()}
+    set {_runCmd = newValue}
+  }
+  /// Returns true if `runCmd` has been explicitly set.
+  var hasRunCmd: Bool {return self._runCmd != nil}
+  /// Clears the value of `runCmd`. Subsequent reads from it will return its default value.
+  mutating func clearRunCmd() {self._runCmd = nil}
+
+  var separateSources: Bool {
+    get {return _separateSources ?? false}
+    set {_separateSources = newValue}
+  }
+  /// Returns true if `separateSources` has been explicitly set.
+  var hasSeparateSources: Bool {return self._separateSources != nil}
+  /// Clears the value of `separateSources`. Subsequent reads from it will return its default value.
+  mutating func clearSeparateSources() {self._separateSources = nil}
+
+  /// Place to store temporary files
+  var mediastore: String {
+    get {return _mediastore ?? String()}
+    set {_mediastore = newValue}
+  }
+  /// Returns true if `mediastore` has been explicitly set.
+  var hasMediastore: Bool {return self._mediastore != nil}
+  /// Clears the value of `mediastore`. Subsequent reads from it will return its default value.
+  mutating func clearMediastore() {self._mediastore = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _deviceWorkdir: String? = nil
+  fileprivate var _localWorkdir: String? = nil
+  fileprivate var _serial: String? = nil
+  fileprivate var _deviceCmd: String? = nil
+  fileprivate var _runCmd: String? = nil
+  fileprivate var _separateSources: Bool? = nil
+  fileprivate var _mediastore: String? = nil
+}
+
 struct Common {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -904,6 +991,15 @@ struct Test {
   /// Clears the value of `parallel`. Subsequent reads from it will return its default value.
   mutating func clearParallel() {_uniqueStorage()._parallel = nil}
 
+  var testSetup: TestSetup {
+    get {return _storage._testSetup ?? TestSetup()}
+    set {_uniqueStorage()._testSetup = newValue}
+  }
+  /// Returns true if `testSetup` has been explicitly set.
+  var hasTestSetup: Bool {return _storage._testSetup != nil}
+  /// Clears the value of `testSetup`. Subsequent reads from it will return its default value.
+  mutating func clearTestSetup() {_uniqueStorage()._testSetup = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -927,6 +1023,7 @@ struct TestSuite {
 #if swift(>=5.5) && canImport(_Concurrency)
 extension DataValueType: @unchecked Sendable {}
 extension PixFmt: @unchecked Sendable {}
+extension TestSetup: @unchecked Sendable {}
 extension Common: @unchecked Sendable {}
 extension Parameter: @unchecked Sendable {}
 extension Input: @unchecked Sendable {}
@@ -966,6 +1063,78 @@ extension PixFmt: SwiftProtobuf._ProtoNameProviding {
     4: .same(proto: "rgba"),
     54: .same(proto: "p010le"),
   ]
+}
+
+extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "TestSetup"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .standard(proto: "device_workdir"),
+    2: .standard(proto: "local_workdir"),
+    3: .same(proto: "serial"),
+    4: .standard(proto: "device_cmd"),
+    5: .standard(proto: "run_cmd"),
+    6: .standard(proto: "separate_sources"),
+    7: .same(proto: "mediastore"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._deviceWorkdir) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._localWorkdir) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._serial) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._deviceCmd) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._runCmd) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self._separateSources) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._mediastore) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._deviceWorkdir {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._localWorkdir {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._serial {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._deviceCmd {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._runCmd {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._separateSources {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._mediastore {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: TestSetup, rhs: TestSetup) -> Bool {
+    if lhs._deviceWorkdir != rhs._deviceWorkdir {return false}
+    if lhs._localWorkdir != rhs._localWorkdir {return false}
+    if lhs._serial != rhs._serial {return false}
+    if lhs._deviceCmd != rhs._deviceCmd {return false}
+    if lhs._runCmd != rhs._runCmd {return false}
+    if lhs._separateSources != rhs._separateSources {return false}
+    if lhs._mediastore != rhs._mediastore {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1738,6 +1907,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
     5: .standard(proto: "decoder_configure"),
     6: .standard(proto: "decoder_runtime"),
     7: .same(proto: "parallel"),
+    8: .standard(proto: "test_setup"),
   ]
 
   fileprivate class _StorageClass {
@@ -1748,6 +1918,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
     var _decoderConfigure: DecoderConfigure? = nil
     var _decoderRuntime: DecoderRuntime? = nil
     var _parallel: Parallel? = nil
+    var _testSetup: TestSetup? = nil
 
     static let defaultInstance = _StorageClass()
 
@@ -1761,6 +1932,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
       _decoderConfigure = source._decoderConfigure
       _decoderRuntime = source._decoderRuntime
       _parallel = source._parallel
+      _testSetup = source._testSetup
     }
   }
 
@@ -1786,6 +1958,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._decoderConfigure) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._decoderRuntime) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._parallel) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._testSetup) }()
         default: break
         }
       }
@@ -1819,6 +1992,9 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
       try { if let v = _storage._parallel {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
+      try { if let v = _storage._testSetup {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1835,6 +2011,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
         if _storage._decoderConfigure != rhs_storage._decoderConfigure {return false}
         if _storage._decoderRuntime != rhs_storage._decoderRuntime {return false}
         if _storage._parallel != rhs_storage._parallel {return false}
+        if _storage._testSetup != rhs_storage._testSetup {return false}
         return true
       }
       if !storagesAreEqual {return false}

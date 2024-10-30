@@ -913,7 +913,19 @@ def expand_filepath(path):
         for file in files:
             if is_video_extension(file):
                 if len(basename) > 0:
-                    m = re.search(basename, file)
+                    # let us make one exception to the reg exp
+                    # accept common glob in case regexp fails
+                    m = None
+                    try:
+                        m = re.search(basename, file)
+                    except Exception as ex:
+                        print(f"Error: problem in regexp {basename}: ", ex)
+                        print(
+                            "Try glob for '*', replacing '*' with '.*'. Fix definition if something else is wanted."
+                        )
+                        basename = basename.replace("*", ".*")
+
+                        m = re.search(basename, file)
                     if m:
                         file = f"{root}/{m.group(0)}"
                     else:
@@ -1502,7 +1514,6 @@ def run_codec_tests(
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
 
-        print("Run single test")
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
@@ -2202,6 +2213,32 @@ def main(argv):
         model = "dry run"
         options.seral = "dry run"
     else:
+        # check if this is a test run and if these params are defined in the test
+        if options.func == "run":
+            # ensure there is an input configuration
+            assert (
+                options.configfile is not None
+            ), "error: need a valid input configuration file"
+        test_suite = tests_definitions.TestSuite()
+        for file in options.configfile:
+            with open(file, "rb") as fd:
+                text_format.Merge(fd.read(), test_suite)
+
+        for test in test_suite.test:
+            if test.test_setup.serial:
+                options.serial = test.test_setup.serial
+            if test.test_setup.device_cmd:
+                if test.test_setup.device_cmd.toLower() == "idb":
+                    set_idb_mode(True)
+            if test.test_setup.device_workdir:
+                options.device_workdir = test.test_setup.device_workdir
+            if test.test_setup.local_workdir:
+                options.local_workdir = test.test_setup.local_workdir
+            if test.test_setup.separate_sources:
+                options.separate_sources = True
+            if test.test_setup.mediastore:
+                options.mediastore = test.test_setup.mediastore
+
         # get model and serial number
         model, serial = encapp_tool.adb_cmds.get_device_info(
             options.serial, options.debug
