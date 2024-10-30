@@ -156,7 +156,7 @@ video_extensions = [
 ]
 
 
-def isVideoExtension(filename):
+def is_video_extension(filename):
     ending = f".{filename.rsplit('.')[-1]}"
     if ending is not None and ending in video_extensions:
         return True
@@ -632,7 +632,7 @@ def valid_path(text):
 def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
-    protobuf_txt_filepath = createTestsFromDefinitionExpansionPath(
+    protobuf_txt_filepath = create_tests_from_definition_expansionPath(
         protobuf_txt_filepath, local_workdir
     )
     if debug > 0:
@@ -804,7 +804,7 @@ def abort_test(local_workdir, message):
     sys.exit(-1)
 
 
-def createTestsFromDefinitionExpansionPath(protobuf_txt_filepath, local_workdir):
+def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_workdir):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
@@ -812,7 +812,7 @@ def createTestsFromDefinitionExpansionPath(protobuf_txt_filepath, local_workdir)
     with open(protobuf_txt_filepath, "rb") as fd:
         text_format.Merge(fd.read(), test_suite)
 
-    test_suite_ = createTestsFromDefinitionExpansion(test_suite)
+    test_suite_ = create_tests_from_definition_expansion(test_suite)
     # check if they are the same, if so do nothing
     # if (test_suite_.equals(test_suite)):
     #    return protobuf_txt_filepath
@@ -833,7 +833,7 @@ def lookup_message_by_name(message, submessage_name):
         return None
 
 
-def multiplyTestsWithItems(test, parent, setting, expanded):
+def multiply_tests_with_tems(test, parent, setting, expanded):
     tests = []
     for item in expanded:
         ntest = tests_definitions.Test()
@@ -846,10 +846,10 @@ def multiplyTestsWithItems(test, parent, setting, expanded):
     return tests
 
 
-def updateSingleSetting(tests, parent, settings_name, expanded):
+def update_single_setting(tests, parent, settings_name, expanded):
     updated = []
     for test in tests:
-        tests_ = multiplyTestsWithItems(test, parent, settings_name, expanded)
+        tests_ = multiply_tests_with_tems(test, parent, settings_name, expanded)
         if tests_:
             updated.extend(tests_)
     return updated
@@ -857,7 +857,7 @@ def updateSingleSetting(tests, parent, settings_name, expanded):
 
 # Takes a test definition and looks through all settins
 # every expanded setting will create copies of the previous
-def createTestsFromDefinitionExpansion(testsuite):
+def create_tests_from_definition_expansion(testsuite):
     # First we may have multiple tests already (ouch)
     # They will be handled as separate cases
 
@@ -886,10 +886,10 @@ def createTestsFromDefinitionExpansion(testsuite):
                                 expanded = expand_filepath(path)
                             force_update = True
                         else:
-                            expanded = expandRanges(setting[1])
+                            expanded = expand_ranges(setting[1])
                         if tests:
                             if len(expanded) > 1 or force_update:
-                                tests_ = updateSingleSetting(
+                                tests_ = update_single_setting(
                                     tests, parent, setting[0].name, expanded
                                 )
                                 if tests_:
@@ -911,7 +911,7 @@ def expand_filepath(path):
     video_files = []
     for root, _dirs, files in os.walk(folder):
         for file in files:
-            if isVideoExtension(file):
+            if is_video_extension(file):
                 if len(basename) > 0:
                     m = re.search(basename, file)
                     if m:
@@ -927,7 +927,7 @@ def expand_filepath(path):
 
 # Same as the bitrate expanding i.e
 # start-stop-step,start2-stop2-step2,val3,val4
-def expandRanges(definition):
+def expand_ranges(definition):
     result = []
     try:
         for item in definition.split(","):
