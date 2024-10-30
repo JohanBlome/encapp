@@ -683,35 +683,113 @@ def run_codec_tests_file(
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
-        # If we are using the id - we need to replace characters that are problematic in
-        # a filepath (i.e. space)
-        protobuf_txt_filepath = (
-            f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
-        )
-        with open(protobuf_txt_filepath, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
-        if debug > 0:
-            print(f"add {protobuf_txt_filepath}")
-        files_to_push |= {protobuf_txt_filepath}
-        if options.dry_run:
-            # Do nothing here
-            if debug:
-                print("Dry run - do nothing")
-            return None, None
-        else:
-            return run_codec_tests(
-                test_suite,
-                files_to_push,
-                model,
-                serial,
-                options.mediastore,
-                local_workdir,
-                options.device_workdir,
-                options.ignore_results,
-                options.fast_copy,
-                options.split,
-                debug,
+
+        if options.separate_sources:
+            # create test(s) for each source
+            # dictionary with source as key
+            test_collection = {}
+            for test in test_suite.test:
+                source = test.input.filepath
+                tests = []
+                if source in test_collection:
+                    tests = test_collection[source]
+                else:
+                    test_collection[source] = tests
+                tests.append(test)
+
+            counter = 0
+            # Clear target and run test, collect result and iterate
+            encapp_tool.adb_cmds.remove_files_using_regex(
+                serial, "encapp_.*", options.device_workdir, options.debug
             )
+            encapp_tool.adb_cmds.remove_files_using_regex(
+                serial, ".*pbtxt$", options.device_workdir, options.debug
+            )
+            encapp_tool.adb_cmds.remove_files_using_regex(
+                serial, ".*[yuv|raw]$", options.device_workdir, options.debug
+            )
+            success = True
+            result_files = []
+            for testsource in test_collection:
+                files = []
+                # find file
+                basename = os.path.basename(testsource)
+                for file in files_to_push:
+                    if basename in file:
+                        files.append(file)
+                        break
+
+                test_suite = tests_definitions.TestSuite()
+                for test in test_collection[testsource]:
+                    # Add tests to the test suite
+                    test_suite.test.append(test)
+                counter += 1
+                protobuf_txt_filepath = (
+                    f"{local_workdir}/{valid_path(test.common.id)}_{counter}.pbtxt"
+                )
+                with open(protobuf_txt_filepath, "w") as f:
+                    f.write(text_format.MessageToString(test_suite))
+                if debug > 0:
+                    print(f"add {protobuf_txt_filepath}")
+                files.append(protobuf_txt_filepath)
+
+                results = run_codec_tests(
+                    test_suite,
+                    files,
+                    model,
+                    serial,
+                    options.mediastore,
+                    local_workdir,
+                    options.device_workdir,
+                    options.ignore_results,
+                    options.fast_copy,
+                    options.split,
+                    debug,
+                )
+
+                # Remove test files
+                for file in files:
+                    basename = os.path.basename(file)
+                    encapp_tool.adb_cmds.remove_file(
+                        serial, f"{options.device_workdir}/{basename}", options.debug
+                    )
+
+                if not results[0]:
+                    success = False
+                result_files += results[1]
+
+            return success, result_files
+
+        else:
+            # If we are using the id - we need to replace characters that are problematic in
+            # a filepath (i.e. space)
+            protobuf_txt_filepath = (
+                f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
+            )
+            with open(protobuf_txt_filepath, "w") as f:
+                f.write(text_format.MessageToString(test_suite))
+            if debug > 0:
+                print(f"add {protobuf_txt_filepath}")
+            files_to_push |= {protobuf_txt_filepath}
+            if options.dry_run:
+                # Do nothing here
+                if debug:
+                    print("Dry run - do nothing")
+                return None, None
+            else:
+                return run_codec_tests(
+                    test_suite,
+                    files_to_push,
+                    model,
+                    serial,
+                    options.mediastore,
+                    local_workdir,
+                    options.device_workdir,
+                    options.ignore_results,
+                    options.fast_copy,
+                    options.split,
+                    debug,
+                )
     else:
         print(
             f"Apparently something is not quite right, check the test definition: {test_suite=}"
@@ -966,8 +1044,10 @@ def update_media(test, options):
                 or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
             )
             and test.configure.surface
-            and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
-            or test.input.device_decode
+            and not (
+                encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+                or test.input.device_decode
+            )
         ):
             if options.debug > 0:
                 print("Skip raw transcoding.")
@@ -1842,6 +1922,14 @@ def add_args(parser):
         help="Run serial test individually",
     )
     parser.add_argument(
+        "--separate_sources",
+        action="store_true",
+        dest="separate_sources",
+        default=False,
+        help="Run each source separatly clearing space inbetween",
+    )
+
+    parser.add_argument(
         "--mediastore",
         type=str,
         nargs="?",
@@ -2084,12 +2172,13 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
             )
 
     else:
-        encapp_tool.ffutils.ffmpeg_convert_to_raw(
-            input_filepath,
-            output_filepath,
-            replace,
-            debug,
-        )
+        if not os.path.exists(output_filepath):
+            encapp_tool.ffutils.ffmpeg_convert_to_raw(
+                input_filepath,
+                output_filepath,
+                replace,
+                debug,
+            )
         # replace input and other derived values
     return {
         "filepath": output_filepath,

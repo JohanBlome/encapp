@@ -98,6 +98,25 @@ def get_device_info(
     return model, serial
 
 
+def remove_file(serial: str, file: str, debug: int) -> None:
+    """Remove files from a device specific file (path).
+
+    Args:
+        serial (str): device serial no.
+        location (str): Path/directory to analyze and remove files from
+        debug (int): Debug level
+    """
+    if USE_IDB:
+        # remove the output
+        print(f"Removing {counter}/{len(output_files)}", end="\r")
+        cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        run_cmd(cmd, debug)
+    else:
+        # remove the output
+        adb_cmd = f"adb -s {serial} shell rm {file}"
+        run_cmd(adb_cmd, debug)
+
+
 def remove_files_using_regex(
     serial: str, regex_str: str, location: str, debug: int
 ) -> None:
@@ -659,7 +678,6 @@ def push_file_to_device_android(
 def pull_files_from_device(
     serial: str, regex_str: str, location: str, debug: int
 ) -> None:
-
     if USE_IDB:
         cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
