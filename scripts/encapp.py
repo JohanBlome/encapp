@@ -802,7 +802,7 @@ def createTestsFromDefinitionExpansion(testsuite):
                         if parent == "input" and setting[0].name == "filepath":
                             # If the filepath match _exactly_ one file, leave it at that.
                             path = os.path.expanduser(setting[1])
-                            if os.path.exists(path):
+                            if os.path.exists(path) and os.path.isfile(path):
                                 expanded = [path]
                             else:
                                 expanded = expand_filepath(path)
