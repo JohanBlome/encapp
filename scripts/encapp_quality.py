@@ -353,7 +353,6 @@ def run_quality(test_file, options, debug):
     found in options.media_path directory or overriden
     """
     global VMAF_MODEL
-    print(f"Run quality, {test_file}")
     if not os.path.exists(test_file):
         print("File not found: " + test_file)
         return None
@@ -602,10 +601,8 @@ def run_quality(test_file, options, debug):
         if options.get("crop_input", None):
             crop = f"crop={options.get('crop_input')},"
         filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
-        print(f"\nFPS -> {input_framerate}")
         # Do calculations
         if recalc or not os.path.exists(vmaf_file):
-
             # important: vmaf must be called with videos in the right order
             # <distorted_video> <reference_video>
             # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
@@ -618,7 +615,8 @@ def run_quality(test_file, options, debug):
             # Allow for an environment variable
             model = ""
             if os.environ.get("VMAF_MODEL_PATH", None):
-                print("Environment VMAF_PATH override model")
+                if debug:
+                    print("Environment VMAF_PATH override model")
                 model = "path=" + os.environ.get("VMAF_MODEL_PATH")
             else:
                 model = f"'version={VMAF_MODEL}'"
@@ -937,6 +935,52 @@ def get_options(argv):
         ), f"Error: {options.media_path} not a readable directory"
 
     return options
+
+
+def calculate_quality(tests, source_path, output, quiet, debug):
+    """
+    Calculates vmaf, psnr and ssim for all test paths using the source_path to
+    look for references. All parameters will be default.
+    """
+    # Everything will be default.
+    # global VMAF_MODEL
+    # VMAF_MODEL = options.vmaf_model
+
+    # run all the tests
+    current = 1
+    total = len(tests)
+    if not quiet:
+        print(f"Total number of tests: {total}")
+    df = None
+    start = time.time()
+    options = {"header": True, "media_path": source_path, "quiet": quiet}
+    for test in tests:
+        try:
+            quality_dict = run_quality(test, options, False)
+        except Exception as ex:
+            print(f"{test} failed: {ex}")
+            continue
+        now = time.time()
+        run_for = now - start
+        time_per_test = float(run_for) / float(current)
+        time_left = round(time_per_test * (total - current))
+        time_left_m = int(time_left / 60)
+        time_left_s = int(time_left) % 60
+        if not quiet:
+            print(
+                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
+            )
+        current += 1
+        if quality_dict is None:
+            continue
+        if df is None:
+            df = pd.DataFrame(columns=quality_dict.keys())
+        df.loc[df.size] = quality_dict.values()
+    # write data to csv file
+    mode = "w"
+    if debug:
+        print(f"Write to {output}")
+    df.to_csv(output, mode=mode, index=False, header=True)
 
 
 def main(argv):
