@@ -45,7 +45,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public abstract class Encoder {
     protected static final String TAG = "encapp.encoder";
-    protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000; // Need to wait some time but not too long
+    protected static final long VIDEO_CODEC_WAIT_TIME_US = 30000; // Need to wait some time but not too long (a full frame)
     protected static final int VIDEO_CODEC_MAX_INPUT_SEC = 5;
     final static int WAIT_TIME_MS = 30000;  // 30 secs
     final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
