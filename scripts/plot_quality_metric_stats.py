@@ -607,6 +607,11 @@ def main():
         action="store_true",
         help="Plot difference between two or more series, first one being the source",
     )
+    parser.add_argument(
+        "--round_fps",
+        action="store_true",
+        help="Round to closest integer, i.e. 29.97->30, 59.94->60",
+    )
 
     parser.add_argument("--graph_size", default="9x9")
     parser.add_argument("--dpi", type=int, default=100)
@@ -654,6 +659,8 @@ def main():
     # filter on resolutions
     data["resolution"] = data["width"].astype(str) + "x" + data["height"].astype(str)
 
+    if args.round_fps:
+        data["framerate_fps"] = data["framerate_fps"].round().astype(int)
     if len(args.resolution) > 0:
         resolutions = args.resolution.split(",")
         sides = [int(x) for x in resolutions if "x" not in x]

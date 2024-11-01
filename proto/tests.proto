@@ -18,6 +18,9 @@ message TestSetup {
   optional bool separate_sources = 6;
   // Place to store temporary files
   optional string mediastore = 7;
+  // Root directory for sources.
+  // If not set the input.filepath wll be absolute or relative from the current
+  optional string source_dir = 8;
 }
 
 message Common {

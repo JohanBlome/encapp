@@ -180,6 +180,17 @@ struct TestSetup {
   /// Clears the value of `mediastore`. Subsequent reads from it will return its default value.
   mutating func clearMediastore() {self._mediastore = nil}
 
+  /// Root directory for sources.
+  /// If not set the input.filepath wll be relative or absolute from the current
+  var sourceDir: String {
+    get {return _sourceDir ?? String()}
+    set {_sourceDir = newValue}
+  }
+  /// Returns true if `sourceDir` has been explicitly set.
+  var hasSourceDir: Bool {return self._sourceDir != nil}
+  /// Clears the value of `sourceDir`. Subsequent reads from it will return its default value.
+  mutating func clearSourceDir() {self._sourceDir = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -191,6 +202,7 @@ struct TestSetup {
   fileprivate var _runCmd: String? = nil
   fileprivate var _separateSources: Bool? = nil
   fileprivate var _mediastore: String? = nil
+  fileprivate var _sourceDir: String? = nil
 }
 
 struct Common {
@@ -1075,6 +1087,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     5: .standard(proto: "run_cmd"),
     6: .standard(proto: "separate_sources"),
     7: .same(proto: "mediastore"),
+    8: .standard(proto: "source_dir"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1090,6 +1103,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 5: try { try decoder.decodeSingularStringField(value: &self._runCmd) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self._separateSources) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._mediastore) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._sourceDir) }()
       default: break
       }
     }
@@ -1121,6 +1135,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._mediastore {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
+    try { if let v = self._sourceDir {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1132,6 +1149,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._runCmd != rhs._runCmd {return false}
     if lhs._separateSources != rhs._separateSources {return false}
     if lhs._mediastore != rhs._mediastore {return false}
+    if lhs._sourceDir != rhs._sourceDir {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

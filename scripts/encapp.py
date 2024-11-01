@@ -1148,7 +1148,9 @@ def update_media(test, options):
         replace["input"] = input
         replace["output"] = output
 
-        d = process_input_path(test.input.filepath, replace, test.input, options.debug)
+        d = process_input_path(
+            test.input.filepath, replace, test.input, options.mediastore, options.debug
+        )
         # now both config and input should be the same i.e. matching config
         test.input.resolution = d["resolution"]
         # TODO: JOHAN - when to do this?
@@ -1694,6 +1696,12 @@ def codec_test(options, model, serial, debug):
                 print("ERROR, first config file lacks a test")
         basename = os.path.basename(options.configfile[0])
         options.configfile = f"{local_workdir}/{basename}"
+
+        # Maybe not the right place to do this but let us do it anyways
+        if options.source_dir:
+            for test in test_suite.test:
+                if test.input.filepath:
+                    test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
         with open(options.configfile, "w") as f:
             f.write(text_format.MessageToString(test_suite))
     else:
@@ -1984,6 +1992,11 @@ def add_args(parser):
         action="store_true",
         help="Always decode to raw format before pushing to device",
     )
+    parser.add_argument(
+        "--source_dir",
+        default=None,
+        help="Root directory for sources. If not set the input.filepath wll be absolute or relative from the current",
+    )
 
 
 def get_options(argv):
@@ -2082,7 +2095,11 @@ def process_options(options):
 
                 # replace input and other derived values
                 d = process_input_path(
-                    input_filepath, options.replace, test, options.debug
+                    input_filepath,
+                    options.replace,
+                    test,
+                    options.mediastore,
+                    options.debug,
                 )
                 if "input" in options:
                     options.input = d["input"]
@@ -2120,7 +2137,7 @@ def verify_app_version(json_files):
                 print(f"File {fl} failed to be read")
 
 
-def process_input_path(input_filepath, replace, test_input, debug=0):
+def process_input_path(input_filepath, replace, test_input, mediastore, debug=0):
     replace = replace.copy()
     if replace is None:
         print("Process input path with no replacement settings")
@@ -2157,9 +2174,12 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
     )
 
     # get raw filepath
-    output_filepath = os.path.join(
-        tempfile.gettempdir(), os.path.basename(output_filepath)
-    )
+    if mediastore:
+        output_filepath = os.path.join(mediastore, os.path.basename(output_filepath))
+    else:
+        output_filepath = os.path.join(
+            tempfile.gettempdir(), os.path.basename(output_filepath)
+        )
     if debug > 0:
         print("***********")
         print("input file will be transcoded")
@@ -2199,8 +2219,41 @@ def process_input_path(input_filepath, replace, test_input, debug=0):
     }
 
 
+def check_protobuf_test_setup(options):
+    # ensure there is an input configuration
+    assert (
+        options.configfile is not None
+    ), "error: need a valid input configuration file"
+    test_suite = tests_definitions.TestSuite()
+    for file in options.configfile:
+        with open(file, "rb") as fd:
+            text_format.Merge(fd.read(), test_suite)
+
+    for test in test_suite.test:
+        if test.test_setup.serial:
+            options.serial = test.test_setup.serial
+        if test.test_setup.device_cmd:
+            if test.test_setup.device_cmd.toLower() == "idb":
+                set_idb_mode(True)
+        if test.test_setup.device_workdir:
+            options.device_workdir = test.test_setup.device_workdir
+        if test.test_setup.local_workdir:
+            options.local_workdir = test.test_setup.local_workdir
+        if test.test_setup.separate_sources:
+            options.separate_sources = True
+        if test.test_setup.mediastore:
+            options.mediastore = test.test_setup.mediastore
+        if test.test_setup.source_dir:
+            options.source_dir = test.test_setup.source_dir
+    return options
+
+
 def main(argv):
     options = get_options(argv)
+
+    if options.func == "run":
+        options = check_protobuf_test_setup(options)
+    # check if this is a test run and if these params are defined in the test
     options = process_options(options)
 
     if options.version:
@@ -2213,32 +2266,6 @@ def main(argv):
         model = "dry run"
         options.seral = "dry run"
     else:
-        # check if this is a test run and if these params are defined in the test
-        if options.func == "run":
-            # ensure there is an input configuration
-            assert (
-                options.configfile is not None
-            ), "error: need a valid input configuration file"
-        test_suite = tests_definitions.TestSuite()
-        for file in options.configfile:
-            with open(file, "rb") as fd:
-                text_format.Merge(fd.read(), test_suite)
-
-        for test in test_suite.test:
-            if test.test_setup.serial:
-                options.serial = test.test_setup.serial
-            if test.test_setup.device_cmd:
-                if test.test_setup.device_cmd.toLower() == "idb":
-                    set_idb_mode(True)
-            if test.test_setup.device_workdir:
-                options.device_workdir = test.test_setup.device_workdir
-            if test.test_setup.local_workdir:
-                options.local_workdir = test.test_setup.local_workdir
-            if test.test_setup.separate_sources:
-                options.separate_sources = True
-            if test.test_setup.mediastore:
-                options.mediastore = test.test_setup.mediastore
-
         # get model and serial number
         model, serial = encapp_tool.adb_cmds.get_device_info(
             options.serial, options.debug
