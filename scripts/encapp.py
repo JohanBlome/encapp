@@ -19,13 +19,16 @@ import time
 import datetime
 from google.protobuf import text_format
 import google.protobuf.descriptor_pool as descriptor_pool
+import multiprocessing
 
 import encapp_tool
 import encapp_tool.app_utils
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
+import encapp_quality
 import copy
 import random
+import pandas as pd
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -41,6 +44,8 @@ import tests_pb2 as tests_definitions  # noqa: E402
 RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
+
+QUALITY_PROCESSES = []
 
 FUNC_CHOICES = {
     "help": "show help options",
@@ -226,6 +231,7 @@ def valid_path(text):
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
     if debug > 0:
         print(f"running test: {protobuf_txt_filepath}")
+    # TODO: add special exec command here.
     if encapp_tool.adb_cmds.USE_IDB:
         # remove log file first
         ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
@@ -757,6 +763,24 @@ def run_codec_tests_file(
                 if not results[0]:
                     success = False
                 result_files += results[1]
+                # Run quality
+                if success and options.quality:
+                    global QUALITY_PROCESSES
+                    output = f"{local_workdir}/quality{basename}.csv"
+                    proc = multiprocessing.Process(
+                        target=encapp_quality.calculate_quality,
+                        args=(
+                            results[1],
+                            options.mediastore,
+                            output,
+                            True,
+                            options.debug,
+                        ),
+                    )
+                    QUALITY_PROCESSES.append([proc, output])
+                    proc.start()
+                    if debug:
+                        print("\n*** Quality proc is started!!!\n***\n")
 
             return success, result_files
 
@@ -1997,6 +2021,11 @@ def add_args(parser):
         default=None,
         help="Root directory for sources. If not set the input.filepath wll be absolute or relative from the current",
     )
+    parser.add_argument(
+        "--quality",
+        action="store_true",
+        help="Run the quality calculations as a part of the session. Same as running the encapp_quality tool after the encoding",
+    )
 
 
 def get_options(argv):
@@ -2338,6 +2367,31 @@ def main(argv):
             # first clear out old result
             remove_encapp_gen_files(serial, options.device_workdir, options.debug)
         result_ok, result_json = codec_test(options, model, serial, options.debug)
+
+        global QUALITY_PROCESSES
+
+        if options.quality:
+            csvdata = []
+            counter = 1
+            total = len(QUALITY_PROCESSES)
+            while len(QUALITY_PROCESSES) > 0:
+                print(f"Wait for quality measurement, {counter}/{total}\r", end="")
+                quality = QUALITY_PROCESSES.pop()
+                proc = quality[0]
+                proc.join()
+                csvdata.append(quality[1])
+
+            output_csv = []
+            data = None
+            for file in csvdata:
+                data_ = pd.read_csv(file)
+                if data is None:
+                    data = data_
+                else:
+                    data = pd.merge(data, data_, how="outer")
+                os.remove(file)
+
+            data.to_csv(f"{options.local_workdir}/quality.csv")
 
         if not options.ignore_results and not options.dry_run:
             verify_app_version(result_json)
