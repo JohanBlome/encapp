@@ -18,6 +18,18 @@ import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import encapp
 import vmaf_json2csv as vmafcsv
+from google.protobuf import text_format
+from google.protobuf.json_format import MessageToDict
+
+SCRIPT_ROOT_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
+)
+SCRIPT_PROTO_DIR = os.path.abspath(
+    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+)
+sys.path.append(SCRIPT_ROOT_DIR)
+sys.path.append(SCRIPT_PROTO_DIR)
+import tests_pb2 as tests_definitions  # noqa: E402
 
 PSNR_RE = re.compile(
     r"y:(?P<psnr_y>[0-9.]*) u:(?P<psnr_u>[0-9.]*) v:(?P<psnr_v>[0-9.]*) average:(?P<psnr_avg>[0-9.]*)"
@@ -427,6 +439,12 @@ def run_quality(test_file, options, debug):
 
     recalc = options.get("recalc", None)
     test = results.get("test")
+    print(f"{test=}, {type(test)=}")
+    if type(test) == str:
+        # Historically this has always been a dictionary but if this is a string describing a protobuf
+        # try to parse it into a dict
+        test = text_format.Parse(test, tests_definitions.Test())
+        test = MessageToDict(test)
     if (
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
@@ -470,23 +488,24 @@ def run_quality(test_file, options, debug):
             output_framerate = output_media_format.get("frame-rate")
         else:
             if test != None:
-                resolution = test["configure"]["resolution"]
-                if len(resolution) == 0:
-                    resolution = test["input"]["resolution"]
+                resolution = test["configure"].get("resolution", None)
+                if not resolution or len(resolution) == 0:
+                    resolution = test["input"].get("resolution", None)
 
-                res = encapp.parse_resolution(resolution)
-                output_width = res[0]
-                output_height = res[1]
+                if resolution:
+                    res = encapp.parse_resolution(resolution)
+                    output_width = res[0]
+                    output_height = res[1]
 
-            else:
+            if output_width == -1 or output_height == -1:
                 output_width = video_info["width"]
                 output_height = video_info["height"]
 
             if test != None:
-                output_framerate = test["configure"]["framerate"]
-                if output_framerate == 0:
-                    output_framerate = test["input"]["framerate"]
-            else:
+                output_framerate = test["configure"].get("framerate", None)
+                if not output_framerate or output_framerate == 0:
+                    output_framerate = test["input"].get("framerate", None)
+            if not output_framerate or output_framerate <= 0:
                 output_framerate = video_info["framerate"]
             print("WARNING! output media format is missing, guessing values...")
             print(
@@ -662,6 +681,7 @@ def run_quality(test_file, options, debug):
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
+        print("Stats doen, look at model")
         model = device_info.get("props", {}).get("ro.product.model", "")
         if options.get("model", None):
             model = options.model
@@ -721,7 +741,6 @@ def run_quality(test_file, options, debug):
         pframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "P"]
         bframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "B"]
         iframeinterval = video_info["duration"] / len(iframes)
-
         iframe_size = pframes_size = bframes_size = 0
         if len(iframes) > 0:
             iframes_size = iframes["size"].mean()
@@ -729,6 +748,9 @@ def run_quality(test_file, options, debug):
             pframes_size = pframes["size"].mean()
         if len(bframes) > 0:
             bframes_size = bframes["size"].mean()
+        if not framerate or framerate == 0:
+            print("Warning, framerate is 0, setting it to 30")
+            framerate = 30
         calculated_bitrate = int((file_size * 8 * framerate) / framecount)
         source_complexity = ""
         source_motion = ""
@@ -736,7 +758,6 @@ def run_quality(test_file, options, debug):
             source_complexity = options.mark_complexity
         if options.get("mark_motion", None):
             source_motion = options.mark_motion
-
         if len(results) == 0:
             # something is wrong...
             meanbitrate = bitrate = calculated_bitrate
