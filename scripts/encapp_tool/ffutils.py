@@ -32,22 +32,29 @@ def ffprobe_parse_output(stdout):
         if line in ("[STREAM]", "[/STREAM]"):
             # ignore start/end of stream
             continue
-        key, value = line.split("=")
+        if "=" in line:
+            key, value = line.split("=")
+        else:
+            continue
         # store interesting fields
         if key in FFPROBE_FIELDS.keys():
-            # process some values
-            if key == "r_frame_rate":
-                split = value.split("/")
-                if len(split) > 1:
-                    value = round(float(split[0]) / float(split[1]), 2)
-                else:
+            try:
+                # process some values
+                if key == "r_frame_rate":
+                    split = value.split("/")
+                    if len(split) > 1:
+                        value = round(float(split[0]) / float(split[1]), 2)
+                    else:
+                        value = float(value)
+                elif key == "width" or key == "height":
+                    value = int(value)
+                elif key == "duration":
                     value = float(value)
-            elif key == "width" or key == "height":
-                value = int(value)
-            elif key == "duration":
-                value = float(value)
-            key = FFPROBE_FIELDS[key]
-            videofile_config[key] = value
+
+                key = FFPROBE_FIELDS[key]
+                videofile_config[key] = value
+            except Exception as ex:
+                print("\n\n***\nError: could not find key = '" + key + "', " + ex)
     return videofile_config
 
 

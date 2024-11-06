@@ -228,40 +228,46 @@ def valid_path(text):
     return ret
 
 
-def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
+def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", debug=0):
     if debug > 0:
         print(f"running test: {protobuf_txt_filepath}")
     # TODO: add special exec command here.
-    if encapp_tool.adb_cmds.USE_IDB:
-        # remove log file first
-        ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-            f"idb file rm Documents/encapp.log --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} ",
-            debug,
-        )
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                f"test {protobuf_txt_filepath}",
-                debug,
-            )
-        else:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                f"test {protobuf_txt_filepath}",
-                debug,
-            )
+    if len(run_cmd) > 0:
+        # TODO: can we assume adb?
+        cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
+        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+
     else:
-        # clean the logcat first
-        encapp_tool.adb_cmds.reset_logcat(serial)
-        ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-            f"adb -s {serial} shell am start "
-            f"-e workdir {device_workdir} "
-            f"-e test {protobuf_txt_filepath} "
-            f"{encapp_tool.app_utils.ACTIVITY}",
-            debug,
-        )
-        assert ret, f"ERROR: {stderr}"
-    wait_for_exit(serial)
+        if encapp_tool.adb_cmds.USE_IDB:
+            # remove log file first
+            ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
+                f"idb file rm Documents/encapp.log --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} ",
+                debug,
+            )
+            if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
+                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+                    f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
+                    f"test {protobuf_txt_filepath}",
+                    debug,
+                )
+            else:
+                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
+                    f"test {protobuf_txt_filepath}",
+                    debug,
+                )
+        else:
+            # clean the logcat first
+            encapp_tool.adb_cmds.reset_logcat(serial)
+            ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
+                f"adb -s {serial} shell am start "
+                f"-e workdir {device_workdir} "
+                f"-e test {protobuf_txt_filepath} "
+                f"{encapp_tool.app_utils.ACTIVITY}",
+                debug,
+            )
+            assert ret, f"ERROR: {stderr}"
+        wait_for_exit(serial)
 
 
 def collect_results(
@@ -1477,8 +1483,11 @@ def run_codec_tests(
                 protobuf_txt_filepath = (
                     f"{device_workdir}/{valid_path(test.common.id)}.pbtxt"
                 )
-            run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
+            run_cmd = ""
+            if test.test_setup and test.test_setup.run_cmd:
+                run_cmd = test.test_setup.run_cmd
+            run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug=debug)
             with open(tests_run, "a") as passed:
                 passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
 
@@ -1497,10 +1506,14 @@ def run_codec_tests(
                     )
                 except:
                     print("Changing name on the ios log file")
-            print("Collect results")
             collected_results.extend(
                 collect_results(
-                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                    local_workdir,
+                    protobuf_txt_filepath,
+                    serial,
+                    device_workdir,
+                    run_cmd=run_cmd,
+                    debug=debug,
                 )
             )
 
@@ -1539,8 +1552,14 @@ def run_codec_tests(
 
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
+        run_cmd = ""
+        test = test_suite.test[0]
+        if test.test_setup and test.test_setup.run_cmd:
+            run_cmd = test.test_setup.run_cmd
+        run_encapp_test(
+            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
+        )
 
-        run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
         if encapp_tool.adb_cmds.USE_IDB:
@@ -2163,7 +2182,9 @@ def verify_app_version(json_files):
                         f"and application ({version})"
                     )
             except:
-                print(f"File {fl} failed to be read")
+                print(
+                    f"Verify app version failed. File {fl} failed to be read properly."
+                )
 
 
 def process_input_path(input_filepath, replace, test_input, mediastore, debug=0):
@@ -2390,8 +2411,10 @@ def main(argv):
                 else:
                     data = pd.merge(data, data_, how="outer")
                 os.remove(file)
-
-            data.to_csv(f"{options.local_workdir}/quality.csv")
+            if data is not None:
+                data.to_csv(f"{options.local_workdir}/quality.csv")
+            else:
+                print("ERROR: no data produced")
 
         if not options.ignore_results and not options.dry_run:
             verify_app_version(result_json)
