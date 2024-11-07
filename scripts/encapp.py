@@ -697,6 +697,8 @@ def run_codec_tests_file(
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
 
+        result_files = []
+        global QUALITY_PROCESSES
         if options.separate_sources:
             # create test(s) for each source
             # dictionary with source as key
@@ -722,7 +724,6 @@ def run_codec_tests_file(
                 serial, ".*[yuv|raw]$", options.device_workdir, options.debug
             )
             success = True
-            result_files = []
             for testsource in test_collection:
                 files = []
                 # find file
@@ -772,7 +773,6 @@ def run_codec_tests_file(
                 result_files += results[1]
                 # Run quality
                 if success and options.quality:
-                    global QUALITY_PROCESSES
                     output = f"{local_workdir}/quality{basename}.csv"
                     proc = multiprocessing.Process(
                         target=encapp_quality.calculate_quality,
@@ -808,7 +808,7 @@ def run_codec_tests_file(
                     print("Dry run - do nothing")
                 return None, None
             else:
-                return run_codec_tests(
+                results = run_codec_tests(
                     test_suite,
                     files_to_push,
                     model,
@@ -821,6 +821,28 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
+                # Run quality
+                success = True
+                if not results[0]:
+                    success = False
+                result_files += results[1]
+                if success and options.quality:
+                    output = f"{local_workdir}/quality.csv"
+                    proc = multiprocessing.Process(
+                        target=encapp_quality.calculate_quality,
+                        args=(
+                            results[1],
+                            options.mediastore,
+                            output,
+                            True,
+                            options.debug,
+                        ),
+                    )
+                    QUALITY_PROCESSES.append([proc, output])
+                    proc.start()
+                    if debug:
+                        print("\n*** Quality proc is started!!!\n***\n")
+                return success, result_files
     else:
         print(
             f"Apparently something is not quite right, check the test definition: {test_suite=}"
@@ -2175,13 +2197,16 @@ def verify_app_version(json_files):
         with open(fl) as f:
             try:
                 data = json.load(f)
-                version = data["encapp_version"]
-                if encapp_tool.__version__ != version:
-                    print(
-                        f"Warning, version missmatch between script "
-                        f"({encapp_tool.__version__}) "
-                        f"and application ({version})"
-                    )
+                if "encapp_version" in data:
+                    version = data["encapp_version"]
+                    if encapp_tool.__version__ != version:
+                        print(
+                            f"Warning, version missmatch between script "
+                            f"({encapp_tool.__version__}) "
+                            f"and application ({version})"
+                        )
+                else:
+                    print(f"Version info is missing in {fl}")
             except:
                 print(
                     f"Verify app version failed. File {fl} failed to be read properly."
