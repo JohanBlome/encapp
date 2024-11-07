@@ -2340,11 +2340,13 @@ def main(argv):
     options = get_options(argv)
 
     # check if this is a test run and if these params are defined in the test
+    proto_options = None
     if options.func == "run":
         proto_options = check_protobuf_test_setup(options)
     options = process_options(options)
     # cli should always override
-    options = merge_options(proto_options, options)
+    if proto_options:
+        options = merge_options(proto_options, options)
     if options.version:
         print("version: %s" % encapp_tool.__version__)
         sys.exit(0)
