@@ -6,6 +6,7 @@ and save encoded video and rate distortion results in the directory
 """
 
 import os
+import copy
 import humanfriendly
 import json
 import sys
@@ -2278,34 +2279,47 @@ def check_protobuf_test_setup(options):
     for file in options.configfile:
         with open(file, "rb") as fd:
             text_format.Merge(fd.read(), test_suite)
-
+    options_ = copy.deepcopy(options)
     for test in test_suite.test:
         if test.test_setup.serial:
-            options.serial = test.test_setup.serial
+            options_.serial = test.test_setup.serial
         if test.test_setup.device_cmd:
             if test.test_setup.device_cmd.toLower() == "idb":
                 set_idb_mode(True)
         if test.test_setup.device_workdir:
-            options.device_workdir = test.test_setup.device_workdir
+            options_.device_workdir = test.test_setup.device_workdir
         if test.test_setup.local_workdir:
-            options.local_workdir = test.test_setup.local_workdir
+            options_.local_workdir = test.test_setup.local_workdir
         if test.test_setup.separate_sources:
-            options.separate_sources = True
+            options_.separate_sources = True
         if test.test_setup.mediastore:
-            options.mediastore = test.test_setup.mediastore
+            options_.mediastore = test.test_setup.mediastore
         if test.test_setup.source_dir:
-            options.source_dir = test.test_setup.source_dir
-    return options
+            options_.source_dir = test.test_setup.source_dir
+    return options_
+
+
+def merge_options(option1, options2):
+    """Merge the two options, let the second have precedence."""
+    if not option1:
+        return options2
+    if not options2:
+        return option1
+    for key in options2.__dict__:
+        if options2.__dict__[key] is not None:
+            option1.__dict__[key] = options2.__dict__[key]
+    return option1
 
 
 def main(argv):
     options = get_options(argv)
 
-    if options.func == "run":
-        options = check_protobuf_test_setup(options)
     # check if this is a test run and if these params are defined in the test
+    if options.func == "run":
+        proto_options = check_protobuf_test_setup(options)
     options = process_options(options)
-
+    # cli should always override
+    options = merge_options(proto_options, options)
     if options.version:
         print("version: %s" % encapp_tool.__version__)
         sys.exit(0)
