@@ -42,6 +42,11 @@ import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import com.google.protobuf.TextFormat;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -187,52 +192,53 @@ public class MainActivity extends AppCompatActivity {
                 }
             })).start();
         } else {
-            listCodecs();
+            listCodecsJson();
         }
 
     }
 
-    protected void listCodecs() {
+
+    protected void listCodecsJson() {
         Log.d(TAG, "List codecs");
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
         MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-
-        StringBuffer encoders = new StringBuffer("encoders {\n");
-        StringBuffer decoders = new StringBuffer("decoders {\n");
-
+        JSONObject json = new JSONObject();
+        JSONArray encoders = new JSONArray();
+        JSONArray decoders = new JSONArray();
         for (MediaCodecInfo info : codecInfos) {
-            String str = MediaCodecInfoHelper.toText(info, 1);
-            if (str.toLowerCase(Locale.US).contains("video")) {
+            JSONObject jcodec = null;
+            try {
+                jcodec = MediaCodecInfoHelper.toJson(info);
+            } catch (JSONException e) {
+                throw new RuntimeException(e);
+            }
+            //TODO: check for video
+            if (true) {
                 if (info.isEncoder()) {
-                    encoders.append(str);
+                    encoders.put(jcodec);
                 } else {
-                    decoders.append(str);
+                    decoders.put(jcodec);
                 }
 
             }
 
 
         }
-        encoders.append("}\n");
-        decoders.append("}\n");
-
-        log(encoders.toString());
-        log("\n" + decoders);
-        Log.d(TAG, encoders + "\n" + decoders);
-
-        FileWriter writer = null;
         try {
+            json.put("encoders", encoders);
+            json.put("decoders", decoders);
+            FileWriter writer = null;
             writer = new FileWriter(CliSettings.getWorkDir() + "/codecs.txt");
             Log.d(TAG, "Write to file");
-            writer.write(encoders.toString());
-            writer.write(decoders.toString());
+            writer.write(json.toString(4));
             writer.flush();
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
         }
     }
-
     public void exit() {
         Log.d(TAG, "Finish and remove");
         mMemLoad.stop();
@@ -285,7 +291,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (mExtraData.containsKey(CliSettings.LIST_CODECS)) {
-            listCodecs();
+            listCodecsJson();
             try {
                 Log.d(TAG, "codecs listed, hold time: " + mUIHoldtimeSec);
                 if (mUIHoldtimeSec > 0) {

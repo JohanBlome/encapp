@@ -30,6 +30,7 @@ import encapp_quality
 import copy
 import random
 import pandas as pd
+import pprint
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -52,7 +53,7 @@ FUNC_CHOICES = {
     "help": "show help options",
     "install": "install apks",
     "uninstall": "uninstall apks",
-    "list": "list codecs and devices supported",
+    "list": "list codecs and devices supported. It can be used to search and file. For more options use 'list -h'.",
     "run": "run codec test case",
     "kill": "kill application",
     "clear": "remove all encapp associated files",
@@ -1609,18 +1610,50 @@ def run_codec_tests(
     return collected_results
 
 
-def list_codecs(serial, model, device_workdir, debug=0):
-    model_clean = model.replace(" ", "_")
-    filename = f"codecs_{model_clean}.txt"
+def list_codecs(
+    serial: str,
+    model: str,
+    device_workdir: str,
+    output: str = None,
+    cache: bool = True,
+    debug: int = 0,
+) -> str:
+    folder = ""
+    filename = None
+    if output:
+        # check if existing file or folder
+        if os.path.exists(output):
+            if os.path.isfile(output):
+                filename = output
+            else:
+                folder = output
+        else:
+            if output[-1] == "/":
+                # create dir
+                os.mkdir(output)
+                folder = output
+            else:
+                filename = output
+    if len(folder) > 0:
+        folder += "/"
+    if not filename:
+        model_clean = model.replace(" ", "_")
+        filename = f"{folder}codecs_{model_clean}.txt"
+
+    # If file exists and from today, read the cached file
+    if os.path.isfile(filename) and cache:
+        # check timestamp
+        ts = os.path.getmtime(filename)
+        now = time.time()
+        diff = now - ts
+        if diff < 3600:
+            return filename
+
     if encapp_tool.adb_cmds.USE_IDB:
         if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            cmd = {
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
-            }
+            cmd = f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
         else:
-            cmd = (
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs",
-            )
+            cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
         # cmd = {f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"}
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
         assert ret, 'error getting codec list: "%s"' % stdout
@@ -1643,12 +1676,7 @@ def list_codecs(serial, model, device_workdir, debug=0):
         adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
         assert ret, 'error getting codec list: "%s"' % stdout
-
-    with open(filename, "r") as codec_file:
-        lines = codec_file.readlines()
-        for line in lines:
-            print(line.split("\n")[0])
-        print(f"File is available in current dir as {filename}")
+    return filename
 
 
 def read_json_file(jsonfile, debug):
@@ -1799,56 +1827,6 @@ def set_idb_mode(mode):
 
 
 def add_args(parser):
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="store_true",
-        dest="version",
-        default=False,
-        help="Print version",
-    )
-    parser.add_argument(
-        "-d",
-        "--debug",
-        action="count",
-        dest="debug",
-        default=default_values["debug"],
-        help="Increase verbosity (use multiple times for more)",
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_const",
-        dest="debug",
-        const=-1,
-        help="Zero verbosity",
-    )
-    parser.add_argument("--serial", help="Android device serial number")
-    parser.add_argument(
-        "--install",
-        action="store_const",
-        dest="install",
-        const=True,
-        default=default_values["install"],
-        help="Do install apk",
-    )
-    parser.add_argument(
-        "--no-install",
-        action="store_const",
-        dest="install",
-        const=False,
-        help="Do not install apk",
-    )
-    parser.add_argument(
-        "func",
-        type=str,
-        nargs="?",
-        default=default_values["func"],
-        choices=FUNC_CHOICES.keys(),
-        metavar="%s"
-        % (" | ".join("{}: {}".format(k, v) for k, v in FUNC_CHOICES.items())),
-        help="function arg",
-    )
-
     # generic replacement mechanism
     class ReplaceAction(argparse.Action):
         def __call__(self, parser, options, values, option_string=None):
@@ -1869,7 +1847,6 @@ def add_args(parser):
         help='use <key> <value> (e.g. "-e configure.bitrate_mode cbr")',
         default={},
     )
-
     # replacement shortcuts
     parser.add_argument(
         "-i",
@@ -1941,7 +1918,6 @@ def add_args(parser):
         (1) will simply multiply the source test the set number of times as parallell case and
         (2) will add x number of the source in addition to
         the test1.pbxt y number of times etc.
-
         If updating a parameter all tests will get the same update.""",
     )
     parser.add_argument(
@@ -1953,14 +1929,6 @@ def add_args(parser):
         help="wanted pix fmt for the encoder",
     )
     # other parameters
-    parser.add_argument(
-        "--device-workdir",
-        type=str,
-        dest="device_workdir",
-        default=None,
-        metavar="device_workdir",
-        help="work (storage) directory on device",
-    )
     parser.add_argument(
         "-w",
         "--local-workdir",
@@ -1993,13 +1961,6 @@ def add_args(parser):
         help="Minimize file interaction",
     )
     parser.add_argument(
-        "--idb",
-        action="store_true",
-        dest="idb",
-        default=False,
-        help="Run on ios using idb",
-    )
-    parser.add_argument(
         "--split",
         action="store_true",
         dest="split",
@@ -2028,12 +1989,6 @@ def add_args(parser):
         dest="dry_run",
         default=False,
         help="Do not execute the tests. Just prepare the test(s).",
-    )
-    parser.add_argument(
-        "--bundleid",
-        type=str,
-        default=None,
-        help="Implicitly it will turn on IDB option",
     )
     parser.add_argument(
         "--width_align",
@@ -2070,13 +2025,227 @@ def add_args(parser):
     )
 
 
-def get_options(argv):
+input_args = {
+    # generic
+    "version": {
+        "func": FUNC_CHOICES,
+        "short": "-v",
+        "long": "--version",
+        "args": {
+            "action": "store_true",
+            "help": "Print version",
+        },
+    },
+    "debug": {
+        "func": FUNC_CHOICES,
+        "short": "-d",
+        "long": "--debug",
+        "args": {
+            "dest": "debug",
+            "default": default_values["debug"],
+            "help": "Increase verbosity (use multiple times for more)",
+        },
+    },
+    "quiet": {
+        "func": FUNC_CHOICES,
+        "short": "-q",
+        "long": "--quiet",
+        "args": {
+            "action": "store_true",
+            "help": "Zero verbosity",
+        },
+    },
+    "serial": {
+        "func": FUNC_CHOICES,
+        "long": "--serial",
+        "args": {
+            "type": str,
+            "help": "Device serial.",
+        },
+    },
+    "install": {
+        "func": FUNC_CHOICES,
+        "long": "--install",
+        "args": {
+            "action": "store_const",
+            "dest": "install",
+            "const": True,
+            "default": default_values["install"],
+            "help": "Do install apk.",
+        },
+    },
+    "no_install": {
+        "func": FUNC_CHOICES,
+        "long": "--no-install",
+        "args": {
+            "action": "store_const",
+            "dest": "install",
+            "const": False,
+            "help": "Do not install apk.",
+        },
+    },
+    "idb": {
+        "func": FUNC_CHOICES,
+        "long": "--idb",
+        "args": {
+            "action": "store_true",
+            "help": "Run on ios using idb",
+        },
+    },
+    "bundleid": {
+        "func": FUNC_CHOICES,
+        "long": "--bundleid",
+        "args": {
+            "type": str,
+            "default": None,
+            "help": "Sets the bundleid to be used an implicitly turns on idb option",
+        },
+    },
+    "device-workdir": {
+        "func": FUNC_CHOICES,
+        "long": "--device-workdir",
+        "args": {
+            "type": str,
+            "default": None,
+            "metavar": "device_workdir",
+            "help": "work (storage) directory on device",
+        },
+    },
+    # List specific arguments
+    "encoders": {
+        "func": "list",
+        "short": "-enc",
+        "long": "--encoders",
+        "args": {
+            "action": "store_true",
+            "help": "Show encoders",
+        },
+    },
+    "decoders": {
+        "func": "list",
+        "short": "-dec",
+        "long": "--decoders",
+        "args": {
+            "action": "store_true",
+            "help": "Show decoders",
+        },
+    },
+    "hw": {
+        "func": "list",
+        "short": "-hw",
+        "long": "--hw",
+        "args": {
+            "action": "store_true",
+            "help": "Only show hardware accelerated codecs",
+        },
+    },
+    "sw": {
+        "func": "list",
+        "short": "--sw",
+        "long": "--sw",
+        "args": {
+            "action": "store_true",
+            "help": "Only show software accelerated codecs",
+        },
+    },
+    "audio": {
+        "func": "list",
+        "long": "--audio",
+        "args": {
+            "action": "store_true",
+            "help": "Only show audio codec",
+        },
+    },
+    "info_level": {
+        "func": "list",
+        "short": "-l",
+        "long": "--info_level",
+        "args": {
+            "type": int,
+            "help": "How much to show. Level > 0 filters parts of the information for more compact displat. Level -1 shows all. Default only name will be shown.",
+        },
+    },
+    "codec": {
+        "func": "list",
+        "short": "-c",
+        "long": "--codec",
+        "args": {
+            "type": str,
+            "help": "Regexp filter codec name",
+        },
+    },
+    "no_cache": {
+        "func": "list",
+        "short": "-nc",
+        "long": "--no_cache",
+        "args": {
+            "action": "store_true",
+            "help": "No cache, refresh from device",
+        },
+    },
+    "output": {
+        "func": "list",
+        "short": "-o",
+        "long": "--output",
+        "args": {
+            "type": str,
+            "help": "Folder or filename. Folder decided either by prexising name or ending '/'",
+        },
+    },
+}
+
+
+# Currently most args are connected to "run" but the number of args creates problem for e.g. list
+# This is a way to have more granularity
+def add_func_arg(func: str, parser: argparse.ArgumentParser) -> None:
+    for key, value in input_args.items():
+        if func in value["func"]:
+            if "short" in value and value["short"]:
+                # First part of add_argument has arbitrary length and not keywords
+                # This is why short and long are set here (No need for more than these two I hope).
+                parser.add_argument(
+                    value["short"],  # type: ignore
+                    value["long"],  # type: ignore
+                    **value["args"],
+                )
+            else:
+                parser.add_argument(
+                    value["long"],  # type: ignore
+                    **value["args"],  # type: ignore
+                )
+
+
+def add_functions(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "func",
+        type=str,
+        nargs="?",
+        default=default_values["func"],
+        choices=FUNC_CHOICES.keys(),
+        metavar="%s"
+        % (" | ".join("{}: {}".format(k, v) for k, v in FUNC_CHOICES.items())),
+        help="function arg",
+    )
+
+
+def get_options(argv: list) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=FlexiFormatter
     )
-
-    add_args(parser)
-
+    func_index = [
+        index for index, val in enumerate(argv) if argv[index] in FUNC_CHOICES
+    ]
+    func = None
+    if len(func_index) == 1:
+        func = argv[func_index[0]]
+    if not func:
+        # empty
+        func = default_values["func"]
+    add_functions(parser)
+    if func != "list":
+        add_args(parser)
+    if func in FUNC_CHOICES:
+        add_func_arg(func, parser)
     options = parser.parse_args(argv[1:])
     options.desc = "testing"
     if options.version:
@@ -2128,15 +2297,16 @@ def process_options(options):
         "resolution": "configure.resolution",
         "framerate": "configure.framerate",
     }
-    for key, val in SHORTCUT_LIST.items():
-        if vars(options).get(key, None) is not None:
-            # shortcut was defined
-            k1, k2 = val.split(".")
-            if k1 not in options.replace:
-                options.replace[k1] = {}
-            options.replace[k1][k2] = vars(options)[key]
-            # remove the old value
-            delattr(options, key)
+    if "replace" in options:
+        for key, val in SHORTCUT_LIST.items():
+            if vars(options).get(key, None) is not None:
+                # shortcut was defined
+                k1, k2 = val.split(".")
+                if k1 not in options.replace:
+                    options.replace[k1] = {}
+                options.replace[k1][k2] = vars(options)[key]
+                # remove the old value
+                delattr(options, key)
 
     # 3. check the validity of some parameters
     if "replace" not in options or not options.replace:
@@ -2148,7 +2318,7 @@ def process_options(options):
             if os.path.exists(videofile)
             else f"file {videofile} is not readable"
         )
-    if options.dim_align:
+    if "dim_align" in options and options.dim_align:
         options.width_align = options.dim_align
         options.height_align = options.dim_align
 
@@ -2183,7 +2353,7 @@ def process_options(options):
                 if "extension" in options:
                     options.extension = d["extension"]
     # 5. check mediastore
-    if options.mediastore:
+    if "mediastore" in options and options.mediastore:
         if not os.path.exists(options.mediastore):
             os.mkdir(options.mediastore)
     return options
@@ -2324,6 +2494,84 @@ def check_protobuf_test_setup(options):
     return options_
 
 
+def regexp_wildcard(pattern: str, data: str) -> re.Match:
+    m = None
+    try:
+        m = re.search(pattern, data)
+    except re.error  as ex:
+        # Just silently ignore
+        pass
+    if not m and "*" in pattern:
+        pattern = pattern.replace("*", ".*")
+        m = re.search(pattern, data)
+    return m
+
+
+def find_codecs(
+    codecs: dict,
+    codec_name: str,
+    encoder: bool = True,
+    decoder: bool = False,
+    hw: bool = True,
+    sw=True,
+) -> str:
+    for codec in codecs:
+        if not encoder and codec["is_encoder"]:
+            continue
+        if not decoder and not codec["is_encoder"]:
+            continue
+        mime = codec["media_type"]["mime_type"]
+        # We do not look at audio (for mime)
+        if "audio" in mime:
+            continue
+        if hw and not codec["is_hardware_accelerated"]:
+            return
+        if sw and codec["is_hardware_accelerated"]:
+            return
+
+        # filter on codec, regexp
+        m = regexp_wildcard(codec_name, codec["name"].lower())
+        if not m:
+            m = regexp_wildcard(codec_name, codec["canonical_name"].lower())
+        if not m:
+            continue
+
+        print(codec["name"])
+        return codec["name"]
+
+
+def print_codec_info(codec: dict, options: argparse.Namespace) -> None:
+    if not options.encoders and codec["is_encoder"]:
+        return
+    if not options.decoders and not codec["is_encoder"]:
+        return
+    mime = codec["media_type"]["mime_type"]
+    if not options.audio and "audio" in mime:
+        return
+    if options.audio and not "audio" in mime:
+        return
+    if options.hw and not codec["is_hardware_accelerated"]:
+        return
+    if options.sw and codec["is_hardware_accelerated"]:
+        return
+    if options.codec:
+        # filter on codec, regexp
+        m = regexp_wildcard(options.codec, codec["name"].lower())
+        if not m:
+            m = regexp_wildcard(options.codec, codec["canonical_name"].lower())
+        if not m:
+            return
+
+    if options.info_level:
+        # print everything
+        depth = options.info_level
+        if depth < 0:
+            depth = None
+        pprint.pp(codec, sort_dicts=False, indent=4, depth=depth)
+    else:
+        print(codec["name"])
+
+
 def merge_options(option1, options2):
     """Merge the two options, let the second have precedence."""
     if not option1:
@@ -2338,7 +2586,6 @@ def merge_options(option1, options2):
 
 def main(argv):
     options = get_options(argv)
-
     # check if this is a test run and if these params are defined in the test
     proto_options = None
     if options.func == "run":
@@ -2353,7 +2600,7 @@ def main(argv):
 
     serial = ""
     # get model and serial number
-    if options.dry_run:
+    if "dry_run" in options and options.dry_run:
         model = "dry run"
         options.seral = "dry run"
     else:
@@ -2365,10 +2612,13 @@ def main(argv):
     # install app
     if options.func == "install" or options.install:
         encapp_tool.app_utils.install_app(serial, options.debug)
+        exit(0)
 
     # uninstall app
     if options.func == "uninstall":
         encapp_tool.app_utils.uninstall_app(serial, options.debug)
+        print("UNINSTALL")
+        exit(0)
         return
 
     if options.func == "kill":
@@ -2409,7 +2659,7 @@ def main(argv):
         )
         return
 
-    if not options.dry_run:
+    if "dry_run" in options and not options.dry_run:
         # ensure the app is correctly installed
         assert encapp_tool.app_utils.install_ok(serial, options.debug), (
             "Apps not installed in %s" % serial
@@ -2417,7 +2667,29 @@ def main(argv):
 
     # run function
     if options.func == "list":
-        list_codecs(serial, model, options.device_workdir, options.debug)
+        codecs_file = list_codecs(
+            serial,
+            model,
+            options.device_workdir,
+            options.output,
+            not options.no_cache,
+            options.debug,
+        )
+        # Read json
+        data = None
+        if not os.path.exists(codecs_file):
+            print(f"ERROR: {codecs_file} does not exist")
+            exit - 1
+        with open(codecs_file, "r") as codec_file:
+            data = json.load(codec_file)
+        # check filters
+        if not options.decoders and not options.encoders:
+            # by default show encoders
+            options.encoders = True
+        for topkey in data.keys():
+            for codec in data[topkey]:
+                print_codec_info(codec, options)
+        return 0
 
     elif options.func == "run":
         # ensure there is an input configuration
