@@ -18,37 +18,35 @@ import java.util.Set;
 
 import com.facebook.encapp.proto.PixFmt;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 
 public class MediaCodecInfoHelper {
     final static int mIndentWidth = 2;
     protected final String TAG = "MediaCodecInfoHelper";
-    public static String getIndentation(int indent) {
-        String tab = "";
-        if (indent > 0){
-            tab = String.format("%" + (indent * mIndentWidth) + "s", ' ');
-        }
-        return tab;
-    }
+
 
     final static List<Integer> mBitrateModeList = Arrays.asList(
-        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR,
-        //MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR_FD,
-        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ,
-        MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR,
+            //MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR_FD,
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ,
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
     );
 
     public static String bitrateModeToString(int bitrate_mode) {
-        switch(bitrate_mode) {
+        switch (bitrate_mode) {
             case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR:
                 return "MODE_CBR";
             //case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR_FD:
-                //return "MODE_CBR_FD";
+            //return "MODE_CBR_FD";
             case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ:
                 return "MODE_CQ";
             case MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR:
                 return "MODE_VBR";
             default:
-                return bitrate_mode  + " is no bitrate mode";
+                return bitrate_mode + " is no bitrate mode";
         }
     }
 
@@ -65,85 +63,56 @@ public class MediaCodecInfoHelper {
             MediaCodecInfo.CodecCapabilities.FEATURE_SecurePlayback,
             MediaCodecInfo.CodecCapabilities.FEATURE_TunneledPlayback);
 
-    public static String encoderCapabilitiesToString(MediaCodecInfo.EncoderCapabilities encoder_capabilities, int indent) {
+    public static JSONObject encoderCapabilitiesToJson(MediaCodecInfo.EncoderCapabilities encoder_capabilities) throws JSONException {
+        JSONObject json = new JSONObject();
         if (encoder_capabilities == null) {
-            return "";
+            return json;
         }
 
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
 
-        str.append(tab + "encoder_capabilities {\n");
-
-        indent += 1;
-        tab = getIndentation(indent);
-
-        str.append(tab + "complexity_range: " + encoder_capabilities.getComplexityRange().toString() + "\n");
+        //str.append(tab + "encoder_capabilities {\n");
+        json.put("complexity_range", encoder_capabilities.getComplexityRange().toString());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            str.append(tab + "quality_range: " + encoder_capabilities.getQualityRange().toString() + "\n");
+            json.put("quality_range", encoder_capabilities.getQualityRange().toString());
         }
         for (int bitrate_mode : mBitrateModeList) {
-            str.append(tab + bitrateModeToString(bitrate_mode) + ": " + encoder_capabilities.isBitrateModeSupported(bitrate_mode) + "\n");
+            json.put(bitrateModeToString(bitrate_mode) + "", encoder_capabilities.isBitrateModeSupported(bitrate_mode));
         }
-
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
     }
 
-    public static String videoCapabilitiesToString(MediaCodecInfo.VideoCapabilities video_capabilities, int indent) {
+
+    public static JSONObject videoCapabilitiesToJson(MediaCodecInfo.VideoCapabilities video_capabilities) throws JSONException {
+        JSONObject json = new JSONObject();
         if (video_capabilities == null) {
-            return "";
+            return json;
         }
 
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
+        json.put("bitrate_range", video_capabilities.getBitrateRange().toString());
+        json.put("height_alignment", video_capabilities.getHeightAlignment());
+        json.put("width_alignment", video_capabilities.getWidthAlignment());
+        json.put("supported_frame_rates", video_capabilities.getSupportedFrameRates().toString());
+        json.put("supported_heights", video_capabilities.getSupportedHeights().toString());
+        json.put("supported_widths", video_capabilities.getSupportedWidths().toString());
 
-        str.append(tab + "video_capabilities {\n");
-
-        indent += 1;
-        tab = getIndentation(indent);
-
-        str.append(tab + "bitrate_range: " + video_capabilities.getBitrateRange().toString() + "\n");
-        str.append(tab + "height_alignment: " + video_capabilities.getHeightAlignment() + "\n");
-        str.append(tab + "width_alignment: " + video_capabilities.getWidthAlignment() + "\n");
-        str.append(tab + "supported_frame_rates: " + video_capabilities.getSupportedFrameRates().toString() + "\n");
-        str.append(tab + "supported_heights: " + video_capabilities.getSupportedHeights().toString() + "\n");
-        str.append(tab + "supported_widths: " + video_capabilities.getSupportedWidths().toString() + "\n");
-
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
     }
 
-    public static String featuresToString(MediaCodecInfo.CodecCapabilities codec_capabilities, boolean required, int indent) {
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
 
-        if (required) {
-            str.append(tab + "feature_required {\n");
-        } else {
-            str.append(tab + "feature_provided {\n");
-        }
-
-        indent += 1;
-        tab = getIndentation(indent);
-
+    public static JSONObject featuresToJson(MediaCodecInfo.CodecCapabilities codec_capabilities, boolean required) throws JSONException{
+        JSONObject json = new JSONObject();
         for (String feature : mFeatureList) {
             if (required) {
-                str.append(tab + feature + ": " + codec_capabilities.isFeatureRequired(feature) + "\n");
+                json.put(feature, codec_capabilities.isFeatureRequired(feature));
             } else {
-                str.append(tab + feature + ": " + codec_capabilities.isFeatureSupported(feature) + "\n");
+                json.put(feature, codec_capabilities.isFeatureSupported(feature));
             }
         }
-
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
     }
+
+
+
 
     public static int mapEncappPixFmtToAndroidColorFormat(PixFmt pix_fmt) {
         switch (pix_fmt.getNumber()) {
@@ -166,7 +135,7 @@ public class MediaCodecInfoHelper {
     }
 
     private static Map<Integer, String> createAndroidColorFormaNameTable() {
-        Map<Integer, String> m = new HashMap<Integer,String>();
+        Map<Integer, String> m = new HashMap<Integer, String>();
         m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format12bitRGB444, "COLOR_Format12bitRGB444");
         m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB1555, "COLOR_Format16bitARGB1555");
         m.put(MediaCodecInfo.CodecCapabilities.COLOR_Format16bitARGB4444, "COLOR_Format16bitARGB4444");
@@ -224,7 +193,7 @@ public class MediaCodecInfoHelper {
 
     // https://jbit.net/Android_Colors/
     private static Map<Integer, String> createAltColorFormaNameTable() {
-        Map<Integer, String> m = new HashMap<Integer,String>();
+        Map<Integer, String> m = new HashMap<Integer, String>();
         m.put(0x00000000, "Java_UNKNOWN");
         m.put(0x00000001, "AImage_RGBA_8888/AHardwareBuffer_R8G8B8A8_UNORM/HAL_RGBA_8888");
         m.put(0x00000002, "AImage_RGBX_8888/AHardwareBuffer_R8G8B8X8_UNORM/HAL_RGBX_8888");
@@ -366,95 +335,155 @@ public class MediaCodecInfoHelper {
     final static Map<Integer, String> androidColorFormatNameTable = createAndroidColorFormaNameTable();
     final static Map<Integer, String> altColorFormatNameTable = createAltColorFormaNameTable();
 
-    public static String colorFormatsToString(int[] color_formats, int indent) {
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
-
-        str.append(tab + "color_formats {\n");
-        indent += 1;
-        tab = getIndentation(indent);
+    public static JSONArray colorFormatsToJson(int[] color_formats) throws JSONException {
+        JSONArray json = new JSONArray();
         for (int color_format : color_formats) {
-            str.append(tab + "color {\n");
-            indent += 1;
-            tab = getIndentation(indent);
-            str.append(tab + "format: " + color_format + "\n");
+            JSONObject jcol = new JSONObject();
+        //    str.append(tab + "color {\n");
+            jcol.put("format", color_format);
             if (androidColorFormatNameTable.containsKey(color_format)) {
-                str.append(tab + "name: " + androidColorFormatNameTable.get(color_format) + "\n");
+                jcol.put("name", androidColorFormatNameTable.get(color_format));
             } else if (altColorFormatNameTable.containsKey(color_format)) {
-                str.append(tab + "name: " + altColorFormatNameTable.get(color_format) + "\n");
+                jcol.put("name", altColorFormatNameTable.get(color_format));
             }
-            indent -= 1;
-            tab = getIndentation(indent);
-            str.append(tab + "}\n");
+            json.put(jcol);
         }
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
     }
 
-    public static String profileLevelsToString(MediaCodecInfo.CodecProfileLevel[] color_profile_level, int indent) {
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
 
-        str.append(tab + "profile_levels {\n");
-        indent += 1;
-        tab = getIndentation(indent);
-
+    public static JSONObject profileLevelsToJson(MediaCodecInfo.CodecProfileLevel[] color_profile_level) throws JSONException {
+        JSONObject json = new JSONObject();
         for (MediaCodecInfo.CodecProfileLevel profile_level : color_profile_level) {
-            str.append(tab + "profile_level {\n");
-            indent += 1;
-            tab = getIndentation(indent);
-            str.append(tab + "profile: " + profile_level.profile + "\n");
-            str.append(tab + "level: " + profile_level.level + "\n");
-            indent -= 1;
-            tab = getIndentation(indent);
-            str.append(tab + "}\n");
+            json.put("profile" , profile_level.profile);
+            json.put("level", profile_level.level);
         }
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
     }
 
-    public static String codecCapabilitiesToText(MediaCodecInfo media_codec_info, String media_type, int indent) {
-        String tab = getIndentation(indent);
-        StringBuilder str = new StringBuilder();
 
+    public static JSONObject codecCapabilitiesToJson(MediaCodecInfo media_codec_info, String media_type) throws JSONException {
+        JSONObject json = new JSONObject();
         MediaCodecInfo.CodecCapabilities codec_capabilities = media_codec_info.getCapabilitiesForType(media_type);
 
-        str.append(tab + "media_type {\n");
-        indent += 1;
-        tab = getIndentation(indent);
 
-        str.append(tab + "media_type: " + media_type + "\n");
-        str.append(tab + "mime_type: " + codec_capabilities.getMimeType() + "\n");
-        str.append(tab + "max_supported_instances: " + codec_capabilities.getMaxSupportedInstances() + "\n");
+        json.put("media_type", media_type);
+        json.put("mime_type", codec_capabilities.getMimeType());
+        json.put("max_supported_instances", codec_capabilities.getMaxSupportedInstances());
 
         // print fields
-        str.append(colorFormatsToString(codec_capabilities.colorFormats, indent));
-        str.append(profileLevelsToString(codec_capabilities.profileLevels, indent));
+        json.put("color_formats", colorFormatsToJson(codec_capabilities.colorFormats));
+        json.put("profile_levels", profileLevelsToJson(codec_capabilities.profileLevels));
 
         MediaFormat mediaFormat = codec_capabilities.getDefaultFormat();
-        //Odds are that if there is no default profile - nothing else will have defaults anyway...
+        //Odds are that if there is no default profile  nothing else will have defaults anyway...
         if (mediaFormat.getString(MediaFormat.KEY_PROFILE) != null) {
-            str.append("\nDefault settings:");
-            str.append(mediaFormatToString(mediaFormat));
+            json.put("default_settings", mediaFormatToJson(mediaFormat));
         }
 
         // print encoder capabilities
-        str.append(encoderCapabilitiesToString(codec_capabilities.getEncoderCapabilities(), indent));
+
+        json.put("encoder_capabilities",encoderCapabilitiesToJson(codec_capabilities.getEncoderCapabilities()));
         // print encoder capabilities
-        str.append(videoCapabilitiesToString(codec_capabilities.getVideoCapabilities(), indent));
+        json.put("video_capabilities", videoCapabilitiesToJson(codec_capabilities.getVideoCapabilities()));
 
         // print features required and supported
-        str.append(featuresToString(codec_capabilities, true, indent));
-        str.append(featuresToString(codec_capabilities, false, indent));
+        json.put("feature_required", featuresToJson(codec_capabilities, true));
+        json.put("feature_provided", featuresToJson(codec_capabilities, false));
 
-        indent -= 1;
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
+        return json;
+    }
+
+
+    public static JSONObject mediaFormatToJson(MediaFormat mediaFormat) throws JSONException {
+        //str.append("MediaFormat {\n");
+        JSONObject json = new JSONObject();
+        if (Build.VERSION.SDK_INT >= 29) {
+            // check the features
+            JSONArray jfeatures = new JSONArray();
+            Set<String> features = mediaFormat.getFeatures();
+            //str.append("  features: [ ");
+            for (String feature : features) {
+                jfeatures.put(feature);
+            }
+
+            Set<String> keys = mediaFormat.getKeys();
+            JSONObject jformats = new JSONObject();
+            for (String key : keys) {
+                int type = mediaFormat.getValueTypeForKey(key);
+                switch (type) {
+                    case MediaFormat.TYPE_BYTE_BUFFER:
+                        jformats.put(key, "[bytebuffer] " + mediaFormat.getByteBuffer(key) );
+                        break;
+                    case MediaFormat.TYPE_FLOAT:
+                        jformats.put(key, "[float] " + mediaFormat.getFloat(key) );
+                        break;
+                    case MediaFormat.TYPE_INTEGER:
+                        jformats.put(key, "[integer] " + mediaFormat.getInteger(key) );
+                        break;
+                    case MediaFormat.TYPE_LONG:
+                        jformats.put(key, "[long] " + mediaFormat.getLong(key) );
+                        break;
+                    case MediaFormat.TYPE_NULL:
+                        jformats.put(key, "[null]");
+                        break;
+                    case MediaFormat.TYPE_STRING:
+                        jformats.put(key, "[string] " + mediaFormat.getString(key) );
+                        break;
+                }
+
+            }
+            json.put("features", jfeatures);
+            json.put("formats", jformats);
+
+        } else {
+            JSONObject jformats = new JSONObject();
+            String[] keys = {
+                    MediaFormat.KEY_BIT_RATE,
+                    MediaFormat.KEY_BITRATE_MODE,
+                    MediaFormat.KEY_MIME,
+                    MediaFormat.KEY_FRAME_RATE,
+                    MediaFormat.KEY_COLOR_FORMAT,
+                    MediaFormat.KEY_COLOR_RANGE,
+                    MediaFormat.KEY_COLOR_STANDARD,
+                    MediaFormat.KEY_COLOR_TRANSFER,
+                    MediaFormat.KEY_I_FRAME_INTERVAL,
+                    MediaFormat.KEY_LATENCY,
+                    MediaFormat.KEY_LEVEL,
+                    MediaFormat.KEY_PROFILE,
+                    MediaFormat.KEY_SLICE_HEIGHT,
+                    MediaFormat.KEY_TEMPORAL_LAYERING,
+            };
+
+            for (String key : keys) {
+                if (!mediaFormat.containsKey(key)) {
+                    continue;
+                }
+                String val = "";
+                try {
+                    val = mediaFormat.getString(key);
+                } catch (ClassCastException ex1) {
+                    try {
+                        val = Integer.toString(mediaFormat.getInteger(key));
+                    } catch (ClassCastException ex2) {
+                        try {
+                            val = Float.toString(mediaFormat.getFloat(key));
+                        } catch (ClassCastException ex3) {
+                            try {
+                                val = Long.toString(mediaFormat.getLong(key));
+                            } catch (ClassCastException ex4) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                if (val != null && val.length() > 0) {
+                    jformats.put(key, val );
+                }
+            }
+            json.put("formats", jformats);
+        }
+        return json;
     }
 
 
@@ -466,7 +495,7 @@ public class MediaCodecInfoHelper {
             Set<String> features = mediaFormat.getFeatures();
             str.append("  features: [ ");
             for (String feature : features) {
-               str.append(feature + " ");
+                str.append(feature + " ");
             }
             str.append("]\n");
 
@@ -517,7 +546,7 @@ public class MediaCodecInfoHelper {
                 if (!mediaFormat.containsKey(key)) {
                     continue;
                 }
-                String val="";
+                String val = "";
                 try {
                     val = mediaFormat.getString(key);
                 } catch (ClassCastException ex1) {
@@ -564,13 +593,14 @@ public class MediaCodecInfoHelper {
     }
 
 
-    public static Dictionary<String, Object> mediaFormatComparison(MediaFormat current, MediaFormat newformat) {
+    public static Dictionary<String, Object> mediaFormatComparison(MediaFormat
+                                                                           current, MediaFormat newformat) {
         if (Build.VERSION.SDK_INT >= 29) {
             Dictionary<String, Object> formatChanges = new Hashtable<>();
             Set<String> keys = newformat.getKeys();
             for (String key : keys) {
                 Object value = getMediaFormatValueFromKey(newformat, key);
-                if ( current == null) {
+                if (current == null) {
                     formatChanges.put(key, value);
                 } else {
                     Object old = getMediaFormatValueFromKey(current, key);
@@ -607,57 +637,46 @@ public class MediaCodecInfoHelper {
         return null;
     }
 
-
-    public static String toText(MediaCodecInfo media_codec_info, int indent) {
-        String tab = getIndentation(indent);
-
-        // TODO(johan): from Android 10 (api 29) we can check
-        // codec type (hw or sw codec)
+    public static JSONObject toJson(MediaCodecInfo media_codec_info) throws JSONException {
+        JSONObject json = new JSONObject();
         StringBuilder str = new StringBuilder();
-        str.append(tab + "MediaCodec {\n");
-        indent += 1;
-        tab = getIndentation(indent);
-        str.append(tab + "name: " + media_codec_info.getName() + "\n");
+        json.put("name", media_codec_info.getName());
         if (Build.VERSION.SDK_INT >= 29) {
-            str.append(tab + "canonical_name: " + media_codec_info.getCanonicalName() + "\n");
-            str.append(tab + "is_alias: " + media_codec_info.isAlias() + "\n");
+            json.put("canonical_name", media_codec_info.getCanonicalName());
+            json.put("is_alias", media_codec_info.isAlias());
         }
-        str.append(tab + "is_encoder: " + media_codec_info.isEncoder() + "\n");
+        json.put("is_encoder", media_codec_info.isEncoder());
         if (Build.VERSION.SDK_INT >= 29) {
-            str.append(tab + "is_hardware_accelerated: " + media_codec_info.isHardwareAccelerated() + "\n");
-            str.append(tab + "is_software_only: " + media_codec_info.isSoftwareOnly() + "\n");
-            str.append(tab + "is_vendor: " + media_codec_info.isVendor() + "\n");
+            json.put("is_hardware_accelerated", media_codec_info.isHardwareAccelerated());
+            json.put("is_software_only", media_codec_info.isSoftwareOnly());
+            json.put("is_vendor", media_codec_info.isVendor());
         }
         String[] media_types = media_codec_info.getSupportedTypes();
         for (String media_type : media_types) {
-            str.append(codecCapabilitiesToText(media_codec_info, media_type, indent));
+            json.put("media_type", codecCapabilitiesToJson(media_codec_info, media_type));
         }
         if (Build.VERSION.SDK_INT >= 31) {
-
-            try {
-                MediaCodec codec = MediaCodec.createByCodecName(media_codec_info.getName());
-                List<String> params = codec.getSupportedVendorParameters();
-                str.append(tab + "Vendor Parameters {" + params.size() + "\n");
-                int counter = 0;
-                for (String param: params) {
-                    MediaCodec.ParameterDescriptor descr = codec.getParameterDescriptor(param);
-                    str.append(tab + String.format("%2d", counter++) + ": (" + param + ", " + mediaFormatTypeToString(descr.getType()) +")\n");
+                try {
+                    MediaCodec codec = MediaCodec.createByCodecName(media_codec_info.getName());
+                    List<String> params = codec.getSupportedVendorParameters();
+                    JSONObject vendor_params = new JSONObject();
+                    int counter = 0;
+                    for (String param : params) {
+                        MediaCodec.ParameterDescriptor descr = codec.getParameterDescriptor(param);
+                        vendor_params.put(String.format("%2d", counter++) + ". " + param,mediaFormatTypeToString(descr.getType()));
+                    }
+                    codec.release();
+                    json.put("vendor_params", vendor_params);
+                } catch (IOException iox) {
                 }
-                str.append(tab + "}\n");
-                codec.release();
-            } catch (IOException iox) {
-            }
         }
-        indent -= 1;
-
-        tab = getIndentation(indent);
-        str.append(tab + "}\n");
-        return str.toString();
-
+        return json;
     }
 
+
+
     private static Map<Integer, String> createAndroidImageFormatTable() {
-        Map<Integer, String> m = new HashMap<Integer,String>();
+        Map<Integer, String> m = new HashMap<Integer, String>();
         m.put(ImageFormat.DEPTH16, "DEPTH16");
         m.put(ImageFormat.DEPTH_JPEG, "DEPTH_JPEG");
         m.put(ImageFormat.DEPTH_POINT_CLOUD, "DEPTH_POINT_CLOUD");
@@ -684,17 +703,18 @@ public class MediaCodecInfoHelper {
         m.put(ImageFormat.YV12, "YV12");
         return m;
     }
+
     final public static Map<Integer, String> androidImageFormatTable = createAndroidImageFormatTable();
 
-        public static int frameSizeInBytes(PixFmt pix_fmt, int width, int height) {
-            switch (pix_fmt.getNumber()) {
-                    case PixFmt.p010le_VALUE:
-                        // 24bit per pixel
-                        return width * height * 3;
-                    default:
-                        // 420 chroma compressed format
-                        return (int)(Math.ceil(width * height * 1.5));
-            }
+    public static int frameSizeInBytes(PixFmt pix_fmt, int width, int height) {
+        switch (pix_fmt.getNumber()) {
+            case PixFmt.p010le_VALUE:
+                // 24bit per pixel
+                return width * height * 3;
+            default:
+                // 420 chroma compressed format
+                return (int) (Math.ceil(width * height * 1.5));
         }
+    }
 
 }

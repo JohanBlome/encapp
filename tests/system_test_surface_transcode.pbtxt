@@ -1,0 +1,13 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.mp4"
+    }
+    common {
+        id: "bitrate_surface"
+        description: "Verify encoding bitrate - surface"
+    }
+    configure {
+        bitrate: "200 kbps"
+        surface: true
+    }
+}

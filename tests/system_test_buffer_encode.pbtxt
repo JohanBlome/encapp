@@ -1,0 +1,12 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.mp4"
+    }
+    common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate - buffer"
+    }
+    configure {
+        bitrate: "200 kbps"
+    }
+}
