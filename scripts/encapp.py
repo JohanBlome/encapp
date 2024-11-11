@@ -1902,7 +1902,7 @@ def add_args(parser):
         2. a list (e.g. "320x240,1280x720")
         3. a range (e.g. "320x240-4000x4000-2") (start-stop-step)
         In the case of the step it is a multiplication of the first.
-        It will stop when the pixel count pass stop value (calculated as wxh)""",
+        It will stop when the pixels pass stop value (calculated as wxh)""",
     )
     parser.add_argument(
         "--multiply",
@@ -1921,11 +1921,11 @@ def add_args(parser):
         If updating a parameter all tests will get the same update.""",
     )
     parser.add_argument(
-        "--pix_fmt",
+        "--pix-fmt",
         type=str,
         dest="pix_fmt",
         default=None,
-        metavar="pix_fmt",
+        metavar="pixel/color-format",
         help="wanted pix fmt for the encoder",
     )
     # other parameters
@@ -1935,7 +1935,7 @@ def add_args(parser):
         type=str,
         dest="local_workdir",
         default=default_values["local_workdir"],
-        metavar="local_workdir",
+        metavar="local workdir",
         help="work (storage) directory on local host",
     )
     parser.add_argument(
@@ -1968,7 +1968,7 @@ def add_args(parser):
         help="Run serial test individually",
     )
     parser.add_argument(
-        "--separate_sources",
+        "--separate-sources",
         action="store_true",
         dest="separate_sources",
         default=False,
@@ -1991,21 +1991,27 @@ def add_args(parser):
         help="Do not execute the tests. Just prepare the test(s).",
     )
     parser.add_argument(
-        "--width_align",
+        "--width-align",
+        dest="width_align",
         type=int,
         default=-1,
+        metavar="pixels",
         help="Horizontal widht alignment in bits to calculate stride and add padding if converting to raw yuv",
     )
     parser.add_argument(
-        "--height_align",
+        "--height-align",
+        dest = "height_align",
         type=int,
         default=-1,
+        metavar="pixels",
         help="Vertical height alignment in bits to calculate and add padding if converting to raw yuv",
     )
     parser.add_argument(
-        "--dim_align",
+        "--dim-align",
+        dest="dim_align",
         type=int,
         default=None,
+        metavar="pixels",
         help="Horizontal and vertical alignment in bits to calculate stride and add padding if converting to raw yuv",
     )
     parser.add_argument(
@@ -2014,8 +2020,10 @@ def add_args(parser):
         help="Always decode to raw format before pushing to device",
     )
     parser.add_argument(
-        "--source_dir",
+        "--source-dir",
         default=None,
+        dest="source_dir",
+        metavar="directory",
         help="Root directory for sources. If not set the input.filepath wll be absolute or relative from the current",
     )
     parser.add_argument(
@@ -2041,7 +2049,6 @@ input_args = {
         "short": "-d",
         "long": "--debug",
         "args": {
-            "dest": "debug",
             "default": default_values["debug"],
             "help": "Increase verbosity (use multiple times for more)",
         },
@@ -2068,20 +2075,9 @@ input_args = {
         "long": "--install",
         "args": {
             "action": "store_const",
-            "dest": "install",
             "const": True,
             "default": default_values["install"],
             "help": "Do install apk.",
-        },
-    },
-    "no_install": {
-        "func": FUNC_CHOICES,
-        "long": "--no-install",
-        "args": {
-            "action": "store_const",
-            "dest": "install",
-            "const": False,
-            "help": "Do not install apk.",
         },
     },
     "idb": {
@@ -2107,7 +2103,8 @@ input_args = {
         "args": {
             "type": str,
             "default": None,
-            "metavar": "device_workdir",
+            "dest": "device_workdir",
+            "metavar": "local directory",
             "help": "work (storage) directory on device",
         },
     },
@@ -2159,9 +2156,10 @@ input_args = {
     "info_level": {
         "func": "list",
         "short": "-l",
-        "long": "--info_level",
+        "long": "--info-level",
         "args": {
             "type": int,
+            "dest":"info_level",
             "help": "How much to show. Level > 0 filters parts of the information for more compact displat. Level -1 shows all. Default only name will be shown.",
         },
     },
@@ -2177,9 +2175,10 @@ input_args = {
     "no_cache": {
         "func": "list",
         "short": "-nc",
-        "long": "--no_cache",
+        "long": "--no-cache",
         "args": {
             "action": "store_true",
+            "dest": "no_cache",
             "help": "No cache, refresh from device",
         },
     },
