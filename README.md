@@ -48,43 +48,28 @@ $ adb shell appops set --uid com.facebook.encapp MANAGE_EXTERNAL_STORAGE allow
 (2) run the list command:
 ```
 $ ./scripts/encapp.py list
-...
---- List of supported encoders  ---
+c2.exynos.h263.encoder
+c2.exynos.h264.encoder
+c2.exynos.hevc.encoder
+....
+```
 
-        MediaCodec {
-            name: OMX.google.h264.encoder
-            type {
-                mime_type: video/avc
-                max_supported_instances: 32
-                color {
-                    format: 2135033992
-                    name: COLOR_FormatYUV420Flexible
-                }
-                color {
-                    format: 19
-                    name: COLOR_FormatYUV420Planar
-                }
-                ...
-            }
-        }
+By default is will show all encoders in a list.
+To see the deoders, use:
 
-*******
---- List of supported decoders  ---
-
-        MediaCodec {
-            name: OMX.google.h264.decoder
-            type {
-                mime_type: video/avc
-                max_supported_instances: 32
-                color {
-                    format: 2135033992
-                    name: COLOR_FormatYUV420Flexible
-                }
-                ...
-            }
-        }
 
 ```
+$ ./scripts/encapp.py list --decoders
+c2.exynos.h263.decoder
+c2.exynos.h264.decoder
+c2.exynos.h264.decoder.secure
+....
+```
+
+By default will be a json compatible file in the current directory called, codecs_XXX.
+**Important** the result will be cached. To force refresh use the "-nc" or "--no-cache" argument.
+More infor can be obtained by increasing the information level or setting it to "-1".
+
 
 Note: The `scripts/encapp.py` scripts will install a prebuild apk before running the test. If you have several devices attached to your host, you can use either the "`ANDROID_SERIAL`" environment variable or the "`--serial <serial>`" CLI option.
 
@@ -120,12 +105,13 @@ In the case of surface encoder from raw the source should be nv21 regardless of 
 
 Now run the h264 encoder (`OMX.google.h264.encoder`):
 ```
-$ ./scripts/encapp.py run tests/bitrate_buffer.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.y4m
+$ ./scripts/encapp.py run tests/bitrate_buffer.pbtxt --local-workdir /tmp/test [ -e input.filepath /tmp/akiyo_qcif.y4m ]
 ...
 results collect: ['/tmp/test/encapp_<uuid>.json']
 ```
 
 Note that the json file is not the only result of the experiment copied to the directory specified using "--local-workdir":
+Also, the [-e ...] is already defined in the test description, this would override the test specified input.
 ```
 $ ls -Flasg /tmp/test/
 11140K -rw-r--r--.   1 ... 11404800 Jan 18 11:28 akiyo_qcif.y4m.176x144.29.97.yuv420p.yuv
@@ -148,13 +134,13 @@ Files include:
 Note that the default encoder value is a Google-provided, software, h264 encoder (`OMX.google.h264.encoder`). If you want to test one of the encoders (from the "`list`" command output), use the CLI. For example, some Qualcomm devices offer an h264 HW encoder called "`OMX.qcom.video.encoder.avc`". In order to test it, use:
 
 ```
-$ ./scripts/encapp.py run tests/bitrate_surface.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.y4m --codec OMX.qcom.video.encoder.avc -e input.pix_fmt nv21
+$ ./scripts/encapp.py run tests/bitrate_surface.pbtxt --local-workdir /tmp/test --codec OMX.qcom.video.encoder.avc
 ...
 results collect: ['/tmp/test/encapp_<uuid>.json']
 ```
 
-Note that we are changing the test from "`tests/bitrate_buffer.pbtxt`" to "`tests/bitrate_surface.pbtxt`". This is due to Buffer mode for HW encoders being broken at the moment.
-
+Note that we are changing the test from "`tests/bitrate_buffer.pbtxt`" to "`tests/bitrate_surface.pbtxt`". This encoding will use a txture as input.
+Also we used a hw encoder. If for example running on a Pixel8/9 try: "-c c2.exynos.h264.encoder" instead.
 
 ## 3.2. HD Video Encoding
 
@@ -193,9 +179,12 @@ $ ls -Flasg /tmp/test/
 For usability reasons (allow testing with generic video files), encapp allows using an encoded video as a source, instead of raw (yuv) video. In this case, encapp will choose one of its decoders (hardware decoders are prioritized), and decode the video to raw (yuv) before testing the encoder.
 
 ```
-$ ./scripts/encapp.py run tests/bitrate_transcoder.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.mp4
-...
-results collect: ['/tmp/test/encapp_<uuid>.json']
+$ /scripts/encapp.py run gtests/bitrate_buffer_transcoder.pbtxt
+```
+
+Or using a surface texture:
+```
+$ /scripts/encapp.py run gtests/bitrate_surface_transcoder.pbtxt
 ```
 
 Note that, in this case, we get the encoded video (`encapp_<uuid>.mp4`) and the original source video (`akiyo_qcif.mp4`).
@@ -216,7 +205,7 @@ Encapp also allows visualizing the video being decoded. We can run the previous 
 The parameter for showing the video is `show` in the `input` section.
 
 ```
-$ ./scripts/encapp.py run tests/bitrate_transcoder_show.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.mp4
+$ ./scripts/encapp.py run tests/bitrate_surface_transcoder_show.pbtxt --local-workdir /tmp/test -e input.filepath /tmp/akiyo_qcif.mp4
 ...
 results collect: ['/tmp/test/encapp_<uuid>.json']
 ```
@@ -435,6 +424,25 @@ test {
 }
 '''
 
+Command line argument wil have precedence.
+
+## 5.4 Test setup
+
+Many of the parameters available on cli are also available in the protobuf description in the "TestSetup" message.
+This can be used to create device specific pbtxt file so not command line typing is needed. E.g:
+```
+$ ./scripts/encapp,py run important_test.pbtxt my_special_device.pbtxt
+```
+Where the "my_special_device.pbtxt" can contain the 
+* serial number (serial)
+* device work dir (device_workdir)
+* local workdir (local_workdir)
+* separate sources (separate_sources)
+    - This setting will split any test containing multiple source video file to the video files are run sequentially and removed before next file, helping memory constrained devices.
+* mediastore
+    - where to store temporary files
+* source directory (source_dir)
+    - where to look for input file. This makes it possible to only have the filename and not the whole filepath in the "input.filepath" setting.
 
 
 
@@ -464,6 +472,30 @@ $ encapp_quality.py --header --media MEDIA_FOLDER $(encapp_search.py)
 
 Since the json file only contains the name of the source for an encoding the source folder needs to be provided.
 The output will be a csv file (default name is 'quality.csv') containing vmaf, ssim, psnr and other relevant properties.
+
+# 6.1 Output naming
+The default output naming is a uuid with not connection to the actual test being run.
+However, "Common.output_filename" can be defined with placeholders to force a different naming scheme.
+All settings can in theory be used, e.g.
+```
+...
+ common {
+        id: "bitrate_buffer"
+        description: "Verify encoding bitrate - buffer"
+        output_filename: "[input.filepath].[configure.bitrate].[xxxx]-[xx]"
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "100kbps,200kbps"
+    }
+
+```
+The 'X' will give a random hex value (0-f), but of course andy number of random numbers can be added. They can be used to minimize potential naming conflicts.
+
+```
+$./scripts/encapp.py tests/bitrate_buffer_naming.pbtxt
+ok: test id: "bitrate_buffer" run_id: akiyo_qcif.100kbps.1af5-c9 result: ok
+ok: test id: "bitrate_buffer" run_id: akiyo_qcif.200kbps.6809-90 result: ok
 
 
 # 7. Requirements

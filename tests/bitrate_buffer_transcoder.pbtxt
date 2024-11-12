@@ -1,0 +1,14 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.mp4"
+        device_decode: true,
+    }
+    common {
+        id: "bitrate_buffer_transcoder",
+        description: "Verify encoding bitrate - buffer transcoding"
+    }
+    configure {
+        codec: "OMX.google.h264.encoder"
+        bitrate: "200 kbps"
+    }
+}

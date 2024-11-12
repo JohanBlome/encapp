@@ -153,6 +153,8 @@ $ adb shell cat /sdcard/codecs.txt
 
 ## 3. Regression test
 
+**NOTE: this is currently not working properly, it will be adressed.**
+
 encapp_verify.py will run through the tests defined in 'tests/' folder and try to verify:
 * bitrate
 * key frames
@@ -178,3 +180,13 @@ $ encapp_verify.py -i /tmp/KristenAndSara_1280x720_60.yuv -is 1280x720 -if 30 -o
 ```
 
 For a raw input both input and output resolution and fps needs to be specified even if raw buffer will not allow scaling (which surface encoding does).
+
+
+## 4. System/Unit testing
+All current tests can be run with:
+python3 -m pytest ~/code/Github/encapp_master/encapp/scripts/tests/
+
+* The unit tests can be run without a device connected.
+* The system tests require a device connected. To pass all tests there needs to be a h264 encodera and decoder. It also needs to have surface textures available.
+
+

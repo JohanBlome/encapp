@@ -108,8 +108,7 @@ def remove_file(serial: str, file: str, debug: int) -> None:
     """
     if USE_IDB:
         # remove the output
-        print(f"Removing {counter}/{len(output_files)}", end="\r")
-        cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        cmd = f"idb file rm {file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         run_cmd(cmd, debug)
     else:
         # remove the output
