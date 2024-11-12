@@ -178,6 +178,9 @@ List of valid keys:
     * but python world will allow time too
   * example: "100"  // wait until 100 frames have been processed (in a different encoder or decoder) before starting this encoder
 
+* "output_filename": str
+  *  The default output naming is a uuid with not connection to the actual test being run.However, "output_filename" can be defined with placeholders to force a different naming scheme.
+  * example: "output_filename: "[input.filepath].[configure.bitrate].[xxxx]-[xx]"
 
 ## 3.3. Input Information
 
@@ -217,6 +220,21 @@ List of valid keys:
     * unit will be frames in the java world
     * python world will allow time units too
   * example: 300  // play 300 frames at the original file framerate, then quit
+
+* "pursuit": int
+  * encapp will try to start this many codecs with the same configuration.
+
+* "realtime":
+  * unless realtime is set or video is displayed, encoding will run as fast as possible.
+
+* "stoptime_sec":
+  * same as playout but in sec time instead
+
+* "show":
+  * if possible sow the vidoe on the device screen
+
+* "device_decode":
+  * decode a compressed file on device and not on host.
 
 Shortcuts (host side only):
 * "resolution": str
@@ -463,6 +481,32 @@ Example:
 
 This test will encode the "foo.yuv" file using the h264 encoder. Once it is finished, it will do the same with the "bar.yuv" file.
 
+## 3.8 Test definition
+The TestSetup message containes settings related to setup of the test and not the actual test itself and inlcudes the following:
+
+* "device_workdir"
+  * Where data can be stored on the device
+
+* "local_workdir"
+  * Where to store output from the test
+
+* "serial"
+  * Serial id of the device to be tested
+
+* "device_cmd";
+  * Default is adb, set it to idb for Apple
+
+* "run_cmd"
+  * If a different command is needed to start the device app it can be defined here e.g. "appXYZ -r " + "DEF.pbtxt. Needs to be self contained, i.e. paths etc, defined in the protobuf
+
+* separate_sources;
+  * This setting will split any test containing multiple source video file to the video files are run sequentially and removed before next file, helping memory constrained devices.
+
+* mediastore
+  * where to store temporary files
+  
+* "source_dir":
+  * where to look for input file. This makes it possible to only have the filename and not the whole filepath in the "input.filepath" setting.
 
 # 4. References
 
