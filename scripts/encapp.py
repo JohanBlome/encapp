@@ -2049,6 +2049,7 @@ input_args = {
         "short": "-d",
         "long": "--debug",
         "args": {
+            "action": "count",
             "default": default_values["debug"],
             "help": "Increase verbosity (use multiple times for more)",
         },
