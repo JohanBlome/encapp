@@ -30,7 +30,7 @@ class EncappMain {
         if command == "list_codecs" {
             log.info("Retrieve codecs")
             let props = ListProps()
-            let output = props.retrieveProps()
+            let output = props.retrievePropsJson()
             log.info(output)
             //TODO: write to file
             let io = FileIO()

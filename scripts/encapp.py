@@ -2000,7 +2000,7 @@ def add_args(parser):
     )
     parser.add_argument(
         "--height-align",
-        dest = "height_align",
+        dest="height_align",
         type=int,
         default=-1,
         metavar="pixels",
@@ -2160,7 +2160,7 @@ input_args = {
         "long": "--info-level",
         "args": {
             "type": int,
-            "dest":"info_level",
+            "dest": "info_level",
             "help": "How much to show. Level > 0 filters parts of the information for more compact displat. Level -1 shows all. Default only name will be shown.",
         },
     },
@@ -2498,13 +2498,30 @@ def regexp_wildcard(pattern: str, data: str) -> re.Match:
     m = None
     try:
         m = re.search(pattern, data)
-    except re.error  as ex:
+    except re.error as ex:
         # Just silently ignore
         pass
     if not m and "*" in pattern:
         pattern = pattern.replace("*", ".*")
         m = re.search(pattern, data)
     return m
+
+
+def is_encoder(codec: dict) -> bool:
+    if "is_encoder" in codec.keys():
+        return codec["is_encoder"] in ["true", "True", "1", True]
+
+    # iOS doe not have this
+    return True
+
+
+def is_hardware_accelerated(codec: dict) -> bool:
+    if "is_hardware_accelerated" in codec.keys():
+        return codec["is_hardware_accelerated"] in ["true", "True", "1", True]
+    elif "IsHardwareAccelerated" in codec.keys():
+        return codec["IsHardwareAccelerated"] in ["true", "True", "1", True]
+
+    return True
 
 
 def find_codecs(
@@ -2516,19 +2533,27 @@ def find_codecs(
     sw=True,
 ) -> str:
     for codec in codecs:
-        if not encoder and codec["is_encoder"]:
-            continue
-        if not decoder and not codec["is_encoder"]:
-            continue
-        mime = codec["media_type"]["mime_type"]
-        # We do not look at audio (for mime)
-        if "audio" in mime:
-            continue
-        if hw and not codec["is_hardware_accelerated"]:
-            return
-        if sw and codec["is_hardware_accelerated"]:
-            return
+        try:
+            if not encoder and "is_encoder" in codec and codec["is_encoder"]:
+                continue
+            if not decoder and "is_encoder" in codec and not codec["is_encoder"]:
+                continue
+            if "media_type" in codec and "mime_type" in codec["media_type"]:
+                mime = codec["media_type"]["mime_type"]
+                # We do not look at audio (for mime)
+                if "audio" in mime:
+                    continue
+            m = re.find("is_hardware_accelerated|IsHardwareAccelerates", codec)
+            if m:
+                key = m.group(1)
+                if hw and not codec[key]:
+                    return
+                if sw and codec[key]:
+                    return
 
+        except:
+            # Rather do something than fail.
+            pass
         # filter on codec, regexp
         m = regexp_wildcard(codec_name, codec["name"].lower())
         if not m:
@@ -2541,18 +2566,19 @@ def find_codecs(
 
 
 def print_codec_info(codec: dict, options: argparse.Namespace) -> None:
-    if not options.encoders and codec["is_encoder"]:
+    if options.encoders and not is_encoder(codec):
         return
-    if not options.decoders and not codec["is_encoder"]:
+    if options.decoders and is_encoder(codec):
         return
-    mime = codec["media_type"]["mime_type"]
-    if not options.audio and "audio" in mime:
+    if "media_type" in codec and "mime_type" in codec["media_type"].keys():
+        mime = codec["media_type"]["mime_type"]
+        if not options.audio and "audio" in mime:
+            return
+        if options.audio and not "audio" in mime:
+            return
+    if options.hw and not is_hardware_accelerated(codec):
         return
-    if options.audio and not "audio" in mime:
-        return
-    if options.hw and not codec["is_hardware_accelerated"]:
-        return
-    if options.sw and codec["is_hardware_accelerated"]:
+    if options.sw and is_hardware_accelerated(codec):
         return
     if options.codec:
         # filter on codec, regexp

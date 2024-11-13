@@ -17,5 +17,7 @@ scheme=$(xcodebuild -list  | grep -A 1 Schemes | grep -v Schemes)
 echo "Using $scheme"
 xcodebuild -scheme ${scheme} clean -quiet  
 echo "Install ${platform} app to ${id}"
-xcodebuild -scheme ${scheme} install -destination 'platform=${platform},id=${id}'  -allowProvisioningUpdates 
+destination="platform=${platform},id=${id}"
+echo "Destination: ${destination}"
+xcodebuild -scheme ${scheme} install -destination ${destination}  -allowProvisioningUpdates 
 
