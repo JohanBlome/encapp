@@ -42,6 +42,13 @@ VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
 vmaf_models = ["vmaf_4k_v0.6.1", "vmaf_v0.6.1", "vmaf_v0.6.1neg"]
 VMAF_MODEL = vmaf_models[2]
 
+KEEP_QUALITY_FILES_ENV = os.environ.get("ENCAPP_KEEP_QUALITY_FILES", False) in [
+    "True",
+    "true",
+    "1",
+    True,
+]
+
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -292,6 +299,8 @@ def detailed_media_info(inputfile, options, debug):
     else:
         df = pd.read_csv(name)
     calc_stats(df, options, inputfile, True)
+    if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
+        os.remove(name)
     return df
 
 
@@ -675,13 +684,19 @@ def run_quality(test_file, options, debug):
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
 
+        if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
+            os.remove(vmaf_file)
+            os.remove(ssim_file)
+            os.remove(psnr_file)
+            os.remove(psnr_file + ".all")
+            os.remove(ssim_file + ".all")
+
         if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
             vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
-        print("Stats doen, look at model")
         model = device_info.get("props", {}).get("ro.product.model", "")
         if options.get("model", None):
             model = options.model
@@ -939,6 +954,12 @@ def get_options(argv):
         help=f"Override the vmaf model, models: {vmaf_models}, default is {VMAF_MODEL}",
         default=VMAF_MODEL,
     )
+    parser.add_argument(
+        "--keep-quality-files",
+        dest="keep_quality_files",
+        action="store_true",
+        help=f'Keep the intermediant results of quality calculations. Can also be set using a environment variable: "ENCAPP_KEEP_QUALITY_FILES"',
+    )
 
     options = parser.parse_args()
 
@@ -1045,7 +1066,8 @@ def main(argv):
     if options.header:
         mode = "w"
         mode = "w"
-    df.to_csv(options.output, mode=mode, index=False, header=options.header)
+    if df is not None:
+        df.to_csv(options.output, mode=mode, index=False, header=options.header)
 
 
 if __name__ == "__main__":
