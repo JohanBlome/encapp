@@ -7,7 +7,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        api-level: [29]
+        api-level: [26]
         python-version: ["3.9", "3.11"]
     steps:
       - name: Checkout
