@@ -946,6 +946,9 @@ def create_tests_from_definition_expansion(testsuite):
                             else:
                                 expanded = expand_filepath(path)
                             force_update = True
+                            assert len(expanded) > 0, print(
+                                f'Input description "{path}" matched no file(s)'
+                            )
                         else:
                             expanded = expand_ranges(setting[1])
                         if tests:
@@ -2351,13 +2354,9 @@ def process_options(options):
     # 3. check the validity of some parameters
     if "replace" not in options or not options.replace:
         options.replace = {}
-    if options.replace.get("input", {}).get("filepath", ""):
-        videofile = options.replace.get("input", {}).get("filepath", "")
-        assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
-            f"file {videofile} does not exist"
-            if os.path.exists(videofile)
-            else f"file {videofile} is not readable"
-        )
+
+    # Input filepath will be checked later (when expansion is done)
+
     if "dim_align" in options and options.dim_align:
         options.width_align = options.dim_align
         options.height_align = options.dim_align
