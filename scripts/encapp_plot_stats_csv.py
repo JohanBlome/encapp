@@ -23,7 +23,11 @@ def plotAverageBitrate(data, options):
     for codec in uniqcodec:
         cfilt = data.loc[(data["codec"] == codec)]
         for descr in uniqdescr:
-            dfilt = cfilt.loc[(cfilt["description"] == descr)]
+            if not np.isnan(descr):
+                dfilt = cfilt.loc[(cfilt["description"] == descr)]
+            else:
+                dfilt = cfilt
+
             for height in uniqheight:
                 hfilt = dfilt.loc[(dfilt["height"] == height)]
                 for br in uniqbr:
@@ -42,9 +46,12 @@ def plotAverageBitrate(data, options):
     style = "codec"
     if options.split_descr:
         style = "description"
+    bitrate_data = bitrates["real_bitrate"]
+    if options.ratio:
+        bitrate_data /= bitrates["bitrate"]
     p = sns.lineplot(
         x=bitrates["bitrate"] / 1000,
-        y=bitrates["real_bitrate"] / bitrates["bitrate"],
+        y=bitrate_data,
         style=style,
         hue="height",
         data=bitrates,
@@ -54,11 +61,13 @@ def plotAverageBitrate(data, options):
     p.set_xlabel("Target bitrate (kbps)")
     p.set_ylabel("Bitrate ratio")
     plt.ticklabel_format(style="plain", axis="x")
+    title = f"{options.label} average bitrate in kbps"
+    if options.ratio:
+        title = f"{options.label} average bitrate ratio"
     if len(options.files) == 1:
-
-        axs.set_title(f"{options.label} Bitrate in kbps")
+        axs.set_title(title)
     else:
-        axs.set_title(f"{options.label} Bitrate in kbps")
+        axs.set_title(title)
     name = f"{options.output}.av_bitrate.png"
     plt.savefig(name.replace(" ", "_"), format="png")
 
@@ -76,7 +85,7 @@ def plotProcRate(data, options):
 
     slen = int(data["fps"].iloc[0])
     data["smooth_proctime"] = (
-        (data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"])
+        data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"]
     ) / (1e9 * slen)
     data = data.drop(data.tail(slen).index)
 
@@ -275,7 +284,6 @@ def plotBitrate(data, options):
     set_label = True
     fig = plt.figure()
     if options.rename_codec is None:
-
         data = data.sort_values(by=["description", "codec", "height", "bitrate"])
         if options.split_descr and "description" in list(data.columns):
             # maybe filter on models
@@ -382,7 +390,17 @@ def parse_args():
     parser.add_argument("-br", "--bit_rate", action="store_true")
     parser.add_argument("-r", "--frame_rate", action="store_true")
     parser.add_argument("-a", "--av_frame_rate", action="store_true")
-    parser.add_argument("-l", "--latency", action="store_true")
+    parser.add_argument(
+        "-l",
+        "--latency",
+        action="store_true",
+        help="Plot the time from entering the encodeer until a frame leaves.",
+    )
+    parser.add_argument(
+        "--ratio",
+        action="store_true",
+        help="Plot bitrate as a ratio of requested/actual instead",
+    )
     parser.add_argument(
         "--split_descr",
         action="store_true",
@@ -450,7 +468,7 @@ def main():
         plotFrameSize(data, options)
     if options.latency:
         plotLatency(data, options)
-    if len(np.unique(data["description"].str)) > 1:
+    if "description" in data.columns and len(np.unique(data["description"])) > 1:
         plotTestNumbers(data)
     if options.show:
         plt.show()
