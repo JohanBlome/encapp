@@ -591,8 +591,14 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    # now we need to go through all test and update media
     test_suite = create_tests_from_definition_expansion(test_suite)
+    if options.dry_run:
+        # Write and exit
+        with open(protobuf_txt_filepath, "w") as f:
+            f.write(text_format.MessageToString(test_suite))
+        return test_suite, [], protobuf_txt_filepath
+
+    # now we need to go through all test and update media
     for test in test_suite.test:
         update_media_files(test, options)
 
@@ -2816,6 +2822,11 @@ def main(argv):
                 os.remove(file)
             if data is not None:
                 data.to_csv(f"{options.local_workdir}/quality.csv")
+            elif options.dry_run:
+                # Dry run will generate protobuf files
+                print("Dry run")
+                print(f"* Protbuf output is in {options.local_workdir}")
+                print(f"* Transcoded media is in {options.mediastore}/")
             else:
                 print("ERROR: no data produced")
 
