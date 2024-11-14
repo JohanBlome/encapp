@@ -592,6 +592,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
 
     test_suite = updated_test_suite
     # now we need to go through all test and update media
+    test_suite = create_tests_from_definition_expansion(test_suite)
     for test in test_suite.test:
         update_media_files(test, options)
 
@@ -1754,6 +1755,39 @@ def check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug):
     assert ret == 0, f"ERROR: {stderr}"
 
 
+def setup_local_workdir(options: argparse.Namespace, model: str) -> argparse.Namespace:
+    if options.local_workdir is None:
+        now = datetime.datetime.now()
+        dt_string = now.strftime("%Y%m%d_%H%M%S")
+        options.local_workdir = (
+            f"{options.desc.replace(' ', '_')}_{model.replace(' ', '_')}_{dt_string}"
+        )
+
+    if not os.path.exists(options.local_workdir):
+        os.mkdir(options.local_workdir)
+
+    return options
+
+
+def rename_local_workdir(options: argparse.Namespace, model: str) -> argparse.Namespace:
+    now = datetime.datetime.now()
+    dt_string = now.strftime("%Y%m%d_%H%M%S")
+    new_local_workdir = (
+        f"{options.desc.replace(' ', '_')}_{model.replace(' ', '_')}_{dt_string}"
+    )
+
+    os.rename(options.local_workdir, new_local_workdir)
+
+    # need to rename config files that may have been created
+    files = []
+    for file in options.configfile:
+        files.append(file.replace(options.local_workdir, new_local_workdir))
+
+    options.configfile = files
+    options.local_workdir = new_local_workdir
+    return options
+
+
 def codec_test(options, model, serial, debug):
     if debug > 0:
         print(f"codec test: {options}")
@@ -2471,6 +2505,7 @@ def check_protobuf_test_setup(options):
         options.configfile is not None
     ), "error: need a valid input configuration file"
     test_suite = tests_definitions.TestSuite()
+
     for file in options.configfile:
         with open(file, "rb") as fd:
             text_format.Merge(fd.read(), test_suite)
@@ -2613,10 +2648,35 @@ def merge_options(option1, options2):
 def main(argv):
     options = get_options(argv)
     # check if this is a test run and if these params are defined in the test
+
     proto_options = None
+
+    rename_workdir = False
     if options.func == "run":
+        # Make sure we are writing to a good place
+        # It will be a chicken and egg situation i.e.
+        # to handle the cli options after working with the
+        # protobuf we may need to save some generated data.
+        # Let us rename the folder later after cli options are handled.
+
+        if not options.local_workdir:
+            rename_workdir = True
+        options = setup_local_workdir(options, f"{int(random.random()*1000)}")
+
+        test_suite = tests_definitions.TestSuite()
+        # let us accept a special case where the test is a single '.'
+        # This allows us to run a simple test over all files in a folder or a
+        # quick one off with only cli options
+        if len(options.configfile) == 1 and options.configfile[0] == ".":
+            # write an empty file
+            filepath = f"{options.local_workdir}/corpus.pbtxt"
+            test_suite.test.append(tests_definitions.Test())
+            with open(filepath, "w") as f:
+                f.write(text_format.MessageToString(test_suite))
+            options.configfile[0] = filepath
         proto_options = check_protobuf_test_setup(options)
     options = process_options(options)
+
     # cli should always override
     if proto_options:
         options = merge_options(proto_options, options)
@@ -2634,6 +2694,10 @@ def main(argv):
         model, serial = encapp_tool.adb_cmds.get_device_info(
             options.serial, options.debug
         )
+
+    # If needed rename local workfolder
+    if rename_workdir:
+        options = rename_local_workdir(options, model)
 
     # install app
     if options.func == "install" or options.install:

@@ -995,7 +995,12 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         print(f"Total number of tests: {total}")
     df = None
     start = time.time()
-    options = {"header": True, "media_path": source_path, "quiet": quiet}
+    options = {
+        "header": True,
+        "media_path": source_path,
+        "quiet": quiet,
+        "keep_quality_files": False,
+    }
     for test in tests:
         try:
             quality_dict = run_quality(test, options, False)
