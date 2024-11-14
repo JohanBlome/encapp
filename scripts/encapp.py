@@ -972,10 +972,14 @@ def expand_filepath(path):
     else:
         basename = os.path.basename(path)
         folder = os.path.dirname(path)
+        if folder != None and len(folder) == 0:
+            folder = "./"  # same folder we are executing in
     video_files = []
-    for root, _dirs, files in os.walk(folder):
-        for file in files:
-            if is_video_extension(file):
+    for entry in os.scandir(folder):
+        if entry.is_file():
+            # for file in files:
+            file = entry.name
+            if is_video_extension(str(file).lower()):
                 if len(basename) > 0:
                     # let us make one exception to the reg exp
                     # accept common glob in case regexp fails
@@ -991,11 +995,11 @@ def expand_filepath(path):
 
                         m = re.search(basename, file)
                     if m:
-                        file = f"{root}/{m.group(0)}"
+                        file = f"{folder}/{file}"
                     else:
                         continue
                 else:
-                    file = f"{root}/{file}"
+                    file = f"{folder}/{file}"
                 video_files.append(file)
 
     return video_files
