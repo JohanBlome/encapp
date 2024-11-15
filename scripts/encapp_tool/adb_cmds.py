@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 import typing
-
+import sys
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
@@ -20,7 +20,7 @@ IOS_MAJOR_VERSION = -1
 MAX_SIZE_BYTES = 20000000
 
 
-def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
+def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tuple[bool, str, str]:
     """Run sh command
 
     Args:
@@ -31,11 +31,15 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         Tuple with boolean (True cmd execution succeeded, False otherwise)
         stdout and stderr messages.
     """
+    errors = None
+    if ignore_errors:
+        errors = "ignore"
+
     try:
         if debug > 0:
             print(cmd, sep=" ")
         with subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, errors=errors,
         ) as process:
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
@@ -43,7 +47,17 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         print(f"Failed to run command: {cmd}")
         return False, "", ""
 
-    return ret, stdout.decode(), stderr.decode()
+    stdstr = ""
+    errstr = ""
+    if isinstance(stdout, str):
+        stdstr = stdout
+        stderr = stderr
+    else:
+        stdstr = stdout.decode()
+        errstr = stderr.decode()
+
+    return ret, stdstr, errstr
+    #return ret, stdout.decode(), stderr.decode()
 
 
 def get_device_info(
@@ -109,11 +123,11 @@ def remove_file(serial: str, file: str, debug: int) -> None:
     if USE_IDB:
         # remove the output
         cmd = f"idb file rm {file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-        run_cmd(cmd, debug)
+        run_cmd(cmd, debug=debug)
     else:
         # remove the output
         adb_cmd = f"adb -s {serial} shell rm {file}"
-        run_cmd(adb_cmd, debug)
+        run_cmd(adb_cmd, debug=debug)
 
 
 def remove_files_using_regex(
@@ -129,23 +143,23 @@ def remove_files_using_regex(
     """
     if USE_IDB:
         cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-        _, stdout, _ = run_cmd(cmd, debug)
+        _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
         for file in output_files:
             # remove the output
             print(f"Removing {counter}/{len(output_files)}", end="\r")
             cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-            run_cmd(cmd, debug)
+            run_cmd(cmd, debug=debug)
             counter += 1
     else:
         adb_cmd = f"adb -s {serial} shell ls {location}/"
-        _, stdout, _ = run_cmd(adb_cmd, debug)
+        _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         for file in output_files:
             # remove the output
             adb_cmd = f"adb -s {serial} shell rm {location}/{file}"
-            run_cmd(adb_cmd, debug)
+            run_cmd(adb_cmd, debug=debug)
 
 
 def get_connected_devices(debug: int) -> typing.Dict:
@@ -163,7 +177,7 @@ def get_connected_devices(debug: int) -> typing.Dict:
     # list all available devices
     if USE_IDB:
         cmd = "idb list-targets | grep -i booted"
-        ret, stdout, _ = run_cmd(cmd, debug)
+        ret, stdout, _ = run_cmd(cmd, debug=debug)
         assert ret, "error: failed to get adb devices"
         # parse list
         device_info = {}
@@ -178,7 +192,7 @@ def get_connected_devices(debug: int) -> typing.Dict:
         return device_info
 
     adb_cmd = "adb devices -l"
-    ret, stdout, _ = run_cmd(adb_cmd, debug)
+    ret, stdout, _ = run_cmd(adb_cmd, debug=debug)
     assert ret, "error: failed to get adb devices"
     # parse list
     device_info = {}
@@ -215,14 +229,14 @@ def get_app_pid(serial: str, package_name: str, debug=0):
     if USE_IDB:
         # This is only for >= V17 but lower version do not need the pid (at this point)
         cmd = f" xcrun devicectl device info processes --device  {serial} | grep Encapp.app"
-        ret, stdout, _ = run_cmd(cmd, debug)
+        ret, stdout, _ = run_cmd(cmd, debug=debug)
         if ret and stdout:
             m = re.search(r"^[0-9]*", stdout)
             if m:
                 pid = int(m.group(0))
     else:
         adb_cmd = f"adb -s {serial} shell pidof {package_name}"
-        ret, stdout, _ = run_cmd(adb_cmd, debug)
+        ret, stdout, _ = run_cmd(adb_cmd, debug=debug)
         if ret is True and stdout:
             try:
                 pid = int(stdout)
@@ -275,7 +289,7 @@ def installed_apps(serial: str, debug=0) -> typing.List:
     Returns:
         List of packages installed at android device.
     """
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell pm list packages", debug)
+    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell pm list packages", debug=debug)
     assert ret, f"error: failed to get installed app list: {stderr}"
     return _parse_pm_list_packages(stdout)
 
@@ -333,7 +347,7 @@ def grant_camera_permission(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} " "android.permission.CAMERA", debug
+        f"adb -s {serial} shell pm grant {package} " "android.permission.CAMERA", debug=debug
     )
 
 
@@ -349,7 +363,7 @@ def force_stop(serial: str, package: str, debug=0):
         # for iso 17 devicectl needs to be used and it cannot terminate an application directly
         # lookup pid and send sigterm
         if IOS_MAJOR_VERSION < 17:
-            run_cmd(f"idb terminate --udid {serial}  {IDB_BUNDLE_ID}", debug)
+            run_cmd(f"idb terminate --udid {serial}  {IDB_BUNDLE_ID}", debug=debug)
         else:
             pid = get_app_pid(serial, package, debug)
             if pid > 0:
@@ -358,7 +372,7 @@ def force_stop(serial: str, package: str, debug=0):
                     debug,
                 )
     else:
-        run_cmd(f"adb -s {serial} shell am force-stop {package}", debug)
+        run_cmd(f"adb -s {serial} shell am force-stop {package}", debug=debug)
 
 
 def reset_logcat(serial: str, debug=0):
@@ -368,7 +382,7 @@ def reset_logcat(serial: str, debug=0):
         serial (str): Android device serial no.
         debug (int): Debug level
     """
-    run_cmd(f"adb -s {serial} logcat -c", debug)
+    run_cmd(f"adb -s {serial} logcat -c", debug=debug)
 
 
 def logcat_dump(serial: str, debug=0) -> str:
@@ -381,7 +395,8 @@ def logcat_dump(serial: str, debug=0) -> str:
     Returns:
       Current logcat dump
     """
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} logcat -d", debug)
+    # For some reason logcat often produce errors in the form of broken utf-8, ignore it.
+    ret, stdout, stderr = run_cmd(f"adb -s {serial} logcat -d", ignore_errors=True, debug=debug)
     assert ret, f"error: failed to dump logcat: {stderr}"
     return stdout
 
@@ -497,24 +512,24 @@ def getprop(serial: str, debug=0) -> dict:
       Current props dump
     """
     if USE_IDB:
-        ret, stdout, stderr = run_cmd(f"idb describe --udid {serial}", debug)
+        ret, stdout, stderr = run_cmd(f"idb describe --udid {serial}", debug=debug)
         assert ret, f"error: failed to getprop: {stderr}"
         return parse_getprop(stdout)
     else:
-        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell getprop", debug)
+        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell getprop", debug=debug)
         assert ret, f"error: failed to getprop: {stderr}"
         return parse_getprop(stdout)
 
 
 def get_device_size(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug)
+    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
     if not ret:
         return -1
     # get the size in bytes
     try:
         ret, stdout, stderr = run_cmd(
-            f'adb -s {serial} shell stat -c "%s" {filepath}', debug
+            f'adb -s {serial} shell stat -c "%s" {filepath}', debug=debug
         )
         filesize = int(stdout)
     except:
@@ -525,12 +540,12 @@ def get_device_size(serial, filepath, debug):
 
 def get_device_hash(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug)
+    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
     if not ret:
         return -1
     # get a hash
     try:
-        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug)
+        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug=debug)
         filehash = stdout.split()[0]
     except:
         print(f"Failed to calc hash for {filepath}")
@@ -549,7 +564,7 @@ def get_host_hash(filepath, debug):
 def file_exists_in_device(filename, serial, debug=False):
     if USE_IDB:
         cmd = f"idb file ls /Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-        _, stdout, _ = run_cmd(cmd, debug)
+        _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
         return len(output_files) > 0
 
@@ -563,7 +578,7 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
         # TODO: fix
         basename = os.path.basename(device_filepath)
         cmd = f"idb file ls Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-        _, stdout, _ = run_cmd(cmd, debug)
+        _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(f"{basename}", stdout, re.MULTILINE)
         return len(output_files) > 0
     # 1. check the size
@@ -621,7 +636,7 @@ def push_file_to_device_android(
 ):
     # 0. try a one-off copy
     cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     if ret:
         return ret
     print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
@@ -632,7 +647,7 @@ def push_file_to_device_android(
     # 1.1. split filepath in pieces
     prefix = tempfile.NamedTemporaryFile(prefix="split.").name + "."
     cmd = f"split -b {max_size_bytes} {filepath} {prefix}"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     assert ret, f"error: cannot split {filepath}"
     # 1.2. push all pieces one by one
     split_pieces = glob.glob(f"{prefix}*")
@@ -651,17 +666,17 @@ def push_file_to_device_android(
     )
     device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
     cmd = f"adb -s {serial} shell 'cat {' '.join(device_split_pieces)} > {device_filepath}'"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     if not ret:
         print(f"error: cannot cat split pieces together: {stdout=} {stderr=}")
         return ret
     # 1.4. check the final file is ok
     cmd = f"md5sum {filepath}"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     assert ret, f"error: cannot md5sum {filepath}"
     local_md5sum = stdout.split()[0]
     cmd = f"adb -s {serial} shell md5sum {device_filepath}"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     assert ret, f"error: cannot md5sum {device_filepath}"
     device_md5sum = stdout.split()[0]
     if local_md5sum != device_md5sum:
@@ -670,7 +685,7 @@ def push_file_to_device_android(
         )
     # 1.5. clean up the split pieces at the device
     cmd = f"adb -s {serial} shell rm {' '.join(device_split_pieces)}"
-    ret, stdout, stderr = run_cmd(cmd, debug)
+    ret, stdout, stderr = run_cmd(cmd, debug=debug)
     return True
 
 
@@ -679,22 +694,22 @@ def pull_files_from_device(
 ) -> None:
     if USE_IDB:
         cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-        _, stdout, _ = run_cmd(cmd, debug)
+        _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
         for file in output_files:
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
             cmd = f"idb file pull {location}/{file} .  --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
-            run_cmd(cmd, debug)
+            run_cmd(cmd, debug=debug)
             counter += 1
     else:
         adb_cmd = f"adb -s {serial} shell ls {location}/"
-        _, stdout, _ = run_cmd(adb_cmd, debug)
+        _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         for file in output_files:
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
             adb_cmd = f"adb -s {serial} shell pull {location}/{file} . "
-            run_cmd(adb_cmd, debug)
+            run_cmd(adb_cmd, debug=debug)
             counter += 1
 
 

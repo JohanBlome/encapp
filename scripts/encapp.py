@@ -236,8 +236,9 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
         # TODO: can we assume adb?
+        encapp_tool.adb_cmds.reset_logcat(serial)
         cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
     else:
         if encapp_tool.adb_cmds.USE_IDB:
@@ -284,7 +285,7 @@ def collect_results(
         cmd = f"idb file ls {device_workdir}/ --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
     else:
         cmd = f"adb -s {serial} shell ls {device_workdir}/"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
     # If we have a output_filename template in the test we need to check the begining
     test_suite = tests_definitions.TestSuite()
@@ -312,7 +313,7 @@ def collect_results(
             cmd = (
                 f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
             )
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"outputfiles: {len(output_files)}")
     # prepare the local working directory to pull the files in
@@ -334,12 +335,12 @@ def collect_results(
             cmd = f"idb file pull {device_workdir}/{file} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
         else:
             cmd = f"adb -s {serial} pull {device_workdir}/{file} " f"{local_workdir}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # append results file (json files) to final results
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
@@ -349,7 +350,7 @@ def collect_results(
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
     else:
         cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
-    encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"results collect: {result_json}")
     # dump device information
@@ -358,7 +359,7 @@ def collect_results(
     result_ok = False
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # Release the app
         encapp_tool.app_utils.force_stop(serial)
         # Remove test output files
@@ -377,15 +378,17 @@ def collect_results(
         return result_ok, result_json
     else:
         try:
-            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            print("** capture logcat **")
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug=1)
+            print("** parse logcat **")
             result_ok = parse_logcat(logcat_contents, local_workdir)
-        except Exception:
-            print("Failed to parse logcat")
+        except Exception as ex:
+            print(f"Failed to parse logcat: {ex}")
         return result_ok, result_json
 
 
 def dump_device_info(serial, local_workdir, debug):
-    props_dict = encapp_tool.adb_cmds.getprop(serial, debug)
+    props_dict = encapp_tool.adb_cmds.getprop(serial, debug=debug)
     device_info = {
         "props": props_dict,
     }
@@ -401,13 +404,13 @@ def parse_logcat(logcat_contents, local_workdir):
         fd.write(logcat_contents.encode("utf8"))
     # 2. look for the status
     line_re = re.compile(
-        r".*Test finished id: \"(?P<id>[^\"]+)\".*run_id: (?P<run_id>[^\ ]+) result: \"(?P<result>[^\"]+)\"(?P<rem>.*)"
+        r".*Test finished id: \"?(?P<id>[^\"]+)\"?.*run_id: (?P<run_id>[^\ ]+) result: \"?(?P<result>[^\"]+)\"?(?P<rem>.*)"
     )
     result_ok = True
     for line in logcat_contents.splitlines():
         line_match = line_re.search(line)
         if line_match:
-            if line_match.group("result") == "ok":
+            if line_match.group("result").lower() == "ok":
                 # experiment went well
                 print(
                     f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
@@ -1529,7 +1532,7 @@ def run_codec_tests(
                 )
                 time.sleep(1)
                 cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-                encapp_tool.adb_cmds.run_cmd(cmd, debug)
+                encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
                 try:
                     os.rename(
                         f"{local_workdir}/encapp.log",
@@ -1599,7 +1602,7 @@ def run_codec_tests(
             )
             time.sleep(1)
             cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-            encapp_tool.adb_cmds.run_cmd(cmd, debug)
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
             try:
                 os.rename(
                     f"{local_workdir}/encapp.log",
@@ -1663,19 +1666,19 @@ def list_codecs(
         else:
             cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
         # cmd = {f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"}
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
         # for some bizzare reason if using a destination a directory is created...
         cmd = f"idb file pull {device_workdir}/codecs.txt . --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
         cmd = f"mv codecs.txt {filename}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     elif run_cmd:
         # call
         # TODO: can we assume adb?
         cmd = f"adb -s {serial} shell {run_cmd} "
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     else:
         adb_cmd = (
             f"adb -s {serial} shell am start "
@@ -1684,10 +1687,10 @@ def list_codecs(
             f"-e list_codecs a {encapp_tool.app_utils.ACTIVITY}"
         )
 
-        encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
         wait_for_exit(serial, debug)
         adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
     return filename
 
@@ -1763,7 +1766,7 @@ def check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug):
         f'protoc -I {protobuf_txt_filepath} --encode="TestSuite" '
         f"{protobuf_bin_file}"
     )
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret == 0, f"ERROR: {stderr}"
 
 
