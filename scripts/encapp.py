@@ -1623,6 +1623,7 @@ def list_codecs(
     device_workdir: str,
     output: str = None,
     cache: bool = True,
+    run_cmd: str = None,
     debug: int = 0,
 ) -> str:
     folder = ""
@@ -1670,6 +1671,11 @@ def list_codecs(
 
         cmd = f"mv codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    elif run_cmd:
+        # call
+        # TODO: can we assume adb?
+        cmd = f"adb -s {serial} shell {run_cmd} "
+        encapp_tool.adb_cmds.run_cmd(cmd, debug)
     else:
         adb_cmd = (
             f"adb -s {serial} shell am start "
@@ -2147,6 +2153,16 @@ input_args = {
             "dest": "device_workdir",
             "metavar": "local directory",
             "help": "work (storage) directory on device",
+        },
+    },
+    "run-cmd": {
+        "func": FUNC_CHOICES,
+        "long": "--run-cmd",
+        "args": {
+            "type": str,
+            "dest": "run_cmd",
+            "default": None,
+            "help": "Excplicitly specify a command tobe run.",
         },
     },
     # List specific arguments
@@ -2769,6 +2785,7 @@ def main(argv):
             options.device_workdir,
             options.output,
             not options.no_cache,
+            options.run_cmd,
             options.debug,
         )
         # Read json
