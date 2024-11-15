@@ -78,7 +78,7 @@ def get_video_info(videofile, debug=0):
         return {}
     # check using ffprobe
     cmd = f"ffprobe -v quiet -select_streams v -show_streams {videofile}"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret, f"error: failed to analyze file {videofile}: {stderr}"
     videofile_config = ffprobe_parse_output(stdout)
     videofile_config["filepath"] = videofile
@@ -133,7 +133,7 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
 
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret, f"error: ffmpeg returned {stderr}"
 
 
@@ -184,7 +184,7 @@ def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
 
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret, f"error: ffmpeg returned {stderr}"
 
 
@@ -206,5 +206,5 @@ def ffmpeg_convert_to_raw_simple(
     ]
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret, f"error: ffmpeg returned {stderr}"
