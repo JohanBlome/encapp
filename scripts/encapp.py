@@ -2251,6 +2251,16 @@ input_args = {
             "help": "Folder or filename. Folder decided either by prexising name or ending '/'",
         },
     },
+    "file": {
+        "func": "list",
+        "short": "-f",
+        "long": "--codecs-file",
+        "args": {
+            "type": str,
+            "dest": "codecs_file",
+            "help": "Read from file instead of fetching from a device.",
+        },
+    },
 }
 
 
@@ -2711,7 +2721,12 @@ def main(argv):
 
     serial = ""
     # get model and serial number
-    if "dry_run" in options and options.dry_run:
+    if (
+        "dry_run" in options
+        and options.dry_run
+        or "codecs_file" in options
+        and options.codecs_file
+    ):
         model = "dry run"
         options.seral = "dry run"
     else:
@@ -2782,15 +2797,19 @@ def main(argv):
 
     # run function
     if options.func == "list":
-        codecs_file = list_codecs(
-            serial,
-            model,
-            options.device_workdir,
-            options.output,
-            not options.no_cache,
-            options.run_cmd,
-            options.debug,
-        )
+        codecs_file = None
+        if options.codecs_file:
+            codecs_file = options.codecs_file
+        else:
+            codecs_file = list_codecs(
+                serial,
+                model,
+                options.device_workdir,
+                options.output,
+                not options.no_cache,
+                options.run_cmd,
+                options.debug,
+            )
         # Read json
         data = None
         if not os.path.exists(codecs_file):
