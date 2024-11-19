@@ -1082,7 +1082,36 @@ def parse_framerate_field(framerate):
     return [framerate]
 
 
+def update_input_section(
+    test: tests_definitions.Test, videoinfo: dict
+) -> tests_definitions.Test:
+    infield = test.input
+
+    if len(infield.resolution) == 0:
+        resolution = f"{videoinfo['width']}x{videoinfo['height']}"
+        infield.resolution = resolution
+    if infield.framerate <= 0:
+        infield.framerate = videoinfo.get("framerate", 0)
+    fmt = PIX_FMT_TYPES_VALUES[videoinfo.get("pix-fmt", 0)]
+    if infield.pix_fmt == fmt:
+        infield.pix_fmt = fmt
+
+    # TODO: set color details in configure unless they are there
+    return test
+
+
 def update_media(test, options):
+    debug = options.debug
+    input_is_raw = encapp_tool.ffutils.video_is_raw(test.input.filepath)
+
+    # if there are not settings for res and rate check the file itself
+    info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
+
+    # Let us help support function later by checking the file and populate the input
+    # fields where we can
+    if not input_is_raw:
+        test = update_input_section(test, info)
+
     in_res = test.input.resolution
     in_rate = test.input.framerate
     in_pix_fmt = test.input.pix_fmt
@@ -1092,136 +1121,123 @@ def update_media(test, options):
     input_repl = replace.get("input", {})
     out_pix_fmt = input_repl.get("pix_fmt", in_pix_fmt)
 
-    # if there are not settings for res and rate check the file itself
-    info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
-    if len(in_res) == 0:
-        in_res = f"{info['width']}x{info['height']}"
-    if in_rate <= 0:
-        in_rate = info["framerate"]
     if len(out_res) == 0:
         out_res = in_res
     if out_rate == 0:
         out_rate = in_rate
+        # Simplify the logic, return if no transcoding is needed
+    if test.input.device_decode:
+        if debug:
+            print("Device decode set")
+        return
     if (
-        (
-            encapp_tool.ffutils.video_is_raw(test.input.filepath)
-            and (
-                in_res != out_res
-                or in_rate != out_rate
-                or (in_pix_fmt != out_pix_fmt and out_pix_fmt is not None)
-            )
-        )
-        or encapp_tool.ffutils.video_is_y4m(test.input.filepath)
-    ) or options.raw:  # Always decode
-        # one more thing to check, if nv21 or rgba only transcode if source is y4m
-        if (
-            (
-                out_pix_fmt == PIX_FMT_TYPES_VALUES["nv21"]
-                or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
-            )
-            and test.configure.surface
-            and not (
-                encapp_tool.ffutils.video_is_y4m(test.input.filepath)
-                or test.input.device_decode
-            )
-        ):
-            if options.debug > 0:
-                print("Skip raw transcoding.")
-                return
-
-        reason = ""
-        if in_res != out_res:
-            reason = f" res ({in_res} != {out_res})"
-        if in_rate != out_rate:
-            reason = f" rate ({in_rate} != {out_rate})"
-        if in_pix_fmt != out_pix_fmt:
-            reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
-        if options.raw:
-            reason = "Always decode to raw set"
-
-        reason = reason.strip()
-        if options.debug > 0:
-            print(f"Transcode raw input: {test.input.filepath} {reason = }")
-        replace = {}
-        input = {}
-        output = {}
-        basename = os.path.basename(test.input.filepath)
-
-        if in_res == "":
-            in_res = f"{info.get('width', -1)}x{info.get('height')}"
-        if in_rate == "":
-            in_rate = info.get("framerate")
-        if out_res == "":
-            out_res = in_res
-        if out_rate == "":
-            out_rate = in_rate
-
-        input["pix_fmt"] = tests_definitions.PixFmt.Name(in_pix_fmt)
-        input["resolution"] = in_res
-        input["framerate"] = in_rate
-
-        if (
+        test.configure.surface
+        and (
             out_pix_fmt == PIX_FMT_TYPES_VALUES["nv21"]
             or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
-        ) and test.configure.surface:
-            print("Attention.")
-            print(
-                "Raw nv21/rgba to a surface will scale on device using the Android default surface scaling"
-            )
-            out_res = in_res
-            out_rate = in_rate
-
-        output["resolution"] = out_res
-        output["framerate"] = out_rate
-        output["pix_fmt"] = out_pix_fmt
-
-        stride = ""
-        if (options.width_align > 0) or (options.height_align > 0):
-            width = int(out_res.split("x")[0])
-            height = int(out_res.split("x")[1])
-            wa = options.width_align if options.width_align > 0 else 1
-            ha = options.height_align if options.height_align > 0 else 1
-            if width % wa != 0:
-                width = (width // wa + 1) * wa
-            if height % ha:
-                height = (height // ha + 1) * ha
-            output["hstride"] = width
-            output["vstride"] = height
-            stride = f"str.{output['hstride']}x{output['vstride']}"
-        extension = "raw"
-        if output["pix_fmt"] == "rgba":
-            extension = "rgba"
-        pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
-        if str(pix_fmt_id).isnumeric():
-            pix_fmt = tests_definitions.PixFmt.Name(pix_fmt_id)
-        else:
-            pix_fmt = pix_fmt_id
-
-        # Special case. Transcoding on device with not specific pixel format set, force nv21.
-        if test.configure.surface:
-            pix_fmt = "nv21"
-
-        output["output_filepath"] = (
-            f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}"
         )
-        if len(stride) > 0:
-            output["output_filepath"] += f"_{stride}"
+        and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+    ):
+        if debug:
+            print("Surface with compatible pixel formats")
+        return
 
-        output["output_filepath"] += f".{extension}"
-        output["pix_fmt"] = pix_fmt
-        replace["input"] = input
-        replace["output"] = output
+    if input_is_raw and (
+        in_res == out_res
+        and in_rate == out_rate
+        and (in_pix_fmt == out_pix_fmt or out_pix_fmt is not None)
+    ):
+        if debug:
+            print("Configure is same format as input")
+        return
 
-        d = process_input_path(
-            test.input.filepath, replace, test.input, options.mediastore, options.debug
+    # Passed this point, always transcode to a raw file
+    if debug:
+        print("Transcode input")
+    reason = ""
+    if in_res != out_res:
+        reason = f" res ({in_res} != {out_res})"
+    if in_rate != out_rate:
+        reason = f" rate ({in_rate} != {out_rate})"
+    if in_pix_fmt != out_pix_fmt:
+        reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
+    if options.raw:
+        reason = "Always decode to raw set"
+
+    reason = reason.strip()
+    if options.debug > 0:
+        print(f"Transcode raw input: {test.input.filepath} {reason = }")
+    replace = {}
+    input = {}
+    output = {}
+    basename = os.path.basename(test.input.filepath)
+
+    input["pix_fmt"] = tests_definitions.PixFmt.Name(in_pix_fmt)
+    input["resolution"] = in_res
+    input["framerate"] = in_rate
+    if (
+        out_pix_fmt == PIX_FMT_TYPES_VALUES["nv21"]
+        or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
+    ) and test.configure.surface:
+        print("Attention.")
+        print(
+            "Raw nv21/rgba to a surface will scale on device using the Android default surface scaling"
         )
-        # now both config and input should be the same i.e. matching config
-        test.input.resolution = d["resolution"]
-        # TODO: JOHAN - when to do this?
-        test.configure.resolution = d["resolution"]
-        test.input.framerate = d["framerate"]
-        test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
-        test.input.filepath = d["filepath"]
+        out_res = in_res
+        out_rate = in_rate
+
+    output["resolution"] = out_res
+    output["framerate"] = out_rate
+    output["pix_fmt"] = out_pix_fmt
+
+    stride = ""
+    if (options.width_align > 0) or (options.height_align > 0):
+        width = int(out_res.split("x")[0])
+        height = int(out_res.split("x")[1])
+        wa = options.width_align if options.width_align > 0 else 1
+        ha = options.height_align if options.height_align > 0 else 1
+        if width % wa != 0:
+            width = (width // wa + 1) * wa
+        if height % ha:
+            height = (height // ha + 1) * ha
+        output["hstride"] = width
+        output["vstride"] = height
+        stride = f"str.{output['hstride']}x{output['vstride']}"
+    extension = "raw"
+    if output["pix_fmt"] == "rgba":
+        extension = "rgba"
+    pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
+    if str(pix_fmt_id).isnumeric():
+        pix_fmt = tests_definitions.PixFmt.Name(pix_fmt_id)
+    else:
+        pix_fmt = pix_fmt_id
+
+    # Special case. Transcoding on device using surfaces with no specific pixel format set, force nv21.
+    if test.configure.surface:
+        pix_fmt = "nv21"
+
+    output["output_filepath"] = (
+        f"{options.mediastore}/{basename}_{out_res}p{round(out_rate, 2)}_{pix_fmt}"
+    )
+    if len(stride) > 0:
+        output["output_filepath"] += f"_{stride}"
+
+    output["output_filepath"] += f".{extension}"
+    output["pix_fmt"] = pix_fmt
+    replace["input"] = input
+    replace["output"] = output
+
+    d = process_input_path(
+        test.input.filepath, replace, test.input, options.mediastore, options.debug
+    )
+    # After transcoding input settings may have changed, adjust.
+    # now both config and input should be the same i.e. matching config
+    test.input.resolution = d["resolution"]
+    test.input.framerate = d["framerate"]
+    test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+    test.input.filepath = d["filepath"]
+    # Maybe not necessary but would just indicate that the input resolution was used.
+    test.configure.resolution = d["resolution"]
 
 
 # Update a set of tests with the CLI arguments.
