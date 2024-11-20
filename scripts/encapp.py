@@ -421,7 +421,9 @@ def parse_logcat(logcat_contents, local_workdir):
                     print(f'error: invalid error line match: "{line}"')
                 error_re = re.compile(r".*error: \"(?P<error_code>.+)\"")
                 error_match = error_re.search(line_match.group("rem"))
-                error_code = error_match.group("error_code")
+                error_code = "not specified"
+                if error_match:
+                    error_code = error_match.group("error_code")
                 print(
                     f'error: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")} error_code: "{error_code}"'
                 )
