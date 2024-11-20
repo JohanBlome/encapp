@@ -1690,21 +1690,22 @@ def list_codecs(
 
         cmd = f"mv codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
-    elif run_cmd:
-        # call
-        # TODO: can we assume adb?
-        cmd = f"adb -s {serial} shell {run_cmd} "
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     else:
-        adb_cmd = (
-            f"adb -s {serial} shell am start "
-            f"-e workdir {device_workdir} "
-            "-e ui_hold_sec 3 "
-            f"-e list_codecs a {encapp_tool.app_utils.ACTIVITY}"
-        )
+        if run_cmd:
+            # call
+            # TODO: can we assume adb?
+            cmd = f"adb -s {serial} shell {run_cmd} "
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        else:
+            adb_cmd = (
+                f"adb -s {serial} shell am start "
+                f"-e workdir {device_workdir} "
+                "-e ui_hold_sec 3 "
+                f"-e list_codecs a {encapp_tool.app_utils.ACTIVITY}"
+            )
 
-        encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
-        wait_for_exit(serial, debug)
+            encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
+            wait_for_exit(serial, debug)
         adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
