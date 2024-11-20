@@ -54,7 +54,6 @@ def parse_encoding_data(json, inputfile, debug=0):
         data["rel_stop"] = data["stoptime"] - start_stop
 
         if "pts" in data:
-            print("Calculating mean data from framedata")
             data["duration_ms"] = round(
                 (data["pts"].shift(-1, axis="index", fill_value=0) - data["pts"])
                 / 1000,
@@ -100,7 +99,6 @@ def parse_encoding_data(json, inputfile, debug=0):
         return None
     if debug > 2:
         print(f'data = "{data}"')
-    print("leaving encoding")
     return data
 
 
@@ -109,6 +107,8 @@ def parse_decoding_data(json, inputfile, debug=0):
         print("Parse decoding data")
     decoded_data = None
     # try:
+
+    # Must sort according to pts
     decoded_data = pd.DataFrame(json["decoded_frames"])
     decoded_data["source"] = inputfile
     if len(decoded_data) > 0:
@@ -116,6 +116,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         codec = test["configure"]["codec"]
         if len(codec) <= 0:
             codec = "na"
+        decoded_data = decoded_data.sort_values("pts")
         decoded_data["codec"] = codec
         start_pts = decoded_data.iloc[0]["pts"]
         start_ts = decoded_data.iloc[0]["starttime"]
@@ -129,7 +130,7 @@ def parse_decoding_data(json, inputfile, debug=0):
         try:
             decoded_data["height"] = json["decoder_media_format"]["height"]
         except Exception:
-            print("Failed to read decoder data")
+            print("Height missing in decoded data")
             decoded_data["height"] = "unknown height"
 
         # data = decoded_data.loc[decoded_data["size"] != "0"]
@@ -162,7 +163,6 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data["fps"].rolling(fps, min_periods=fps, win_type=None).sum() / fps
         )
         decoded_data, __ = calc_infligh(decoded_data, start_ts)
-        print(f"{decoded_data}")
         decoded_data["proc_fps"] = (decoded_data["inflight"] * 1.0e9) / decoded_data[
             "proctime"
         ]
@@ -251,7 +251,6 @@ def calc_infligh(frames, time_ref):
 
 def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({",": "_", " ": "_"}))
-    print(f"{name} -> {ret}")
     return ret
 
 
@@ -305,13 +304,11 @@ def main():
                     current_dir = directory
                     with open(device_info_file, "r") as input_file:
                         device_info = json.load(input_file)
-                    print(f"File exist: {device_info}")
                 else:
                     device_info = {}
 
             alldata = json.load(json_file)
             if "frames" in alldata and len(alldata["frames"]) > 0:
-                print("parse encoding data")
                 encoding_data = parse_encoding_data(alldata, filename, options.debug)
                 if device_info is not None:
                     model = device_info.get("props", {}).get("ro.product.model", "")
@@ -327,11 +324,13 @@ def main():
                 if encoding_data is not None and len(encoding_data) > 0:
                     encoding_data.to_csv(f"{filename}_encoding_data.csv")
 
-            if "decoded_frames" in alldata and len(alldata["decoded_frames"]) > 0:
-                print("parse decoding data")
+            if (
+                "decoded_frames" in alldata
+                and alldata["decoded_frames"] is not None
+                and len(alldata["decoded_frames"]) > 0
+            ):
                 decoded_data = parse_decoding_data(alldata, filename, options.debug)
                 if decoded_data is not None and len(decoded_data) > 0:
-                    print(f"Write csv to {filename}...")
                     decoded_data.to_csv(f"{filename}_decoding_data.csv")
             if "gpu_data" in alldata:
                 gpu_data = parse_gpu_data(alldata, filename, options.debug)
