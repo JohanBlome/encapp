@@ -114,7 +114,7 @@ class TestAdbCommands(unittest.TestCase):
     def test_remove_files_using_regex_shall_remove_regex_match_files(self, mock_run):
         mock_run.return_value = (True, ADB_LS_ENCAPP, "")
         encapp_tool.adb_cmds.remove_files_using_regex(
-            ADB_DEVICE_VALID_ID, r"encapp_.*", "/sdcard", 1
+            ADB_DEVICE_VALID_ID, r"encapp_.*", "/sdcard", debug=1
         )
         mock_run.assert_has_calls(
             [
@@ -139,7 +139,7 @@ class TestAdbCommands(unittest.TestCase):
     def test_get_app_pid_active_process_shall_return_pid(self, mock_run):
         mock_run.return_value = (True, "19519", "")
         actual_pid = encapp_tool.adb_cmds.get_app_pid(
-            ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0
+            ADB_DEVICE_VALID_ID, "com.facebook.encapp", debug=0
         )
         self.assertEqual(actual_pid, 19519)
 
@@ -147,7 +147,7 @@ class TestAdbCommands(unittest.TestCase):
     def test_get_app_pid_inactive_process_shall_return_not_running_code(self, mock_run):
         mock_run.return_value = (True, "", "")
         actual_pid = encapp_tool.adb_cmds.get_app_pid(
-            ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0
+            ADB_DEVICE_VALID_ID, "com.facebook.encapp", debug=0
         )
         self.assertEqual(actual_pid, -1)
 
@@ -155,7 +155,7 @@ class TestAdbCommands(unittest.TestCase):
     def test_get_app_pid_invalid_id_output_shall_return_error_code(self, mock_run):
         mock_run.return_value = (True, "INVALID", "")
         actual_pid = encapp_tool.adb_cmds.get_app_pid(
-            ADB_DEVICE_VALID_ID, "com.facebook.encapp", 0
+            ADB_DEVICE_VALID_ID, "com.facebook.encapp", debug=0
         )
         self.assertEqual(actual_pid, -2)
 
@@ -188,7 +188,7 @@ class TestAdbCommands(unittest.TestCase):
         pm_grant_str = (
             f"adb -s {ADB_DEVICE_VALID_ID} shell " "pm grant com.example.myapp "
         )
-        encapp_tool.adb_cmds.grant_storage_permissions(ADB_DEVICE_VALID_ID, apk, 0)
+        encapp_tool.adb_cmds.grant_storage_permissions(ADB_DEVICE_VALID_ID, apk, debug=0)
         mock_run.assert_has_calls(
             [
                 unittest.mock.call(
@@ -211,13 +211,13 @@ class TestAdbCommands(unittest.TestCase):
     def test_force_stop_shall_use_am_to_stop_package(self, mock_run):
         apk = "com.example.myapp"
         expected_cmd = f"adb -s {ADB_DEVICE_VALID_ID} shell " f"am force-stop {apk}"
-        encapp_tool.adb_cmds.force_stop(ADB_DEVICE_VALID_ID, apk)
+        encapp_tool.adb_cmds.force_stop(ADB_DEVICE_VALID_ID, apk, debug=0)
         mock_run.assert_called_with(expected_cmd, 0)
 
     @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
     def test_installed_apps_shall_list_pm_list_packages(self, mock_run):
         mock_run.return_value = (True, ADB_PM_LIST_OUT, "")
-        result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, 1)
+        result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, debug=1)
         expect_out = [
             "com.android.package.a",
             "com.android.package.b",
@@ -237,11 +237,11 @@ class TestAdbCommands(unittest.TestCase):
         ]
         mock_installed.return_value = installed_packages
         encapp_tool.adb_cmds.uninstall_apk(
-            ADB_DEVICE_VALID_ID, "com.not.found.package", 0
+            ADB_DEVICE_VALID_ID, "com.not.found.package", debug=0
         )
         mock_run.assert_not_called()
         encapp_tool.adb_cmds.uninstall_apk(
-            ADB_DEVICE_VALID_ID, "com.android.package.a", 1
+            ADB_DEVICE_VALID_ID, "com.android.package.a", debug=1
         )
         mock_run.assert_called_with(
             f"adb -s {ADB_DEVICE_VALID_ID} uninstall com.android.package.a", 1
