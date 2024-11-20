@@ -1835,37 +1835,34 @@ def codec_test(options, model, serial, debug):
     # Create local_workdir
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
-    if len(options.configfile) > 1:
-        # merge the protobuf files
-        # First file will be the base
-        # For later definitions on the first test will be merged
-        # to all of the tests in the first prototbuf
-        # TODO: should parallels be considered?
-        test_suite = None
-        for proto in options.configfile:
-            tmp = tests_definitions.TestSuite()
-            with open(proto, "rb") as fd:
-                text_format.Merge(fd.read(), tmp)
-            if test_suite is None:
-                test_suite = tmp
-            elif len(test_suite.test):
-                for test in test_suite.test:
-                    if test is not None:
-                        test.MergeFrom(tmp.test[0])
-            else:
-                print("ERROR, first config file lacks a test")
-        basename = os.path.basename(options.configfile[0])
-        options.configfile = f"{local_workdir}/{basename}"
-
-        # Maybe not the right place to do this but let us do it anyways
-        if options.source_dir:
+    # merge the protobuf files
+    # First file will be the base
+    # For later definitions on the first test will be merged
+    # to all of the tests in the first prototbuf
+    # TODO: should parallels be considered?
+    test_suite = None
+    for proto in options.configfile:
+        tmp = tests_definitions.TestSuite()
+        with open(proto, "rb") as fd:
+            text_format.Merge(fd.read(), tmp)
+        if test_suite is None:
+            test_suite = tmp
+        elif len(test_suite.test):
             for test in test_suite.test:
-                if test.input.filepath:
-                    test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
-        with open(options.configfile, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
-    else:
-        options.configfile = options.configfile[0]
+                if test is not None:
+                    test.MergeFrom(tmp.test[0])
+        else:
+            print("ERROR, first config file lacks a test")
+    basename = os.path.basename(options.configfile[0])
+    options.configfile = f"{local_workdir}/{basename}"
+
+    # Maybe not the right place to do this but let us do it anyways
+    if options.source_dir:
+        for test in test_suite.test:
+            if test.input.filepath:
+                test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
+    with open(options.configfile, "w") as f:
+        f.write(text_format.MessageToString(test_suite))
 
     if options.mediastore is None:
         options.mediastore = local_workdir
