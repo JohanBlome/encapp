@@ -55,7 +55,6 @@ def plotAverageBitrate(data, options):
     p.set_ylabel("Bitrate ratio")
     plt.ticklabel_format(style="plain", axis="x")
     if len(options.files) == 1:
-
         axs.set_title(f"{options.label} Bitrate in kbps")
     else:
         axs.set_title(f"{options.label} Bitrate in kbps")
@@ -76,7 +75,7 @@ def plotProcRate(data, options):
 
     slen = int(data["fps"].iloc[0])
     data["smooth_proctime"] = (
-        (data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"])
+        data["stoptime"].shift(-slen, axis="index", fill_value=0) - data["stoptime"]
     ) / (1e9 * slen)
     data = data.drop(data.tail(slen).index)
 
@@ -90,7 +89,9 @@ def plotProcRate(data, options):
     data = data.loc[(data["smooth_proctime"] > 0) & (data["starttime"] > 0)]
     hue = "codec"
     fig = plt.figure()
-    if options.split_descr:
+    if options.split_dataset:
+        hue = "dataset"
+    elif options.split_descr:
         hue = "description"
     p = sns.lineplot(  # noqa: F841
         x=data["rel_start_quant"] / 1e3,
@@ -101,14 +102,23 @@ def plotProcRate(data, options):
     )
     # p.set_ylim(0, 90)
     axs = p.axes
+    secAxis = axs.twinx()
+    sns.lineplot(
+        x=data["rel_start_quant"] / 1e3,
+        y=data["inflight"],
+        hue=hue,
+        linestyle="--",
+        data=data,
+        legend=None,
+    )
+
     if len(options.files) == 1:
         axs.set_title(f"{options.label} Processing framerate ( {mean_input_fps} fps )")
     else:
         axs.set_title(f"{options.label} Processing framerate")
-    if options.limit:
-        axs.set_ylim(0, 15)
-    axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
+
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
+    axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.grid(visible=True, which="minor", color="gray", linewidth=0.5)
     name = f"{options.output}.procrate.png"
@@ -275,7 +285,6 @@ def plotBitrate(data, options):
     set_label = True
     fig = plt.figure()
     if options.rename_codec is None:
-
         data = data.sort_values(by=["description", "codec", "height", "bitrate"])
         if options.split_descr and "description" in list(data.columns):
             # maybe filter on models
@@ -341,7 +350,7 @@ def plotBitrate(data, options):
 
 def plotTestNumbers(data):
     # plot the number of test per test description
-    u_descrs = np.unique(data["description"])
+    u_descrs = data["description"].unique()
     items = []
     for desc in u_descrs:
         filt = data.loc[(data["description"] == desc) & (data["frame"] == 1)]
@@ -389,6 +398,17 @@ def parse_args():
         help="Use test description to distinguish groups of data. Otherwise all data will be considered as being related",
     )
     parser.add_argument(
+        "--split_dataset",
+        action="store_true",
+        help="Use test input file data set to distinguish groups of data. Otherwise all data will be considered as being related",
+    )
+    parser.add_argument(
+        "--dataset_labels",
+        type=str,
+        nargs="+",
+        help="Labels for the datasets. If not provided, the file name will be used",
+    )
+    parser.add_argument(
         "--quantization",
         default="60",
         type=int,
@@ -414,6 +434,10 @@ def main():
         if not file[-4:] == ".csv":
             print(f"Warning! {file} is not a csv file. Check input.")
         input_data = pd.read_csv(file)
+        if options.dataset_labels is not None:
+            input_data["dataset"] = options.dataset_labels.pop(0)
+        else:
+            input_data["dataset"] = file
         if data is not None:
             data = pd.concat([data, input_data])
         else:
@@ -450,8 +474,10 @@ def main():
         plotFrameSize(data, options)
     if options.latency:
         plotLatency(data, options)
-    if len(np.unique(data["description"].str)) > 1:
+    """
+    if len((data["description"].unique())) > 1:
         plotTestNumbers(data)
+    """
     if options.show:
         plt.show()
 
