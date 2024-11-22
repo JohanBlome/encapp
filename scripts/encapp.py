@@ -378,9 +378,7 @@ def collect_results(
         return result_ok, result_json
     else:
         try:
-            print("** capture logcat **")
-            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug=1)
-            print("** parse logcat **")
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug=0)
             result_ok = parse_logcat(logcat_contents, local_workdir)
         except Exception as ex:
             print(f"Failed to parse logcat: {ex}")
