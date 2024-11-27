@@ -448,7 +448,6 @@ def run_quality(test_file, options, debug):
 
     recalc = options.get("recalc", None)
     test = results.get("test")
-    print(f"{test=}, {type(test)=}")
     if type(test) == str:
         # Historically this has always been a dictionary but if this is a string describing a protobuf
         # try to parse it into a dict
@@ -582,6 +581,7 @@ def run_quality(test_file, options, debug):
                 print(f"Reference {reference_pathname} is unavailable")
                 return None
         distorted = encodedfile
+        referenced = reference_pathname
         if not os.path.exists(distorted):
             print(f"Distorted {distorted} is unavailable")
             return None
@@ -602,6 +602,12 @@ def run_quality(test_file, options, debug):
         if options.get("lr_fr", None):
             force_scale = ";[d1]scale=in_range=limited:out_range=full[distorted]"
 
+        tmp_ref = None
+        tmp_dist = None
+        if options.get("ignore_timing"):
+            # transcode to raw intermidiant file
+            tmp_ref = f"ref_{time.time()}.raw"
+            tmp_dist = f"dist_{time.time()}.raw"
         if raw:
             ref_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} "
@@ -614,6 +620,17 @@ def run_quality(test_file, options, debug):
             print(f"input res = {input_resolution} vs {output_resolution}")
 
         dist_part = f"-i {encodedfile} "
+        if tmp_dist is not None:
+            pix_fmt = "yuv420p"
+            # create them
+            shell_cmd = f"{FFMPEG_SILENT} -i {encodedfile} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {tmp_dist} -y"
+            ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            shell_cmd = f"{FFMPEG_SILENT} {ref_part} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {tmp_ref} -y"
+            ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            dist_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} -r 30 -i {tmp_dist}"
+            ref_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} -r 30 -i {tmp_ref}"
+            distorted = tmp_dist
+            referenced = tmp_ref
 
         # This is jsut a naming scheme for the color scaling
         diststream = "distorted"
@@ -678,6 +695,8 @@ def run_quality(test_file, options, debug):
 
         if distorted != encodedfile:
             os.remove(distorted)
+        if referenced != reference_pathname:
+            os.remove(referenced)
 
     if os.path.exists(vmaf_file):
         vmaf_dict = parse_quality_vmaf(vmaf_file)
@@ -959,6 +978,13 @@ def get_options(argv):
         dest="keep_quality_files",
         action="store_true",
         help=f'Keep the intermediant results of quality calculations. Can also be set using a environment variable: "ENCAPP_KEEP_QUALITY_FILES"',
+    )
+    parser.add_argument(
+        "--ignore-timing",
+        dest="ignore_timing",
+        action="store_true",
+        help="Ignore all timing information and compare frame by frame between source and reference. "
+        "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken.",
     )
 
     options = parser.parse_args()
