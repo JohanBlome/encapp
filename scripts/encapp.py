@@ -2724,6 +2724,11 @@ def main(argv):
                 f.write(text_format.MessageToString(test_suite))
             options.configfile[0] = filepath
         proto_options = check_protobuf_test_setup(options)
+
+    # Default settings will be set where necessary unless it is already set.
+    if not options.device_workdir:
+        if proto_options is not None and proto_options.device_workdir:
+            options.device_workdir = proto_options.device_workdir
     options = process_options(options)
 
     # cli should always override
