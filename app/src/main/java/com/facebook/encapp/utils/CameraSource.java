@@ -125,8 +125,12 @@ public class CameraSource {
             camera_characteristics_info.append("camera_characteristics {\n");
             for (String id : cameraIdList) {
                 CameraCharacteristics cameraCharacteristics = mCameraManager.getCameraCharacteristics(id);
-                String str = CameraCharacteristicsHelper.toText(cameraCharacteristics, id, 1);
-                camera_characteristics_info.append(str);
+                try {
+                    String str = CameraCharacteristicsHelper.toText(cameraCharacteristics, id, 1);
+                    camera_characteristics_info.append(str);
+                } catch (Exception ex){
+                    Log.e(TAG, "Failed to get characteristics for camera id:" + id + ", ex: " + ex.getMessage());
+                }
             }
             camera_characteristics_info.append("}\n");
             Log.d(TAG, camera_characteristics_info + "\n");
