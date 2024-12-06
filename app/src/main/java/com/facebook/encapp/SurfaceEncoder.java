@@ -436,9 +436,12 @@ class SurfaceEncoder extends Encoder {
                 // Without it the extractor will read as fast a possible
                 // until no buffers are available.
                 mRealtime = true;
-            } else {
-                if (mOutputMult != null)
-                    mOutputMult.setRealtime(false);
+            }
+        }
+        if (!mRealtime) {
+            if (mOutputMult != null) {
+                Log.d(TAG, "Outputmultiplier will work in non realtime mode");
+                mOutputMult.setRealtime(false);
             }
         }
     }
@@ -447,6 +450,14 @@ class SurfaceEncoder extends Encoder {
         if (mOutputMult != null) {
             mOutputMult.setName("SE_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
             mOutputMult.confirmSize(width, height);
+
+            // Need to update outputmulti and configure working mode.
+            if (!mRealtime) {
+                if (mOutputMult != null) {
+                    Log.d(TAG, "Outputmultiplier will work in non realtime mode");
+                    mOutputMult.setRealtime(false);
+                }
+            }
         }
     }
 

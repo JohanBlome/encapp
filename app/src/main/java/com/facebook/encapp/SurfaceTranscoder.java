@@ -42,7 +42,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     DecoderRuntime mDecoderRuntimeParams;
-    OutputMultiplier mOutputMult = null;
     double mLoopTime = 0;
     int mCurrentLoop = 1;
     long mPtsOffset = 0;
