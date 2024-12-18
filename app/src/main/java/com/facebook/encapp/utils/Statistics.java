@@ -158,13 +158,27 @@ public class Statistics {
     }
 
     public void start() {
+        //TODO: make this configurable
+        //mLoad.start();
+        // Give the load stats two seconds to gather some starting
+        try {
+            Thread.sleep(START_STOP_EXTRA);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         mStartTime = SystemClock.elapsedRealtimeNanos();
-        mLoad.start();
     }
 
     public void stop() {
         mStopTime = SystemClock.elapsedRealtimeNanos();
-        mLoad.stop();
+        // Give the load stats two seconds to gather some starting
+        try {
+            Thread.sleep(START_STOP_EXTRA);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        //TODO: make this configurable
+        //mLoad.stop();
     }
 
     public FrameInfo startEncodingFrame(long pts, int originalFrame) {
@@ -185,6 +199,7 @@ public class Statistics {
             Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
         mEncodingProcessingFrames -= 1;
+
         return frame;
     }
 
@@ -518,6 +533,16 @@ public class Statistics {
             }
             gpuData.put("gpu_clock_freq", jsonArray);
             json.put("gpu_data", gpuData);
+
+            // CPU info
+            JSONArray cpuInfo = mLoad.getCPUInfo();
+            JSONArray cpuTimeInState = mLoad.getCPUTimeInStateData();
+            if (cpuInfo.length() > 0) {
+                json.put("cpu_info", cpuInfo);
+            }
+            if (cpuTimeInState.length() > 0) {
+                json.put("cpu_time_in_state", cpuTimeInState);
+            }
             writer.write(json.toString(2));
         } catch (JSONException e) {
             Log.e(TAG, "Failed writing stats");

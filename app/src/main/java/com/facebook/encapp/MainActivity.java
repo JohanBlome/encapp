@@ -64,9 +64,11 @@ public class MainActivity extends AppCompatActivity {
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
-    MemoryLoad mMemLoad;
 
+    // TODO: make these to run when configured to capture and always
+    MemoryLoad mMemLoad;
     PowerLoad mPowerLoad;
+
     Stack<Encoder> mEncoderList = new Stack<>();
     CameraSource mCameraSource = null;
     OutputMultiplier mCameraSourceMultiplier;
@@ -175,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             } catch (android.content.ActivityNotFoundException ex) {
                 Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
-                // System.exit(-1);
                 Toast.makeText(this, "Missing MANAGE_APP_ALL_FILES_ACCESS_PERMISSION request,", Toast.LENGTH_LONG).show();
             }
         }
@@ -284,8 +285,10 @@ public class MainActivity extends AppCompatActivity {
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
         mPowerLoad = new PowerLoad(this);
-        mMemLoad.start();
-        mPowerLoad.start();
+
+        //TODO: make these to start only when requested
+        //mMemLoad.start();
+        //mPowerLoad.start();
         if (mExtraData.containsKey(CliSettings.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(CliSettings.TEST_UI_HOLD_TIME_SEC, "0"));
         }
