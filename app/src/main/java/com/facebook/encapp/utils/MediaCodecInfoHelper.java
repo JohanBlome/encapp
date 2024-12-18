@@ -81,6 +81,23 @@ public class MediaCodecInfoHelper {
         return json;
     }
 
+    public static JSONArray videoPerformancePointToJson(MediaCodecInfo.VideoCapabilities video_capabilities) throws JSONException {
+        JSONArray json = new JSONArray();
+        if (video_capabilities == null) {
+            return json;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            List<MediaCodecInfo.VideoCapabilities.PerformancePoint> performancePoints = video_capabilities.getSupportedPerformancePoints();
+            if (performancePoints != null) {
+                for (MediaCodecInfo.VideoCapabilities.PerformancePoint perf: performancePoints) {
+                    json.put(perf.toString());
+                }
+            }
+
+        }
+        return json;
+    }
 
     public static JSONObject videoCapabilitiesToJson(MediaCodecInfo.VideoCapabilities video_capabilities) throws JSONException {
         JSONObject json = new JSONObject();
@@ -386,11 +403,11 @@ public class MediaCodecInfoHelper {
         json.put("encoder_capabilities",encoderCapabilitiesToJson(codec_capabilities.getEncoderCapabilities()));
         // print encoder capabilities
         json.put("video_capabilities", videoCapabilitiesToJson(codec_capabilities.getVideoCapabilities()));
-
         // print features required and supported
         json.put("feature_required", featuresToJson(codec_capabilities, true));
         json.put("feature_provided", featuresToJson(codec_capabilities, false));
-
+        // print performance points if available
+        json.put("performance_points", videoPerformancePointToJson(codec_capabilities.getVideoCapabilities()));
         return json;
     }
 
