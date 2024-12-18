@@ -48,7 +48,7 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
-
+    private int START_STOP_EXTRA = 0;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,

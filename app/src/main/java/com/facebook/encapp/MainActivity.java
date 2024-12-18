@@ -381,12 +381,13 @@ public class MainActivity extends AppCompatActivity {
                         while (!mPursuitOver) {
                             if (pursuit > 0) pursuit -= 1;
 
+
                             if (pursuit == 0) {
                                 mPursuitOver = true;
                             }
 
                             Stack<Thread> threads = new Stack<>();
-                            Thread t = startTest(test, threads);
+                            Thread currentRunningThread = startTest(test, threads);
 
                             Log.d(TAG, "Started the test, check camera: " + mCameraCount);
                             if (mCameraCount > 0 && !cameraStarted) {
@@ -394,6 +395,7 @@ public class MainActivity extends AppCompatActivity {
                                 Surface outputSurface = null;
                                 while (outputSurface == null) {
                                     Log.d(TAG, "Wait for input surface");
+
                                     outputSurface = mCameraSourceMultiplier.getInputSurface();
                                     try {
                                         Thread.sleep(50);
@@ -454,9 +456,10 @@ public class MainActivity extends AppCompatActivity {
                                 try {
                                     // Run next test serially so wait for this test
                                     // and all parallels to be finished first
-                                    Log.d(TAG, "Join " + t.getName() + ", state = " + t.getState());
-                                    t.join();
-
+                                    if (currentRunningThread != null) {
+                                        Log.d(TAG, "Join " + currentRunningThread.getName() + ", state = " + currentRunningThread.getState());
+                                        currentRunningThread.join();
+                                    }
                                     while (!threads.empty()) {
                                         try {
                                             for (Thread t_: threads) {
@@ -594,83 +597,95 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        Encoder coder;
+        Encoder coder = null;
         synchronized (mEncoderList) {
             Log.d(TAG, "[" + test.getCommon().getId() + "] input.filepath: " + filePath.toLowerCase(Locale.US));
             OutputAndTexture ot = null;
             Log.d(TAG, "[" + test.getCommon().getId() + "] configure.surface: " + test.getConfigure().getSurface());
+            // Surface of not?
+            OutputMultiplier mult = null;
+            boolean surface = false;
             if (test.getConfigure().getSurface()) {
+                Log.d(TAG, "Surface will be used");
                 if (mViewsToDraw.size() > 0 &&
                         test.getInput().hasShow() &&
                         test.getInput().getShow()) {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] getting texture");
                     ot = getFirstFreeTextureView();
                 }
-            }
-            if (filePath.toLowerCase(Locale.US).equals("camera")) {
-                setupCamera(ot);
-            }
-
-            String extension = getFilenameExtension(filePath);
-            if (VIDEO_ENCODED_EXTENSIONS.contains(extension)) {
-                Log.d(TAG, "[" + test.getCommon().getId() + "] decoding input");
-                // A decoder is needed
-                if (ot != null) {
-                    ot.mMult = new OutputMultiplier(mVsyncHandler);
-                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test");
-                    coder = new SurfaceTranscoder(test, ot.mMult, mVsyncHandler);
-                    ot.mEncoder = coder;
-                    if (!test.getConfigure().getEncode() &&
-                            ot.mMult != null &&
-                            ot.mView != null) {
-                        Log.d(TAG, "Decode only, use view size");
-                        ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
-                    }
-                } else if(test.getInput().getDeviceDecode() && !test.getConfigure().getSurface()) {
-                    coder = new BufferTranscoder(test);
-                } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
-                    Log.d(TAG, "[" + test.getCommon().getId() + "] BufferDecode test");
-                    coder = new BufferDecoder(test);
-                } else {
-                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test (alt)");
-                    coder = new SurfaceTranscoder(test, new OutputMultiplier(mVsyncHandler), mVsyncHandler);
-                }
-            } else if (test.getConfigure().getSurface()) {
-                OutputMultiplier mult = null;
                 if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                         filePath.toLowerCase(Locale.US).contains(".yuv") ||
                         filePath.toLowerCase(Locale.US).contains(".rgba")) {
                     mult = new OutputMultiplier(Texture2dProgram.ProgramType.TEXTURE_2D, mVsyncHandler);
                 } else if (filePath.toLowerCase(Locale.US).contains("camera")) {
-                    if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
-                        // TODO: create a separate viewfinder camera instance in this case
-                        // most android devices support two surfaces from the camera
-                        mult = mCameraSourceMultiplier;
-                    } else {
-                        mult = mCameraSourceMultiplier;
-                    }
+                    mult = mCameraSourceMultiplier;
+                } else {
+                    mult = new OutputMultiplier(mVsyncHandler);
                 }
+
                 if (ot != null) {
                     ot.mMult = mult;
                 }
-                if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
-                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceNoEncoder test");
-                    coder = new SurfaceNoEncoder(test, mult);
-                } else {
-                    Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceEncoder test");
-                    coder = new SurfaceEncoder(test, this, mult);
+                surface = true;
+                if (ot != null) {
+                    if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                        setupCamera(ot);
+                    }
                 }
+            }
+            String extension = getFilenameExtension(filePath);
+            // Check decode
+            boolean deviceDecode = false;
+            if (test.getInput().getDeviceDecode() || VIDEO_ENCODED_EXTENSIONS.contains(extension)) {
+                Log.d(TAG, "[" + test.getCommon().getId() + "] decoding input");
+                deviceDecode = true;
+            }
+            boolean deviceEncode = test.getConfigure().getEncode();
+            // If no encoder specified also set this, but warn.
+            if (test.getConfigure().hasCodec()) {
+                deviceEncode = true;
+            }
 
+            // Simplify next step
+            if (mult == null && ot != null && ot.mMult != null) {
+                mult = ot.mMult;
             } else {
-                if (test.getConfigure().getCodec().endsWith(".so")){
-                    coder = new CustomEncoder(test, this.getFilesDir().getPath());
-                } else {
-                    coder = new BufferEncoder(test);
-                }
+                Log.e(TAG, "Error: no output multiplier");
+                // Will cause a crash.
+            }
+
+            if (test.getConfigure().getCodec().endsWith(".so")) {
+                // TODO: how to integrate with the rest?
+                Log.d(TAG, "0. Custom encoder");
+                coder = new CustomEncoder(test, this.getFilesDir().getPath());
+            } else if (!surface && deviceDecode && !deviceEncode) {
+
+                Log.d(TAG, "1. Simple buffer decode");
+                coder = new BufferDecoder(test);
+            } else if (!surface && !deviceDecode && deviceEncode) {
+
+                Log.d(TAG, "2. Simple buffer encode");
+                coder = new BufferEncoder(test);
+            } else if (!surface && deviceDecode && deviceEncode) {
+
+                Log.d(TAG, "3. Buffer transcode");
+                coder = new BufferTranscoder(test);
+            } else if (surface && deviceDecode && !deviceEncode) {
+
+                Log.d(TAG, "4. Surface decode");
+                //TODO: SurfaceNoEncoder does is only for camera source basically (maybe remove?)
+                coder = new SurfaceTranscoder(test, mult, mVsyncHandler);
+            } else if (surface && !deviceDecode && deviceEncode) {
+
+                Log.d(TAG, "5. Surface encode");
+                coder = new SurfaceEncoder(test, this, mult, mVsyncHandler);
+            } else if (surface && deviceDecode && deviceEncode) {
+                Log.d(TAG, "6. Surface transcode");
+                coder = new SurfaceTranscoder(test, mult, mVsyncHandler);
             }
 
 
-            if (ot != null) {
+            if (ot != null && coder != null) {
                 ot.mEncoder = coder;
                 Log.d(TAG, "Add surface texture for " + test.getCommon().getId() + " st: "+ot.mView.getSurfaceTexture());
                 ot.mMult.addSurfaceTexture(ot.mView.getSurfaceTexture());
@@ -679,18 +694,18 @@ public class MainActivity extends AppCompatActivity {
             mEncoderList.add(coder);
         }
 
-
+        final Encoder coder_ = coder;
         t = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
-                    final String status = coder.start();
+                    final String status = coder_.start();
                     if (status.length() == 0) {
                         // test was ok
-                        report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "ok", "");
+                        report_result(coder_.mTest.getCommon().getId(), coder_.getStatistics().getId(), "ok", "");
                     } else if (status.length() > 0) {
-                        report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "error", status);
+                        report_result(coder_.mTest.getCommon().getId(), coder_.getStatistics().getId(), "error", status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
                         Log.d(TAG, "Pursuit over");
                         mPursuitOver = true;
@@ -701,17 +716,21 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Instances running: " + mInstancesRunning);
                 } finally {
                     // dump statistics
-                    final Statistics stats = coder.getStatistics();
-                    stats.setAppVersion(getCurrentAppVersion());
-                    try {
-                        String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
-                        Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
-                        FileWriter fw = new FileWriter(fullFilename, false);
-                        stats.writeJSON(fw);
-                        fw.close();
-                    } catch (IOException e) {
-                        Log.e(TAG, test.getCommon().getId() + " - Error when writing stats");
-                        e.printStackTrace();
+                    final Statistics stats = coder_.getStatistics();
+                    if (stats != null) {
+                        stats.setAppVersion(getCurrentAppVersion());
+                        try {
+                            String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
+                            Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
+                            FileWriter fw = new FileWriter(fullFilename, false);
+                            stats.writeJSON(fw);
+                            fw.close();
+                        } catch (IOException e) {
+                            Log.e(TAG, test.getCommon().getId() + " - Error when writing stats");
+                            e.printStackTrace();
+                        }
+                    } else {
+                        Log.d(TAG, "No stats available");
                     }
                     decreaseTestsInflight();
                     log("\nDone test: " + test.getCommon().getId());
@@ -723,15 +742,15 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }
-        }, "TestRunner_" + coder.mTest.getCommon().getId());
+        }, "TestRunner_" + coder_.mTest.getCommon().getId());
         t.start();
 
         int waitTime = 10000; //ms
         int waitForPrevious = 50; //todo: make configurable
-        while (!coder.initDone() && t.isAlive()) {
+        while (!coder_.initDone() && t.isAlive()) {
             try {
                 // If we do not wait for the init to de done before starting next
-                // transcoder there may be issue in the surface handling on lower levels
+                // transcoder_ there may be issue in the surface handling on lower levels
                 // on certain hw (not thread safe)
                 Log.d(TAG, "Sleep while waiting for init to be done");
                 Thread.sleep(waitForPrevious);
