@@ -285,7 +285,6 @@ class BufferEncoder extends Encoder {
                                 mMuxer.writeSampleData(mVideoTrack, data, info);
                             }
                             mCodec.releaseOutputBuffer(index, false /* render */);
-                            mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
                         }
                     }
                 } catch (MediaCodec.CodecException ex) {

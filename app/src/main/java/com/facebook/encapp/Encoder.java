@@ -482,12 +482,14 @@ public abstract class Encoder {
                         if (mFirstFrameTimestampUsec != -1) {
                             long timestampUsec = mPts + (long) (frameBuffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
                             if (timestampUsec < 0) {
+                                Log.w(TAG, "Timestamp < 0");
                                 mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                                 continue;
                             }
                             try {
                                 FrameInfo info =  mStats.stopEncodingFrame(timestampUsec, frameBuffer.mInfo.size,
                                         (frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+
                                 ++mOutFramesCount;
                                 if (Build.VERSION.SDK_INT >= 29) {
                                     MediaFormat oformat = mCodec.getOutputFormat();

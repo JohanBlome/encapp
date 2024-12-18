@@ -25,7 +25,6 @@ public class OutputMultiplier {
     final private Object mLock = new Object();
     private final Vector<FrameswapControl> mOutputSurfaces = new Vector<>();
     VsyncHandler mMessageHandler;
-    boolean mDropFrames = true;
     int LATE_LIMIT_NS = 15 * 1000000000; // ms
     Texture2dProgram.ProgramType mProgramType = Texture2dProgram.ProgramType.TEXTURE_EXT;
     private Renderer mRenderer;
@@ -331,8 +330,8 @@ public class OutputMultiplier {
                     }
                     long diff = 0;
                     long timeNs = 0;
+                    timeNs = buffer.getTimestampUs() * 1000;
                     if (mVsynchWait) {
-                        timeNs = buffer.getTimestampUs() * 1000;
                         if (mTimestamp0Ns == -1) {
                             mTimestamp0Ns = timeNs;
                             mVsync0 = mCurrentVsyncNs;

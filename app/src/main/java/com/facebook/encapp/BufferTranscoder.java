@@ -395,14 +395,6 @@ public class BufferTranscoder extends Encoder  {
                 currentMediaFormat = newFormat;
                 mInFramesCount++;
                 long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
-                if (mFirstFrameTimestampUsec == timestamp ) {
-                    // Request key frame
-                    Bundle bundle = new Bundle();
-                    bundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
-                    if (mCodec != null) {
-                        mCodec.setParameters(bundle);
-                    }
-                }
                 setRuntimeParameters(mInFramesCount);
                 mDropNext = dropFrame(mInFramesCount);
                 mDropNext |= dropFromDynamicFramerate(mInFramesCount);
@@ -410,7 +402,6 @@ public class BufferTranscoder extends Encoder  {
                 //Check time, if to far off drop frame, minimize the drops so something is show.
                 long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                mCurrentTimeSec = diffUsec/1000000.0f;
                 if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                     if (mDropcount < mFrameRate) {
                         Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
@@ -464,12 +455,7 @@ public class BufferTranscoder extends Encoder  {
                     int size = mExtractor.readSampleData(buffer, 0);
                     int flags = mExtractor.getSampleFlags();
 
-                    double runtime = mCurrentTimeSec;
-                    if (mFirstFrameTimestampUsec > 0) {
-                        runtime -= mFirstFrameTimestampUsec/1000000.0;
-                    }
-
-                    if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, false)) {
+                    if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec /* runtime*/, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
                     }
@@ -503,9 +489,10 @@ public class BufferTranscoder extends Encoder  {
                     } else {
                         mDecoderBuffers.add(index);
                     }
+                    /*
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
-                    }
+                    }*/
                     boolean eof = !mExtractor.advance();
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
@@ -519,7 +506,7 @@ public class BufferTranscoder extends Encoder  {
 
                         mLoopTime = mPtsOffset /1000000.0;
                         Log.d(TAG, "*** Loop ended starting " + mCurrentLoop + " - currentTime " + mCurrentTimeSec + " ***");
-                        if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, true)) {
+                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec /*runtime*/, true)) {
                             mDone = true;
                         }
                     }
@@ -630,11 +617,11 @@ public class BufferTranscoder extends Encoder  {
 
                 try {
                     long videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    //while (videoDiffMs > 0) {
+                    while (videoDiffMs > 0) {
                         // Wait for next vsync and check time difference again.
                         mSyncLock.wait(WAIT_TIME_MS);
                         videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    ///}
+                    }
                     mLastTime = mVsyncTimeNs;
 
                 } catch (InterruptedException e) {

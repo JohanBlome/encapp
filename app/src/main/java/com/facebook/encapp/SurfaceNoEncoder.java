@@ -51,13 +51,13 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
     long mVsyncTimeNs = 0;
     long mFirstSynchNs = -1;
 
-    public SurfaceNoEncoder(Test test, OutputMultiplier multiplier ) {
-        super(test);
-        mOutputMult = multiplier;
+    public SurfaceNoEncoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
+        super(test, null, multiplier, vsyncHandler);
     }
 
 
     public String start() {
+        mStats = new Statistics("surface no encoder", mTest);
         Surface surface = null;
         SurfaceTexture surfaceTexture = null;
 
@@ -73,6 +73,7 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
         checkRealtime();
         if (mRealtime) {
             mVsyncHandler.addListener(this);
+            Log.d(TAG, "Realtime");
         }
 
         mFrameRate = mTest.getConfigure().getFramerate();
@@ -84,8 +85,6 @@ public class SurfaceNoEncoder extends SurfaceEncoder implements VsyncListener {
         } catch (RuntimeException e) {
             Log.e(TAG, "Error: " + e.getMessage());
         }
-
-        mStats = new Statistics("surface no encoder", mTest);
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();
