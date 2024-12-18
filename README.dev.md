@@ -188,5 +188,11 @@ python3 -m pytest ~/code/Github/encapp_master/encapp/scripts/tests/
 
 * The unit tests can be run without a device connected.
 * The system tests require a device connected. To pass all tests there needs to be a h264 encodera and decoder. It also needs to have surface textures available.
+```
+$ export ANDROID_SERIAL=XXX
+```
 
-
+By default the latest build will be installed on the device. Test can also be run using the currently installed application by setting:
+```
+$ export ENCAPP_ALWAYS_INSTALL=0
+```
