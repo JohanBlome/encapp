@@ -509,8 +509,10 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                             mDone = true;
                         }
                     }
-                    //Log.d(TAG, "Set lastpts = " + ptsUsec/1000 +" ms" + ", ptsOffset = " + mPtsOffset);
                     mLastPtsUs = ptsUsec;
+		    if (mRealtime) {
+			sleepUntilNextFrame();
+		    }
                 }
             }
         }
