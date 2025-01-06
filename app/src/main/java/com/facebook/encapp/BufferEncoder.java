@@ -55,7 +55,7 @@ class BufferEncoder extends Encoder {
         mFramesAdded = 0;
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         PixFmt inputFmt = mTest.getInput().getPixFmt();
-        mRefFramesizeInBytes =  mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
+        mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
         mYuvReader = new FileReader();
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
