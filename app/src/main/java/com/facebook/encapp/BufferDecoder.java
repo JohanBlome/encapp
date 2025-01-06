@@ -191,6 +191,16 @@ class BufferDecoder extends Encoder {
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
     }
 
+    protected boolean timeForNextFrame(double frameTimeUsec) {
+        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
+        long sleepTimeMs = (long)(frameTimeUsec - (now - mLastTime)) / 1000; //To ms
+        boolean timeForNext = false;
+        if (sleepTimeMs <= 0) {
+            timeForNext = true;
+        }
+        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+        return timeForNext;
+    }
     void decodeFrames(int trackIndex) throws IOException {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         /* YUV file dump */
@@ -223,59 +233,62 @@ class BufferDecoder extends Encoder {
             }
             // Feed more data to the decoder.
             if (!inputDone) {
-                index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US);
-                if (index >= 0) {
-                    ByteBuffer inputBuffer = mDecoder.getInputBuffer(index);
-                    // Read the sample data into the ByteBuffer.  This neither respects nor
-                    // updates inputBuffer's position, limit, etc.
-                    int chunkSize = mExtractor.readSampleData(inputBuffer, 0);
-                    int flags = 0;
-                    if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
-                        flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                        inputDone = true;
-                    }
-                    if (chunkSize < 0) {
-                        if (mYuvReader != null) {
-                            mYuvReader.closeFile();
-                        }
-                        currentLoop++;
-
-                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true) || mYuvReader == null) {
-                            // Set EOS flag and call encoder
-                            Log.d(TAG, "*******************************");
-                            Log.d(TAG, "End of stream");
-
+                // Sleep before data is pushed
+                if (mRealtime && timeForNextFrame(mFrameTimeUsec)) {
+                    index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US);
+                    if (index >= 0) {
+                        ByteBuffer inputBuffer = mDecoder.getInputBuffer(index);
+                        // Read the sample data into the ByteBuffer.  This neither respects nor
+                        // updates inputBuffer's position, limit, etc.
+                        int chunkSize = mExtractor.readSampleData(inputBuffer, 0);
+                        int flags = 0;
+                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                             flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                            // End of stream -- send empty frame with EOS flag set.
-                            mDecoder.queueInputBuffer(index, 0, 0, 0L,
-                                    flags);
                             inputDone = true;
                         }
+                        if (chunkSize < 0) {
+                            if (mYuvReader != null) {
+                                mYuvReader.closeFile();
+                            }
+                            currentLoop++;
 
-                        if (!inputDone) {
-                            Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                            mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
-                            Log.d(TAG, "*** Loop ended start " + currentLoop + "***");
+                            if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true) || mYuvReader == null) {
+                                // Set EOS flag and call encoder
+                                Log.d(TAG, "*******************************");
+                                Log.d(TAG, "End of stream");
+
+                                flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                                // End of stream -- send empty frame with EOS flag set.
+                                mDecoder.queueInputBuffer(index, 0, 0, 0L,
+                                        flags);
+                                inputDone = true;
+                            }
+
+                            if (!inputDone) {
+                                Log.d(TAG, " *********** OPEN FILE AGAIN *******");
+                                mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
+                                Log.d(TAG, "*** Loop ended start " + currentLoop + "***");
+                            }
+
+                        } else {
+                            if (mExtractor.getSampleTrackIndex() != trackIndex) {
+                                Log.w(TAG, "WEIRD: got sample from track " +
+                                        mExtractor.getSampleTrackIndex() + ", expected " + trackIndex);
+                            }
+                            presentationTimeUs = mExtractor.getSampleTime();
+                            mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
+                            mStats.startDecodingFrame(presentationTimeUs, chunkSize, flags);
+
+                            mDecoder.queueInputBuffer(index, 0, chunkSize,
+                                    presentationTimeUs, flags /*flags*/);
+
+                            mInFramesCount++;
+                            mExtractor.advance();
                         }
 
                     } else {
-                        if (mExtractor.getSampleTrackIndex() != trackIndex) {
-                            Log.w(TAG, "WEIRD: got sample from track " +
-                                    mExtractor.getSampleTrackIndex() + ", expected " + trackIndex);
-                        }
-                        presentationTimeUs = mExtractor.getSampleTime();
-                        mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
-                        mStats.startDecodingFrame(presentationTimeUs, chunkSize, flags);
-
-                        mDecoder.queueInputBuffer(index, 0, chunkSize,
-                                presentationTimeUs, flags /*flags*/);
-
-                        mInFramesCount++;
-                        mExtractor.advance();
+                        Log.d(TAG, "Input buffer not available");
                     }
-
-                } else {
-                    Log.d(TAG, "Input buffer not available");
                 }
             }
 
@@ -293,6 +306,7 @@ class BufferDecoder extends Encoder {
                 } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     MediaFormat newFormat = mDecoder.getOutputFormat();
                 } else if(index >= 0) {
+                    FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         outputDone = true;
                         Log.d(TAG, "Output EOS");
@@ -302,7 +316,6 @@ class BufferDecoder extends Encoder {
                     if (outputBuf != null) {
                         int limit = outputBuf.limit();
                         if(limit != 0) {
-                            FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
                             frameInfo.addInfo(latestFrameChanges);
                             latestFrameChanges = null;
 
@@ -322,7 +335,6 @@ class BufferDecoder extends Encoder {
                         Log.e(TAG, "Illegal state exception when trying to release output buffers");
                     }
                 }
-                if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
             }
         }
         if (mDecodeDump) fo.close();
