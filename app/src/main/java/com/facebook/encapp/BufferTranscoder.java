@@ -381,6 +381,7 @@ public class BufferTranscoder extends Encoder  {
             long timestamp = info.presentationTimeUs;
 
             if (MainActivity.isStable()) {
+                FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
                     mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
@@ -388,7 +389,6 @@ public class BufferTranscoder extends Encoder  {
                 // Buffer will be released when drawn
                 MediaFormat newFormat = codec.getOutputFormat();
                 Dictionary<String, Object> mediaFormatInfo = mediaFormatComparison(currentMediaFormat, newFormat);
-                FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (frameInfo != null) {
                     frameInfo.addInfo(mediaFormatInfo);
                 }

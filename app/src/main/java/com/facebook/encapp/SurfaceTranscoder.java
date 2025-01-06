@@ -341,6 +341,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             long timestamp = info.presentationTimeUs;
 
             if (MainActivity.isStable()) {
+                FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
                     mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
@@ -348,7 +349,6 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 // Buffer will be released when drawn
                 MediaFormat newFormat = codec.getOutputFormat();
                 Dictionary<String, Object> mediaFormatInfo = mediaFormatComparison(currentMediaFormat, newFormat);
-                FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (frameInfo != null) {
                     frameInfo.addInfo(mediaFormatInfo);
                 }
@@ -509,12 +509,31 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                             mDone = true;
                         }
                     }
+                    if (mRealtime) sleepUntilNextFrame();
                     mLastPtsUs = ptsUsec;
 		    if (mRealtime) {
 			sleepUntilNextFrame();
 		    }
                 }
             }
+        }
+
+
+        protected void sleepUntilNextFrame() {
+            long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
+            long sleepTimeMs = (long)(mFrameTimeUsec - (now - mLastTime)) / 1000; //To ms
+            if (sleepTimeMs < 0) {
+                // We have been delayed. Run forward.
+                sleepTimeMs = 0;
+            }
+            if (sleepTimeMs > 0) {
+                try {
+                    Thread.sleep(sleepTimeMs);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
         }
 
         public void addBuffer(int id) {
