@@ -522,6 +522,7 @@ public class BufferTranscoder extends Encoder  {
 
     private class EncoderWriter extends Thread {
         ConcurrentLinkedQueue<FrameBuffer> mDecoderBuffers = new ConcurrentLinkedQueue<>();
+        boolean mDone = false;
 
         @Override
         public void run() {
@@ -594,6 +595,10 @@ public class BufferTranscoder extends Encoder  {
                 mDecoderBuffers.notifyAll();
             }
         }
+
+        public void stopWriter() {
+            mDone = true;
+        }
     }
 
 
@@ -640,6 +645,7 @@ public class BufferTranscoder extends Encoder  {
                 }
             }
             mDone = true;
+            mEncoderWriter.stopWriter();
             mStats.stop();
             Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
             Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
