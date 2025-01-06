@@ -1,24 +1,31 @@
 package com.facebook.encapp.utils;
+import android.os.Build;
 import android.os.SystemClock;
+import android.os.Trace;
+import android.util.Log;
 
 import java.util.Dictionary;
 
 public class FrameInfo {
+    private static String TAG = "FrameInfo";
     long mPts;
     long mDts;
     long mSize;
-    long mProcessTime;
     long mStartTime;
     long mStopTime;
     boolean mIsIframe;
     int mFlags;
     int mOriginalFrame;
-
+    int mUUID = -1;
+    static Integer mIdCounter = 0;
     Dictionary<String, Object> mInfo;
 
     public FrameInfo(long pts) {
         mPts = pts;
         mOriginalFrame = -1; // When this does not make sense
+        synchronized (mIdCounter) {
+            mUUID = mIdCounter++;
+        }
     }
 
     public FrameInfo(long pts, int originalFrame) {
@@ -55,9 +62,15 @@ public class FrameInfo {
     }
     public void start(){
         mStartTime = SystemClock.elapsedRealtimeNanos();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Trace.beginAsyncSection("Process frame", mUUID);
+        }
     }
 
     public void stop(){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Trace.endAsyncSection("Process frame", mUUID);
+        }
         mStopTime = SystemClock.elapsedRealtimeNanos();
         if (mStopTime < mStartTime) {
             mStopTime = -1;
