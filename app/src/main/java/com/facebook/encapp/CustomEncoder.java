@@ -195,13 +195,7 @@ class CustomEncoder extends Encoder {
 
     public String start() {
         Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
-        try {
-            if (TestDefinitionHelper.checkBasicSettings(mTest)) {
-                mTest = TestDefinitionHelper.updateBasicSettings(mTest);
-            }
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
-        }
+        mTest = TestDefinitionHelper.updateBasicSettings(mTest);
         if (mTest.hasRuntime())
             mRuntimeParams = mTest.getRuntime();
         if (mTest.getInput().hasRealtime())

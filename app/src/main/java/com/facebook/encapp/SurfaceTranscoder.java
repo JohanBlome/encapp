@@ -20,6 +20,7 @@ import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
 import com.facebook.encapp.utils.OutputMultiplier;
@@ -121,11 +122,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             return "Failed to create decoder";
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
-        try {
-            mTest = TestDefinitionHelper.updateBasicSettings(mTest);
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
-        }
+        mTest = TestDefinitionHelper.updateBasicSettings(mTest);
 
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = res.getWidth();

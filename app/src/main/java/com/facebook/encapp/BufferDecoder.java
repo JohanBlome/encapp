@@ -47,13 +47,7 @@ class BufferDecoder extends Encoder {
 
     public String start() {
         Log.d(TAG,"** Buffer decoding - " + mTest.getCommon().getDescription());
-        try {
-            if (TestDefinitionHelper.checkBasicSettings(mTest)) {
-                mTest = TestDefinitionHelper.updateBasicSettings(mTest);
-            }
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
-        }
+        mTest = TestDefinitionHelper.updateBasicSettings(mTest);
 
         if (mTest.getInput().hasRealtime()) {
             mRealtime = mTest.getInput().getRealtime();

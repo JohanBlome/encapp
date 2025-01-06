@@ -139,11 +139,7 @@ public class BufferTranscoder extends Encoder  {
             return "Failed to create decoder";
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
-        try {
-            mTest = TestDefinitionHelper.updateBasicSettings(mTest);
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
-        }
+        mTest = TestDefinitionHelper.updateBasicSettings(mTest);
 
         if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
             mInputWidth = inputFormat.getInteger(MediaFormat.KEY_WIDTH);

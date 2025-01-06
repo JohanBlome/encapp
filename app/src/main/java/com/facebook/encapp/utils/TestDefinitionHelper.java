@@ -252,29 +252,6 @@ public class TestDefinitionHelper {
         return builder.build();
     }
 
-    public static boolean checkBasicSettings(Test test) {
-        // Make sure we have the most basic settings well defined
-        Size res;
-        Configure.Builder config = test.getConfigure().toBuilder();
-        // make sure the input is well-defined
-        Input.Builder input = test.getInput().toBuilder();
-        // default configure.encode value is True
-        Log.d(TAG, "Filepath:" + input.getFilepath());
-        if (!config.hasEncode() || (config.getEncode() == true) && !(input.getFilepath().endsWith(".mp4"))) {
-            if (!input.hasResolution()) {
-               // throw new RuntimeException("No valid resolution on input settings");
-            }
-            if (!input.hasPixFmt()) {
-               // throw new RuntimeException("No valid pixel format on input settings");
-            }
-            if (!input.hasFramerate()) {
-                //:w
-                // throw new RuntimeException("No valid framerate on input settings");
-            }
-        }
-        return true;
-    }
-
     public static Test updateBasicSettings(Test test) {
         // get derived values
         Input.Builder input = test.getInput().toBuilder();
