@@ -12,15 +12,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
-import android.os.SystemClock;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.ClockTimes;
 import com.facebook.encapp.utils.FileReader;
-import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
 import com.facebook.encapp.utils.OutputMultiplier;
@@ -28,7 +27,6 @@ import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 import com.facebook.encapp.utils.VsyncHandler;
-import com.facebook.encapp.utils.VsyncListener;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -341,7 +339,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
-                    mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
+                    mFirstFrameSystemTimeNsec = ClockTimes.currentTimeNs();
                 }
                 // Buffer will be released when drawn
                 MediaFormat newFormat = codec.getOutputFormat();
@@ -351,7 +349,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 }
                 currentMediaFormat = newFormat;
                 mInFramesCount++;
-                long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
+                long diffUsec = (long)(ClockTimes.currentTimeUs()- mFirstFrameSystemTimeNsec/1000);
                 if (!mNoEncoding) {
                     if (mFirstFrameTimestampUsec == timestamp ) {
                         // Request key frame
@@ -506,23 +504,21 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                             mDone = true;
                         }
                     }
-                    if (mRealtime) sleepUntilNextFrame();
                     mLastPtsUs = ptsUsec;
-		    if (mRealtime) {
-			sleepUntilNextFrame();
-		    }
+                    if (mRealtime) sleepUntilNextFrame();
                 }
             }
         }
 
 
         protected void sleepUntilNextFrame() {
-            long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
-            long sleepTimeMs = (long)(mFrameTimeUsec - (now - mLastTime)) / 1000; //To ms
+            long now = ClockTimes.currentTimeMs();
+            long sleepTimeMs = (long)(mFrameTimeUsec/1000 - (now - mLastTimeMs));
             if (sleepTimeMs < 0) {
                 // We have been delayed. Run forward.
                 sleepTimeMs = 0;
             }
+            Log.d(TAG, "Sleep time: " + sleepTimeMs);
             if (sleepTimeMs > 0) {
                 try {
                     Thread.sleep(sleepTimeMs);
@@ -530,7 +526,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     e.printStackTrace();
                 }
             }
-            mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+            mLastTimeMs = ClockTimes.currentTimeMs();
         }
 
         public void addBuffer(int id) {

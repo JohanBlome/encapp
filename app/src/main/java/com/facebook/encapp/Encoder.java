@@ -1,9 +1,7 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
-import android.graphics.ImageFormat;
 import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -12,9 +10,7 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.util.Log;
-import android.os.SystemClock;
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Configure;
@@ -22,8 +18,8 @@ import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.CliSettings;
+import com.facebook.encapp.utils.ClockTimes;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
@@ -36,10 +32,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -55,7 +49,7 @@ public abstract class Encoder {
     protected double mRefFrameTime = 0;
     double mCurrentTimeSec;
     double mFirstFrameTimestampUsec = -1;
-    long mLastTime = -1;
+    long mLastTimeMs = -1;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
     protected MediaMuxer mMuxer;
@@ -115,8 +109,8 @@ public abstract class Encoder {
     }
 
     protected void sleepUntilNextFrame(double frameTimeUsec) {
-        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
-        long sleepTimeMs = (long)(frameTimeUsec - (now - mLastTime)) / 1000; //To ms
+        long now = ClockTimes.currentTimeMs();
+        long sleepTimeMs = (long)(frameTimeUsec/1000 - (now - mLastTimeMs)); //To ms
         if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
             sleepTimeMs = 0;
@@ -128,12 +122,12 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
-        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+        mLastTimeMs = ClockTimes.currentTimeMs();
     }
 
     protected void sleepUntilNextFrame() {
-        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
-        long sleepTimeMs = (long)(mFrameTimeUsec - (now - mLastTime)) / 1000; //To ms
+        long now = ClockTimes.currentTimeMs();
+        long sleepTimeMs = (long)(mFrameTimeUsec/1000 - (now - mLastTimeMs)); //To ms
         if (sleepTimeMs < 0) {
             // We have been delayed. Run forward.
             sleepTimeMs = 0;
@@ -145,7 +139,7 @@ public abstract class Encoder {
                 e.printStackTrace();
             }
         }
-        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+        mLastTimeMs = ClockTimes.currentTimeMs();
     }
 
 

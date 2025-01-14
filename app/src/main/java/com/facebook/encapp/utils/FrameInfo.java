@@ -1,6 +1,5 @@
 package com.facebook.encapp.utils;
 import android.os.Build;
-import android.os.SystemClock;
 import android.os.Trace;
 import android.util.Log;
 
@@ -61,7 +60,7 @@ public class FrameInfo {
         mFlags = flags;
     }
     public void start(){
-        mStartTime = SystemClock.elapsedRealtimeNanos();
+        mStartTime = ClockTimes.currentTimeNs();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Trace.beginAsyncSection("Process frame", mUUID);
         }
@@ -71,7 +70,7 @@ public class FrameInfo {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Trace.endAsyncSection("Process frame", mUUID);
         }
-        mStopTime = SystemClock.elapsedRealtimeNanos();
+        mStopTime = ClockTimes.currentTimeNs();
         if (mStopTime < mStartTime) {
             mStopTime = -1;
             mStartTime = 0;
