@@ -7,13 +7,13 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Environment;
-import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.ClockTimes;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
@@ -186,15 +186,16 @@ class BufferDecoder extends Encoder {
     }
 
     protected boolean timeForNextFrame(double frameTimeUsec) {
-        long now = SystemClock.elapsedRealtimeNanos() / 1000; //To Us
-        long sleepTimeMs = (long)(frameTimeUsec - (now - mLastTime)) / 1000; //To ms
+        long now = ClockTimes.currentTimeMs();
+        long sleepTimeMs = (long)(frameTimeUsec/1000 - (now - mLastTimeMs)); //To ms
         boolean timeForNext = false;
         if (sleepTimeMs <= 0) {
             timeForNext = true;
         }
-        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+        mLastTimeMs = ClockTimes.currentTimeMs();
         return timeForNext;
     }
+
     void decodeFrames(int trackIndex) throws IOException {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         /* YUV file dump */
@@ -214,7 +215,7 @@ class BufferDecoder extends Encoder {
         int currentLoop = 1;
         MediaFormat currentOutputFormat = mDecoder.getOutputFormat();
         Dictionary<String, Object> latestFrameChanges = null;
-        mLastTime = SystemClock.elapsedRealtimeNanos() / 1000;
+        mLastTimeMs = ClockTimes.currentTimeMs();
         while (!outputDone) {
             int index;
             long presentationTimeUs = 0L;
@@ -228,7 +229,7 @@ class BufferDecoder extends Encoder {
             // Feed more data to the decoder.
             if (!inputDone) {
                 // Sleep before data is pushed
-                if (mRealtime && timeForNextFrame(mFrameTimeUsec)) {
+                if (!mRealtime || (mRealtime && timeForNextFrame(mFrameTimeUsec))) {
                     index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US);
                     if (index >= 0) {
                         ByteBuffer inputBuffer = mDecoder.getInputBuffer(index);

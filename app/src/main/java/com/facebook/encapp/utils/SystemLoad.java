@@ -1,9 +1,6 @@
 package com.facebook.encapp.utils;
 
-import android.os.SystemClock;
 import android.util.Log;
-
-import com.google.gson.JsonObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -273,7 +270,7 @@ public class SystemLoad {
     }
 
     private void captureCpuStats() {
-        long ts = SystemClock.elapsedRealtimeNanos();
+        long ts = ClockTimes.currentTimeNs();
         for (Integer cpunum: mCpuNumList) {
             String data = readSystemData(CPU_DIR + "/cpu"  + cpunum + TIME_IN_STATE);
             /*

@@ -1,27 +1,23 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.frameSizeInBytes;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
-import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
-import android.view.Surface;
 
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderRuntime;
-import com.facebook.encapp.proto.Input;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.ClockTimes;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
@@ -30,7 +26,6 @@ import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 import com.facebook.encapp.utils.VsyncHandler;
-import com.facebook.encapp.utils.VsyncListener;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -55,9 +50,8 @@ public class BufferTranscoder extends Encoder  {
     private FrameswapControl mFrameSwapSurface;
     private VsyncHandler mVsyncHandler;
     Object mSyncLock = new Object();
-    long mVsyncTimeNs = 0;
-    long mFirstSynchNs = -1;
-    Surface mSurface = null;
+    long mVsyncTimeUs = 0;
+    long mFirstSynchUs = -1;
     boolean mDone = false;
     Object mStopLock = new Object();
 
@@ -367,7 +361,7 @@ public class BufferTranscoder extends Encoder  {
         }
     }
 
-    long mFirstFrameSystemTimeNsec = 0;
+    long mFirstFrameSystemTimeUsec = 0;
     long mDropcount = 0;
     MediaFormat currentMediaFormat;
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
@@ -380,7 +374,7 @@ public class BufferTranscoder extends Encoder  {
                 FrameInfo frameInfo = mStats.stopDecodingFrame(timestamp);
                 if (mFirstFrameTimestampUsec < 0) {
                     mFirstFrameTimestampUsec = timestamp;
-                    mFirstFrameSystemTimeNsec = SystemClock.elapsedRealtimeNanos();
+                    mFirstFrameSystemTimeUsec = ClockTimes.currentTimeUs();
                 }
                 // Buffer will be released when drawn
                 MediaFormat newFormat = codec.getOutputFormat();
@@ -390,7 +384,7 @@ public class BufferTranscoder extends Encoder  {
                 }
                 currentMediaFormat = newFormat;
                 mInFramesCount++;
-                long diffUsec = (SystemClock.elapsedRealtimeNanos() - mFirstFrameSystemTimeNsec)/1000;
+                long diffUsec = ClockTimes.currentTimeUs() - mFirstFrameSystemTimeUsec;
                 setRuntimeParameters(mInFramesCount);
                 mDropNext = dropFrame(mInFramesCount);
                 mDropNext |= dropFromDynamicFramerate(mInFramesCount);
@@ -398,7 +392,7 @@ public class BufferTranscoder extends Encoder  {
                 //Check time, if to far off drop frame, minimize the drops so something is show.
                 long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
+                if (mRealtime &&  mFirstFrameSystemTimeUsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                     if (mDropcount < mFrameRate) {
                         Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
                         mDropNext = true;
@@ -605,16 +599,15 @@ public class BufferTranscoder extends Encoder  {
 
 
     public  long sleepUntilNextFrameSynched() {
-        if (mFirstSynchNs == -1) {
-            Log.d(TAG, "Set first sync: "+mVsyncTimeNs);
-            mFirstSynchNs = mVsyncTimeNs;
+        if (mFirstSynchUs == -1) {
+            Log.d(TAG, "Set first sync: "+ mVsyncTimeUs);
+            mFirstSynchUs = mVsyncTimeUs;
         }
         if (mLastPtsUs == -1) {
             Log.d(TAG,"First time - no wait");
         } else {
-            //TODO: Fix this, it is broken. Lockup with the loop and growing delay without it.
             synchronized (mSyncLock) {
-                long startTime = mVsyncTimeNs;
+                long startTime = mVsyncTimeUs;
 
                 try {
                     long videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
@@ -623,14 +616,14 @@ public class BufferTranscoder extends Encoder  {
                         mSyncLock.wait(WAIT_TIME_MS);
                         videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
                     }
-                    mLastTime = mVsyncTimeNs;
+                    mLastTimeMs = mVsyncTimeUs;
 
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         }
-        return mVsyncTimeNs;
+        return mVsyncTimeUs;
     }
 
 

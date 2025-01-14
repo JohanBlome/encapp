@@ -3,7 +3,6 @@ package com.facebook.encapp.utils;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
-import android.os.SystemClock;
 
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
@@ -166,11 +165,11 @@ public class Statistics {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        mStartTime = SystemClock.elapsedRealtimeNanos();
+        mStartTime = ClockTimes.currentTimeNs();
     }
 
     public void stop() {
-        mStopTime = SystemClock.elapsedRealtimeNanos();
+        mStopTime = ClockTimes.currentTimeNs();
         // Give the load stats two seconds to gather some starting
         try {
             Thread.sleep(START_STOP_EXTRA);
@@ -223,7 +222,8 @@ public class Statistics {
     }
 
     public void startDecodingFrame(long pts, long size, int flags) {
-        FrameInfo frame = new FrameInfo(pts);
+        // Original frame in decoding will be in read order
+        FrameInfo frame = new FrameInfo(pts, getDecodedFrameCount());
         frame.setSize(size);
         frame.setFlags(flags);
         frame.start();
