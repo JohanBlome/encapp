@@ -518,7 +518,6 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 // We have been delayed. Run forward.
                 sleepTimeMs = 0;
             }
-            Log.d(TAG, "Sleep time: " + sleepTimeMs);
             if (sleepTimeMs > 0) {
                 try {
                     Thread.sleep(sleepTimeMs);
