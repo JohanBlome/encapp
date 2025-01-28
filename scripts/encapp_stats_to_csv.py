@@ -106,76 +106,80 @@ def parse_decoding_data(json, inputfile, debug=0):
     if debug > 0:
         print("Parse decoding data")
     decoded_data = None
-    # try:
+    try:
+        # Must sort according to pts
+        decoded_data = pd.DataFrame(json["decoded_frames"])
+        decoded_data["source"] = inputfile
+        if len(decoded_data) > 0:
+            test = json["test"]
+            codec = test["configure"]["codec"]
+            if len(codec) <= 0:
+                codec = "na"
+            decoded_data = decoded_data.sort_values("pts")
+            decoded_data["codec"] = codec
+            start_pts = decoded_data.iloc[0]["pts"]
+            start_ts = decoded_data.iloc[0]["starttime"]
+            start_stop = decoded_data.iloc[0]["stoptime"]
+            decoded_data = decoded_data.loc[decoded_data["proctime"] > 0]
+            # decoded_data["pts_sec"] = pd.to_timedelta(decoded_data["pts"], unit="s")
 
-    # Must sort according to pts
-    decoded_data = pd.DataFrame(json["decoded_frames"])
-    decoded_data["source"] = inputfile
-    if len(decoded_data) > 0:
-        test = json["test"]
-        codec = test["configure"]["codec"]
-        if len(codec) <= 0:
-            codec = "na"
-        decoded_data = decoded_data.sort_values("pts")
-        decoded_data["codec"] = codec
-        start_pts = decoded_data.iloc[0]["pts"]
-        start_ts = decoded_data.iloc[0]["starttime"]
-        start_stop = decoded_data.iloc[0]["stoptime"]
-        decoded_data = decoded_data.loc[decoded_data["proctime"] > 0]
-        # decoded_data["pts_sec"] = pd.to_timedelta(decoded_data["pts"], unit="s")
+            decoded_data["rel_pts"] = decoded_data["pts"] - start_pts
+            decoded_data["rel_start"] = decoded_data["starttime"] - start_ts
+            decoded_data["rel_stop"] = decoded_data["stoptime"] - start_stop
+            try:
+                decoded_data["height"] = json["decoder_media_format"]["height"]
+            except Exception:
+                print("Height missing in decoded data")
+                decoded_data["height"] = "unknown height"
 
-        decoded_data["rel_pts"] = decoded_data["pts"] - start_pts
-        decoded_data["rel_start"] = decoded_data["starttime"] - start_ts
-        decoded_data["rel_stop"] = decoded_data["stoptime"] - start_stop
-        try:
-            decoded_data["height"] = json["decoder_media_format"]["height"]
-        except Exception:
-            print("Height missing in decoded data")
-            decoded_data["height"] = "unknown height"
+            # data = decoded_data.loc[decoded_data["size"] != "0"]
+            decoded_data["description"] = test["common"]["description"]
+            decoded_data["camera"] = (
+                test["input"]["filepath"].find('filepath: "camera"')
+            ) > 0
+            decoded_data["test"] = test["common"]["id"]
+            # decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
+            resolution = test["input"]["resolution"]
+            decoded_data["height"] = parse_resolution(resolution)[1]
+            fps = test["configure"]["framerate"]
+            if fps == 0:
+                fps = 30
 
-        # data = decoded_data.loc[decoded_data["size"] != "0"]
-        decoded_data["description"] = test["common"]["description"]
-        decoded_data["camera"] = (
-            test["input"]["filepath"].find('filepath: "camera"')
-        ) > 0
-        decoded_data["test"] = test["common"]["id"]
-        # decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
-        resolution = test["input"]["resolution"]
-        decoded_data["height"] = parse_resolution(resolution)[1]
-        fps = test["configure"]["framerate"]
-        if fps == 0:
-            fps = 30
+            decoded_data["fps"] = fps
 
-        decoded_data["fps"] = fps
-
-        # oh no we may have b frames...
-        decoded_data["duration_ms"] = round(
-            (
-                decoded_data["pts"].shift(-1, axis="index", fill_value=0)
-                - decoded_data["pts"]
+            # oh no we may have b frames...
+            decoded_data["duration_ms"] = round(
+                (
+                    decoded_data["pts"].shift(-1, axis="index", fill_value=0)
+                    - decoded_data["pts"]
+                )
+                / 1000,
+                2,
             )
-            / 1000,
-            2,
-        )
 
-        decoded_data["fps"] = round(1000.0 / (decoded_data["duration_ms"]), 2)
-        decoded_data["av_fps"] = (
-            decoded_data["fps"].rolling(fps, min_periods=fps, win_type=None).sum() / fps
-        )
-        decoded_data, __ = calc_infligh(decoded_data, start_ts)
-        decoded_data["proc_fps"] = (decoded_data["inflight"] * 1.0e9) / decoded_data[
-            "proctime"
-        ]
-        decoded_data["av_proc_fps"] = (
-            decoded_data["proc_fps"].rolling(fps, min_periods=fps, win_type=None).sum()
-            / fps
-        )
-        decoded_data["av_fps"].fillna(decoded_data["fps"], inplace=True)
-        decoded_data["av_proc_fps"].fillna(decoded_data["proc_fps"], inplace=True)
-        decoded_data.fillna(pd.Timedelta(seconds=0), inplace=True)
-    # except Exception as ex:
-    #    print(f'Failed to parse decode data for {inputfile}: {ex}')
-    #    decoded_data = None
+            decoded_data["fps"] = round(1000.0 / (decoded_data["duration_ms"]), 2)
+            decoded_data["av_fps"] = (
+                decoded_data["fps"].rolling(fps, min_periods=fps, win_type=None).sum()
+                / fps
+            )
+            decoded_data, __ = calc_infligh(decoded_data, start_ts)
+            decoded_data["proc_fps"] = (
+                decoded_data["inflight"] * 1.0e9
+            ) / decoded_data["proctime"]
+            decoded_data["av_proc_fps"] = (
+                decoded_data["proc_fps"]
+                .rolling(fps, min_periods=fps, win_type=None)
+                .sum()
+                / fps
+            )
+            decoded_data["av_fps"] = decoded_data["av_fps"].fillna(decoded_data["fps"])
+            decoded_data["av_proc_fps"] = decoded_data["av_proc_fps"].fillna(
+                decoded_data["proc_fps"]
+            )
+            decoded_data.fillna(pd.Timedelta(seconds=0), inplace=True)
+    except Exception as ex:
+        print(f"Failed to parse decode data for {inputfile}: {ex}")
+        decoded_data = None
 
     return decoded_data
 
