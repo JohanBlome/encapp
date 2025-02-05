@@ -745,6 +745,10 @@ def run_codec_tests_file(
                         break
 
                 test_suite = tests_definitions.TestSuite()
+
+                if options.shuffle:
+                    random.shuffle(test_collection[testsource])
+
                 for test in test_collection[testsource]:
                     # Add tests to the test suite
                     test_suite.test.append(test)
@@ -2093,6 +2097,11 @@ def add_args(parser):
         "--quality",
         action="store_true",
         help="Run the quality calculations as a part of the session. Same as running the encapp_quality tool after the encoding",
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="Shuffle multi tests so each run will execute the tests in a different order."
     )
 
 
