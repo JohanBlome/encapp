@@ -59,7 +59,7 @@ def parse_encoding_data(json, inputfile, debug=0):
                 / 1000,
                 2,
             )
-            data.loc[data["duration_ms"] < 0] = 0
+            data.loc[data["duration_ms"] < 0.0, "duration_ms"] = 0.0
             data["bitrate_per_frame_bps"] = (data["size"] * 8.0) / (
                 data["duration_ms"] / 1000.0
             )
@@ -74,7 +74,7 @@ def parse_encoding_data(json, inputfile, debug=0):
                 / fps
             )
             data.replace([np.inf, -np.inf], 0, inplace=True)
-            data.replace(np.NaN, 0, inplace=True)
+            data.replace(np.nan, 0, inplace=True)
             data["av_bitrate"] = data["av_bitrate"].astype(int)
             data["real_fps"] = round(1000.0 / (data["duration_ms"]), 2)
             # delete the last item
@@ -89,16 +89,16 @@ def parse_encoding_data(json, inputfile, debug=0):
                 data["proc_fps"].rolling(fps, min_periods=fps, win_type=None).sum()
                 / fps
             )
-            data["av_fps"].fillna(data["fps"], inplace=True)
-            data["av_proc_fps"].fillna(data["proc_fps"], inplace=True)
+            data["av_fps"] = data["av_fps"].fillna(data["fps"])
+            data["av_proc_fps"] = data["av_proc_fps"].fillna(data["proc_fps"])
 
         data.fillna(pd.Timedelta(seconds=0), inplace=True)
-
     except Exception as ex:
         print(f"Encode data parsing failed: {ex}")
         return None
     if debug > 2:
         print(f'data = "{data}"')
+
     return data
 
 
@@ -112,11 +112,15 @@ def parse_decoding_data(json, inputfile, debug=0):
         decoded_data["source"] = inputfile
         if len(decoded_data) > 0:
             test = json["test"]
-            codec = test["configure"]["codec"]
+            codec = json.get("decoder", "na")
             if len(codec) <= 0:
                 codec = "na"
+            fps = 30
+            try:
+                fps = json["decode_media_format"]["frame-rate"]
+            except Exception:
+                fps = test["input"]["framerate"]
             decoded_data = decoded_data.sort_values("pts")
-            decoded_data["codec"] = codec
             start_pts = decoded_data.iloc[0]["pts"]
             start_ts = decoded_data.iloc[0]["starttime"]
             start_stop = decoded_data.iloc[0]["stoptime"]
@@ -126,27 +130,12 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data["rel_pts"] = decoded_data["pts"] - start_pts
             decoded_data["rel_start"] = decoded_data["starttime"] - start_ts
             decoded_data["rel_stop"] = decoded_data["stoptime"] - start_stop
-            try:
-                decoded_data["height"] = json["decoder_media_format"]["height"]
-            except Exception:
-                print("Height missing in decoded data")
-                decoded_data["height"] = "unknown height"
 
             # data = decoded_data.loc[decoded_data["size"] != "0"]
-            decoded_data["description"] = test["common"]["description"]
             decoded_data["camera"] = (
                 test["input"]["filepath"].find('filepath: "camera"')
             ) > 0
-            decoded_data["test"] = test["common"]["id"]
             # decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
-            resolution = test["input"]["resolution"]
-            decoded_data["height"] = parse_resolution(resolution)[1]
-            fps = test["configure"]["framerate"]
-            if fps == 0:
-                fps = 30
-
-            decoded_data["fps"] = fps
-
             # oh no we may have b frames...
             decoded_data["duration_ms"] = round(
                 (
@@ -176,7 +165,17 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data["av_proc_fps"] = decoded_data["av_proc_fps"].fillna(
                 decoded_data["proc_fps"]
             )
-            decoded_data.fillna(pd.Timedelta(seconds=0), inplace=True)
+            decoded_data["test"] = test["common"]["id"]
+            decoded_data["description"] = test["common"]["description"]
+            decoded_data["codec"] = codec
+            try:
+                decoded_data["height"] = json["decoder_media_format"]["height"]
+            except Exception:
+                print("Height missing in decoded data")
+                resolution = test["input"]["resolution"]
+                decoded_data["height"] = parse_resolution(resolution)[1]
+                decoded_data["height"] = "unknown height"
+            decoded_data.fillna(method="ffill", inplace=True)
     except Exception as ex:
         print(f"Failed to parse decode data for {inputfile}: {ex}")
         decoded_data = None
@@ -314,6 +313,9 @@ def main():
             alldata = json.load(json_file)
             if "frames" in alldata and len(alldata["frames"]) > 0:
                 encoding_data = parse_encoding_data(alldata, filename, options.debug)
+                if encoding_data is None:
+                    print(f"Failed to parse encoding data in {filename}")
+                    continue
                 if device_info is not None:
                     model = device_info.get("props", {}).get("ro.product.model", "")
                     if options.model:
