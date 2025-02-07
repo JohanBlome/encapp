@@ -116,7 +116,9 @@ public class BufferTranscoder extends Encoder  {
                 //mTest = setCodecNameAndIdentifier(mTest);
                 Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
                 try {
+                    mStats.pushTimestamp("decoder.create");
                     mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
+                    mStats.pushTimestamp("decoder.create");
                 } catch (Exception ex) {
                     Log.e(TAG, "Failed to create decoder");
                     return "Failed to create decoder.";
@@ -124,7 +126,9 @@ public class BufferTranscoder extends Encoder  {
 
             } else {
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
                 Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
             }
         } catch (IOException e) {
@@ -183,7 +187,9 @@ public class BufferTranscoder extends Encoder  {
         }
         Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
         try {
+            mStats.pushTimestamp("encoder.create");
             mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+            mStats.pushTimestamp("encoder.create");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -207,10 +213,14 @@ public class BufferTranscoder extends Encoder  {
         TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
         mDecoder.setCallback(new DecoderCallbackHandler());
 
+        mStats.pushTimestamp("decoder.configure");
         mDecoder.configure(inputFormat, null, null, 0);
+        mStats.pushTimestamp("decoder.configure");
 
         Log.d(TAG, "Start decoder");
+        mStats.pushTimestamp("decoder.start");
         mDecoder.start();
+        mStats.pushTimestamp("decoder.start");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
         } else {
@@ -233,18 +243,22 @@ public class BufferTranscoder extends Encoder  {
         //TODO: color handling
         // The decoder must output same colorformat as input. QC hw encoder does not take same pix fmt android sw decoder.
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
+        mStats.pushTimestamp("encoder.configure");
         mCodec.configure(
                 mediaFormat,
                 null /* surface */,
                 null /* crypto */,
                 MediaCodec.CONFIGURE_FLAG_ENCODE);
+        mStats.pushTimestamp("encoder.configure");
         Log.d(TAG, "Check input format after encoder is configured");
         logMediaFormat(mCodec.getInputFormat());
 
         mMuxer = createMuxer(mCodec, mediaFormat);
         try {
             Log.d(TAG, "Start encoder");
+            mStats.pushTimestamp("encoder.start");
             mCodec.start();
+            mStats.pushTimestamp("encoder.start");
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
             //return "Start encoding failed";

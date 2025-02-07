@@ -216,7 +216,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             mStats.pushTimestamp("decoder.configure");
 
             Log.d(TAG, "Start decoder");
+            mStats.pushTimestamp("decoder.start");
             mDecoder.start();
+            mStats.pushTimestamp("decoder.start");
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setDecoder(mDecoder.getCodecInfo().getCanonicalName());
             } else {

@@ -84,10 +84,14 @@ class BufferDecoder extends Encoder {
             Log.d(TAG, "Create decoder)");
             if (mTest.getDecoderConfigure().hasCodec()) {
                 Log.d(TAG, "Create decoder by name: " + mTest.getDecoderConfigure().getCodec());
+                mStats.pushTimestamp("decoder.create");
                 mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
+                mStats.pushTimestamp("decoder.create");
             } else {
                 Log.d(TAG, "Create decoder by mime: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 mStats.setDecoderIsHardwareAccelerated(mDecoder.getCodecInfo().isHardwareAccelerated());
@@ -97,7 +101,9 @@ class BufferDecoder extends Encoder {
 
             TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
             Log.d(TAG, "Configure: " + mDecoder.getName());
+            mStats.pushTimestamp("decoder.configure");
             mDecoder.configure(inputFormat, null, null, 0);
+            mStats.pushTimestamp("decoder.configure");
             Log.d(TAG, "MediaFormat (post-test)");
             logMediaFormat(mDecoder.getInputFormat());
             mStats.setDecoderMediaFormat(mDecoder.getInputFormat());
@@ -117,7 +123,9 @@ class BufferDecoder extends Encoder {
 
         try {
             Log.d(TAG, "Start decoder");
+            mStats.pushTimestamp("decoder.start");
             mDecoder.start();
+            mStats.pushTimestamp("decoder.start");
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
             return "Start decoding failed";
