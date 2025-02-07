@@ -108,10 +108,14 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 //TODO: throw error on failed lookup
                 //mTest = setCodecNameAndIdentifier(mTest);
                 Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
+                mStats.pushTimestamp("decoder.create");
                 mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
+                mStats.pushTimestamp("decoder.create");
             } else {
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
                 mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                mStats.pushTimestamp("decoder.create");
                 Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
             }
         } catch (IOException e) {
@@ -161,7 +165,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
                 }
                 Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
+                mStats.pushTimestamp("encoder.create");
                 mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+                mStats.pushTimestamp("encoder.create");
             } else {
                 mStats.setCodec(Statistics.NA);
             }
@@ -184,11 +190,14 @@ public class SurfaceTranscoder extends SurfaceEncoder {
 
                 setConfigureParams(mTest, format);
                 mCodec.setCallback(new EncoderCallbackHandler());
+
+                mStats.pushTimestamp("encoder.configure");
                 mCodec.configure(
                         format,
                         null /* surface */,
                         null /* crypto */,
                         MediaCodec.CONFIGURE_FLAG_ENCODE);
+                mStats.pushTimestamp("encoder.configure");
                 Log.d(TAG, "Check input format after encoder is configured");
                 logMediaFormat(mCodec.getInputFormat());
                 mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
@@ -202,7 +211,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 mSurfaceTexture = new SurfaceTexture(false);
                 mSurface = new Surface(mSurfaceTexture);
             }
+            mStats.pushTimestamp("decoder.configure");
             mDecoder.configure(inputFormat, mSurface, null, 0);
+            mStats.pushTimestamp("decoder.configure");
 
             Log.d(TAG, "Start decoder");
             mDecoder.start();
@@ -238,7 +249,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             if (!mNoEncoding) {
                 try {
                     Log.d(TAG, "Start encoder");
+                    mStats.pushTimestamp("encoder.start");
                     mCodec.start();
+                    mStats.pushTimestamp("encoder.start");
                 } catch (Exception ex) {
                     Log.e(TAG, "Start failed: " + ex.getMessage());
                     return "Start encoding failed";
