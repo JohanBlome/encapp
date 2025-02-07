@@ -3,6 +3,7 @@ package com.facebook.encapp.utils;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
+import android.util.Pair;
 
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
@@ -32,6 +33,8 @@ public class Statistics {
     private final String mDesc;
     private final ArrayList<FrameInfo> mEncodingFrames;
     private final HashMap<Long, FrameInfo> mDecodingFrames;
+    private final ArrayList<Pair> mNamedTimestamps;
+
     int mEncodingProcessingFrames = 0;
     Test mTest;
     Date mStartDate;
@@ -118,6 +121,7 @@ public class Statistics {
         mDesc = desc;
         mEncodingFrames = new ArrayList<>(20);
         mDecodingFrames = new HashMap<>(20);
+        mNamedTimestamps = new ArrayList<>(20);
         mTest = test;
         mStartDate = new Date();
         // if no output filename use uuid
@@ -154,6 +158,10 @@ public class Statistics {
         }
 
         return buffer.toString();
+    }
+
+    public void pushTimestamp(String name) {
+        mNamedTimestamps.add(new Pair(name, ClockTimes.currentTimeNs()));
     }
 
     public void start() {
@@ -543,6 +551,19 @@ public class Statistics {
             if (cpuTimeInState.length() > 0) {
                 json.put("cpu_time_in_state", cpuTimeInState);
             }
+
+            if (mNamedTimestamps.size() > 0) {
+                JSONArray timestamps = new JSONArray();
+                for (Pair pair: mNamedTimestamps) {
+                    obj = new JSONObject();
+                    String name = pair.first.toString();
+                    Long ts = (Long)(pair.second);
+                    obj.put(name, ts);
+                    timestamps.put(obj);
+                }
+                json.put("named_timestamps", timestamps);
+            }
+
             writer.write(json.toString(2));
         } catch (JSONException e) {
             Log.e(TAG, "Failed writing stats");

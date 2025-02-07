@@ -186,6 +186,20 @@ def parse_decoding_data(json, inputfile, debug=0):
     return decoded_data
 
 
+def parse_named_timestamps(json, inputfile, debug=0):
+    data = None
+    try:
+        data = pd.DataFrame(json["named_timestamps"])
+        if len(data) > 0:
+            data = data.fillna(0)
+            data["source"] = inputfile
+
+    except Exception as ex:
+        print(f"Failed to parse decode data for {inputfile}: {ex}")
+        decoded_data = None
+    return data
+
+
 def parse_gpu_data(json, inputfile, debug=0):
     if debug > 0:
         print("Parse gpu data")
@@ -345,6 +359,11 @@ def main():
                 gpu_data = parse_gpu_data(alldata, filename, options.debug)
                 if gpu_data is not None and len(gpu_data) > 0:
                     gpu_data.to_csv(f"{filename}_gpu_data.csv")
+
+            if "named_timestamps" in alldata:
+                timestamps = parse_named_timestamps(alldata, filename, options.debug)
+                if timestamps is not None and len(timestamps) > 0:
+                    timestamps.to_csv(f"{filename}_named_ts_timestamps.csv")
 
 
 if __name__ == "__main__":

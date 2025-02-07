@@ -167,7 +167,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
             }
             Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
+            mStats.pushTimestamp("encoder.create");
             mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+            mStats.pushTimestamp("encoder.create");
 
             format = TestDefinitionHelper.buildMediaFormat(mTest);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT,
@@ -178,11 +180,13 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             logMediaFormat(format);
 
             mCodec.setCallback(new EncoderCallbackHandler());
+            mStats.pushTimestamp("encoder.config");
             mCodec.configure(
                     format,
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mStats.pushTimestamp("encoder.config");
             logMediaFormat(mCodec.getInputFormat());
             mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
             setupOutputMult(width, height);
@@ -204,7 +208,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
 
         try {
             Log.d(TAG, "Start encoder");
+            mStats.pushTimestamp("encoder.start");
             mCodec.start();
+            mStats.pushTimestamp("encoder.start");
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
             return "Start encoding failed";
@@ -224,7 +230,10 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
 
         Log.d(TAG, "Create fps measure: " + this);
         mFpsMeasure = new FpsMeasure(mFrameRate, this.toString());
+
+        mStats.pushTimestamp("encoder.start");
         mFpsMeasure.start();
+        mStats.pushTimestamp("encoder.start");
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         int current_loop = 1;
         ByteBuffer byteBuffer = ByteBuffer.allocate(mRefFramesizeInBytes);

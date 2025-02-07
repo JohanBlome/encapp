@@ -75,7 +75,9 @@ class BufferEncoder extends Encoder {
                 Log.d(TAG, "codec: " + mTest.getConfigure().getCodec() + " mime: " + mTest.getConfigure().getMime());
             }
             Log.d(TAG, "Create codec by name: " + mTest.getConfigure().getCodec());
+            mStats.pushTimestamp("encoder.create");
             mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
+            mStats.pushTimestamp("encoder.create");
 
             mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
             Log.d(TAG, "MediaFormat (mTest)");
@@ -88,11 +90,13 @@ class BufferEncoder extends Encoder {
             }
             Log.d(TAG, "useImage: " + useImage);
             Log.d(TAG, "Configure: " + mCodec.getName());
+            mStats.pushTimestamp("encoder.configure");
             mCodec.configure(
                     mediaFormat,
                     null /* surface */,
                     null /* crypto */,
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mStats.pushTimestamp("encoder.configure");
             Log.d(TAG, "MediaFormat (post-mTest)");
             logMediaFormat(mCodec.getInputFormat());
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
@@ -111,7 +115,9 @@ class BufferEncoder extends Encoder {
 
         try {
             Log.d(TAG, "Start encoder");
+            mStats.pushTimestamp("encoder.start");
             mCodec.start();
+            mStats.pushTimestamp("encoder.start");
         } catch (Exception ex) {
             Log.e(TAG, "Start failed: " + ex.getMessage());
             return "Start encoding failed";
