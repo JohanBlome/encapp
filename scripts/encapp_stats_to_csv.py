@@ -67,6 +67,7 @@ def parse_encoding_data(json, inputfile, debug=0):
             data.drop(data.tail(1).index, inplace=True)
             data["mean_bitrate"] = np.mean(data["bitrate_per_frame_bps"])
 
+            fps = int(round(fps))
             data["av_bitrate"] = (
                 data["bitrate_per_frame_bps"]
                 .rolling(fps, min_periods=fps, win_type=None)
@@ -147,6 +148,8 @@ def parse_decoding_data(json, inputfile, debug=0):
             )
 
             decoded_data["fps"] = round(1000.0 / (decoded_data["duration_ms"]), 2)
+
+            fps = int(round(fps))
             decoded_data["av_fps"] = (
                 decoded_data["fps"].rolling(fps, min_periods=fps, win_type=None).sum()
                 / fps
