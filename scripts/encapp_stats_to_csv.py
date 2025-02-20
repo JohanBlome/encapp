@@ -178,7 +178,7 @@ def parse_decoding_data(json, inputfile, debug=0):
                 resolution = test["input"]["resolution"]
                 decoded_data["height"] = parse_resolution(resolution)[1]
                 decoded_data["height"] = "unknown height"
-            decoded_data.fillna(method="ffill", inplace=True)
+            decoded_data.ffill(inplace=True)
     except Exception as ex:
         print(f"Failed to parse decode data for {inputfile}: {ex}")
         decoded_data = None
