@@ -703,6 +703,9 @@ def run_quality(test_file, options, debug):
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
 
+        if options.get("csv", None):
+            base, extension = os.path.splitext(vmaf_file)
+            vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
             os.remove(vmaf_file)
             os.remove(ssim_file)
@@ -710,9 +713,6 @@ def run_quality(test_file, options, debug):
             os.remove(psnr_file + ".all")
             os.remove(ssim_file + ".all")
 
-        if options.get("csv", None):
-            base, extension = os.path.splitext(vmaf_file)
-            vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
         file_size = os.stat(encodedfile).st_size
