@@ -191,12 +191,13 @@ def parse_named_timestamps(json, inputfile, debug=0):
     try:
         data = pd.DataFrame(json["named_timestamps"])
         if len(data) > 0:
-            data = data.fillna(0)
             data["source"] = inputfile
 
+            # transpose to single column
+            mdata = data.melt(id_vars="source", var_name="named_timestamp", value_name="timestamp")
+            data = mdata.dropna(subset="timestamp")
     except Exception as ex:
         print(f"Failed to parse decode data for {inputfile}: {ex}")
-        decoded_data = None
     return data
 
 
