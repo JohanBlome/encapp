@@ -111,6 +111,8 @@ def parse_decoding_data(json, inputfile, debug=0):
         # Must sort according to pts
         decoded_data = pd.DataFrame(json["decoded_frames"])
         decoded_data["source"] = inputfile
+
+        decoded_data["original_media"] = json["test"]["input"]["filepath"].split("/")[-1]
         if len(decoded_data) > 0:
             test = json["test"]
             codec = json.get("decoder", "na")
@@ -270,6 +272,38 @@ def calc_infligh(frames, time_ref):
     return frames, concurrent
 
 
+def calc_transcoding(encoded_frames, decoded_frames):
+    encoded = encoded_frames.filter(["source", "stoptime", "pts", "test_id", "test_description", "description", "height", "fps"])
+    encoded["frame"]=encoded_frames["original_frame"]
+    encoded["encoding_codec"]  = encoded_frames["codec"]
+    decoded = decoded_frames.filter(["frame", "starttime", "original_media"])
+    decoded["decoding_codec"] = decoded_frames["codec"]
+    merged = decoded.merge(encoded, how="inner", on=["frame"])
+    merged["proctime"] = merged["stoptime"] - merged["starttime"]
+
+    start_pts = merged.iloc[0]["pts"]
+    start_ts = merged.iloc[0]["starttime"]
+    start_stop = merged.iloc[0]["stoptime"]
+    merged["rel_pts"] = merged["pts"] - start_pts
+    merged["rel_start"] = merged["starttime"] - start_ts
+    merged["rel_stop"] = merged["stoptime"] - start_stop
+
+    merged["duration_ms"] = round(merged["proctime"] / 1000000, 2)
+    merged["real_fps"] = round(1000.0 / (merged["duration_ms"]), 2)
+    merged = merged.loc[merged["starttime"] > 0]
+    fps = merged["fps"].unique()[0]
+    merged["av_fps"] = (
+        round(merged["real_fps"].rolling(fps, min_periods=fps, win_type=None).sum()
+        / fps, 2)
+    )
+    merged["proc_fps"] =  merged["real_fps"]
+    merged["av_proc_fps"] = merged["av_fps"]
+    merged["av_fps"] = merged["av_fps"].fillna(merged["fps"])
+    merged["av_proc_fps"] = merged["av_proc_fps"].fillna(merged["proc_fps"])
+
+    return merged
+
+
 def clean_name(name, debug=0):
     ret = name.translate(str.maketrans({",": "_", " ": "_"}))
     return ret
@@ -329,6 +363,8 @@ def main():
                     device_info = {}
 
             alldata = json.load(json_file)
+            encoding_data = None
+            decoding_data = None
             if "frames" in alldata and len(alldata["frames"]) > 0:
                 encoding_data = parse_encoding_data(alldata, filename, options.debug)
                 if encoding_data is None:
@@ -353,9 +389,10 @@ def main():
                 and alldata["decoded_frames"] is not None
                 and len(alldata["decoded_frames"]) > 0
             ):
-                decoded_data = parse_decoding_data(alldata, filename, options.debug)
-                if decoded_data is not None and len(decoded_data) > 0:
-                    decoded_data.to_csv(f"{filename}_decoding_data.csv")
+                decoding_data = parse_decoding_data(alldata, filename, options.debug)
+                if decoding_data is not None and len(decoding_data) > 0:
+                    decoding_data.to_csv(f"{filename}_decoding_data.csv")
+
             if "gpu_data" in alldata:
                 gpu_data = parse_gpu_data(alldata, filename, options.debug)
                 if gpu_data is not None and len(gpu_data) > 0:
@@ -365,7 +402,12 @@ def main():
                 timestamps = parse_named_timestamps(alldata, filename, options.debug)
                 if timestamps is not None and len(timestamps) > 0:
                     timestamps.to_csv(f"{filename}_named_ts_timestamps.csv")
-
+            try:
+                # Transcoding
+                transcoded_data = calc_transcoding(encoding_data, decoding_data)
+                transcoded_data.to_csv(f"{filename}_transcoding_data.csv")
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     main()
