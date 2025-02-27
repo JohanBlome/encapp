@@ -128,13 +128,11 @@ def plotProcRate(data, options):
     # get legends and add average fps
     legends = p.axes.get_legend().texts
     for text in legends:
-        print(text.get_text())
         tmp = data.loc[data[options.split_field] == text.get_text()]
         average = round(
             len(tmp) * 1e9 / (tmp["stoptime"].max() - tmp["starttime"].min()), 1
         )
         text.set_text(f"{text.get_text()} - {average} fps")
-        print(f"Updated to :", text)
     axs.set(xlabel="Time (sec)", ylabel="Average processing fps")
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.grid(visible=True, which="minor", color="gray", linewidth=0.5)
@@ -210,13 +208,10 @@ def plotLatency(data, options):
     meandata = pd.DataFrame(tmp, columns=[hue, "average", "p50", "p90", "p99"])
     meandata.sort_values(["p50"], inplace=True)
     meandata["index"] = np.arange(1, len(meandata) + 1)
-    print("meandata:", meandata)
     meanmelt = pd.melt(meandata, ["index", hue])
     p = sns.lineplot(x="variable", y="value", hue="codec", data=meanmelt)
     ymax = meanmelt["value"].max()
     xmax = meanmelt["index"].max()
-    print("mean melt:", meanmelt)
-    print("Index: ", meanmelt["index"])
     for num in meanmelt["index"].unique():
         item = meanmelt.loc[meanmelt["index"] == num].iloc[0][hue]
         text += f"{num}: {item}\n"
@@ -447,7 +442,6 @@ def plot_cpu_load(data_: pd.DataFrame, options):
     if data_ is None:
         return
     data = data_.copy()
-    print(f"{len(data)} {data.columns=}")
     ts_0 = data["timestamp_ns"].min()
     data["ts_sec_0"] = (data["timestamp_ns"] - ts_0) / 1e9
     data["ts_sec"] = 0
