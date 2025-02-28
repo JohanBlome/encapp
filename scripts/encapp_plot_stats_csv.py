@@ -209,7 +209,7 @@ def plotLatency(data, options):
     meandata.sort_values(["p50"], inplace=True)
     meandata["index"] = np.arange(1, len(meandata) + 1)
     meanmelt = pd.melt(meandata, ["index", hue])
-    p = sns.lineplot(x="variable", y="value", hue="codec", data=meanmelt)
+    p = sns.lineplot(x="variable", y="value", hue=hue, data=meanmelt)
     ymax = meanmelt["value"].max()
     xmax = meanmelt["index"].max()
     for num in meanmelt["index"].unique():
