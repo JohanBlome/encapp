@@ -197,6 +197,7 @@ public class BufferTranscoder extends Encoder  {
         //Use same color settings as the input
         Log.d(TAG, "Check decoder settings");
         format = TestDefinitionHelper.buildMediaFormat(mTest);
+        format = TestDefinitionHelper.maybeUpdateBitrateFromDecoder(format, inputFormat);
         Log.d(TAG, "Check created encoder format");
         logMediaFormat(format);
 

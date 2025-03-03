@@ -300,4 +300,19 @@ public class TestDefinitionHelper {
             }
         }
     }
+
+
+    public static MediaFormat maybeUpdateBitrateFromDecoder(MediaFormat encoderFormat, MediaFormat decoderFormat) {
+        // If no bitrate is set, warn and use the source bitrate
+        int encBitrate = encoderFormat.getInteger(MediaFormat.KEY_BIT_RATE, -1);
+        if (encBitrate == -1) {
+            Log.w(TAG, "No encoder bitrate set, use source bitrate");
+            int decBitrate = decoderFormat.getInteger(MediaFormat.KEY_BIT_RATE, -1);
+            if (decBitrate == -1) {
+                Log.d(TAG, "No bitrate from decoder. Abort.");
+            }
+            encoderFormat.setInteger(MediaFormat.KEY_BIT_RATE, decBitrate);
+        }
+        return encoderFormat;
+    }
 }

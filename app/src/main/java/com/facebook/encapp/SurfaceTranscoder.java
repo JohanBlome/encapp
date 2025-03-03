@@ -175,6 +175,8 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             // Makes the analysis easier by adding the resolution
             mTest = TestDefinitionHelper.updateEncoderResolution(mTest, width, height);
             format = TestDefinitionHelper.buildMediaFormat(mTest);
+            format = TestDefinitionHelper.maybeUpdateBitrateFromDecoder(format, inputFormat);
+
             Log.d(TAG, "Check created encoder format");
             logMediaFormat(format);
             Log.d(TAG, "Set color format");
