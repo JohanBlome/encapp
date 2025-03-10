@@ -242,6 +242,15 @@ public class MainActivity extends AppCompatActivity {
     }
     public void exit() {
         Log.d(TAG, "Finish and remove");
+        try {
+            Log.d(TAG, "Finished, check hold time:" + mUIHoldtimeSec);
+            if (mUIHoldtimeSec > 0) {
+                Thread.sleep(mUIHoldtimeSec * 1000);
+            }
+            Log.d(TAG, "Done sleeping");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         mMemLoad.stop();
         mPowerLoad.stop();
         finishAndRemoveTask();
