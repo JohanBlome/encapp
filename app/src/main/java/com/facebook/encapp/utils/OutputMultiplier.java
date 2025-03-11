@@ -24,7 +24,7 @@ public class OutputMultiplier {
     final private Object mLock = new Object();
     private final Vector<FrameswapControl> mOutputSurfaces = new Vector<>();
     VsyncHandler mMessageHandler;
-    int LATE_LIMIT_NS = 15 * 1000000000; // ms
+    int LATE_LIMIT_NS = 15 * 1000000; // ms
     Texture2dProgram.ProgramType mProgramType = Texture2dProgram.ProgramType.TEXTURE_EXT;
     private Renderer mRenderer;
     private EglCore mEglCore;
@@ -336,21 +336,25 @@ public class OutputMultiplier {
                             mVsync0 = mCurrentVsyncNs;
                         }
                         diff = timeNs - mTimestamp0Ns;
+
+
+                        // Drop frame if we have frame in the buffert and we are more than one frame late
+                        if((diff - (mCurrentVsyncNs - mVsync0) < -2L * LATE_LIMIT_NS) && mFrameBuffers.size() > 0) {
+                            FrameBuffer fb = (FrameBuffer)buffer;
+                            Log.d(TAG, "Drop late frame " + (diff - (mCurrentVsyncNs - mVsync0)/1000000) + " ms ");
+                            fb.mCodec.releaseOutputBuffer(fb.mBufferId, false);
+                            synchronized (mFrameDrawnLock) {
+                                frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
+                                mFrameDrawnLock.notifyAll();
+                            }
+                        }
+
+                        // If further away than 15ms, wait for a new sync.
                         while ((diff - (mCurrentVsyncNs - mVsync0)) > LATE_LIMIT_NS) {
                             try {
                                 mVSynchLock.wait(WAIT_TIME_SHORT_MS);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
-                            }
-                        }
-
-                        // Drop frame if we have frame in the buffert and we are more than one frame late
-                        if((diff - (mCurrentVsyncNs - mVsync0)) < -2 * LATE_LIMIT_NS && mFrameBuffers.size() > 0) {
-                            FrameBuffer fb = (FrameBuffer)buffer;
-                            fb.mCodec.releaseOutputBuffer(fb.mBufferId, false);
-                            synchronized (mFrameDrawnLock) {
-                                frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
-                                mFrameDrawnLock.notifyAll();
                             }
                         }
                     }
