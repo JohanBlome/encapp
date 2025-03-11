@@ -50,6 +50,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
     Surface mSurface = null;
     boolean mDone = false;
     Object mStopLock = new Object();
+    boolean mFirstDecodedFrame = false;
 
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test, null, multiplier, vsyncHandler);
@@ -357,6 +358,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     mFirstFrameTimestampUsec = timestamp;
                     mFirstFrameSystemTimeNsec = ClockTimes.currentTimeNs();
                 }
+                mFirstDecodedFrame = true;
                 // Buffer will be released when drawn
                 MediaFormat newFormat = codec.getOutputFormat();
                 Dictionary<String, Object> mediaFormatInfo = mediaFormatComparison(currentMediaFormat, newFormat);
@@ -521,7 +523,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                         }
                     }
                     mLastPtsUs = ptsUsec;
-                    if (mRealtime) sleepUntilNextFrame();
+                    if (mRealtime && mFirstDecodedFrame) sleepUntilNextFrame();
                 }
             }
         }
