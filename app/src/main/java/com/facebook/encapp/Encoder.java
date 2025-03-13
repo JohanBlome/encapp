@@ -53,7 +53,6 @@ public abstract class Encoder {
     long mLastTimeMs = -1;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
-    protected CodecWrapper mEncoder;
     protected MediaMuxer mMuxer;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;

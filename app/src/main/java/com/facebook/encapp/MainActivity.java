@@ -33,6 +33,7 @@ import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.TestSuite;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.CliSettings;
+import com.facebook.encapp.utils.CodecCache;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.OutputMultiplier;
@@ -255,6 +256,7 @@ public class MainActivity extends AppCompatActivity {
         mPowerLoad.stop();
         finishAndRemoveTask();
         Process.killProcess(Process.myPid());
+        CodecCache.getCache().clearCodecs();
         Log.d(TAG, "EXIT");
     }
 
