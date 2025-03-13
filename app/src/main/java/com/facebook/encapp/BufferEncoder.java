@@ -68,7 +68,7 @@ class BufferEncoder extends Encoder {
             // Unless we have a mime, do lookup
             if (mTest.getConfigure().getMime().length() == 0) {
                 try {
-                    mTest = setCodecNameAndIdentifier(mTest);
+                    mTest = MediaCodecInfoHelper.setCodecNameAndIdentifier(mTest);
                 } catch (Exception e) {
                     return e.getMessage();
                 }
