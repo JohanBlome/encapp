@@ -1,6 +1,8 @@
 test {
     input {
         filepath: "/tmp/akiyo_qcif.mp4"
+        device_decode: true
+        realtime: true
         show: true
     }
     common {
