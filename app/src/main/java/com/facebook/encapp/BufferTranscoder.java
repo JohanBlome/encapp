@@ -22,6 +22,7 @@ import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -113,7 +114,6 @@ public class BufferTranscoder extends Encoder  {
             // Allow explicit decoder only for non encoding tests (!?)
             if (mTest.getDecoderConfigure().hasCodec()) {
                 //TODO: throw error on failed lookup
-                //mTest = setCodecNameAndIdentifier(mTest);
                 Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
                 try {
                     mStats.pushTimestamp("decoder.create");
@@ -179,7 +179,7 @@ public class BufferTranscoder extends Encoder  {
         if (mTest.getConfigure().getMime().length() == 0) {
             Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
             try {
-                mTest = setCodecNameAndIdentifier(mTest);
+                mTest = MediaCodecInfoHelper.setCodecNameAndIdentifier(mTest);
             } catch (Exception e) {
                 return e.getMessage();
             }

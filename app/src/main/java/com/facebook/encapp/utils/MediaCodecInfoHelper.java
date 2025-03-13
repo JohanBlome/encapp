@@ -3,9 +3,12 @@ package com.facebook.encapp.utils;
 import android.graphics.ImageFormat;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -13,10 +16,14 @@ import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Vector;
 
+import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.PixFmt;
+import com.facebook.encapp.proto.Test;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,7 +32,7 @@ import org.json.JSONObject;
 
 public class MediaCodecInfoHelper {
     final static int mIndentWidth = 2;
-    protected final String TAG = "MediaCodecInfoHelper";
+    protected final static String TAG = "MediaCodecInfoHelper";
 
 
     final static List<Integer> mBitrateModeList = Arrays.asList(
@@ -733,5 +740,64 @@ public class MediaCodecInfoHelper {
                 return (int) (Math.ceil(width * height * 1.5));
         }
     }
+
+
+    public static Test setCodecNameAndIdentifier(Test test) throws Exception {
+        String partialName = test.getConfigure().getCodec();
+        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+
+        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+        Log.d(TAG, "Searching for partialName: \"" + partialName + "\" in codecList");
+        Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, partialName);
+
+        if (matching.size() > 1) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("\nMultiple matching codecs for partialName: \"" + partialName + "\" codecs_matching: " + matching.size() + " ");
+            sb.append("{");
+            for (MediaCodecInfo info : matching) {
+                sb.append(info.getName() + " ");
+            }
+            sb.append("}");
+            Log.e(TAG, sb.toString());
+            throw new Exception(sb.toString());
+        } else if (matching.size() == 0) {
+            Log.e(TAG, "No matching codecs for partialName: \"" + partialName + "\"");
+            throw new Exception("No matching codecs for \"" + partialName + "\"");
+        } else {
+            Test.Builder builder = Test.newBuilder(test);
+            // set the codec and mime types
+            Configure configure = Configure.
+                    newBuilder(test.
+                            getConfigure())
+                    .setCodec(matching.get(0).getName())
+                    .setMime(matching.get(0).getSupportedTypes()[0]).build();
+            builder.setConfigure(configure);
+            return builder.build();
+        }
+    }
+
+    @NonNull
+    protected static Vector<MediaCodecInfo> getMediaCodecInfos(MediaCodecInfo[] codecInfos, String id) {
+        Vector<MediaCodecInfo> matching = new Vector<>();
+        for (MediaCodecInfo info : codecInfos) {
+            //Handle special case of codecs with naming schemes consisting of substring of another
+
+            if (info.isEncoder()) {
+                if (info.getSupportedTypes().length > 0 &&
+                        info.getSupportedTypes()[0].toLowerCase(Locale.US).contains("video")) {
+                    if (info.getName().toLowerCase(Locale.US).equals(id.toLowerCase(Locale.US))) {
+                        //Break on exact match
+                        matching.clear();
+                        matching.add(info);
+                        break;
+                    } else if (info.getName().toLowerCase(Locale.US).contains(id.toLowerCase(Locale.US))) {
+                        matching.add(info);
+                    }
+                }
+            }
+        }
+        return matching;
+    }
+
 
 }

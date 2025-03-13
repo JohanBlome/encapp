@@ -24,6 +24,7 @@ import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameswapControl;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -160,7 +161,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             if (mTest.getConfigure().getMime().length() == 0) {
                 Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
                 try {
-                    mTest = setCodecNameAndIdentifier(mTest);
+                    mTest = MediaCodecInfoHelper.setCodecNameAndIdentifier(mTest);
                 } catch (Exception e) {
                     return e.getMessage();
                 }

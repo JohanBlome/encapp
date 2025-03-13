@@ -20,6 +20,7 @@ import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.CodecWrapper;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
@@ -52,6 +53,7 @@ public abstract class Encoder {
     long mLastTimeMs = -1;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
+    protected CodecWrapper mEncoder;
     protected MediaMuxer mMuxer;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
@@ -187,68 +189,11 @@ public abstract class Encoder {
         return mFilename;
     }
 
-    @NonNull
-    protected Vector<MediaCodecInfo> getMediaCodecInfos(MediaCodecInfo[] codecInfos, String id) {
-        Vector<MediaCodecInfo> matching = new Vector<>();
-        for (MediaCodecInfo info : codecInfos) {
-            //Handle special case of codecs with naming schemes consisting of substring of another
-
-            if (info.isEncoder()) {
-                if (info.getSupportedTypes().length > 0 &&
-                        info.getSupportedTypes()[0].toLowerCase(Locale.US).contains("video")) {
-                    if (info.getName().toLowerCase(Locale.US).equals(id.toLowerCase(Locale.US))) {
-                        //Break on exact match
-                        matching.clear();
-                        matching.add(info);
-                        break;
-                    } else if (info.getName().toLowerCase(Locale.US).contains(id.toLowerCase(Locale.US))) {
-                        matching.add(info);
-                    }
-                }
-            }
-        }
-        return matching;
-    }
-
     public Statistics getStatistics() {
         if (mStats == null) {
             Log.e(TAG, "No stats available");
         }
         return mStats;
-    }
-
-    protected Test setCodecNameAndIdentifier(Test test) throws Exception {
-        String partialName = test.getConfigure().getCodec();
-        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
-
-        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
-        Log.d(TAG, "Searching for partialName: \"" + partialName + "\" in codecList");
-        Vector<MediaCodecInfo> matching = getMediaCodecInfos(codecInfos, partialName);
-
-        if (matching.size() > 1) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("\nMultiple matching codecs for partialName: \"" + partialName + "\" codecs_matching: " + matching.size() + " ");
-            sb.append("{");
-            for (MediaCodecInfo info : matching) {
-                sb.append(info.getName() + " ");
-            }
-            sb.append("}");
-            Log.e(TAG, sb.toString());
-            throw new Exception(sb.toString());
-        } else if (matching.size() == 0) {
-            Log.e(TAG, "No matching codecs for partialName: \"" + partialName + "\"");
-            throw new Exception("No matching codecs for \"" + partialName + "\"");
-        } else {
-            Test.Builder builder = Test.newBuilder(test);
-            // set the codec and mime types
-            Configure configure = Configure.
-                    newBuilder(test.
-                            getConfigure())
-                    .setCodec(matching.get(0).getName())
-                    .setMime(matching.get(0).getSupportedTypes()[0]).build();
-            builder.setConfigure(configure);
-            return builder.build();
-        }
     }
 
     protected void setConfigureParams(Test test, MediaFormat format) {
