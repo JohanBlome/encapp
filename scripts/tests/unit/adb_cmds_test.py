@@ -119,17 +119,17 @@ class TestAdbCommands(unittest.TestCase):
         mock_run.assert_has_calls(
             [
                 unittest.mock.call(
-                    f"adb -s {ADB_DEVICE_VALID_ID} shell ls /sdcard/", 1
+                    f"adb -s {ADB_DEVICE_VALID_ID} shell ls /sdcard/", debug=1
                 ),
                 unittest.mock.call(
-                    f"adb -s {ADB_DEVICE_VALID_ID} shell " "rm /sdcard/encapp_1.txt", 1
+                    f"adb -s {ADB_DEVICE_VALID_ID} shell " "rm /sdcard/encapp_1.txt", debug=1
                 ),
                 unittest.mock.call(
-                    f"adb -s {ADB_DEVICE_VALID_ID} shell " "rm /sdcard/encapp_2.txt", 1
+                    f"adb -s {ADB_DEVICE_VALID_ID} shell " "rm /sdcard/encapp_2.txt", debug=1
                 ),
                 unittest.mock.call(
                     f"adb -s {ADB_DEVICE_VALID_ID} shell " "rm /sdcard/encapp_logs.log",
-                    1,
+                    debug=1,
                 ),
             ],
             any_order=True,
@@ -212,12 +212,12 @@ class TestAdbCommands(unittest.TestCase):
         apk = "com.example.myapp"
         expected_cmd = f"adb -s {ADB_DEVICE_VALID_ID} shell " f"am force-stop {apk}"
         encapp_tool.adb_cmds.force_stop(ADB_DEVICE_VALID_ID, apk, debug=0)
-        mock_run.assert_called_with(expected_cmd, 0)
+        mock_run.assert_called_with(expected_cmd, debug=0)
 
     @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
     def test_installed_apps_shall_list_pm_list_packages(self, mock_run):
         mock_run.return_value = (True, ADB_PM_LIST_OUT, "")
-        result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, debug=1)
+        result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, debug=0)
         expect_out = [
             "com.android.package.a",
             "com.android.package.b",
@@ -225,7 +225,7 @@ class TestAdbCommands(unittest.TestCase):
         ]
         self.assertEqual(result, expect_out)
         expected_call = f"adb -s {ADB_DEVICE_VALID_ID} shell pm list packages"
-        mock_run.assert_called_with(expected_call, 1)
+        mock_run.assert_called_with(expected_call, debug=0)
 
     @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
     @unittest.mock.patch("encapp_tool.adb_cmds.installed_apps")
