@@ -51,6 +51,8 @@ public class Statistics {
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
     private int START_STOP_EXTRA = 0;
+    private PowerSnapshot mStartPower;
+    private PowerSnapshot mEndPower;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -173,11 +175,13 @@ public class Statistics {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        mStartPower = PowerLoad.getPowerLoad().getSnapshot();
         mStartTime = ClockTimes.currentTimeNs();
     }
 
     public void stop() {
         mStopTime = ClockTimes.currentTimeNs();
+        mEndPower = PowerLoad.getPowerLoad().getSnapshot();
         // Give the load stats two seconds to gather some starting
         try {
             Thread.sleep(START_STOP_EXTRA);
@@ -427,6 +431,10 @@ public class Statistics {
             json.put("sourcefile", tmp[tmp.length - 1]);
 
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
+
+            long powernWh = mEndPower.getCapacitynWh() - mStartPower.getCapacitynWh();
+            double powernW = powernWh / (getProcessingTime() / (60 * 60 * 1e9));//ns to h
+            json.put("power_diff_in_nW", powernW);
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder", mDecoderName);
                 json.put("decoder_media_format", getSettingsFromMediaFormat(mDecoderMediaFormat));

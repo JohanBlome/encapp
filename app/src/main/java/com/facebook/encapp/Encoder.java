@@ -20,7 +20,6 @@ import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.ClockTimes;
-import com.facebook.encapp.utils.CodecWrapper;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
@@ -75,6 +74,7 @@ public abstract class Encoder {
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
+
 
     public Encoder(Test test) {
         mTest = test;
