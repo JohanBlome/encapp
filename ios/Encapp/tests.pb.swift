@@ -200,6 +200,17 @@ struct TestSetup {
   /// Clears the value of `firstFrameFastRead`. Subsequent reads from it will return its default value.
   mutating func clearFirstFrameFastRead() {self._firstFrameFastRead = nil}
 
+  /// If set the 20%-80% power lvel rules will be ignored and the test will run until power is out.
+  /// Useful for devices with problem in the power reporting.
+  var ignorePowerStatus: Bool {
+    get {return _ignorePowerStatus ?? false}
+    set {_ignorePowerStatus = newValue}
+  }
+  /// Returns true if `ignorePowerStatus` has been explicitly set.
+  var hasIgnorePowerStatus: Bool {return self._ignorePowerStatus != nil}
+  /// Clears the value of `ignorePowerStatus`. Subsequent reads from it will return its default value.
+  mutating func clearIgnorePowerStatus() {self._ignorePowerStatus = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -213,6 +224,7 @@ struct TestSetup {
   fileprivate var _mediastore: String? = nil
   fileprivate var _sourceDir: String? = nil
   fileprivate var _firstFrameFastRead: Bool? = nil
+  fileprivate var _ignorePowerStatus: Bool? = nil
 }
 
 struct Common {
@@ -1099,6 +1111,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     7: .same(proto: "mediastore"),
     8: .standard(proto: "source_dir"),
     9: .standard(proto: "first_frame_fast_read"),
+    10: .standard(proto: "ignore_power_status"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1116,6 +1129,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 7: try { try decoder.decodeSingularStringField(value: &self._mediastore) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._sourceDir) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self._ignorePowerStatus) }()
       default: break
       }
     }
@@ -1153,6 +1167,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._firstFrameFastRead {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 9)
     } }()
+    try { if let v = self._ignorePowerStatus {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1166,6 +1183,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._mediastore != rhs._mediastore {return false}
     if lhs._sourceDir != rhs._sourceDir {return false}
     if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
+    if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
