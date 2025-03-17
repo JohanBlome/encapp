@@ -21,6 +21,7 @@ message TestSetup {
   // Root directory for sources.
   // If not set the input.filepath wll be absolute or relative from the current
   optional string source_dir = 8;
+  optional bool first_frame_fast_read = 9;
 }
 
 message Common {
@@ -29,7 +30,7 @@ message Common {
   optional string operation = 3;
   optional string start = 4;
   // template or specific name for output file(s)
-  // Placeholder markers are [] 
+  // Placeholder markers are []
   // e.g. [common.id].[input.resolution].[configuration.bitrate]-[XXXX]
   // X is a substitution marker for A random hex number (1-f)
   // If not set the filename will be encapp_uuid

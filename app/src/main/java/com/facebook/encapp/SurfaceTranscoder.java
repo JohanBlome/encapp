@@ -78,6 +78,11 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             mRuntimeParams = mTest.getRuntime();
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
+        if (mTest.hasTestSetup()) {
+            // Default is that we should throttle from the start. Setting this to false means that
+            // we are waiting for the first frame to arrive before throttling.
+            mFirstDecodedFrame = !mTest.getTestSetup().getFirstFrameFastRead();
+        }
 
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");

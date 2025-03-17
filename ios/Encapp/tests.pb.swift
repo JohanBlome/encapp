@@ -181,7 +181,7 @@ struct TestSetup {
   mutating func clearMediastore() {self._mediastore = nil}
 
   /// Root directory for sources.
-  /// If not set the input.filepath wll be relative or absolute from the current
+  /// If not set the input.filepath wll be absolute or relative from the current
   var sourceDir: String {
     get {return _sourceDir ?? String()}
     set {_sourceDir = newValue}
@@ -190,6 +190,15 @@ struct TestSetup {
   var hasSourceDir: Bool {return self._sourceDir != nil}
   /// Clears the value of `sourceDir`. Subsequent reads from it will return its default value.
   mutating func clearSourceDir() {self._sourceDir = nil}
+
+  var firstFrameFastRead: Bool {
+    get {return _firstFrameFastRead ?? false}
+    set {_firstFrameFastRead = newValue}
+  }
+  /// Returns true if `firstFrameFastRead` has been explicitly set.
+  var hasFirstFrameFastRead: Bool {return self._firstFrameFastRead != nil}
+  /// Clears the value of `firstFrameFastRead`. Subsequent reads from it will return its default value.
+  mutating func clearFirstFrameFastRead() {self._firstFrameFastRead = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -203,6 +212,7 @@ struct TestSetup {
   fileprivate var _separateSources: Bool? = nil
   fileprivate var _mediastore: String? = nil
   fileprivate var _sourceDir: String? = nil
+  fileprivate var _firstFrameFastRead: Bool? = nil
 }
 
 struct Common {
@@ -247,7 +257,7 @@ struct Common {
   mutating func clearStart() {self._start = nil}
 
   /// template or specific name for output file(s)
-  /// Placeholder markers are [] 
+  /// Placeholder markers are []
   /// e.g. [common.id].[input.resolution].[configuration.bitrate]-[XXXX]
   /// X is a substitution marker for A random hex number (1-f)
   /// If not set the filename will be encapp_uuid
@@ -1088,6 +1098,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     6: .standard(proto: "separate_sources"),
     7: .same(proto: "mediastore"),
     8: .standard(proto: "source_dir"),
+    9: .standard(proto: "first_frame_fast_read"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1104,6 +1115,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 6: try { try decoder.decodeSingularBoolField(value: &self._separateSources) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._mediastore) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._sourceDir) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
       default: break
       }
     }
@@ -1138,6 +1150,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._sourceDir {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
     } }()
+    try { if let v = self._firstFrameFastRead {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1150,6 +1165,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._separateSources != rhs._separateSources {return false}
     if lhs._mediastore != rhs._mediastore {return false}
     if lhs._sourceDir != rhs._sourceDir {return false}
+    if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
