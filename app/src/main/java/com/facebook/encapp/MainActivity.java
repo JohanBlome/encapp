@@ -392,17 +392,22 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                             " number of combinations (parallels not counted) **");
                     for (Test test : test_suite.getTestList()) {
                         // Do not start if power level is low
-                        synchronized (mPowerMonitor) {
-                            while (mPowerLow) {
-                                try {
-                                    Log.d(TAG, "Power is low wait");
-                                    mPowerMonitor.wait(CHARGE_WAIT_TIME_MS);
-                                } catch (InterruptedException e) {
-                                    Log.e(TAG, "Wait failed: " + e.getMessage());
-                                    return;
+                        if (test.hasTestSetup() && test.getTestSetup().getIgnorePowerStatus()) {
+                            Log.w(TAG, "Power level checks are overridden. Measurements will run regardless of power status.");
+                        } else {
+                            synchronized (mPowerMonitor) {
+                                while (mPowerLow) {
+                                    try {
+                                        Log.d(TAG, "Power is low wait");
+                                        mPowerMonitor.wait(CHARGE_WAIT_TIME_MS);
+                                    } catch (InterruptedException e) {
+                                        Log.e(TAG, "Wait failed: " + e.getMessage());
+                                        return;
+                                    }
                                 }
                             }
                         }
+
                         Log.d(TAG, test.getCommon().getId() + " starting, current power percentage: " + mPowerLoad.getCurrentPowerPercentage() + " %, mWh: " + mPowerLoad.getSnapshot().getCapacitynWh());
                         mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;

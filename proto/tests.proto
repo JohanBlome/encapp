@@ -22,6 +22,9 @@ message TestSetup {
   // If not set the input.filepath wll be absolute or relative from the current
   optional string source_dir = 8;
   optional bool first_frame_fast_read = 9;
+  // If set the 20%-80% power lvel rules will be ignored and the test will run until power is out.
+  // Useful for devices with problem in the power reporting.
+  optional bool ignore_power_status = 10;
 }
 
 message Common {
