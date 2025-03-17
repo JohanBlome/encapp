@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.TestSuite;
+import com.facebook.encapp.utils.BatteryStatusListener;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.CodecCache;
@@ -59,7 +60,7 @@ import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements BatteryStatusListener {
     private final static String TAG = "encapp.main";
     private static boolean mStable = false;
     private final Object mTestLockObject = new Object();
@@ -83,8 +84,11 @@ public class MainActivity extends AppCompatActivity {
     private Bundle mExtraData;
     private int mInstancesRunning = 0;
     VsyncHandler mVsyncHandler;
-    final static int WAIT_TIME_MS = 5000;  // 5 secs
+    final static int WAIT_TIME_MS = 5000;
+    final static long CHARGE_WAIT_TIME_MS = 1 * 60 * 1000;// X minutes
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
+    private boolean  mPowerLow = false;
+    private Object mPowerMonitor = new Object();
 
     public static boolean isStable() {
         return mStable;
@@ -295,11 +299,14 @@ public class MainActivity extends AppCompatActivity {
      */
     private void performAllTests() {
         mMemLoad = new MemoryLoad(this);
-        mPowerLoad = new PowerLoad(this);
+        mPowerLoad = PowerLoad.getPowerLoad(this);
+        mPowerLoad.addStatusListener(this);
 
         //TODO: make these to start only when requested
         //mMemLoad.start();
-        //mPowerLoad.start();
+
+        // Contains safe guards. TODO: add the timed power measurements, only need one per total run.
+        mPowerLoad.start();
         if (mExtraData.containsKey(CliSettings.TEST_UI_HOLD_TIME_SEC)) {
             mUIHoldtimeSec = Integer.parseInt(mExtraData.getString(CliSettings.TEST_UI_HOLD_TIME_SEC, "0"));
         }
@@ -384,6 +391,19 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "** Starting tests, " + test_suite.getTestCount() +
                             " number of combinations (parallels not counted) **");
                     for (Test test : test_suite.getTestList()) {
+                        // Do not start if power level is low
+                        synchronized (mPowerMonitor) {
+                            while (mPowerLow) {
+                                try {
+                                    Log.d(TAG, "Power is low wait");
+                                    mPowerMonitor.wait(CHARGE_WAIT_TIME_MS);
+                                } catch (InterruptedException e) {
+                                    Log.e(TAG, "Wait failed: " + e.getMessage());
+                                    return;
+                                }
+                            }
+                        }
+                        Log.d(TAG, test.getCommon().getId() + " starting, current power percentage: " + mPowerLoad.getCurrentPowerPercentage() + " %, mWh: " + mPowerLoad.getSnapshot().getCapacitynWh());
                         mCameraCount = 0; // All used should have been closed already
                         if (pursuit > 0) pursuit -= 1;
                         pursuit = test.getInput().getPursuit();
@@ -990,4 +1010,31 @@ public class MainActivity extends AppCompatActivity {
             mEncoder = encoder;
         }
     }
+
+
+
+    @Override
+    public void lowCapacity() {
+        synchronized (mPowerMonitor) {
+            Log.e(TAG, "Power too low, wait for charging");
+            mPowerLow = true;
+            mPowerMonitor.notifyAll();
+        }
+    }
+
+    @Override
+    public void recovered() {
+        synchronized (mPowerMonitor) {
+            Log.d(TAG, "Power level restored");
+            mPowerLow = false;
+            mPowerMonitor.notifyAll();
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        Log.e(TAG, "Battery problem, shutdown.");
+        exit();
+    }
+
 }
