@@ -1756,7 +1756,6 @@ def convert_to_frames(value, fps=30):
     return int(sec * fps)
 
 
-
 # protobuf operation
 # check a file
 def configfile_check(protobuf_txt_filepath, local_workdir, debug):
@@ -2104,7 +2103,7 @@ def add_args(parser):
     parser.add_argument(
         "--shuffle",
         action="store_true",
-        help="Shuffle multi tests so each run will execute the tests in a different order."
+        help="Shuffle multi tests so each run will execute the tests in a different order.",
     )
 
 
