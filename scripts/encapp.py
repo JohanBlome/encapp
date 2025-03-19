@@ -288,10 +288,8 @@ def collect_results(
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
     # If we have a output_filename template in the test we need to check the begining
-    test_suite = tests_definitions.TestSuite()
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
-    with open(local_path, "rb") as fd:
-        text_format.Merge(fd.read(), test_suite)
+    test_suite = configufile_read(local_path)
 
     output_files = []
     for test in test_suite.test:
@@ -579,9 +577,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
-    test_suite = tests_definitions.TestSuite()
-    with open(protobuf_txt_filepath, "rb") as fd:
-        text_format.Merge(fd.read(), test_suite)
+    test_suite = configufile_read(protobuf_txt_filepath)
 
     updated_test_suite = tests_definitions.TestSuite()
     update_codec_testsuite(
@@ -597,8 +593,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     test_suite = create_tests_from_definition_expansion(test_suite)
     if options.dry_run:
         # Write and exit
-        with open(protobuf_txt_filepath, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
+        configfile_write(test_suite, protobuf_txt_filepath)
         return test_suite, [], protobuf_txt_filepath
 
     # now we need to go through all test and update media
@@ -636,14 +631,12 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
             filename = f"{output_dir}/{valid_path(test.common.id)}.pbtxt"
-            with open(filename, "w") as f:
-                f.write(text_format.MessageToString(test))
+            configfile_write(test, filename)
             files_to_push |= {filename}
     else:
         # (b) one pbtxt for all tests
         protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
-        with open(protobuf_txt_filepath, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
+        configfile_write(test_suite, protobuf_txt_filepath)
         files_to_push |= {protobuf_txt_filepath}
     return test_suite, files_to_push, protobuf_txt_filepath
 
@@ -698,8 +691,7 @@ def run_codec_tests_file(
             suite = tests_definitions.TestSuite()
             suite.test.extend([test])
             path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
-            with open(path, "w") as f:
-                f.write(text_format.MessageToString(suite))
+            configfile_write(suite, path)
             files_to_push |= {path}
     # Save the complete test if updated
     if updated:
@@ -756,8 +748,7 @@ def run_codec_tests_file(
                 protobuf_txt_filepath = (
                     f"{local_workdir}/{valid_path(test.common.id)}_{counter}.pbtxt"
                 )
-                with open(protobuf_txt_filepath, "w") as f:
-                    f.write(text_format.MessageToString(test_suite))
+                configfile_write(test_suite, protobuf_txt_filepath)
                 if debug > 0:
                     print(f"add {protobuf_txt_filepath}")
                 files.append(protobuf_txt_filepath)
@@ -812,8 +803,7 @@ def run_codec_tests_file(
             protobuf_txt_filepath = (
                 f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
             )
-            with open(protobuf_txt_filepath, "w") as f:
-                f.write(text_format.MessageToString(test_suite))
+            configfile_write(test_suite, protobuf_txt_filepath)
             if debug > 0:
                 print(f"add {protobuf_txt_filepath}")
             files_to_push |= {protobuf_txt_filepath}
@@ -876,9 +866,7 @@ def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_work
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
-    test_suite = tests_definitions.TestSuite()
-    with open(protobuf_txt_filepath, "rb") as fd:
-        text_format.Merge(fd.read(), test_suite)
+    test_suite = configufile_read(protobuf_txt_filepath)
 
     test_suite_ = create_tests_from_definition_expansion(test_suite)
     # check if they are the same, if so do nothing
@@ -888,8 +876,7 @@ def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_work
     # write in the workdir
     basename = os.path.basename(protobuf_txt_filepath)
     filepath = f"{local_workdir}/expanded_{basename}"
-    with open(filepath, "w") as f:
-        f.write(text_format.MessageToString(test_suite_))
+    configfile_write(test_suite_, filepath)
 
     return filepath
 
@@ -1769,7 +1756,10 @@ def convert_to_frames(value, fps=30):
     return int(sec * fps)
 
 
-def check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug):
+
+# protobuf operation
+# check a file
+def configfile_check(protobuf_txt_filepath, local_workdir, debug):
     # ensure the protobuf text file exists and is readable
     if protobuf_txt_filepath is None:
         abort_test(local_workdir, "ERROR: need a test file name")
@@ -1791,6 +1781,22 @@ def check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug):
     assert ret == 0, f"ERROR: {stderr}"
 
 
+# read a protobuf text file into a protobuf TestSuite
+def configufile_read(protobuf_txt_filepath, test_suite=None):
+    if test_suite is None:
+        test_suite = tests_definitions.TestSuite()
+    with open(protobuf_txt_filepath, "rb") as fd:
+        text_format.Merge(fd.read(), test_suite)
+    return test_suite
+
+
+# write a protobuf object into a protobuf text file
+def configfile_write(test_suite, protobuf_txt_filepath):
+    with open(protobuf_txt_filepath, "w") as f:
+        f.write(text_format.MessageToString(test_suite))
+
+
+# other
 def setup_local_workdir(options: argparse.Namespace, model: str) -> argparse.Namespace:
     if options.local_workdir is None:
         now = datetime.datetime.now()
@@ -1846,9 +1852,7 @@ def codec_test(options, model, serial, debug):
     # TODO: should parallels be considered?
     test_suite = None
     for proto in options.configfile:
-        tmp = tests_definitions.TestSuite()
-        with open(proto, "rb") as fd:
-            text_format.Merge(fd.read(), tmp)
+        tmp = configufile_read(proto)
         if test_suite is None:
             test_suite = tmp
         elif len(test_suite.test):
@@ -1865,14 +1869,13 @@ def codec_test(options, model, serial, debug):
         for test in test_suite.test:
             if test.input.filepath:
                 test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
-    with open(options.configfile, "w") as f:
-        f.write(text_format.MessageToString(test_suite))
+    configfile_write(test_suite, options.configfile)
 
     if options.mediastore is None:
         options.mediastore = local_workdir
     # check the protobuf text is correct
     protobuf_txt_filepath = options.configfile
-    check_protobuf_txt_file(protobuf_txt_filepath, local_workdir, debug)
+    configfile_check(protobuf_txt_filepath, local_workdir, debug)
 
     # run the codec test
     return run_codec_tests_file(
@@ -2423,9 +2426,7 @@ def process_options(options):
         ):
             test_suite = tests_definitions.TestSuite()
             for test in test_suite.test:
-                with open(options.configfile, "rb") as fd:
-                    text_format.Merge(fd.read(), test_suite)
-
+                test_suite = configufile_read(options.configfile, test_suite)
                 # replace input and other derived values
                 d = process_input_path(
                     input_filepath,
@@ -2565,8 +2566,7 @@ def check_protobuf_test_setup(options):
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
-        with open(file, "rb") as fd:
-            text_format.Merge(fd.read(), test_suite)
+        test_suite = configufile_read(file, test_suite)
     options_ = copy.deepcopy(options)
     for test in test_suite.test:
         if test.test_setup.serial:
@@ -2729,8 +2729,7 @@ def main(argv):
             # write an empty file
             filepath = f"{options.local_workdir}/corpus.pbtxt"
             test_suite.test.append(tests_definitions.Test())
-            with open(filepath, "w") as f:
-                f.write(text_format.MessageToString(test_suite))
+            configfile_write(test_suite, filepath)
             options.configfile[0] = filepath
         proto_options = check_protobuf_test_setup(options)
 
