@@ -705,6 +705,8 @@ def run_codec_tests_file(
         if options.separate_sources:
             # create test(s) for each source
             # dictionary with source as key
+            if debug > 0:
+                print("Run separate sources")
             test_collection = {}
             for test in test_suite.test:
                 source = test.input.filepath
@@ -716,9 +718,11 @@ def run_codec_tests_file(
                 tests.append(test)
 
             counter = 0
+            if debug > 0:
+                print("Clear target")
             # Clear target and run test, collect result and iterate
             encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, "encapp_.*", options.device_workdir, options.debug
+                serial, "[encapp_|split.].*", options.device_workdir, options.debug
             )
             encapp_tool.adb_cmds.remove_files_using_regex(
                 serial, ".*pbtxt$", options.device_workdir, options.debug
