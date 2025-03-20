@@ -17,8 +17,8 @@ IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
 
 # size for split adb push
-MAX_SIZE_BYTES = 20000000
-
+MAX_SIZE_BYTES = sys.maxsize # Can handle andy size
+SPLIT_SIZE_BYTES = int(20e6) # 20MB
 
 def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tuple[bool, str, str]:
     """Run sh command
@@ -634,31 +634,41 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
 def push_file_to_device_android(
     filepath, serial, device_workdir, debug, max_size_bytes=MAX_SIZE_BYTES
 ):
-    # 0. try a one-off copy
-    cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
-    ret, stdout, stderr = run_cmd(cmd, debug=debug)
-    if ret:
-        return ret
-    print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
+    # 0. try a one-off copy. Limit this for devices that fail and reboot (or worse).
+    ret = stdout = stderr = None
+    if os.path.getsize(filepath) <= MAX_SIZE_BYTES: 
+        cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
+        ret, stdout, stderr = run_cmd(cmd, debug=1)
+        if ret:
+            return ret
+        print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
+
     if max_size_bytes == 0:
         return ret
     # 1. try split copy
-    print(f'warning: trying split push for "{filepath}"')
+    print(f'warning: trying split push for "{filepath}", split size = {SPLIT_SIZE_BYTES}')
     # 1.1. split filepath in pieces
     prefix = tempfile.NamedTemporaryFile(prefix="split.").name + "."
-    cmd = f"split -b {max_size_bytes} {filepath} {prefix}"
+    cmd = f"split -b {SPLIT_SIZE_BYTES} {filepath} {prefix}"
     ret, stdout, stderr = run_cmd(cmd, debug=debug)
     assert ret, f"error: cannot split {filepath}"
     # 1.2. push all pieces one by one
     split_pieces = glob.glob(f"{prefix}*")
+    counter = 1
     for split_piece in split_pieces:
-        time.sleep(1)
+        print(f"Push: {counter}/{len(split_pieces)}")
         ret = push_file_to_device_android(
-            split_piece, serial, device_workdir, debug, max_size_bytes=0
+            split_piece, serial, device_workdir, debug=1, max_size_bytes=0
         )
         if not ret:
             print(f'error: cannot copy "{split_piece}": {stdout=} {stderr=}')
+            print("Remove splits: ", len(split_pieces))
+            for piece in split_pieces:
+                os.remove(piece)
             return ret
+        counter += 1
+        time.sleep(1)
+
     # 1.3. cat all pieces together
     device_split_pieces = list(
         os.path.join(device_workdir, os.path.basename(split_piece))

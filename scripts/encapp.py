@@ -1007,7 +1007,7 @@ def expand_ranges(definition):
                     return []
                 # filter endings
                 # if bitrate or k,M it will be converted
-                start, stop, step = [parse_range(it) for it in ranges]
+                start, stop, step = [parse_magnitude(it) for it in ranges]
                 result.extend(list(range(start, stop + 1, step)))
             else:
                 result.append(item)
@@ -1021,6 +1021,7 @@ def expand_ranges(definition):
 # * (2) a range (e.g. "100k-1M-100k") (start-stop-step)
 # * (3) a list of single numbers or ranges (e.g. "100kbps,200kbps")
 def parse_bitrate_field(bitrate):
+    print("parse bitrate field:", bitrate)
     # parse lists
     if "," in bitrate:
         bitrate_list = [parse_bitrate_field(it) for it in bitrate.split(",")]
@@ -1030,11 +1031,14 @@ def parse_bitrate_field(bitrate):
     if "-" in bitrate:
         bitrate_spec = bitrate.split("-")
         assert len(bitrate_spec) == 3, f'error: invalid bitrate spec: "{bitrate}"'
-        start, stop, step = [parse_range(it) for it in bitrate_spec]
+        start, stop, step = [parse_magnitude(it) for it in bitrate_spec]
         # We want to include the last value...
+        if (start > stop) | (step > (stop - start)):
+            print(f"Bitrate ranges have errors, {start=}, {stop=}, {step=}")
+            exit(0)
         return list(range(start, stop + 1, step))
     # parse single elements
-    return [parse_range(bitrate)]
+    return [parse_magnitude(bitrate)]
 
 
 # TODO: fix and comment
@@ -1433,6 +1437,7 @@ def update_codec_test(
     if bitrate_str:
         # update the bitrate
         bitrate_list = parse_bitrate_field(bitrate_str)
+
         if len(bitrate_list) > 1:
             for bitrate in bitrate_list:
                 # create a new test with the new bitrate
@@ -1458,6 +1463,8 @@ def update_codec_test(
                     )
             return
         else:
+            print(bitrate_list)
+            print(f"{len(bitrate_list)=}")
             # replace the namd and bitrate in the old test
             test.common.id = test.common.id + f".{bitrate_list[0]}bps"
             test.configure.bitrate = str(bitrate_list[0])
@@ -1757,7 +1764,7 @@ def is_int(s):
     return s[1:].isdigit() if s[0] in ("-", "+") else s.isdigit()
 
 
-def parse_range(value):
+def parse_magnitude(value):
     # support for integers
     if isinstance(value, int):
         return value
@@ -2155,6 +2162,21 @@ def add_args(parser):
         "--shuffle",
         action="store_true",
         help="Shuffle multi tests so each run will execute the tests in a different order.",
+    )
+    parser.add_argument(
+        "--file-transfer-limit",
+        dest="file_transfer_limit",
+        default=encapp_tool.adb_cmds.MAX_SIZE_BYTES,
+        type=str,
+        help=f"Limit the maximum file size for direct transfer. Above this size " \
+             f"limit the file will be split up and one part per second will be transfered. Default is {encapp_tool.adb_cmds.MAX_SIZE_BYTES} bytes"
+    )
+    parser.add_argument(
+        "--file-split-size",
+        dest="file_split_size",
+        default=encapp_tool.adb_cmds.SPLIT_SIZE_BYTES,
+        type=str,
+        help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes"
     )
 
 
@@ -2758,8 +2780,11 @@ def main(argv):
     # check if this is a test run and if these params are defined in the test
 
     proto_options = None
-
     rename_workdir = False
+
+    encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(options.file_transfer_limit)
+    encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
+
     if options.func == "run":
         # Make sure we are writing to a good place
         # It will be a chicken and egg situation i.e.
