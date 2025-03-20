@@ -289,7 +289,7 @@ def collect_results(
 
     # If we have a output_filename template in the test we need to check the begining
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
-    test_suite = configufile_read(local_path)
+    test_suite = configfile_read(local_path)
 
     output_files = []
     for test in test_suite.test:
@@ -577,7 +577,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
-    test_suite = configufile_read(protobuf_txt_filepath)
+    test_suite = configfile_read(protobuf_txt_filepath)
 
     updated_test_suite = tests_definitions.TestSuite()
     update_codec_testsuite(
@@ -866,7 +866,7 @@ def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_work
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
-    test_suite = configufile_read(protobuf_txt_filepath)
+    test_suite = configfile_read(protobuf_txt_filepath)
 
     test_suite_ = create_tests_from_definition_expansion(test_suite)
     # check if they are the same, if so do nothing
@@ -1005,7 +1005,7 @@ def expand_ranges(definition):
                     return []
                 # filter endings
                 # if bitrate or k,M it will be converted
-                start, stop, step = [convert_to_bps(it) for it in ranges]
+                start, stop, step = [parse_range(it) for it in ranges]
                 result.extend(list(range(start, stop + 1, step)))
             else:
                 result.append(item)
@@ -1028,11 +1028,11 @@ def parse_bitrate_field(bitrate):
     if "-" in bitrate:
         bitrate_spec = bitrate.split("-")
         assert len(bitrate_spec) == 3, f'error: invalid bitrate spec: "{bitrate}"'
-        start, stop, step = [convert_to_bps(it) for it in bitrate_spec]
+        start, stop, step = [parse_range(it) for it in bitrate_spec]
         # We want to include the last value...
         return list(range(start, stop + 1, step))
     # parse single elements
-    return [convert_to_bps(bitrate)]
+    return [parse_range(bitrate)]
 
 
 # TODO: fix and comment
@@ -1296,7 +1296,36 @@ def update_codec_test(
                 k1 == "input" and k2 in INPUT_INT_KEYS
             ):
                 # force integer value
-                val = int(val)
+                if type(val) is str:
+                    expanded = expand_ranges(val)
+                    print(expanded)
+                    for gop in expanded:
+                        print("Gop is ", gop)
+                        # create a new test with the new bitrate
+                        if is_parallel:
+                            ntest = test
+                        else:
+                            ntest = tests_definitions.Test()
+                            ntest.CopyFrom(test)
+
+                        ntest.common.id = test.common.id + f".gop-{gop}"
+                        ntest.configure.i_frame_interval = int(gop)
+                        if not is_parallel:
+                            # remove the options already taken care of
+                            rep_copy = copy.deepcopy(replace)
+                            rep_copy["configure"]["i_frame_interval"] = int(gop)
+                            update_codec_test(
+                                ntest,
+                                updated_test_suite,
+                                local_workdir,
+                                device_workdir,
+                                rep_copy,
+                                mediastore,
+                            )
+                    return
+
+                else:
+                    val = int(val)
             # process float keys
             if (k1 == "configure" and k2 in CONFIGURE_FLOAT_KEYS) or (
                 k1 == "input" and k2 in INPUT_FLOAT_KEYS
@@ -1718,7 +1747,7 @@ def is_int(s):
     return s[1:].isdigit() if s[0] in ("-", "+") else s.isdigit()
 
 
-def convert_to_bps(value):
+def parse_range(value):
     # support for integers
     if isinstance(value, int):
         return value
@@ -1738,7 +1767,7 @@ def convert_to_bps(value):
             mul = int(1e6)
         else:
             # not a valid number
-            raise AssertionError(f"invalid bitrate: {value}")
+            raise AssertionError(f"invalid range: {value}")
     return int(float(value[0:index]) * mul)
 
 
@@ -1781,7 +1810,7 @@ def configfile_check(protobuf_txt_filepath, local_workdir, debug):
 
 
 # read a protobuf text file into a protobuf TestSuite
-def configufile_read(protobuf_txt_filepath, test_suite=None):
+def configfile_read(protobuf_txt_filepath, test_suite=None):
     if test_suite is None:
         test_suite = tests_definitions.TestSuite()
     with open(protobuf_txt_filepath, "rb") as fd:
@@ -1851,7 +1880,7 @@ def codec_test(options, model, serial, debug):
     # TODO: should parallels be considered?
     test_suite = None
     for proto in options.configfile:
-        tmp = configufile_read(proto)
+        tmp = configfile_read(proto)
         if test_suite is None:
             test_suite = tmp
         elif len(test_suite.test):
@@ -2425,7 +2454,7 @@ def process_options(options):
         ):
             test_suite = tests_definitions.TestSuite()
             for test in test_suite.test:
-                test_suite = configufile_read(options.configfile, test_suite)
+                test_suite = configfile_read(options.configfile, test_suite)
                 # replace input and other derived values
                 d = process_input_path(
                     input_filepath,
@@ -2565,7 +2594,7 @@ def check_protobuf_test_setup(options):
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
-        test_suite = configufile_read(file, test_suite)
+        test_suite = configfile_read(file, test_suite)
     options_ = copy.deepcopy(options)
     for test in test_suite.test:
         if test.test_setup.serial:
