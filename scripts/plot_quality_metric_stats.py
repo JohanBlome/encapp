@@ -206,7 +206,10 @@ def plot_by(data, args):
             plt.savefig(f"{clean_filename(label)}.{args.metric}.by_model.png")
             plt.close()
     else:
-        hue = args.split_by
+        hue = "source"
+        if len(args.split_by) >0:
+            hue = args.split_by
+
         style = "codec"
         size = "model"
         if len(data["model"]) > 1:
@@ -265,7 +268,7 @@ def plot_by(data, args):
                 g = sns.catplot(
                     x=bitrate_column,
                     y=args.metric,
-                    hue=args.split_by,
+                    hue=hue,
                     col="model",
                     kind="box",
                     data=data,
@@ -455,7 +458,6 @@ def plot_percentile(data, args):
     col = "resolution"
     row = "framerate"
     style="metric"
-    print(df.columns)
     if args.metric == "vmaf_mean":
         g = sns.relplot(
             x="percentile",
@@ -511,9 +513,7 @@ def plot_percentile(data, args):
     axes = g.axes
     for ax in axes:
         for single in ax:
-            print(single)
             single.legend(fancybox=True, framealpha=0.8)
-    print(axes)
 
     plt.suptitle(args.label)
     plt.tight_layout()
