@@ -762,7 +762,7 @@ def run_quality(test_file, options, debug):
             codec = test.get("configure").get("codec")
             bitrate = test.get("configure").get("bitrate")
             meanbitrate = results.get("meanbitrate")
-            iframeinterval = test.get("configure").get("iFrameInterval")
+            iframeinterval = test.get("configure").get("iFrameInterval", -1)
             description = test.get("common").get("description")
             id = test.get("common").get("id")
             filepath = test.get("input").get("filepath")
@@ -791,9 +791,12 @@ def run_quality(test_file, options, debug):
         pframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "P"]
         bframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "B"]
 
-        iframeinterval = (
-            video_info["duration"] / len(iframes) if len(iframes) > 0 else 0
-        )
+        if iframeinterval < 0:
+            iframeinterval = (
+                iframes["pts"].diff().max()
+            )
+            if np.isna(iframeinterval):
+                iframeinterval = 0
         iframe_size = pframes_size = bframes_size = 0
         if len(iframes) > 0:
             iframes_size = iframes["size"].mean()
