@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/local/bin/env python3
 
 import matplotlib.pyplot as plt
 import os.path as path
@@ -14,7 +14,6 @@ import itertools as it
 sns.set_style("whitegrid")
 sns.set(rc={"xtick.bottom": True})
 sns.color_palette("dark")
-
 metrics = [
     "vmaf_mean",
     "vmaf_pX",
@@ -53,7 +52,10 @@ def plot_by(data, args):
         data.sort_values("pixel_count", inplace=True)
     else:
         data.sort_values(args.use_dimension, inplace=True)
-
+    if args.split_by != "source":
+        data.sort_values(["source"], inplace=True)
+    else:
+        data.sort_values(["codec"], inplace=True)
     bitrate_column = f"bitrate {args.bitrate_magnitude}bps"
     if args.output_bitrate:
         bitrate_column = f"calculated bitrate {args.bitrate_magnitude}bps"
@@ -204,7 +206,7 @@ def plot_by(data, args):
             plt.savefig(f"{clean_filename(label)}.{args.metric}.by_model.png")
             plt.close()
     else:
-        hue = "source"
+        hue = args.split_by
         style = "codec"
         size = "model"
         if len(data["model"]) > 1:
@@ -212,7 +214,7 @@ def plot_by(data, args):
             size = "codec"
         if args.split_on_datasource:
             style = "data source"
-            hue = "source"
+            #hue = "source"
             size = "codec"
 
         # implicit by height
@@ -225,7 +227,7 @@ def plot_by(data, args):
                         g = sns.catplot(
                             x=bitrate_column,
                             y=args.metric,
-                            hue="codec",
+                            hue=hue,
                             col="model",
                             kind="box",
                             data=filt2,
@@ -243,8 +245,9 @@ def plot_by(data, args):
                     g = sns.relplot(
                         x=bitrate_column,
                         y=args.metric,
-                        hue="source",
-                        style="codec",
+                        hue=hue,
+                        style=style,
+                        size=size,
                         data=filt,
                         col="framerate_fps",
                         kind="line",
@@ -262,7 +265,7 @@ def plot_by(data, args):
                 g = sns.catplot(
                     x=bitrate_column,
                     y=args.metric,
-                    hue="codec",
+                    hue=args.split_by,
                     col="model",
                     kind="box",
                     data=data,
@@ -312,7 +315,7 @@ def find_mean_max_examples_per_file(data, args):
             for dim in dims:
                 dfilt = bfilt.loc[bfilt[args.use_dimension] == dim]
                 bitrate = dfilt["bitrate_bps"].values[0]
-                vmaf = dfilt["vmaf"].values[0]
+                vmaf = dfilt["vmaf_mean"].values[0]
                 vmaf_min = dfilt["vmaf_min"].values[0]
                 testfile = dfilt["testfile"].values[0]
                 reference_file = dfilt["reference_file"].values[0]
@@ -386,7 +389,7 @@ def plot_percentile(data, args):
                         args.metric: p,
                     }
                 )
-            if args.metric == "vmaf":
+            if args.metric == "vmaf_mean":
                 perc = [
                     np.percentile(df["vmaf_min"], perc) for perc in range(10, 100, 10)
                 ]
@@ -429,7 +432,7 @@ def plot_percentile(data, args):
                     }
                 )
 
-        if args.metric == "vmaf":
+        if args.metric == "vmaf_mean":
             perc = [np.percentile(df["vmaf_min"], perc) for perc in range(10, 100, 10)]
             for index, p in enumerate(perc):
                 percentiles.append(
@@ -448,15 +451,20 @@ def plot_percentile(data, args):
         return
     custom_palette = sns.color_palette()
     g = None
-    if args.metric == "vmaf":
+
+    col = "resolution"
+    row = "framerate"
+    style="metric"
+    print(df.columns)
+    if args.metric == "vmaf_mean":
         g = sns.relplot(
             x="percentile",
             y=args.metric,
             hue=bitrate_label,
             kind="line",
-            col="resolution",
-            row="framerate",
-            style="metric",
+            col=col,
+            row=row,
+            style=style,
             data=df,
             palette=custom_palette,
             linewidth=2,
@@ -476,29 +484,39 @@ def plot_percentile(data, args):
                 y=args.metric,
                 errorbar=None,
                 color="black",
-                style="metric",
+                style=style,
                 data=max_percentile,
                 linewidth=3,
                 label=f"{max_bitrate}{args.bitrate_magnitude}bps {max_resolution}, {max_fps}fps",
                 legend="full",
                 zorder=-1,
             )
-        plt.legend()
     else:
         g = sns.relplot(
             x="percentile",
             y=args.metric,
             hue=bitrate_label,
             kind="line",
-            col="width",
-            row="framerate",
+            col=col,
+            row=row,
             data=df,
-            c="red",
+            #c="red",
             linewidth=2,
         )
+
+    g._legend.remove()
     if args.limit_y:
         miny = df[args.metric].min() // 10 * 10
         plt.ylim(miny)
+    axes = g.axes
+    for ax in axes:
+        for single in ax:
+            print(single)
+            single.legend(fancybox=True, framealpha=0.8)
+    print(axes)
+
+    plt.suptitle(args.label)
+    plt.tight_layout()
     plt.savefig(f"{clean_label_for_filename(args.label)}.percentiles.png")
 
 
@@ -592,7 +610,12 @@ def main():
     )
     parser.add_argument(
         "--limit_y",
-        action="store_true",
+        default=-1,
+    )
+    parser.add_argument(
+        "--limit_x",
+        default=-1,
+        type=int,
     )
     parser.add_argument(
         "--bitrate_magnitude", default="k", help="Represent bps as 'k' or 'M'bps"
@@ -688,6 +711,20 @@ def main():
     # Make sorting on absolute size possible
     data["pixel_count"] = data["width"] * data["height"]
 
+    # Limit x and y
+    if args.limit_x > 0:
+        # Check what x is...
+        print(data["bitrate_bps"].max())
+        data = data.loc[data["bitrate_bps"] < args.limit_x]
+        if len(data) == 0:
+            print("Warning! limit removed all data")
+            exit(0)
+
+    if args.metric == "bitrate_ratio":
+        data["bitrate_ratio"] = data["calculated_bitrate_bps"] / data["bitrate_bps"]
+        # If doing this, scaling needs to be off (or it will compensate for the difference...)
+        args.scale_by_bitrate = False
+
     # Easier read
     magnitudes = ["k", "M"]
     if args.bitrate_magnitude:
@@ -722,6 +759,7 @@ def main():
             ref = datasources[0]
             # If missing bitrate interpolate
             data_1 = data.loc[data["data source"] == ref]
+            # Sort on source
             for ds in datasources[1:]:
                 for bitrate in data_1["bitrate_bps"].unique():
                     data_2 = data.loc[
@@ -747,11 +785,7 @@ def main():
                             & (data["bitrate_bps"] == bitrate),
                             args.metric,
                         ] = val
-            for bitrate in data_1["bitrate_bps"].unique():
-                data.loc[
-                    (data["data source"] == ref) & (data["bitrate_bps"] == bitrate),
-                    args.metric,
-                ] = 0
+            data = data.loc[data["data source"] != datasources[0]]
 
     if args.split_on_datasource:
         data["data source"] = data["data source"].astype("category")
@@ -760,13 +794,27 @@ def main():
         data = data.sort_values("data source")
 
     # Colors
+    data = data.sort_values(["source"])
     sources = data["source"].unique()
     if len(args.split_by) > 0:
-        sources = data[args.split_by].unique()
+        if args.split_by != "source":
+            sources = data[args.split_by].unique()
+        else:
+            sources = data["codec"].unique()
+
     colors = dict(zip(sources, sns.color_palette(n_colors=len(sources))))
 
     if args.percentile:
-        plot_percentile(data, args)
+        # a bit complicated to do with different splits so split here and draw separate graphs
+        if len(args.split_by) > 0:
+            splits = data[args.split_by].unique()
+            source_label = args.label
+            for item in splits:
+                args.label = f"{source_label}.{args.split_by}-{item}"
+                tmp = pd.DataFrame(data.loc[data[args.split_by] == item])
+                plot_percentile(tmp, args)
+        else:
+            plot_percentile(data, args)
     elif args.find_min_max_vmaf:
         matches = find_mean_max_examples_per_file(data, args)
         matches.to_csv("vmaf_matches.csv")
