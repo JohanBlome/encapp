@@ -86,7 +86,6 @@ def indexDirectory(options, recursive):
                 print("json " + filename + ", load device data failed: " + str(exc))
 
         try:
-
             # get experiment data
             with open(filename) as f:
                 data = json.load(f)
@@ -182,9 +181,11 @@ def derive_values(data):
     data["height"] = height_list
     data["configure.bitrate"] = data["configure.bitrate"].apply(
         lambda x: (
-            encapp.convert_to_bps(x)
+            encapp.parse_magnitude(x)
             if type(x) == type(str)
-            else 0 if np.isnan(0) else x
+            else 0
+            if np.isnan(0)
+            else x
         )
     )
 
@@ -200,7 +201,7 @@ def force_options(data, options):
         ranges = options.bitrate.split("-")
         vals = []
         for val in ranges:
-            bitrate = encapp.convert_to_bps(val)
+            bitrate = encapp.parse_magnitude(val)
             vals.append(int(bitrate))
         if len(vals) == 2:
             data = data.loc[
