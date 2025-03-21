@@ -223,7 +223,7 @@ def detailed_media_info(inputfile, options, debug):
             "duration_time,pkt_size,key_frame,pict_type -v quiet -of csv='p=0' "
             f"{inputfile} >> {name}"
         )
-        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=debug)
         # process data
         alt_dur = 1.0 / 29.97
         counter = 0
@@ -234,12 +234,19 @@ def detailed_media_info(inputfile, options, debug):
         first_pts = -1
         pts = 0
         recalc_duration = False
+
+        # ['key_frame', 'pts_time', 'duration_time', 'pkt_size', 'pict_type']
+
         with open(name, "r") as fd:
             datareader = csv.reader(fd, delimiter=",")
             for row in datareader:
                 try:
-                    is_iframe = int(row[0])
-                    pict_type = row[4]
+                    if not row[0].isdigit():
+                        continue
+                    is_iframe = int(row[0].strip())
+                    pict_type = 0
+                    if len(row) > 4:
+                        pict_type = row[4]
                     try:
                         dur = float(row[2])
                     except Exception as ex:
@@ -291,12 +298,12 @@ def detailed_media_info(inputfile, options, debug):
                 except Exception as e:
                     print(str(e) + ", row = " + str(row))
                 counter += 1
-
         labels = ["file", "key_frame", "pict_type", "pts", "duration", "size", "kbps"]
         df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
         df.to_csv(name)
     else:
+        print("File exists read")
         df = pd.read_csv(name)
     calc_stats(df, options, inputfile, True)
     if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
@@ -384,8 +391,11 @@ def run_quality(test_file, options, debug):
     results = {}
     if test_file[-4:] == "json":
         # read test file results
-        with open(test_file, "r") as fd:
-            results = json.load(fd)
+        try:
+            with open(test_file, "r") as fd:
+                results = json.load(fd)
+        except:
+            return None
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}")
@@ -665,8 +675,10 @@ def run_quality(test_file, options, debug):
                 model = "path=" + os.environ.get("VMAF_MODEL_PATH")
             else:
                 model = f"'version={VMAF_MODEL}'"
-            shell_cmd += f":model={model}"
+            # For older ffmpeg
+            # shell_cmd += f":model={model}"
             shell_cmd += '" -f null - 2>&1'
+            print(f"run vmaf {shell_cmd}")
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f"vmaf already calculated for media, {vmaf_file}")
@@ -693,10 +705,10 @@ def run_quality(test_file, options, debug):
         else:
             print(f"psnr already calculated for media, {psnr_file}")
 
-        if distorted != encodedfile:
-            os.remove(distorted)
-        if referenced != reference_pathname:
-            os.remove(referenced)
+        # if distorted != encodedfile:
+        #    os.remove(distorted)
+        # if referenced != reference_pathname:
+        #    os.remove(referenced)
 
     if os.path.exists(vmaf_file):
         vmaf_dict = parse_quality_vmaf(vmaf_file)
@@ -733,6 +745,7 @@ def run_quality(test_file, options, debug):
         bitratemode = ""
         quality = -1  # CQ is between 0-100
         id = ""
+        framecount = 0
         if test is not None:
             # get resolution and framerate
             resolution = test.get("configure").get("resolution")
@@ -769,12 +782,18 @@ def run_quality(test_file, options, debug):
         if reference_info:
             filepath = reference_pathname
         # get the data from ffmpeg
-        ffmpeg_data = detailed_media_info(encodedfile, options, debug)
+        ffmpeg_data = detailed_media_info(encodedfile, options, debug=debug)
+
+        # TODO: check result
         framecount = len(ffmpeg_data)
+
         iframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "I"]
         pframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "P"]
         bframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "B"]
-        iframeinterval = video_info["duration"] / len(iframes)
+
+        iframeinterval = (
+            video_info["duration"] / len(iframes) if len(iframes) > 0 else 0
+        )
         iframe_size = pframes_size = bframes_size = 0
         if len(iframes) > 0:
             iframes_size = iframes["size"].mean()
@@ -785,7 +804,11 @@ def run_quality(test_file, options, debug):
         if not framerate or framerate == 0:
             print("Warning, framerate is 0, setting it to 30")
             framerate = 30
-        calculated_bitrate = int((file_size * 8 * framerate) / framecount)
+        if framecount == 0:
+            exit(0)
+        calculated_bitrate = (
+            int((file_size * 8 * framerate) / framecount) if framecount > 0 else 0
+        )
         source_complexity = ""
         source_motion = ""
         if options.get("mark_complexity", None):
@@ -812,7 +835,7 @@ def run_quality(test_file, options, debug):
             "framerate_fps": f"{framerate}",
             "width": f"{width}",
             "height": f"{height}",
-            "bitrate_bps": f"{encapp.convert_to_bps(bitrate)}",
+            "bitrate_bps": f"{encapp.parse_magnitude(bitrate)}",
             "meanbitrate_bps": f"{meanbitrate}",
             "mean_bpp": f"{mean_bpp}",
             "calculated_bitrate_bps": f"{calculated_bitrate}",
@@ -1071,11 +1094,11 @@ def main(argv):
     df = None
     start = time.time()
     for test in options.test:
-        try:
-            quality_dict = run_quality(test, vars(options), options.debug)
-        except Exception as ex:
-            print(f"{test} failed: {ex}")
-            continue
+        # try:
+        quality_dict = run_quality(test, vars(options), options.debug)
+        # except Exception as ex:
+        #    print(f"{test} failed: {ex}")
+        #    continue
         now = time.time()
         run_for = now - start
         time_per_test = float(run_for) / float(current)

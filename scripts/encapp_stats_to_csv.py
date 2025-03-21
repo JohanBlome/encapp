@@ -37,7 +37,7 @@ def parse_encoding_data(json, inputfile, debug=0):
         data["description"] = test["common"]["description"]
         data["camera"] = (test["input"]["filepath"].find('filepath: "camera"')) > 0
         data["test"] = test["common"]["id"]
-        data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
+        data["bitrate"] = ep.parse_magnitude(test["configure"]["bitrate"])
         resolution = test["configure"]["resolution"]
         if len(resolution) == 0:
             resolution = test["input"]["resolution"]
@@ -112,7 +112,9 @@ def parse_decoding_data(json, inputfile, debug=0):
         decoded_data = pd.DataFrame(json["decoded_frames"])
         decoded_data["source"] = inputfile
 
-        decoded_data["original_media"] = json["test"]["input"]["filepath"].split("/")[-1]
+        decoded_data["original_media"] = json["test"]["input"]["filepath"].split("/")[
+            -1
+        ]
         if len(decoded_data) > 0:
             test = json["test"]
             codec = json.get("decoder", "na")
@@ -138,7 +140,7 @@ def parse_decoding_data(json, inputfile, debug=0):
             decoded_data["camera"] = (
                 test["input"]["filepath"].find('filepath: "camera"')
             ) > 0
-            # decoded_data["bitrate"] = ep.convert_to_bps(test["configure"]["bitrate"])
+            # decoded_data["bitrate"] = ep.parse_magnitude(test["configure"]["bitrate"])
             # oh no we may have b frames...
             decoded_data["duration_ms"] = round(
                 (
@@ -196,7 +198,9 @@ def parse_named_timestamps(json, inputfile, debug=0):
             data["source"] = inputfile
 
             # transpose to single column
-            mdata = data.melt(id_vars="source", var_name="named_timestamp", value_name="timestamp")
+            mdata = data.melt(
+                id_vars="source", var_name="named_timestamp", value_name="timestamp"
+            )
             data = mdata.dropna(subset="timestamp")
     except Exception as ex:
         print(f"Failed to parse decode data for {inputfile}: {ex}")
@@ -273,9 +277,20 @@ def calc_infligh(frames, time_ref):
 
 
 def calc_transcoding(encoded_frames, decoded_frames):
-    encoded = encoded_frames.filter(["source", "stoptime", "pts", "test_id", "test_description", "description", "height", "fps"])
-    encoded["frame"]=encoded_frames["original_frame"]
-    encoded["encoding_codec"]  = encoded_frames["codec"]
+    encoded = encoded_frames.filter(
+        [
+            "source",
+            "stoptime",
+            "pts",
+            "test_id",
+            "test_description",
+            "description",
+            "height",
+            "fps",
+        ]
+    )
+    encoded["frame"] = encoded_frames["original_frame"]
+    encoded["encoding_codec"] = encoded_frames["codec"]
     decoded = decoded_frames.filter(["frame", "starttime", "original_media"])
     decoded["decoding_codec"] = decoded_frames["codec"]
     merged = decoded.merge(encoded, how="inner", on=["frame"])
@@ -292,11 +307,10 @@ def calc_transcoding(encoded_frames, decoded_frames):
     merged["real_fps"] = round(1000.0 / (merged["duration_ms"]), 2)
     merged = merged.loc[merged["starttime"] > 0]
     fps = merged["fps"].unique()[0]
-    merged["av_fps"] = (
-        round(merged["real_fps"].rolling(fps, min_periods=fps, win_type=None).sum()
-        / fps, 2)
+    merged["av_fps"] = round(
+        merged["real_fps"].rolling(fps, min_periods=fps, win_type=None).sum() / fps, 2
     )
-    merged["proc_fps"] =  merged["real_fps"]
+    merged["proc_fps"] = merged["real_fps"]
     merged["av_proc_fps"] = merged["av_fps"]
     merged["av_fps"] = merged["av_fps"].fillna(merged["fps"])
     merged["av_proc_fps"] = merged["av_proc_fps"].fillna(merged["proc_fps"])
@@ -408,6 +422,7 @@ def main():
                 transcoded_data.to_csv(f"{filename}_transcoding_data.csv")
             except Exception:
                 pass
+
 
 if __name__ == "__main__":
     main()
