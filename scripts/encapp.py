@@ -237,9 +237,10 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
         )
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
+        print("Run run_cmd path, ",run_cmd)
         # TODO: can we assume adb?
         encapp_tool.adb_cmds.reset_logcat(serial)
-        cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
+        cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath} -e ui_hold_sec 60 "
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
     else:
@@ -262,12 +263,14 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
                     debug,
                 )
         else:
+            print("Run no run_cmd path")
             # clean the logcat first
             encapp_tool.adb_cmds.reset_logcat(serial)
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
                 f"adb -s {serial} shell am start "
                 f"-e workdir {device_workdir} "
                 f"-e test {protobuf_txt_filepath} "
+                " -e ui_hold_sec 60 "
                 f"{encapp_tool.app_utils.ACTIVITY}",
                 debug,
             )
@@ -718,6 +721,8 @@ def run_codec_tests_file(
                 tests.append(test)
 
             counter = 0
+            if debug > 0:
+                print("Clear target and remove known encapp files")
             # Clear target and run test, collect result and iterate
             encapp_tool.adb_cmds.remove_files_using_regex(
                 serial, "encapp_.*", options.device_workdir, options.debug
@@ -2782,9 +2787,6 @@ def main(argv):
     proto_options = None
     rename_workdir = False
 
-    encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(options.file_transfer_limit)
-    encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
-
     if options.func == "run":
         # Make sure we are writing to a good place
         # It will be a chicken and egg situation i.e.
@@ -2929,6 +2931,9 @@ def main(argv):
         return 0
 
     elif options.func == "run":
+        encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(options.file_transfer_limit)
+        encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
+
         # ensure there is an input configuration
         assert (
             options.configfile is not None
