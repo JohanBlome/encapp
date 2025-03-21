@@ -432,8 +432,12 @@ public class Statistics {
 
             json.put("encoder_media_format", getSettingsFromMediaFormat(mEncoderMediaFormat));
 
-            long powernWh = mEndPower.getCapacitynWh() - mStartPower.getCapacitynWh();
-            double powernW = powernWh / (getProcessingTime() / (60 * 60 * 1e9));//ns to h
+            double powernW = 0;
+            if (mEndPower != null && mStartPower != null) {
+                long powernWh = mEndPower.getCapacitynWh() - mStartPower.getCapacitynWh();
+                powernW = powernWh / (getProcessingTime() / (60 * 60 * 1e9));//ns to h
+            }
+
             json.put("power_diff_in_nW", powernW);
             if (mDecodingFrames.size() > 0) {
                 json.put("decoder", mDecoderName);
