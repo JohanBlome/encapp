@@ -171,6 +171,8 @@ def plotLatency(data, options):
             )
         proctime = "proctime_rolling"
 
+    # drop na
+    data = data.dropna(subset=["proctime"])
     average_lat_msec = round(data["proctime"].mean() / 1e6, 2)
     p50_msec = int(round(data["proctime"].quantile(0.5) / 1e6, 0))
     p95_msec = int(round(data["proctime"].quantile(0.95) / 1e6, 0))
@@ -198,12 +200,13 @@ def plotLatency(data, options):
     # Show the mean, p50,90,99
     tmp = []
     text = ""
+    print("Small proc:",data.loc[data["proctime"] < 1] )
     for item in data[hue].unique():
         itemdata = data.loc[data[hue] == item]
         average_lat_msec = round(itemdata["proctime"].mean() / 1e6, 2)
-        p50_msec = int(round(itemdata["proctime"].quantile(0.5) / 1e6, 0))
-        p95_msec = int(round(itemdata["proctime"].quantile(0.95) / 1e6, 0))
-        p99_msec = int(round(itemdata["proctime"].quantile(0.99) / 1e6, 0))
+        p50_msec = round(itemdata["proctime"].quantile(0.5) / 1e6, 1)
+        p95_msec = round(itemdata["proctime"].quantile(0.95) / 1e6, 1)
+        p99_msec = round(itemdata["proctime"].quantile(0.99) / 1e6, 1)
         tmp.append([item, average_lat_msec, p50_msec, p95_msec, p99_msec])
     meandata = pd.DataFrame(tmp, columns=[hue, "average", "p50", "p90", "p99"])
     meandata.sort_values(["p50"], inplace=True)
@@ -471,6 +474,79 @@ def plot_cpu_load(data_: pd.DataFrame, options):
     plt.savefig(name.replace(" ", "_"), format="png")
 
 
+def plot_named_timestamps(data, enc_dec_data, options):
+    print(f"{len(data)=}, {len(enc_dec_data)=}")
+    # find pars and calculate diff
+    names = data["named_timestamp"].unique()
+    if "original_media" not in data.columns:
+        data["original_media"] = ""
+
+    output = pd.DataFrame()
+    for name in names:
+        limited = pd.DataFrame(data.loc[data["named_timestamp"] == name])
+        if len(limited) % 2 != 0:
+            print("Data point is missing, not even")
+        else:
+            ts_min = limited["timestamp"].min()
+            limited["timestamp"] = limited["timestamp"] - ts_min
+            limited["diff"] = limited["timestamp"].astype(int).diff().shift(-1)
+            limited = limited.iloc[::2]
+            output = pd.concat([output, limited])
+    output["time ms"] = output["diff"] / 1000000
+
+    extra = []
+    for source in data["source"].unique():
+        print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
+        print(f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}")
+        proctime = enc_dec_data.loc[
+            (enc_dec_data["source"] == source)]["proctime"].values[0]
+        original_media = enc_dec_data.loc[enc_dec_data["source"] == source][
+            "original_media"
+        ].values[0]
+        print(f"{proctime=} {original_media=}")
+        output.loc[output["source"] == source, "original_media"] = original_media
+
+        extra.append(
+            {
+                "source": source,
+                "original_media": original_media,
+                "named_timestamp": "first.frame.transcode",
+                "diff": proctime,
+                "time ms": proctime / 1000000.0,
+            }
+        )
+
+        complete_sum = output.loc[output["source"] == source]["diff"].sum() + proctime
+        extra.append(
+            {
+                "source": source,
+                "original_media": original_media,
+                "named_timestamp": "timestamp.sum",
+                "diff": complete_sum,
+                "time ms": complete_sum / 1000000.0,
+            }
+        )
+
+    ff = pd.DataFrame(extra)
+    output = pd.concat([output, ff])
+    output = output.ffill()
+    print(output)
+    p = sns.barplot(
+        x="named_timestamp", y="time ms", hue=options.split_field, data=output
+    )
+    plt.xticks(rotation=70)
+    plt.suptitle(f"{options.label} - Timestamp times in ms")
+    axs = p.axes
+    axs.legend(loc="best", fancybox=True, framealpha=0.5)
+    axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
+    axs.grid(visible=True, which="both")
+    axs.grid(visible=True, which="minor", color="black", linewidth=0.1)
+
+    plt.tight_layout()
+    name = f"{options.output}.named_ts.png"
+    plt.savefig(name.replace(" ", "_"), format="png")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
@@ -565,8 +641,10 @@ def main():
     Takes the output from encapp_stats_to_csv.py as a source for plotting performance stats.
     """
     options = parse_args()
-    data = None
+    data = pd.DataFrame()
     cpu_data = None
+    named_timestamps = pd.DataFrame()
+
     if len(options.files) == 1 and len(options.output) == 0:
         options.output = options.files[0]
     for file in options.files:
@@ -577,10 +655,13 @@ def main():
             input_data["dataset"] = options.dataset_labels.pop(0)
         else:
             input_data["dataset"] = file
-        if data is not None:
-            data = pd.concat([data, input_data], ignore_index=True)
+        if "named_timestamp" in input_data.columns:
+            named_timestamps = pd.concat(
+                [named_timestamps, input_data], ignore_index=True
+            )
         else:
-            data = input_data
+            data = pd.concat([data, input_data], ignore_index=True)
+
         if options.cpu_load:
             cpu_filename = ""
             input_cpu_data = None
@@ -601,6 +682,16 @@ def main():
             else:
                 cpu_data = input_cpu_data
 
+    # special case
+
+    sns.set_style("whitegrid")
+    sns.set(rc={"xtick.bottom": True, "ytick.left": True})
+    sns.set_theme(rc={"figure.figsize": (options.size.lower().split("x"))})
+    if len(named_timestamps) > 0:
+        plot_named_timestamps(named_timestamps, data, options)
+        if options.show:
+            plt.show()
+
     # clean up and removed potential error runs
     if not options.keep_na_codec:
         if "codec" in data.columns:
@@ -614,9 +705,6 @@ def main():
     if options.split_field not in data.columns:
         print("Split option does not exists, choices are: ", data.columns)
         exit(0)
-    sns.set_style("whitegrid")
-    sns.set(rc={"xtick.bottom": True, "ytick.left": True})
-    sns.set_theme(rc={"figure.figsize": (options.size.lower().split("x"))})
 
     # `fps` column contains the framerate calculated from the
     # input-reported timings (the input/camera framerate)
