@@ -1814,13 +1814,25 @@ def configfile_check(protobuf_txt_filepath, local_workdir, debug):
             local_workdir, f'ERROR: invalid test file name "{protobuf_txt_filepath}"'
         )
     # use a temp file for the binary output
-    _, protobuf_bin_file = tempfile.mkstemp(dir=tempfile.gettempdir())
-    cmd = (
-        f'protoc -I {protobuf_txt_filepath} --encode="TestSuite" '
-        f"{protobuf_bin_file}"
-    )
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
-    assert ret == 0, f"ERROR: {stderr}"
+    try:
+        test_suite = configfile_read(protobuf_txt_filepath)
+    except FileNotFoundError:
+        abort_test(
+            local_workdir, f'ERROR: test file not found "{protobuf_txt_filepath}"'
+        )
+    except IsADirectoryError:
+        abort_test(
+            local_workdir, f'ERROR: test file is a directory "{protobuf_txt_filepath}"'
+        )
+    except PermissionError:
+        abort_test(
+            local_workdir,
+            f'ERROR: test file is not accesible "{protobuf_txt_filepath}"',
+        )
+    except text_format.ParseError:
+        abort_test(
+            local_workdir, f'ERROR: invalid protobuf file "{protobuf_txt_filepath}"'
+        )
 
 
 # read a protobuf text file into a protobuf TestSuite
