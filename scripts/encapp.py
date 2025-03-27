@@ -232,7 +232,9 @@ def valid_path(text):
 
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", debug=0):
     if debug > 0:
-        print(f"running test: {protobuf_txt_filepath}")
+        print(
+            f"running test: {protobuf_txt_filepath}, {serial=}, {device_workdir=}, {run_cmd=}"
+        )
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
         print("Run run_cmd path, ",run_cmd)
@@ -1505,18 +1507,22 @@ def update_codec_testsuite(
 
 
 def run_codec_tests(
-    test_suite,
-    files_to_push,
-    model,
-    serial,
-    mediastore,
-    local_workdir,
-    device_workdir=None,
-    ignore_results=False,
-    fast_copy=False,
-    split=False,
-    debug=False,
+    test_suite: tests_definitions.TestSuite,
+    files_to_push: list[str],
+    model: str,
+    serial: str,
+    mediastore: str,
+    local_workdir: str,
+    device_workdir: str = default_values["device_workdir"],
+    ignore_results: bool = False,
+    fast_copy: bool = False,
+    split: bool = False,
+    debug: int = 0,
 ):
+    """Run the testsuite.
+    The testsuite will be written to a file for pushing along with files_to_push.
+    """
+
     global default_values
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
@@ -1614,15 +1620,19 @@ def run_codec_tests(
                     f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
                 )
             encapp_tool.adb_cmds.run_cmd(cmd)
-        protobuf_txt_filepath = ""
+        protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
+        with open(protobuf_txt_filepath, "w") as f:
+            f.write(text_format.MessageToString(test_suite))
+        if not encapp_tool.adb_cmds.push_file_to_device(
+            protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
+        ):
+            abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
         for filepath in files_to_push:
-            # Kind of stupid but there should be a pbtxtx, and just one here
+            # Ignore pbtxt, only the test_suite based one will be used.
             fc = fast_copy
             if filepath.endswith("pbtxt"):
-                protobuf_txt_filepath = filepath
-                # We always write the test definitions
-                fc = False
+                continue
             if not encapp_tool.adb_cmds.push_file_to_device(
                 filepath, serial, device_workdir, fc, debug
             ):
@@ -1641,7 +1651,7 @@ def run_codec_tests(
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
         run_encapp_test(
-            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
+            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=3
         )
 
         # collect the test results
