@@ -20,6 +20,7 @@ import encapp
 import vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
+import multiprocessing as mp
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -370,6 +371,13 @@ def parse_quality_psnr(psnr_file):
     return psnr, psnr_y, psnr_u, psnr_v
 
 
+def run_quality_mp(args):
+    try:
+        run_quality(args.get("test"), args.get("options"), args.get("debug"))
+    except Exception as ex:
+        print(f"Failed run test: {args=}, {ex}")
+
+
 """
 def get_source_length:
     #TODO: fix this
@@ -653,6 +661,7 @@ def run_quality(test_file, options, debug):
         # Or convert to the output. This nomrally gives higher score to lower fps and process faster...
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
         crop = ""
+
         if options.get("crop_input", None):
             crop = f"crop={options.get('crop_input')},"
         filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
@@ -675,10 +684,8 @@ def run_quality(test_file, options, debug):
                 model = "path=" + os.environ.get("VMAF_MODEL_PATH")
             else:
                 model = f"'version={VMAF_MODEL}'"
-            # For older ffmpeg
-            # shell_cmd += f":model={model}"
+            shell_cmd += f":model={model}"
             shell_cmd += '" -f null - 2>&1'
-            print(f"run vmaf {shell_cmd}")
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
         else:
             print(f"vmaf already calculated for media, {vmaf_file}")
@@ -792,9 +799,7 @@ def run_quality(test_file, options, debug):
         bframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "B"]
 
         if iframeinterval < 0:
-            iframeinterval = (
-                iframes["pts"].diff().max()
-            )
+            iframeinterval = iframes["pts"].diff().max()
             if np.isna(iframeinterval):
                 iframeinterval = 0
         iframe_size = pframes_size = bframes_size = 0
@@ -1012,6 +1017,13 @@ def get_options(argv):
         help="Ignore all timing information and compare frame by frame between source and reference. "
         "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken.",
     )
+    parser.add_argument(
+        "--max-parallel",
+        dest="max_parallel",
+        type=int,
+        default=1,
+        help="Maximum number of parallel processes",
+    )
 
     options = parser.parse_args()
 
@@ -1051,7 +1063,7 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         "header": True,
         "media_path": source_path,
         "quiet": quiet,
-        "keep_quality_files": False,
+        "keep_quality_files": True,
     }
     for test in tests:
         try:
@@ -1077,6 +1089,7 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         df.loc[df.size] = quality_dict.values()
     # write data to csv file
     mode = "w"
+
     if debug:
         print(f"Write to {output}")
     df.to_csv(output, mode=mode, index=False, header=True)
@@ -1096,12 +1109,28 @@ def main(argv):
     print(f"Total number of tests: {total}")
     df = None
     start = time.time()
+
+    if options.max_parallel > 1:
+        options.keep_quality_files = True
+        voptions = vars(options).copy()
+        del voptions["test"]
+        mpargs = [
+            ({"test": test, "options": voptions, "debug": False})
+            for test in options.test
+        ]
+
+        with mp.Pool(processes=options.max_parallel) as p:
+            results = p.map(run_quality_mp, mpargs, chunksize=1)
+
+        # rerun to get complete csv, quality files are kept so it will just read the files and compile the dataset
+
+
     for test in options.test:
-        # try:
-        quality_dict = run_quality(test, vars(options), options.debug)
-        # except Exception as ex:
-        #    print(f"{test} failed: {ex}")
-        #    continue
+        try:
+            quality_dict = run_quality(test, vars(options), options.debug)
+        except Exception as ex:
+            print(f"{test} failed: {ex}")
+            continue
         now = time.time()
         run_for = now - start
         time_per_test = float(run_for) / float(current)
@@ -1114,7 +1143,7 @@ def main(argv):
         current += 1
         if quality_dict is None:
             continue
-            continue
+
         if df is None:
             df = pd.DataFrame(columns=quality_dict.keys())
         df.loc[df.size] = quality_dict.values()
