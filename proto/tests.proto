@@ -25,6 +25,8 @@ message TestSetup {
   // If set the 20%-80% power lvel rules will be ignored and the test will run until power is out.
   // Useful for devices with problem in the power reporting.
   optional bool ignore_power_status = 10;
+  // Add a delay before exiting the app. Can be usefull for identifying back to back runs.
+  optional int32 uihold_sec = 11;
 }
 
 message Common {

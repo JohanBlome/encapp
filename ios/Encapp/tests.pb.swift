@@ -211,6 +211,16 @@ struct TestSetup {
   /// Clears the value of `ignorePowerStatus`. Subsequent reads from it will return its default value.
   mutating func clearIgnorePowerStatus() {self._ignorePowerStatus = nil}
 
+  /// Add a delay before exiting the app. Can be usefull for identifying back to back runs.
+  var uiholdSec: Int32 {
+    get {return _uiholdSec ?? 0}
+    set {_uiholdSec = newValue}
+  }
+  /// Returns true if `uiholdSec` has been explicitly set.
+  var hasUiholdSec: Bool {return self._uiholdSec != nil}
+  /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
+  mutating func clearUiholdSec() {self._uiholdSec = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -225,6 +235,7 @@ struct TestSetup {
   fileprivate var _sourceDir: String? = nil
   fileprivate var _firstFrameFastRead: Bool? = nil
   fileprivate var _ignorePowerStatus: Bool? = nil
+  fileprivate var _uiholdSec: Int32? = nil
 }
 
 struct Common {
@@ -1112,6 +1123,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     8: .standard(proto: "source_dir"),
     9: .standard(proto: "first_frame_fast_read"),
     10: .standard(proto: "ignore_power_status"),
+    11: .standard(proto: "uihold_sec"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1130,6 +1142,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 8: try { try decoder.decodeSingularStringField(value: &self._sourceDir) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self._ignorePowerStatus) }()
+      case 11: try { try decoder.decodeSingularInt32Field(value: &self._uiholdSec) }()
       default: break
       }
     }
@@ -1170,6 +1183,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._ignorePowerStatus {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
     } }()
+    try { if let v = self._uiholdSec {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1184,6 +1200,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._sourceDir != rhs._sourceDir {return false}
     if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
     if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
+    if lhs._uiholdSec != rhs._uiholdSec {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
