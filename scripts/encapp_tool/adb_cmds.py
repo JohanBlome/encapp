@@ -638,7 +638,7 @@ def push_file_to_device_android(
     ret = stdout = stderr = None
     if os.path.getsize(filepath) <= MAX_SIZE_BYTES: 
         cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
-        ret, stdout, stderr = run_cmd(cmd, debug=1)
+        ret, stdout, stderr = run_cmd(cmd, debug=debug)
         if ret:
             return ret
         print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
@@ -658,7 +658,7 @@ def push_file_to_device_android(
     for split_piece in split_pieces:
         print(f"Push: {counter}/{len(split_pieces)}")
         ret = push_file_to_device_android(
-            split_piece, serial, device_workdir, debug=1, max_size_bytes=0
+            split_piece, serial, device_workdir, debug=debug, max_size_bytes=0
         )
         if not ret:
             print(f'error: cannot copy "{split_piece}": {stdout=} {stderr=}')

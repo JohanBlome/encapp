@@ -262,7 +262,6 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
                     debug,
                 )
         else:
-            print("Run no run_cmd path")
             # clean the logcat first
             encapp_tool.adb_cmds.reset_logcat(serial)
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
@@ -1026,7 +1025,6 @@ def expand_ranges(definition):
 # * (2) a range (e.g. "100k-1M-100k") (start-stop-step)
 # * (3) a list of single numbers or ranges (e.g. "100kbps,200kbps")
 def parse_bitrate_field(bitrate):
-    print("parse bitrate field:", bitrate)
     # parse lists
     if "," in bitrate:
         bitrate_list = [parse_bitrate_field(it) for it in bitrate.split(",")]
