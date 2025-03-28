@@ -237,7 +237,6 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
         )
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
-        print("Run run_cmd path, ",run_cmd)
         # TODO: can we assume adb?
         encapp_tool.adb_cmds.reset_logcat(serial)
         cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
@@ -1650,7 +1649,7 @@ def run_codec_tests(
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
         run_encapp_test(
-            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=3
+            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
         )
 
         # collect the test results
@@ -2174,15 +2173,15 @@ def add_args(parser):
         dest="file_transfer_limit",
         default=encapp_tool.adb_cmds.MAX_SIZE_BYTES,
         type=str,
-        help=f"Limit the maximum file size for direct transfer. Above this size " \
-             f"limit the file will be split up and one part per second will be transfered. Default is {encapp_tool.adb_cmds.MAX_SIZE_BYTES} bytes"
+        help=f"Limit the maximum file size for direct transfer. Above this size "
+        f"limit the file will be split up and one part per second will be transfered. Default is {encapp_tool.adb_cmds.MAX_SIZE_BYTES} bytes",
     )
     parser.add_argument(
         "--file-split-size",
         dest="file_split_size",
         default=encapp_tool.adb_cmds.SPLIT_SIZE_BYTES,
         type=str,
-        help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes"
+        help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes",
     )
 
 
@@ -2932,7 +2931,9 @@ def main(argv):
         return 0
 
     elif options.func == "run":
-        encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(options.file_transfer_limit)
+        encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(
+            options.file_transfer_limit
+        )
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
