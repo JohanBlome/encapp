@@ -5,7 +5,6 @@ Converts a ffmpeg vmaf json file to a csv file
 
 """
 
-
 import argparse
 import json
 import os

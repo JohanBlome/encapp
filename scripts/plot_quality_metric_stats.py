@@ -207,7 +207,7 @@ def plot_by(data, args):
             plt.close()
     else:
         hue = "source"
-        if len(args.split_by) >0:
+        if len(args.split_by) > 0:
             hue = args.split_by
 
         style = "codec"
@@ -217,7 +217,7 @@ def plot_by(data, args):
             size = "codec"
         if args.split_on_datasource:
             style = "data source"
-            #hue = "source"
+            # hue = "source"
             size = "codec"
 
         # implicit by height
@@ -457,7 +457,7 @@ def plot_percentile(data, args):
 
     col = "resolution"
     row = "framerate"
-    style="metric"
+    style = "metric"
     if args.metric == "vmaf_mean":
         g = sns.relplot(
             x="percentile",
@@ -502,7 +502,7 @@ def plot_percentile(data, args):
             col=col,
             row=row,
             data=df,
-            #c="red",
+            # c="red",
             linewidth=2,
         )
 

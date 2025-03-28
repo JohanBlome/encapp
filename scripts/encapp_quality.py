@@ -224,7 +224,7 @@ def detailed_media_info(inputfile, options, debug):
             "duration_time,pkt_size,key_frame,pict_type -v quiet -of csv='p=0' "
             f"{inputfile} >> {name}"
         )
-        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=1)
+        encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=debug)
         # process data
         alt_dur = 1.0 / 29.97
         counter = 0
@@ -791,7 +791,7 @@ def run_quality(test_file, options, debug):
         if reference_info:
             filepath = reference_pathname
         # get the data from ffmpeg
-        ffmpeg_data = detailed_media_info(encodedfile, options, debug=1)
+        ffmpeg_data = detailed_media_info(encodedfile, options, debug=debug)
 
         # TODO: check result
         framecount = len(ffmpeg_data)
@@ -1125,7 +1125,6 @@ def main(argv):
             results = p.map(run_quality_mp, mpargs, chunksize=1)
 
         # rerun to get complete csv, quality files are kept so it will just read the files and compile the dataset
-
 
     for test in options.test:
         try:

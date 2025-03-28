@@ -200,7 +200,7 @@ def plotLatency(data, options):
     # Show the mean, p50,90,99
     tmp = []
     text = ""
-    print("Small proc:",data.loc[data["proctime"] < 1] )
+    print("Small proc:", data.loc[data["proctime"] < 1])
     for item in data[hue].unique():
         itemdata = data.loc[data[hue] == item]
         average_lat_msec = round(itemdata["proctime"].mean() / 1e6, 2)
@@ -497,9 +497,12 @@ def plot_named_timestamps(data, enc_dec_data, options):
     extra = []
     for source in data["source"].unique():
         print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
-        print(f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}")
-        proctime = enc_dec_data.loc[
-            (enc_dec_data["source"] == source)]["proctime"].values[0]
+        print(
+            f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}"
+        )
+        proctime = enc_dec_data.loc[(enc_dec_data["source"] == source)][
+            "proctime"
+        ].values[0]
         original_media = enc_dec_data.loc[enc_dec_data["source"] == source][
             "original_media"
         ].values[0]

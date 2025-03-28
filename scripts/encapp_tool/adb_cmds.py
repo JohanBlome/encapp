@@ -17,10 +17,13 @@ IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
 
 # size for split adb push
-MAX_SIZE_BYTES = sys.maxsize # Can handle andy size
-SPLIT_SIZE_BYTES = int(20e6) # 20MB
+MAX_SIZE_BYTES = sys.maxsize  # Can handle andy size
+SPLIT_SIZE_BYTES = int(20e6)  # 20MB
 
-def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tuple[bool, str, str]:
+
+def run_cmd(
+    cmd: str, ignore_errors: bool = False, debug: int = 0
+) -> typing.Tuple[bool, str, str]:
     """Run sh command
 
     Args:
@@ -39,7 +42,11 @@ def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tup
         if debug > 0:
             print(cmd, sep=" ")
         with subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, errors=errors,
+            cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            errors=errors,
         ) as process:
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
@@ -57,7 +64,7 @@ def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tup
         errstr = stderr.decode()
 
     return ret, stdstr, errstr
-    #return ret, stdout.decode(), stderr.decode()
+    # return ret, stdout.decode(), stderr.decode()
 
 
 def get_device_info(
@@ -289,7 +296,9 @@ def installed_apps(serial: str, debug=0) -> typing.List:
     Returns:
         List of packages installed at android device.
     """
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell pm list packages", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell pm list packages", debug=debug
+    )
     assert ret, f"error: failed to get installed app list: {stderr}"
     return _parse_pm_list_packages(stdout)
 
@@ -347,7 +356,8 @@ def grant_camera_permission(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} " "android.permission.CAMERA", debug=debug
+        f"adb -s {serial} shell pm grant {package} " "android.permission.CAMERA",
+        debug=debug,
     )
 
 
@@ -396,7 +406,9 @@ def logcat_dump(serial: str, debug=0) -> str:
       Current logcat dump
     """
     # For some reason logcat often produce errors in the form of broken utf-8, ignore it.
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} logcat -d", ignore_errors=True, debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} logcat -d", ignore_errors=True, debug=debug
+    )
     assert ret, f"error: failed to dump logcat: {stderr}"
     return stdout
 
@@ -523,7 +535,9 @@ def getprop(serial: str, debug=0) -> dict:
 
 def get_device_size(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell test -e {filepath}", debug=debug
+    )
     if not ret:
         return -1
     # get the size in bytes
@@ -540,12 +554,16 @@ def get_device_size(serial, filepath, debug):
 
 def get_device_hash(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell test -e {filepath}", debug=debug
+    )
     if not ret:
         return -1
     # get a hash
     try:
-        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug=debug)
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} shell md5sum {filepath}", debug=debug
+        )
         filehash = stdout.split()[0]
     except:
         print(f"Failed to calc hash for {filepath}")
@@ -636,9 +654,9 @@ def push_file_to_device_android(
 ):
     # 0. try a one-off copy. Limit this for devices that fail and reboot (or worse).
     ret = stdout = stderr = None
-    if os.path.getsize(filepath) <= MAX_SIZE_BYTES: 
+    if os.path.getsize(filepath) <= MAX_SIZE_BYTES:
         cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
-        ret, stdout, stderr = run_cmd(cmd, debug=1)
+        ret, stdout, stderr = run_cmd(cmd, debug=debug)
         if ret:
             return ret
         print(f'warning: cannot copy "{filepath}": {stdout=} {stderr=}')
@@ -646,7 +664,9 @@ def push_file_to_device_android(
     if max_size_bytes == 0:
         return ret
     # 1. try split copy
-    print(f'warning: trying split push for "{filepath}", split size = {SPLIT_SIZE_BYTES}')
+    print(
+        f'warning: trying split push for "{filepath}", split size = {SPLIT_SIZE_BYTES}'
+    )
     # 1.1. split filepath in pieces
     prefix = tempfile.NamedTemporaryFile(prefix="split.").name + "."
     cmd = f"split -b {SPLIT_SIZE_BYTES} {filepath} {prefix}"
@@ -658,7 +678,7 @@ def push_file_to_device_android(
     for split_piece in split_pieces:
         print(f"Push: {counter}/{len(split_pieces)}")
         ret = push_file_to_device_android(
-            split_piece, serial, device_workdir, debug=1, max_size_bytes=0
+            split_piece, serial, device_workdir, debug=debug, max_size_bytes=0
         )
         if not ret:
             print(f'error: cannot copy "{split_piece}": {stdout=} {stderr=}')
