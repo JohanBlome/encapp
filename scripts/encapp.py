@@ -240,7 +240,7 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
         print("Run run_cmd path, ",run_cmd)
         # TODO: can we assume adb?
         encapp_tool.adb_cmds.reset_logcat(serial)
-        cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath} -e ui_hold_sec 60 "
+        cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
     else:
@@ -270,7 +270,6 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
                 f"adb -s {serial} shell am start "
                 f"-e workdir {device_workdir} "
                 f"-e test {protobuf_txt_filepath} "
-                " -e ui_hold_sec 60 "
                 f"{encapp_tool.app_utils.ACTIVITY}",
                 debug,
             )

@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.TestSuite;
+import com.facebook.encapp.proto.TestSetup;
 import com.facebook.encapp.utils.BatteryStatusListener;
 import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.CliSettings;
@@ -343,6 +344,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 TextFormat.getParser().merge(test_path_contents, tests_builder);
                 test_suite = tests_builder.build();
 
+
                 // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
                 if (test_suite.getTestList().size() <= 0) {
@@ -354,6 +356,16 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     return;
                 }
 
+                // Get test setup params
+                // cli have preference
+                Test test0 = test_suite.getTestList().get(0);
+                if (test0.hasTestSetup() && mUIHoldtimeSec == 0) {
+                    TestSetup setup = test0.getTestSetup();
+                    if (setup.hasUiholdSec()) {
+                        mUIHoldtimeSec = setup.getUiholdSec();
+                    }
+                }
+                
                 int nbrViews = 0;
                 boolean hasCameraPreview = false;
                 // Prepare views for visualization
