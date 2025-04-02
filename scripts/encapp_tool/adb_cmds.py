@@ -654,6 +654,7 @@ def push_file_to_device_android(
     assert ret, f"error: cannot split {filepath}"
     # 1.2. push all pieces one by one
     split_pieces = glob.glob(f"{prefix}*")
+    split_pieces.sort()
     counter = 1
     for split_piece in split_pieces:
         print(f"Push: {counter}/{len(split_pieces)}")
