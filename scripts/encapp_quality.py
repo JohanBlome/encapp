@@ -729,10 +729,10 @@ def run_quality(test_file, options, debug):
         else:
             print(f"psnr already calculated for media, {psnr_file}")
 
-        # if distorted != encodedfile:
-        #    os.remove(distorted)
-        # if referenced != reference_pathname:
-        #    os.remove(referenced)
+        if distorted != encodedfile:
+            os.remove(distorted)
+        if referenced != reference_pathname:
+            os.remove(referenced)
 
     if os.path.exists(vmaf_file):
         error_in_calc = False
