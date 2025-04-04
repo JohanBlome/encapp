@@ -38,7 +38,7 @@ PSNR_RE = re.compile(
 SSIM_RE = "SSIM Y:([0-9.]*)"
 FFMPEG_SILENT = "ffmpeg -hide_banner -y "
 
-VMAF_PERCENTILE_LIST = (5, 10, 25, 75, 90, 95)
+VMAF_PERCENTILE_LIST = (5, 10, 25, 50, 75, 90, 95)
 
 vmaf_models = ["vmaf_4k_v0.6.1", "vmaf_v0.6.1", "vmaf_v0.6.1neg"]
 VMAF_MODEL = vmaf_models[2]
@@ -55,6 +55,7 @@ def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
         print("Failed to read data")
         return None
+
     last_frame_index = np.argmax(pdata["pts"])
     total_duration = (
         pdata.iloc[last_frame_index]["pts"] + pdata.iloc[last_frame_index]["duration"]
@@ -113,7 +114,7 @@ def calc_stats(pdata, options, label, print_text=False):
         np.sum(pframes["size"]) + np.sum(bframes["size"])
     )
 
-    if options.get("quiet", None) is None:
+    if options.get("info", False):
         print(f"ime,imx,imi = {imean}, {imax}, {imin}")
         print(f"{len(pframes)}")
         print("*** {:s} stats ***".format(label))
@@ -182,7 +183,11 @@ def detailed_media_info(inputfile, options, debug):
     data = []
 
     name = inputfile + ".frames.csv"
-    if not os.path.exists(name):
+    df = pd.DataFrame()
+    if os.path.exists(name):
+        df = pd.read_csv(name)
+
+    if "pts" not in df.columns:
         """
         media_type=video
         stream_index=0
@@ -303,9 +308,6 @@ def detailed_media_info(inputfile, options, debug):
         df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
         df.to_csv(name)
-    else:
-        print("File exists read")
-        df = pd.read_csv(name)
     calc_stats(df, options, inputfile, True)
     if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
         os.remove(name)
@@ -333,6 +335,9 @@ def parse_quality_vmaf(vmaf_file):
             for percentile in VMAF_PERCENTILE_LIST
         }
     )
+    # Check for zero frames and frame count
+    vmaf_dict.update({"framecount: ": len(data["frames"])})
+    vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
     return vmaf_dict
 
 
@@ -372,10 +377,13 @@ def parse_quality_psnr(psnr_file):
 
 
 def run_quality_mp(args):
+    result = None
     try:
-        run_quality(args.get("test"), args.get("options"), args.get("debug"))
+        result = run_quality(args.get("test"), args.get("options"), args.get("debug"))
     except Exception as ex:
         print(f"Failed run test: {args=}, {ex}")
+        result = {"file": args.get("test"), "Error": f"Exception: {ex}"}
+    return result
 
 
 """
@@ -389,9 +397,11 @@ def run_quality(test_file, options, debug):
     found in options.media_path directory or overriden
     """
     global VMAF_MODEL
+    # Dictionary used for a failed run
+    failed = {"file": test_file}
     if not os.path.exists(test_file):
-        print("File not found: " + test_file)
-        return None
+        failed["error"] = "File not found"
+        return failed
 
     if debug > 0:
         print(options)
@@ -406,8 +416,9 @@ def run_quality(test_file, options, debug):
             return None
 
         if results.get("sourcefile") is None:
-            print(f"ERROR, bad source, {test_file}")
-            return None
+            print(f"ERROR, bad source, {test_file}, probably not an Encapp file")
+            failed["error"] = "Not an encapp file"
+            return failed
 
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
@@ -446,13 +457,16 @@ def run_quality(test_file, options, debug):
 
     if len(encodedfile) <= 0:
         print(f"No file: {encodedfile}")
-        return None
+        failed["error"] = f"No file: {encodedfile}"
+        return failed
+
     if len(directory) > 0:
         encodedfile = f"{directory}/{encodedfile}"
 
     if (len(encodedfile) == 0) or (not os.path.exists(encodedfile)):
         print(f"ERROR! Encoded file name is missing, {encodedfile}")
-        return None
+        failed["error"] = f"ERROR! Encoded file name is missing, {encodedfile}"
+        return failed
     vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
@@ -477,7 +491,10 @@ def run_quality(test_file, options, debug):
         and os.path.exists(psnr_file)
         and not recalc
     ):
-        print("All quality indicators already calculated for media, " f"{vmaf_file}")
+        if options.get("debug", False) > 0:
+            print(
+                "All quality indicators already calculated for media, " f"{vmaf_file}"
+            )
     else:
         input_media_format = results.get("decoder_media_format")
         raw = encapp_tool.ffutils.video_is_raw(reference_pathname)
@@ -604,7 +621,7 @@ def run_quality(test_file, options, debug):
             print(f"Distorted {distorted} is unavailable")
             return None
 
-        if debug:
+        if debug > 0:
             print(
                 f"** Run settings:\n {input_resolution}@{input_framerate} &  {output_resolution}@{output_framerate}"
             )
@@ -718,6 +735,7 @@ def run_quality(test_file, options, debug):
         #    os.remove(referenced)
 
     if os.path.exists(vmaf_file):
+        error_in_calc = False
         vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
@@ -792,7 +810,32 @@ def run_quality(test_file, options, debug):
         ffmpeg_data = detailed_media_info(encodedfile, options, debug=debug)
 
         # TODO: check result
-        framecount = len(ffmpeg_data)
+        ffmpeg_framecount = len(ffmpeg_data)
+        if framecount == 0:
+            print("Warning! did not get frame count from test. Get it from ffmpeg")
+            framecount = ffmpeg_framecount
+        if framecount != ffmpeg_framecount:
+            failed["warning"] = (
+                f"Warning! Frame count differs. Test: {framecount}, ffmpeg: {ffmpeg_framecount}"
+            )
+        # Check vmaf for zero vmaf and/or wrong number of frames
+        try:
+            if vmaf_dict["vmaf_zero"] == True:
+                error_in_calc = True
+                # raise Exception("Warning! Some frames are zero, most likely a broken calculation.")
+                print(
+                    "Warning! Some frames are zero, most likely a broken calculation."
+                )
+                failed["warning"] = (
+                    "Warning! Some frames are zero, most likely a broken calculation."
+                )
+
+            if vmaf_dict["framecount"] != framecount:
+                error_in_calc = True
+                print("Warning! Frame count diffes for vmaf and test")
+                failed["warning"] = "Warning! Frame count diffes for vmaf and test"
+        except Exception as ex:
+            pass
 
         iframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "I"]
         pframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "P"]
@@ -870,9 +913,16 @@ def run_quality(test_file, options, debug):
                 "source_motions": source_motion,
             }
         )
+        if "warning" in failed:
+            quality_dict["warning"] = failed["warning"]
+        else:
+            quality_dict["warning"] = ""
+
         return quality_dict
+    else:
+        failed["error"] = "No quality caclulated, probably error in encoded file"
     print("error: no vmaf data")
-    return None
+    return failed
 
 
 def get_options(argv):
@@ -1024,6 +1074,11 @@ def get_options(argv):
         default=1,
         help="Maximum number of parallel processes",
     )
+    parser.add_argument(
+        "--info",
+        action="store_true",
+        help="Extra informatiin",
+    )
 
     options = parser.parse_args()
 
@@ -1107,7 +1162,7 @@ def main(argv):
     current = 1
     total = len(options.test)
     print(f"Total number of tests: {total}")
-    df = None
+    values = []
     start = time.time()
 
     if options.max_parallel > 1:
@@ -1124,10 +1179,19 @@ def main(argv):
 
         # rerun to get complete csv, quality files are kept so it will just read the files and compile the dataset
 
-
+    failed = []
+    success = []
     for test in options.test:
         try:
             quality_dict = run_quality(test, vars(options), options.debug)
+            if "error" in quality_dict:
+                failed.append({"file": test, "error": quality_dict["error"]})
+            else:
+                if len(quality_dict["warning"]) > 0:
+                    success.append({"file": test, "warning": quality_dict["warning"]})
+                else:
+                    success.append({"file": test, "warning": "none"})
+
         except Exception as ex:
             print(f"{test} failed: {ex}")
             continue
@@ -1144,16 +1208,39 @@ def main(argv):
         if quality_dict is None:
             continue
 
-        if df is None:
-            df = pd.DataFrame(columns=quality_dict.keys())
-        df.loc[df.size] = quality_dict.values()
+        if "error" in quality_dict:
+            continue
+        values.append(quality_dict)
     # write data to csv file
+    df = pd.DataFrame(values)
     mode = "a"
     if options.header:
         mode = "w"
         mode = "w"
     if df is not None:
         df.to_csv(options.output, mode=mode, index=False, header=options.header)
+
+    # Summary
+    dfs = pd.DataFrame(success)
+    warn = pd.DataFrame()
+    if "warning" in dfs.columns:
+        warn = dfs.loc[dfs["warning"] != "none"]
+    summary = "\n***********************\n"
+    summary += f"Succesfully parsed :{len(success)}\n"
+    summary += f"number of warnings:{len(warn)}\n"
+    summary += f"Failed: {len(failed)}\n\n\n"
+
+    print(summary)
+    with open(f"{options.output}.summary.log", "w") as f:
+        f.write(summary)
+        f.write("Warnings:\n")
+        if len(warn) > 0:
+            f.write(warn.to_string(header=False, index=False))
+        else:
+            f.write("None\n")
+        f.write("\nErrors:\n")
+        for fail in failed:
+            f.write(f"{fail['file']} - {fail['error']}\n")
 
 
 if __name__ == "__main__":
