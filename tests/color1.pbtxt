@@ -1,0 +1,7 @@
+test {
+    configure {
+        color_range: full
+        color_standard: bt2020
+        color_transfer: hlg
+    }
+}

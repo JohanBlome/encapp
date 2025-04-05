@@ -1,0 +1,5 @@
+test {
+    common {
+        output_filename: "[input.filepath].default.transcode"
+    }
+}
