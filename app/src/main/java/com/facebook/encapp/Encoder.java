@@ -343,6 +343,7 @@ public abstract class Encoder {
             read = fileReader.fillBuffer(byteBuffer, size);
         }
         long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
+        mCurrentTimeSec =  ptsUsec / 1000000.0f;
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);
         // support for dropping frames

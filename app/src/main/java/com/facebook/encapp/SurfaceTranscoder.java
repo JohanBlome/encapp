@@ -386,7 +386,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     //Check time, if to far off drop frame, minimize the drops so something is show (when show is true)
                     long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                    //mCurrentTimeSec = diffUsec/1000000.0f;
+                    mCurrentTimeSec = diffUsec/1000000.0f;
                     if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder: " + (diffUsec - ptsUsec)/1000 + " ms"  );
@@ -406,7 +406,7 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                         mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                     }
                 } else {
-                    //mCurrentTimeSec = diffUsec/1000000.0f;
+                    mCurrentTimeSec = diffUsec/1000000.0f;
                     //info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
                     long diff =(diffUsec - timestamp);
                     if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
