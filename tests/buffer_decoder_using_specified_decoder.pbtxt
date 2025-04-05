@@ -1,0 +1,16 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.mp4"
+        device_decode: true
+    }
+    common {
+        id: "decoder_buffer"
+        description: "Verify decoder - sw decoder"
+    }
+    configure {
+        encode: false
+    }
+    decoder_configure {
+        codec: "OMX.google.h264.decoder"
+    }
+}
