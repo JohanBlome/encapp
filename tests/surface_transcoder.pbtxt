@@ -1,7 +1,7 @@
 test {
     input {
         filepath: "/tmp/akiyo_qcif.mp4"
-        device_decode: true,
+        device_decode: true
     }
     common {
         id: "bitrate_transcoder_surface"

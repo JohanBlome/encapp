@@ -1,7 +1,11 @@
 test {
     common {
-        id: "bitrate_buffer"
+        id: "bitrate_buffer_20sec"
         description: "Verify encoding bitrate - buffer"
+    }
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+        stoptime_sec: 20
     }
     configure {
         codec: "OMX.google.h264.encoder"
