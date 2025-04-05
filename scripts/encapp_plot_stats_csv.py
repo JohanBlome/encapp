@@ -23,6 +23,7 @@ def plotAverageBitrate(data, options):
     uniqbr = np.unique(data["bitrate"])
     uniqcodec = np.unique(data["codec"])
     uniqdescr = np.unique(data["description"])
+    uniqsplit = np.unique(data[options.split_field])
     for codec in uniqcodec:
         cfilt = data.loc[(data["codec"] == codec)]
         for descr in uniqdescr:
@@ -30,24 +31,48 @@ def plotAverageBitrate(data, options):
             for height in uniqheight:
                 hfilt = dfilt.loc[(dfilt["height"] == height)]
                 for br in uniqbr:
-                    filtered = hfilt.loc[hfilt["bitrate"] == br]
-                    if len(filtered) > 0:
-                        match = filtered.iloc[0]
-                        realbr = match["mean_bitrate"]
-                        if math.isinf(realbr):
-                            realbr = 0
-                        pair.append([br, int(realbr), codec, height, descr])
+                    brfilt = hfilt.loc[hfilt["bitrate"] == br]
+                    for spl in uniqsplit:
+                        filtered = brfilt.loc[brfilt[options.split_field] == spl]
+                        if len(filtered) > 0:
+                            match = filtered.iloc[0]
+                            realbr = match["mean_bitrate"]
+                            if math.isinf(realbr):
+                                realbr = 0
+                            pair.append(
+                                [
+                                    br,
+                                    int(realbr),
+                                    codec,
+                                    height,
+                                    descr,
+                                    options.split_field,
+                                ]
+                            )
 
     bitrates = pd.DataFrame(
-        pair, columns=["bitrate", "real_bitrate", "codec", "height", "description"]
+        pair,
+        columns=[
+            "bitrate",
+            "real_bitrate",
+            "codec",
+            "height",
+            "description",
+            options.split_field,
+        ],
     )
+
+    bitrates["kbps"] = bitrates["real_bitrate"] / 1000
+    bitrates["ratio"] = bitrates["real_bitrate"] / bitrates["bitrate"]
     fig = plt.subplots(nrows=1, dpi=100)
-    style = options.split_field
+    style = "height"
+    hue = options.split_field
+    print(bitrates)
     p = sns.lineplot(
-        x=bitrates["bitrate"] / 1000,
-        y=bitrates["real_bitrate"] / bitrates["bitrate"],
+        x="kbps",
+        y="ratio",
         style=style,
-        hue="height",
+        hue=hue,
         data=bitrates,
         marker="o",
     )
@@ -200,7 +225,7 @@ def plotLatency(data, options):
     # Show the mean, p50,90,99
     tmp = []
     text = ""
-    print("Small proc:",data.loc[data["proctime"] < 1] )
+    print("Small proc:", data.loc[data["proctime"] < 1])
     for item in data[hue].unique():
         itemdata = data.loc[data[hue] == item]
         average_lat_msec = round(itemdata["proctime"].mean() / 1e6, 2)
@@ -298,13 +323,13 @@ def plotFrameSize(data, options):
     if options.split_field and options.split_field in list(data.columns):
         data = data.sort_values(by=[options.split_field, "codec", "height"])
         u_test_description = np.unique(data[options.split_field].astype(str))
-        col_wrap = len(u_test_description)
+        col_wrap = 1  # len(u_test_description)
         fg = sns.relplot(
             x=data["pts"] / 1e6,
             y=data["size"] / 1000,
-            style="codec",
-            hue="frame type",
-            col=options.split_field,
+            col="codec",
+            style="frame type",
+            hue=options.split_field,
             col_wrap=col_wrap,
             data=data,
             kind="scatter",
@@ -362,18 +387,18 @@ def plotBitrate(data, options):
     fig = plt.figure()
     if options.rename_codec is None:
         data = data.sort_values(by=["description", "codec", "height", "bitrate"])
-        if options.split_Field and options.split_field in list(data.columns):
+        if options.split_field and options.split_field in list(data.columns):
             # maybe filter on models
             u_test_description = np.unique(data["description"].astype(str))
-            col_wrap = len(u_test_description)
+            col_wrap = 1  # len(u_test_description)
             counter = 0
 
             fg = sns.relplot(
                 x=data["pts"] / 1e6,
                 y="Average kbps",
-                hue="codec",
+                col="codec",
                 style="model",
-                col=options.split_field,
+                hue=options.split_field,
                 col_wrap=col_wrap,
                 kind="line",
                 data=data,
@@ -497,9 +522,12 @@ def plot_named_timestamps(data, enc_dec_data, options):
     extra = []
     for source in data["source"].unique():
         print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
-        print(f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}")
-        proctime = enc_dec_data.loc[
-            (enc_dec_data["source"] == source)]["proctime"].values[0]
+        print(
+            f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}"
+        )
+        proctime = enc_dec_data.loc[(enc_dec_data["source"] == source)][
+            "proctime"
+        ].values[0]
         original_media = enc_dec_data.loc[enc_dec_data["source"] == source][
             "original_media"
         ].values[0]
