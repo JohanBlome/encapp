@@ -21,6 +21,8 @@ import vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
+import datetime
+import tempfile
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -49,6 +51,9 @@ KEEP_QUALITY_FILES_ENV = os.environ.get("ENCAPP_KEEP_QUALITY_FILES", False) in [
     "1",
     True,
 ]
+
+# until proven not be around
+CVVDP_AVAILABLE = True
 
 
 def calc_stats(pdata, options, label, print_text=False):
@@ -308,6 +313,8 @@ def detailed_media_info(inputfile, options, debug):
         df = pd.DataFrame.from_records(data, columns=labels, coerce_float=True)
         # overwrite with derived data
         df.to_csv(name)
+    else:
+        df = pd.read_csv(name)
     calc_stats(df, options, inputfile, True)
     if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
         os.remove(name)
@@ -376,6 +383,18 @@ def parse_quality_psnr(psnr_file):
     return psnr, psnr_y, psnr_u, psnr_v
 
 
+def parse_quality_cvvdp(cvvdp_csv_file):
+    # test, reference, cvvdp
+    # jcq_hdr8/hdr8.jcq.0e56c5c3-9dd2-4ce8-af3f-5c7fc87a9b4f.video_0.gop-5.20000000bps.mp4, /tmp/encapp.jod.haawxdc_.y4m, 9.574105262756348
+    try:
+        data = pd.read_csv(cvvdp_csv_file)
+        data.columns = data.columns.str.strip()
+        return data["cvvdp"].values[0]
+    except Exception as ex:
+        print(f"Failed to read cvvdp file: {cvvdp_csv_file}, {ex}")
+    return -1
+
+
 def run_quality_mp(args):
     result = None
     try:
@@ -397,6 +416,7 @@ def run_quality(test_file, options, debug):
     found in options.media_path directory or overriden
     """
     global VMAF_MODEL
+    global CVVDP_AVAILABLE
     # Dictionary used for a failed run
     failed = {"file": test_file}
     if not os.path.exists(test_file):
@@ -464,12 +484,13 @@ def run_quality(test_file, options, debug):
         encodedfile = f"{directory}/{encodedfile}"
 
     if (len(encodedfile) == 0) or (not os.path.exists(encodedfile)):
-        print(f"ERROR! Encoded file name is missing, {encodedfile}")
         failed["error"] = f"ERROR! Encoded file name is missing, {encodedfile}"
         return failed
+
     vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
+    cvvdp_file = f"{encodedfile}.cvvdp.csv"
 
     video_info = None
     try:
@@ -489,12 +510,11 @@ def run_quality(test_file, options, debug):
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
+        and os.path.exists(cvvdp_file)
         and not recalc
     ):
         if options.get("debug", False) > 0:
-            print(
-                "All quality indicators already calculated for media, " f"{vmaf_file}"
-            )
+            print(f"All quality indicators already calculated for media, {vmaf_file}")
     else:
         input_media_format = results.get("decoder_media_format")
         raw = encapp_tool.ffutils.video_is_raw(reference_pathname)
@@ -557,11 +577,11 @@ def run_quality(test_file, options, debug):
 
         output_resolution = f"{output_width}x{output_height}"
         if video_info is not None:
-            media_res = f'{video_info["width"]}x{video_info["height"]}'
+            media_res = f"{video_info['width']}x{video_info['height']}"
             # Although we assume that the distorted file is starting at the beginning
             # at least we limit the length to the duration of it.
             # TODO: shortest file wins :)
-            duration = f'{video_info["duration"]}'
+            duration = f"{video_info['duration']}"
         else:
             media_res = None
         if options.get("limit_length", -1) > 0:
@@ -584,8 +604,8 @@ def run_quality(test_file, options, debug):
             except BaseException:
                 print("Warning. Input size is wrong.")
                 print(
-                    f'json {input_media_format.get("width")}x'
-                    f'{input_media_format.get("height")}'
+                    f"json {input_media_format.get('width')}x"
+                    f"{input_media_format.get('height')}"
                 )
                 input_resolution = output_resolution
             else:
@@ -729,6 +749,29 @@ def run_quality(test_file, options, debug):
         else:
             print(f"psnr already calculated for media, {psnr_file}")
 
+        if recalc or not os.path.exists(cvvdp_file) and CVVDP_AVAILABLE:
+            # No way to tell cvvdp raw file settings. Convert to y4m.
+            with tempfile.NamedTemporaryFile(
+                suffix=".y4m", prefix="encapp.jod."
+            ) as y4mfile:
+                y4m = y4mfile.name
+                shell_cmd = f"ffmpeg -y {ref_part} -t {duration} -pix_fmt yuv420p {y4m}"
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                shell_cmd = (
+                    f"cvvdp --test {distorted} --ref {y4m} "
+                    f" --config-paths=/home/jblome/code/ColorVideoVDP/pycvvdp/vvdp_data/display_models.json --display standard_hdr_hlg "
+                    f"--result {cvvdp_file}"
+                )
+
+                ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                if stderr:
+                    print(f"Failed to run cvvdp: {stderr}")
+                    if "command not found" in stderr:
+                        print("** ColorVideoVDP needs to be installed! **\n\n")
+                        CVVDP_AVAILABLE = False
+        else:
+            print(f"cvvdp already calculated for media, {psnr_file}")
+
         if distorted != encodedfile:
             os.remove(distorted)
         if referenced != reference_pathname:
@@ -739,6 +782,7 @@ def run_quality(test_file, options, debug):
         vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
+        cvvdp = parse_quality_cvvdp(cvvdp_file)
 
         if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
@@ -747,6 +791,7 @@ def run_quality(test_file, options, debug):
             os.remove(vmaf_file)
             os.remove(ssim_file)
             os.remove(psnr_file)
+            os.remove(cvvdp_file)
             os.remove(psnr_file + ".all")
             os.remove(ssim_file + ".all")
 
@@ -778,7 +823,7 @@ def run_quality(test_file, options, debug):
                 resolution = test.get("input").get("resolution")
             if not resolution:
                 # get res from file
-                resolution = f'{video_info["width"]}x{video_info["height"]}'
+                resolution = f"{video_info['width']}x{video_info['height']}"
             framerate = test.get("configure").get("framerate")
             if not framerate:
                 framerate = test.get("input").get("framerate")
@@ -801,7 +846,7 @@ def run_quality(test_file, options, debug):
                         continue
         else:
             framerate = video_info["framerate"]
-            resolution = f'{video_info["width"]}x{video_info["height"]}'
+            resolution = f"{video_info['width']}x{video_info['height']}"
             codec = video_info["codec-name"]
 
         if reference_info:
@@ -907,6 +952,7 @@ def run_quality(test_file, options, debug):
                 "psnr_y": f"{psnr_y}",
                 "psnr_u": f"{psnr_u}",
                 "psnr_v": f"{psnr_v}",
+                "cvvdp": cvvdp,
                 "testfile": f"{test_file}",
                 "reference_file": f"{filepath}",
                 "source_complexity": source_complexity,
@@ -959,9 +1005,7 @@ def get_options(argv):
     parser.add_argument(
         "-ref",
         "--override_reference",
-        help=(
-            "Override reference, used when source is downsampled prior to " "encoding"
-        ),
+        help=("Override reference, used when source is downsampled prior to encoding"),
         default=None,
     )
     parser.add_argument(
@@ -1088,12 +1132,12 @@ def get_options(argv):
 
     if options.media_path is not None:
         # make sure media_path holds a valid directory
-        assert os.path.isdir(
-            options.media_path
-        ), f"Error: {options.media_path} not a valid directory"
-        assert os.access(
-            options.media_path, os.R_OK
-        ), f"Error: {options.media_path} not a readable directory"
+        assert os.path.isdir(options.media_path), (
+            f"Error: {options.media_path} not a valid directory"
+        )
+        assert os.access(options.media_path, os.R_OK), (
+            f"Error: {options.media_path} not a readable directory"
+        )
 
     return options
 
@@ -1155,6 +1199,7 @@ def main(argv):
     a csv with relevant data
     """
     global VMAF_MODEL
+    global CVVDP_AVAILABLE
     options = get_options(argv)
     VMAF_MODEL = options.vmaf_model
 
@@ -1241,6 +1286,9 @@ def main(argv):
         f.write("\nErrors:\n")
         for fail in failed:
             f.write(f"{fail['file']} - {fail['error']}\n")
+
+    if not CVVDP_AVAILABLE:
+        print("** ColorVideoVDP needs to be installed! **\n\n")
 
 
 if __name__ == "__main__":
