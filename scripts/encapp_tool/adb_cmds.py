@@ -667,6 +667,8 @@ def push_file_to_device_android(
             for piece in split_pieces:
                 os.remove(piece)
             return ret
+        # remove local split file
+        os.remove(split_piece)
         counter += 1
         time.sleep(1)
 
