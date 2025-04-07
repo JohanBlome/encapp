@@ -21,6 +21,8 @@ import vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
+import datetime
+import tempfile
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -371,6 +373,14 @@ def parse_quality_psnr(psnr_file):
     return psnr, psnr_y, psnr_u, psnr_v
 
 
+def parse_quality_cvvdp(cvvdp_csv_file):
+    # test, reference, cvvdp
+    # jcq_hdr8/hdr8.jcq.0e56c5c3-9dd2-4ce8-af3f-5c7fc87a9b4f.video_0.gop-5.20000000bps.mp4, /tmp/encapp.jod.haawxdc_.y4m, 9.574105262756348
+
+    data = pd.read_csv(cvvdp_csv_file)
+    return data["cvvdp"]
+
+
 def run_quality_mp(args):
     try:
         run_quality(args.get("test"), args.get("options"), args.get("debug"))
@@ -456,6 +466,7 @@ def run_quality(test_file, options, debug):
     vmaf_file = f"{encodedfile}.vmaf.json"
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
+    cvvdp_file = f"{encodedfile}.cvvdp.csv"
 
     video_info = None
     try:
@@ -475,6 +486,7 @@ def run_quality(test_file, options, debug):
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
+        and os.path.exists(cvvdp_file)
         and not recalc
     ):
         print("All quality indicators already calculated for media, " f"{vmaf_file}")
@@ -712,6 +724,37 @@ def run_quality(test_file, options, debug):
         else:
             print(f"psnr already calculated for media, {psnr_file}")
 
+        if recalc or not os.path.exists(cvvdp_file):
+            # No way to tell cvvdp raw file settings. Convert to y4m.
+            y4mfile = tempfile.NamedTemporaryFile(suffix=".y4m", prefix="encapp.jod.")
+            print(f"-- missing: {cvvdp_file}")
+            exit(0)
+            y4m = y4mfile.name
+            shell_cmd = f"ffmpeg -y {ref_part} -t {duration} -pix_fmt yuv420p {y4m}"
+            print(shell_cmd)
+            t1 = datetime.datetime.now()
+            print("Decode.")
+            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            t2 = datetime.datetime.now()
+            print(f"Decode took: {t2-t1}")
+            shell_cmd = (
+                f"cvvdp --test {distorted} --ref {y4m} "
+                f" --config-paths=/home/jblome/code/ColorVideoVDP/pycvvdp/vvdp_data/display_models.json --display standard_hdr_hlg "
+                f"--result {cvvdp_file}"
+            )
+            print(shell_cmd)
+
+            ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            print(f"{ret=} - {std=} - {stderr=}")
+            if stderr:
+                print(f"Failed to run cvvdp: {stderr}")
+
+            t3 = datetime.datetime.now()
+            print(f"ColoVideoVDP took: {t3-t2}")
+            os.remove(y4mfile)
+        else:
+            print(f"cvvdp already calculated for media, {psnr_file}")
+
         # if distorted != encodedfile:
         #    os.remove(distorted)
         # if referenced != reference_pathname:
@@ -721,6 +764,7 @@ def run_quality(test_file, options, debug):
         vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
+        cvvdp = parse_quality_cvvdp(cvvdp_file)
 
         if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
@@ -868,6 +912,7 @@ def run_quality(test_file, options, debug):
                 "reference_file": f"{filepath}",
                 "source_complexity": source_complexity,
                 "source_motions": source_motion,
+                "cvvdp": cvvdp,
             }
         )
         return quality_dict
@@ -1123,7 +1168,6 @@ def main(argv):
             results = p.map(run_quality_mp, mpargs, chunksize=1)
 
         # rerun to get complete csv, quality files are kept so it will just read the files and compile the dataset
-
 
     for test in options.test:
         try:
