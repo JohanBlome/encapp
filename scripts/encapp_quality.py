@@ -804,7 +804,7 @@ def run_quality(test_file, options, debug):
                         print("** ColorVideoVDP needs to be installed! **\n\n")
                         CVVDP_AVAILABLE = False
         else:
-            print(f"cvvdp already calculated for media, {psnr_file}")
+            print(f"cvvdp already calculated for media, {cvvdp_file}")
 
         if (
             recalc
