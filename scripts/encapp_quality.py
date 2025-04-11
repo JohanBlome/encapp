@@ -802,10 +802,17 @@ def run_quality(test_file, options, debug):
 
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 if stderr:
-                    print(f"Failed to run cvvdp: {stderr}")
-                    if "command not found" in stderr:
-                        print("** ColorVideoVDP needs to be installed! **\n\n")
-                        CVVDP_AVAILABLE = False
+                    # cvvdp is printing to std err
+                    if not ret:
+                        print(f"Failed to run cvvdp: {stderr}")
+                        if "command not found" in stderr:
+                            print("** ColorVideoVDP needs to be installed! **\n\n")
+                            CVVDP_AVAILABLE = False
+                    else:
+                        # collect info and write that to a txt file
+                        if not os.path.isfile("cvvdp.settings.txt"):
+                            with open("cvvdp.settings.txt", "w") as ifile:
+                                ifile.write(stderr)
         elif options.get("debug", False) > 0:
             print(f"cvvdp already calculated for media, {cvvdp_file}")
 
