@@ -54,6 +54,7 @@ KEEP_QUALITY_FILES_ENV = os.environ.get("ENCAPP_KEEP_QUALITY_FILES", False) in [
 
 # until proven not be around
 CVVDP_AVAILABLE = True
+QPEXTRACT_AVAILABLE = True
 
 
 def calc_stats(pdata, options, label, print_text=False):
@@ -395,6 +396,36 @@ def parse_quality_cvvdp(cvvdp_csv_file):
     return -1
 
 
+def parse_quality_qpextract(qpextract_single_file):
+    try:
+        df = pd.read_csv(qpextract_single_file)
+        return (
+            df["qpy_min"].values[0],
+            df["qpy_max"].values[0],
+            df["qpy_avg"].values[0],
+            df["qpu_min"].values[0],
+            df["qpu_max"].values[0],
+            df["qpu_avg"].values[0],
+            df["qpv_min"].values[0],
+            df["qpv_max"].values[0],
+            df["qpv_avg"].values[0],
+        )
+    # , qpy_min, qpy_max, qpu_avg, qpu_min, qpu_max, qpv_avg, qpv_min,  qpv_max = parse_qpextract(qpextract_file)
+    except Exception as ex:
+        print(f"Failed to parse qpvals file: {qpextract_single_file}, {ex}")
+    return (
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+    )
+
+
 def run_quality_mp(args):
     result = None
     try:
@@ -417,6 +448,7 @@ def run_quality(test_file, options, debug):
     """
     global VMAF_MODEL
     global CVVDP_AVAILABLE
+    global QPEXTRACT_AVAILABLE
     # Dictionary used for a failed run
     failed = {"file": test_file}
     if not os.path.exists(test_file):
@@ -491,6 +523,7 @@ def run_quality(test_file, options, debug):
     ssim_file = f"{encodedfile}.ssim"
     psnr_file = f"{encodedfile}.psnr"
     cvvdp_file = f"{encodedfile}.cvvdp.csv"
+    qpextract_file = f"{encodedfile}.qpvals.csv"
 
     video_info = None
     try:
@@ -511,6 +544,7 @@ def run_quality(test_file, options, debug):
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
         and os.path.exists(cvvdp_file)
+        and os.path.exists(qpextract_file)
         and not recalc
     ):
         if options.get("debug", False) > 0:
@@ -772,6 +806,65 @@ def run_quality(test_file, options, debug):
         else:
             print(f"cvvdp already calculated for media, {psnr_file}")
 
+        if (
+            recalc
+            or not os.path.exists(qpextract_file)
+            and QPEXTRACT_AVAILABLE
+            and video_info["codec-name"].lower() == "hevc"
+        ):
+            # Need a .265 (and also on hevc)
+            with tempfile.NamedTemporaryFile(
+                suffix=".265", prefix="encapp.qp."
+            ) as mediafile:
+                media = mediafile.name
+                shell_cmd = f"ffmpeg -y -i {distorted} -t {duration} -vcodec copy -bsf hevc_mp4toannexb {media}"
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                shell_cmd = (
+                    f"qpextract -i {media} --dump  --qpymode -o {qpextract_file}_y"
+                )
+
+                ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                if stderr:
+                    print(f"Failed to run cvvdp: {stderr}")
+                    if "command not found" in stderr:
+                        print("** qpextract needs to be installed! **\n\n")
+                        QPEXTRACT_AVAILABLE = False
+
+                shell_cmd = (
+                    f"qpextract -i {media} --dump  --qpcbmode -o {qpextract_file}_cb"
+                )
+
+                ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                shell_cmd = (
+                    f"qpextract -i {media} --dump  --qpcrmode -o {qpextract_file}_cr"
+                )
+
+                ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                qpydata = pd.read_csv(f"{qpextract_file}_y")
+                qpcbdata = pd.read_csv(f"{qpextract_file}_cb")
+                qpcrdata = pd.read_csv(f"{qpextract_file}_cr")
+
+                vals = {
+                    "source": distorted,
+                    "qpy_avg": qpydata["qp_avg"].mean(),
+                    "qpy_min": qpydata["qp_min"].min(),
+                    "qpy_max": qpydata["qp_max"].max(),
+                    "qpu_avg": qpcbdata["qp_avg"].mean(),
+                    "qpu_min": qpcbdata["qp_min"].min(),
+                    "qpu_max": qpcbdata["qp_max"].max(),
+                    "qpv_avg": qpcbdata["qp_avg"].mean(),
+                    "qpv_min": qpcbdata["qp_min"].min(),
+                    "qpv_max": qpcbdata["qp_max"].max(),
+                }
+
+                df = pd.DataFrame([vals])
+                df.to_csv(qpextract_file, index=False, header=True)
+                os.remove(f"{qpextract_file}_y")
+                os.remove(f"{qpextract_file}_cb")
+                os.remove(f"{qpextract_file}_cr")
+        else:
+            print(f"qpextract already calculated for media, {qpextract_file}")
+
         if distorted != encodedfile:
             os.remove(distorted)
         if referenced != reference_pathname:
@@ -783,6 +876,17 @@ def run_quality(test_file, options, debug):
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
         cvvdp = parse_quality_cvvdp(cvvdp_file)
+        (
+            qpy_min,
+            qpy_max,
+            qpy_avg,
+            qpu_min,
+            qpu_max,
+            qpu_avg,
+            qpv_min,
+            qpv_max,
+            qpv_avg,
+        ) = parse_quality_qpextract(qpextract_file)
 
         if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
@@ -953,6 +1057,15 @@ def run_quality(test_file, options, debug):
                 "psnr_u": f"{psnr_u}",
                 "psnr_v": f"{psnr_v}",
                 "cvvdp": cvvdp,
+                "qpy_min": qpy_min,
+                "qpy_max": qpy_max,
+                "qpy_avg": qpy_avg,
+                "qpu_min": qpu_min,
+                "qpu_max": qpu_max,
+                "qpu_avg": qpu_avg,
+                "qpv_min": qpv_min,
+                "qpv_max": qpv_max,
+                "qpv_avg": qpv_avg,
                 "testfile": f"{test_file}",
                 "reference_file": f"{filepath}",
                 "source_complexity": source_complexity,
@@ -1289,6 +1402,9 @@ def main(argv):
 
     if not CVVDP_AVAILABLE:
         print("** ColorVideoVDP needs to be installed! **\n\n")
+
+    if not QPEXTRACT_AVAILABLE:
+        print("** qpextract needs to be installed! **\n\n")
 
 
 if __name__ == "__main__":
