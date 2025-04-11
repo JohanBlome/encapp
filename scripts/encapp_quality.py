@@ -1234,7 +1234,7 @@ def get_options(argv):
     parser.add_argument(
         "--info",
         action="store_true",
-        help="Extra informatiin",
+        help="Extra information",
     )
 
     options = parser.parse_args()
