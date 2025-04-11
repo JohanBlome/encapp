@@ -449,6 +449,7 @@ def run_quality(test_file, options, debug):
     global VMAF_MODEL
     global CVVDP_AVAILABLE
     global QPEXTRACT_AVAILABLE
+
     # Dictionary used for a failed run
     failed = {"file": test_file}
     if not os.path.exists(test_file):
@@ -758,7 +759,7 @@ def run_quality(test_file, options, debug):
             shell_cmd += f":model={model}"
             shell_cmd += '" -f null - 2>&1'
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-        else:
+        elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
 
         if recalc or not os.path.exists(ssim_file):
@@ -769,7 +770,7 @@ def run_quality(test_file, options, debug):
                 f"-f null - 2>&1 | grep SSIM > {ssim_file}"
             )
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-        else:
+        elif options.get("debug", False) > 0:
             print(f"ssim already calculated for media, {ssim_file}")
 
         if recalc or not os.path.exists(psnr_file):
@@ -780,10 +781,12 @@ def run_quality(test_file, options, debug):
                 f"-f null - 2>&1 | grep PSNR > {psnr_file}"
             )
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-        else:
+        elif options.get("debug", False) > 0:
             print(f"psnr already calculated for media, {psnr_file}")
 
-        if recalc or not os.path.exists(cvvdp_file) and CVVDP_AVAILABLE:
+        if options.get("cvvdp", False) and (
+            recalc or not os.path.exists(cvvdp_file) and CVVDP_AVAILABLE
+        ):
             # No way to tell cvvdp raw file settings. Convert to y4m.
             with tempfile.NamedTemporaryFile(
                 suffix=".y4m", prefix="encapp.jod."
@@ -803,10 +806,10 @@ def run_quality(test_file, options, debug):
                     if "command not found" in stderr:
                         print("** ColorVideoVDP needs to be installed! **\n\n")
                         CVVDP_AVAILABLE = False
-        else:
+        elif options.get("debug", False) > 0:
             print(f"cvvdp already calculated for media, {cvvdp_file}")
 
-        if (
+        if options.get("qpextract", False) and (
             recalc
             or not os.path.exists(qpextract_file)
             and QPEXTRACT_AVAILABLE
@@ -862,7 +865,7 @@ def run_quality(test_file, options, debug):
                 os.remove(f"{qpextract_file}_y")
                 os.remove(f"{qpextract_file}_cb")
                 os.remove(f"{qpextract_file}_cr")
-        else:
+        elif options.get("debug", False) > 0:
             print(f"qpextract already calculated for media, {qpextract_file}")
 
         if distorted != encodedfile:
@@ -1235,6 +1238,16 @@ def get_options(argv):
         "--info",
         action="store_true",
         help="Extra information",
+    )
+    parser.add_argument(
+        "--cvvdp",
+        action="store_true",
+        help="Calculate ColoVideoVdp value",
+    )
+    parser.add_argument(
+        "--qpextract",
+        action="store_true",
+        help="Calculate qp distribution",
     )
 
     options = parser.parse_args()
