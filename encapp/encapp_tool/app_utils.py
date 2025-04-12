@@ -2,8 +2,8 @@
 
 import os
 
-import encapp_tool
-import encapp_tool._version
+import encapp.encapp_tool
+import encapp.encapp_tool._version
 
 APPNAME_MAIN = "com.facebook.encapp"
 ACTIVITY = f"{APPNAME_MAIN}/.MainActivity"
@@ -14,7 +14,7 @@ SCRIPT_DIR = os.path.abspath(os.path.join(MODULE_PATH, os.pardir))
 RELEASE_APK_DIR = os.path.abspath(
     os.path.join(SCRIPT_DIR, os.pardir, "app", "releases")
 )
-APK_NAME_MAIN = f"{APPNAME_MAIN}-v{encapp_tool._version.__version__}-debug.apk"
+APK_NAME_MAIN = f"{APPNAME_MAIN}-v{encapp.encapp_tool._version.__version__}-debug.apk"
 APK_MAIN = os.path.join(RELEASE_APK_DIR, APK_NAME_MAIN)
 
 

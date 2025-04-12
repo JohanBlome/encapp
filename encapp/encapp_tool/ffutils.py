@@ -4,7 +4,7 @@
 
 import os
 
-import encapp_tool
+import encapp.encapp_tool as encapp_tool
 
 RAW_EXTENSION_LIST = (".yuv", ".rgb", ".rgba", ".raw")
 FFPROBE_FIELDS = {

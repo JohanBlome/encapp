@@ -22,21 +22,21 @@ from google.protobuf import text_format
 import google.protobuf.descriptor_pool as descriptor_pool
 import multiprocessing
 
-import encapp_tool
-import encapp_tool.app_utils
-import encapp_tool.adb_cmds
-import encapp_tool.ffutils
-import encapp_quality
+import encapp.encapp_tool as encapp_tool
+import encapp.encapp_tool.app_utils
+import encapp.encapp_tool.adb_cmds
+import encapp.encapp_tool.ffutils
+import encapp.encapp_quality
 import copy
 import random
 import pandas as pd
 import pprint
 
 SCRIPT_ROOT_DIR = os.path.abspath(
-    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
+    os.path.join(encapp.encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
 )
 SCRIPT_PROTO_DIR = os.path.abspath(
-    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+    os.path.join(encapp.encapp_tool.app_utils.SCRIPT_DIR, "proto")
 )
 sys.path.append(SCRIPT_ROOT_DIR)
 sys.path.append(SCRIPT_PROTO_DIR)
@@ -2778,8 +2778,8 @@ def merge_options(option1, options2):
     return option1
 
 
-def main(argv):
-    options = get_options(argv)
+def main():
+    options = get_options(sys.argv)
     # check if this is a test run and if these params are defined in the test
 
     proto_options = None
@@ -2984,7 +2984,7 @@ def main(argv):
 
 if __name__ == "__main__":
     try:
-        main(sys.argv)
+        main()
     except AssertionError as ae:
         print(ae, file=sys.stderr)
         if DEBUG:

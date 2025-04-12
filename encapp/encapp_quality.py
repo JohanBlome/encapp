@@ -14,10 +14,11 @@ import re
 import time
 import pandas as pd
 import numpy as np
-import encapp_tool.adb_cmds
-import encapp_tool.ffutils
-import encapp
-import vmaf_json2csv as vmafcsv
+import encapp.encapp_tool as encapp_tool
+import encapp.encapp_tool.adb_cmds
+import encapp.encapp_tool.ffutils as ffutils
+import encapp.encapp as encapp
+import encapp.vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
@@ -25,10 +26,10 @@ import datetime
 import tempfile
 
 SCRIPT_ROOT_DIR = os.path.abspath(
-    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
+    os.path.join(encapp.encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
 )
 SCRIPT_PROTO_DIR = os.path.abspath(
-    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
+    os.path.join(encapp.encapp_tool.app_utils.SCRIPT_DIR, "proto")
 )
 sys.path.append(SCRIPT_ROOT_DIR)
 sys.path.append(SCRIPT_PROTO_DIR)
@@ -528,9 +529,9 @@ def run_quality(test_file, options, debug):
 
     video_info = None
     try:
-        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
-    except:
-        print("Failed to parse with ffprobe")
+        video_info = ffutils.get_video_info(encodedfile, debug)
+    except Exception as ex:
+        print(f"Failed to parse with ffprobe: {encodedfile}, {ex}")
         video_info = None
 
     recalc = options.get("recalc", None)
@@ -1327,13 +1328,13 @@ def calculate_quality(tests, source_path, output, quiet, debug):
     df.to_csv(output, mode=mode, index=False, header=True)
 
 
-def main(argv):
+def main():
     """Calculate video quality properties (vmaf/ssim/psnr) and write
     a csv with relevant data
     """
     global VMAF_MODEL
     global CVVDP_AVAILABLE
-    options = get_options(argv)
+    options = get_options(sys.argv)
     VMAF_MODEL = options.vmaf_model
 
     # run all the tests
@@ -1428,4 +1429,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
