@@ -1,4 +1,4 @@
-python_path=../scripts/proto/
+python_path=../encapp/proto/
 swift_path=../ios/Encapp/
 # java will be generated when building with gradle
 all: tests.proto

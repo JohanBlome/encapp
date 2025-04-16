@@ -184,7 +184,7 @@ For a raw input both input and output resolution and fps needs to be specified e
 
 ## 4. System/Unit testing
 All current tests can be run with:
-python3 -m pytest PATH_TO_REPO/encapp/scripts/tests/
+python3 -m pytest PATH_TO_REPO/encapp/encapp/tests/
 
 * The unit tests can be run without a device connected.
 * The system tests require a device connected. To pass all tests there needs to be a h264 encodera and decoder. It also needs to have surface textures available.
