@@ -1102,7 +1102,7 @@ def run_quality(test_file, options, debug):
             }
         )
         if "warning" in failed:
-            quality_dict["warning"] = failed["warning"]
+            quality_dict["warning"] = f"\"{failed['warning']}\""
         else:
             quality_dict["warning"] = ""
 
