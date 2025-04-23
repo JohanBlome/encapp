@@ -766,7 +766,9 @@ def run_quality(test_file, options, debug):
             # write a settings file
             if not os.path.exists(f"{directory}/vmafmodel.txt"):
                 with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
-                    modelfile.write(f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n")
+                    modelfile.write(
+                        f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
+                    )
             vmaf_model_info = model
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
             # Open json and add the info
@@ -776,8 +778,8 @@ def run_quality(test_file, options, debug):
             with open(vmaf_file, "w") as fd:
                 paths = model.split("/")
                 vmafdata["model"] = paths[-1]
-                vmafdata["path"] = model if len(paths) > 1 else "";
-                json.dump(vmafdata, fd, indent = 4)
+                vmafdata["path"] = model if len(paths) > 1 else ""
+                json.dump(vmafdata, fd, indent=4)
         elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
 
@@ -1102,7 +1104,7 @@ def run_quality(test_file, options, debug):
             }
         )
         if "warning" in failed:
-            quality_dict["warning"] = f"\"{failed['warning']}\""
+            quality_dict["warning"] = f'"{failed["warning"]}"'
         else:
             quality_dict["warning"] = ""
 
