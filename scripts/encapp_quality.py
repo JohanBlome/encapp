@@ -343,6 +343,8 @@ def parse_quality_vmaf(vmaf_file):
             for percentile in VMAF_PERCENTILE_LIST
         }
     )
+    if "model" in data:
+        vmaf_dict["model"] = data["model"]
     # Check for zero frames and frame count
     vmaf_dict.update({"framecount: ": len(data["frames"])})
     vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
@@ -525,6 +527,7 @@ def run_quality(test_file, options, debug):
     psnr_file = f"{encodedfile}.psnr"
     cvvdp_file = f"{encodedfile}.cvvdp.csv"
     qpextract_file = f"{encodedfile}.qpvals.csv"
+    vmaf_model_info = None
 
     video_info = None
     try:
@@ -758,7 +761,23 @@ def run_quality(test_file, options, debug):
                 model = f"'version={VMAF_MODEL}'"
             shell_cmd += f":model={model}"
             shell_cmd += '" -f null - 2>&1'
+            print(shell_cmd)
+            print(f"Write to {directory}")
+            # write a settings file
+            if not os.path.exists(f"{directory}/vmafmodel.txt"):
+                with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
+                    modelfile.write(f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n")
+            vmaf_model_info = model
             encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            # Open json and add the info
+            vmafdata = None
+            with open(vmaf_file, "r") as fd:
+                vmafdata = json.load(fd)
+            with open(vmaf_file, "w") as fd:
+                paths = model.split("/")
+                vmafdata["model"] = paths[-1]
+                vmafdata["path"] = model if len(paths) > 1 else "";
+                json.dump(vmafdata, fd, indent = 4)
         elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
 
