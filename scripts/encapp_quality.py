@@ -398,6 +398,16 @@ def parse_quality_cvvdp(cvvdp_csv_file):
     return -1
 
 
+def parse_quality_siti(csv_file):
+    try:
+        data = pd.read_csv(csv_file)
+        data.columns = data.columns.str.strip()
+        return data.values[0]
+    except Exception as ex:
+        print(f"Failed to read siti file: {csv_file}, {ex}")
+    return [-1] * 6
+
+
 def parse_quality_qpextract(qpextract_single_file):
     try:
         df = pd.read_csv(qpextract_single_file)
@@ -527,6 +537,8 @@ def run_quality(test_file, options, debug):
     psnr_file = f"{encodedfile}.psnr"
     cvvdp_file = f"{encodedfile}.cvvdp.csv"
     qpextract_file = f"{encodedfile}.qpvals.csv"
+    siti_file = f"{reference_pathname}.siti.csv"
+
     vmaf_model_info = None
 
     video_info = None
@@ -549,6 +561,7 @@ def run_quality(test_file, options, debug):
         and os.path.exists(psnr_file)
         and os.path.exists(cvvdp_file)
         and os.path.exists(qpextract_file)
+        and os.path.exists(siti_file)
         and not recalc
     ):
         if options.get("debug", False) > 0:
@@ -896,6 +909,74 @@ def run_quality(test_file, options, debug):
         elif options.get("debug", False) > 0:
             print(f"qpextract already calculated for media, {qpextract_file}")
 
+        if options.get("siti", False) and not os.path.exists(siti_file):
+            # If trunnign multi proc there wil be double work - but not that much
+            with tempfile.NamedTemporaryFile(
+                suffix=".txt", prefix="encapp.siti."
+            ) as tfo:
+                tf = tfo.name
+                shell_cmd = (
+                    f"ffmpeg  {ref_part} -t 1 "  # {duration} "
+                    "-filter_complex "
+                    f'"siti=print_summary=1 " '
+                    f"-f null - &> {tf}"
+                )
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=1)
+                # Parse the text and create a csv
+                with open(tf, "r") as fd:
+                    """
+                    Spatial Information:
+                    Average: 73.351112
+                    Max: 93.298119
+                    Min: 38.185577
+
+                    Temporal Information:
+                    Average: 41.029724
+                    Max: 56.454857
+                    """
+                    data = {}
+                    spatial = True
+                    lines = fd.readlines()
+                    for line in lines:
+                        line = line.lower()
+                        if "spatial" in line:
+                            spatial = True
+                            continue
+                        if "temporal" in line.lower():
+                            spatial = False
+                            continue
+                        print("Parse key and val")
+                        try:
+                            key, val = line.split(": ")
+                        except Exception as ve:
+                            print("Val error:", ve)
+                            continue
+                        print("Check key and val")
+                        val = val.strip()
+                        if "average" in key:
+                            if spatial:
+                                data["si_avg"] = val
+                            else:
+                                data["ti_avg"] = val
+                        if "max" in key:
+                            if spatial:
+                                data["si_max"] = val
+                            else:
+                                data["ti_max"] = val
+                        if "min" in key:
+                            if spatial:
+                                data["si_min"] = val
+                            else:
+                                data["ti_min"] = val
+
+                    if len(data) > 0:
+                        pdata = pd.DataFrame([data])
+                        pdata.to_csv(siti_file, index=False)
+                # os.remove(f"{siti_file}.txt")
+
+        elif options.get("debug", False) > 0:
+            print(f"siti already calculated for media, {siti_file}")
+
         if distorted != encodedfile:
             os.remove(distorted)
         if referenced != reference_pathname:
@@ -919,6 +1000,7 @@ def run_quality(test_file, options, debug):
             qpv_avg,
         ) = parse_quality_qpextract(qpextract_file)
 
+        (si_avg, si_min, si_max, ti_avg, ti_min, ti_max) = parse_quality_siti(siti_file)
         if options.get("csv", None):
             base, extension = os.path.splitext(vmaf_file)
             vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
@@ -1097,6 +1179,12 @@ def run_quality(test_file, options, debug):
                 "qpv_min": qpv_min,
                 "qpv_max": qpv_max,
                 "qpv_avg": qpv_avg,
+                "si_min": si_min,
+                "si_max": si_max,
+                "si_avg": si_avg,
+                "ti_min": si_min,
+                "ti_max": si_max,
+                "ti_avg": si_avg,
                 "testfile": f"{test_file}",
                 "reference_file": f"{filepath}",
                 "source_complexity": source_complexity,
@@ -1276,6 +1364,11 @@ def get_options(argv):
         "--qpextract",
         action="store_true",
         help="Calculate qp distribution",
+    )
+    parser.add_argument(
+        "--siti",
+        action="store_true",
+        help="Run siti to characterize the video. Done on the source to mimimize the runtime.",
     )
 
     options = parser.parse_args()
