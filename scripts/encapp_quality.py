@@ -393,6 +393,8 @@ def parse_quality_cvvdp(cvvdp_csv_file):
         data = pd.read_csv(cvvdp_csv_file)
         data.columns = data.columns.str.strip()
         return data["cvvdp"].values[0]
+    except FileNotFoundError as fex:
+        pass
     except Exception as ex:
         print(f"Failed to read cvvdp file: {cvvdp_csv_file}, {ex}")
     return -1
@@ -403,6 +405,8 @@ def parse_quality_siti(csv_file):
         data = pd.read_csv(csv_file)
         data.columns = data.columns.str.strip()
         return data.values[0]
+    except FileNotFoundError as fex:
+        pass
     except Exception as ex:
         print(f"Failed to read siti file: {csv_file}, {ex}")
     return [-1] * 6
@@ -423,6 +427,8 @@ def parse_quality_qpextract(qpextract_single_file):
             df["qpv_avg"].values[0],
         )
     # , qpy_min, qpy_max, qpu_avg, qpu_min, qpu_max, qpv_avg, qpv_min,  qpv_max = parse_qpextract(qpextract_file)
+    except FileNotFoundError as fex:
+        pass
     except Exception as ex:
         print(f"Failed to parse qpvals file: {qpextract_single_file}, {ex}")
     return (
