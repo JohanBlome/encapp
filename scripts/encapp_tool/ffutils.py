@@ -16,7 +16,8 @@ FFPROBE_FIELDS = {
     "color_space": "color-space",
     "color_transfer": "color-transfer",
     "color_primaries": "color-primaries",
-    "r_frame_rate": "framerate",
+    #"r_frame_rate": "framerate",
+    "avg_frame_rate": "framerate",
     "duration": "duration",
 }
 
@@ -40,7 +41,14 @@ def ffprobe_parse_output(stdout):
         if key in FFPROBE_FIELDS.keys():
             try:
                 # process some values
+                # This is the lowest framerate with which all timestamps can be represented accurately (it is the least common multiple of all framerates in the stream). Note, this value is just a guess! For example, if the time base is 1/90000 and all frames have either approximately 3600 or 1800 timer ticks, then r_frame_rate will be 50/1.
+                # This is problematic since that will be handled in a different way when running ffmpeg cli command.
+                # Let us use the average instead.
+
+                '''
                 if key == "r_frame_rate":
+                '''
+                if key == "avg_frame_rate":
                     split = value.split("/")
                     if len(split) > 1:
                         value = round(float(split[0]) / float(split[1]), 2)
