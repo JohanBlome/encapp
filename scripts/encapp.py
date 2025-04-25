@@ -2929,6 +2929,12 @@ def main(argv):
         return 0
 
     elif options.func == "run":
+        # Save commandline for easy rerun
+        with open(".encapp_run_history", "a") as cmdfile:
+            now = datetime.datetime.now()
+            dt_string = now.strftime("%Y%m%d_%H%M%S")
+            cmdfile.write(f"{now}: " + " ".join(argv) + "\n")
+
         encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(
             options.file_transfer_limit
         )
