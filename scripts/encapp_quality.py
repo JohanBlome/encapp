@@ -565,9 +565,9 @@ def run_quality(test_file, options, debug):
         os.path.exists(vmaf_file)
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
-        and os.path.exists(cvvdp_file)
-        and os.path.exists(qpextract_file)
-        and os.path.exists(siti_file)
+        and (os.path.exists(cvvdp_file) or not options.get("cvvdp", False))
+        and (os.path.exists(qpextract_file)  or not options.get("qpextract", False))
+        and (os.path.exists(siti_file) or not options.get("siti", False))
         and not recalc
     ):
         if options.get("debug", False) > 0:
