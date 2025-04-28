@@ -527,8 +527,8 @@ def run_quality(test_file, options, debug):
         encodedfile = test_file
 
     if len(encodedfile) <= 0:
-        print(f"No file: {encodedfile}")
-        failed["error"] = f"No file: {encodedfile}"
+        print(f"No encoded file available: {encodedfile}")
+        failed["error"] = f"No encoded file: {encodedfile}"
         return failed
 
     if len(directory) > 0:
@@ -566,7 +566,7 @@ def run_quality(test_file, options, debug):
         and os.path.exists(ssim_file)
         and os.path.exists(psnr_file)
         and (os.path.exists(cvvdp_file) or not options.get("cvvdp", False))
-        and (os.path.exists(qpextract_file)  or not options.get("qpextract", False))
+        and (os.path.exists(qpextract_file) or not options.get("qpextract", False))
         and (os.path.exists(siti_file) or not options.get("siti", False))
         and not recalc
     ):
@@ -953,13 +953,12 @@ def run_quality(test_file, options, debug):
                         if "temporal" in line.lower():
                             spatial = False
                             continue
-                        print("Parse key and val")
                         try:
                             key, val = line.split(": ")
                         except Exception as ve:
-                            print("Val error:", ve)
+                            if debug > 0:
+                                print(f"SITI parse Val error: {ve} for {line}")
                             continue
-                        print("Check key and val")
                         val = val.strip()
                         if "average" in key:
                             if spatial:
