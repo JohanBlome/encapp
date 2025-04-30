@@ -716,10 +716,10 @@ def run_quality(test_file, options, debug):
 
         tmp_ref = None
         tmp_dist = None
-        if options.get("ignore_timing"):
+        if options.get("ignore_timing") and (input_framerate != output_framerate):
             # transcode to raw intermidiant file
-            tmp_ref = f"ref_{time.time()}.raw"
-            tmp_dist = f"dist_{time.time()}.raw"
+            tmp_ref = f".ref_{time.time()}.raw"
+            tmp_dist = f".dist_{time.time()}.raw"
         if raw:
             ref_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} "
@@ -755,10 +755,22 @@ def run_quality(test_file, options, debug):
         # Or convert to the output. This nomrally gives higher score to lower fps and process faster...
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
         crop = ""
+        if input_framerate != output_framerate and not options.get("ignore_timing"):
+            print(
+                "WARNING! Encoded file framerate differs from reference and 'ignore-timing' is not set."
+            )
 
         if options.get("crop_input", None):
             crop = f"crop={options.get('crop_input')},"
-        filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
+        filter_cmd = ""
+        if options.get("ignore_timing") or (input_framerate == output_framerate):
+            filter_cmd = f"[0:v]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
+            if debug > 0:
+                print(
+                    f"No framerate scaling, ref = {referenced}, {input_framerate=} vs {output_framerate=}"
+                )
+        else:
+            filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
         # Do calculations
         if recalc or not os.path.exists(vmaf_file):
             # important: vmaf must be called with videos in the right order
@@ -929,7 +941,7 @@ def run_quality(test_file, options, debug):
                     f'"siti=print_summary=1 " '
                     f"-f null - &> {tf}"
                 )
-                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=1)
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 # Parse the text and create a csv
                 with open(tf, "r") as fd:
                     """
@@ -1088,7 +1100,7 @@ def run_quality(test_file, options, debug):
             )
         # Check vmaf for zero vmaf and/or wrong number of frames
         try:
-            if vmaf_dict["vmaf_zero"] == True:
+            if vmaf_dict["zero_vmaf"] == True:
                 error_in_calc = True
                 # raise Exception("Warning! Some frames are zero, most likely a broken calculation.")
                 print(
@@ -1103,6 +1115,7 @@ def run_quality(test_file, options, debug):
                 print("Warning! Frame count diffes for vmaf and test")
                 failed["warning"] = "Warning! Frame count diffes for vmaf and test"
         except Exception as ex:
+            print(f"VMAF failed: {ex} - {type(ex)}")
             pass
 
         iframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "I"]
@@ -1345,9 +1358,11 @@ def get_options(argv):
     parser.add_argument(
         "--ignore-timing",
         dest="ignore_timing",
-        action="store_true",
+        type=bool,
+        default=True,
         help="Ignore all timing information and compare frame by frame between source and reference. "
-        "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken.",
+        "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken. "
+        "The transcoding will only happen if there is a difference in the framerates.",
     )
     parser.add_argument(
         "--max-parallel",
