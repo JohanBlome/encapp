@@ -592,15 +592,15 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    test_suite = create_tests_from_definition_expansion(test_suite)
+    test_suite = create_tests_from_definition_expansion(test_suite, options)
+    # now we need to go through all test and update media
+    for test in test_suite.test:
+        update_media_files(test, options)
+
     if options.dry_run:
         # Write and exit
         configfile_write(test_suite, protobuf_txt_filepath)
         return test_suite, [], protobuf_txt_filepath
-
-    # now we need to go through all test and update media
-    for test in test_suite.test:
-        update_media_files(test, options)
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
@@ -652,7 +652,7 @@ def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     protobuf_txt_filepath = create_tests_from_definition_expansionPath(
-        protobuf_txt_filepath, local_workdir
+        protobuf_txt_filepath, local_workdir, options
     )
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
@@ -868,13 +868,15 @@ def abort_test(local_workdir, message):
     sys.exit(-1)
 
 
-def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_workdir):
+def create_tests_from_definition_expansionPath(
+    protobuf_txt_filepath, local_workdir, options
+):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
     test_suite = configfile_read(protobuf_txt_filepath)
 
-    test_suite_ = create_tests_from_definition_expansion(test_suite)
+    test_suite_ = create_tests_from_definition_expansion(test_suite, options)
     # check if they are the same, if so do nothing
     # if (test_suite_.equals(test_suite)):
     #    return protobuf_txt_filepath
@@ -918,12 +920,15 @@ def update_single_setting(tests, parent, settings_name, expanded):
 
 # Takes a test definition and looks through all settins
 # every expanded setting will create copies of the previous
-def create_tests_from_definition_expansion(testsuite):
+def create_tests_from_definition_expansion(testsuite, options):
     # First we may have multiple tests already (ouch)
     # They will be handled as separate cases
 
     force_update = False
     updated_testsuite = tests_definitions.TestSuite()
+    regexp = None
+    if options.filter_input:
+        regexp = options.filter_input
     # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
         tests = [test]
@@ -944,7 +949,7 @@ def create_tests_from_definition_expansion(testsuite):
                             if os.path.exists(path) and os.path.isfile(path):
                                 expanded = [path]
                             else:
-                                expanded = expand_filepath(path)
+                                expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
                             expanded = expand_ranges(setting[1])
@@ -960,7 +965,7 @@ def create_tests_from_definition_expansion(testsuite):
     return updated_testsuite
 
 
-def expand_filepath(path):
+def expand_filepath(path, regexp=None):
     # Check if path is a folder
     basename = ""
     folder = ""
@@ -972,6 +977,11 @@ def expand_filepath(path):
     video_files = []
     for root, _dirs, files in os.walk(folder):
         for file in files:
+            if regexp:
+                print(f"Check reg:{regexp}")
+                m = re.search(regexp, file)
+                if not m:
+                    continue
             if is_video_extension(file):
                 if len(basename) > 0:
                     # let us make one exception to the reg exp
@@ -2180,6 +2190,12 @@ def add_args(parser):
         default=encapp_tool.adb_cmds.SPLIT_SIZE_BYTES,
         type=str,
         help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes",
+    )
+    parser.add_argument(
+        "--filter-input",
+        dest="filter_input",
+        type=str,
+        help="Regexp filter on the input files when using a folder input.",
     )
 
 
