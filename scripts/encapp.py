@@ -722,16 +722,17 @@ def run_codec_tests_file(
             counter = 0
             if debug > 0:
                 print("Clear target and remove known encapp files")
-            # Clear target and run test, collect result and iterate
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, "[encapp_|split.].*", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*pbtxt$", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*[yuv|raw]$", options.device_workdir, options.debug
-            )
+            if not options.dry_run:
+                # Clear target and run test, collect result and iterate
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, "[encapp_|split.].*", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*pbtxt$", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*[yuv|raw]$", options.device_workdir, options.debug
+                )
             success = True
             for testsource in test_collection:
                 files = []
@@ -758,6 +759,9 @@ def run_codec_tests_file(
                 if debug > 0:
                     print(f"add {protobuf_txt_filepath}")
                 files.append(protobuf_txt_filepath)
+
+                if options.dry_run:
+                    continue
 
                 results = run_codec_tests(
                     test_suite,
