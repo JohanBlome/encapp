@@ -334,7 +334,7 @@ def collect_results(
         if encapp_tool.adb_cmds.USE_IDB:
             cmd = f"idb file pull {device_workdir}/{file} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
         else:
-            cmd = f"adb -s {serial} pull {device_workdir}/{file} " f"{local_workdir}"
+            cmd = f"adb -s {serial} pull {device_workdir}/{file} {local_workdir}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
@@ -349,7 +349,7 @@ def collect_results(
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
     else:
-        cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
+        cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
     encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"results collect: {result_json}")
@@ -1053,9 +1053,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert (
-            len(resolution_spec) == 3
-        ), f'error: invalid resolution spec: "{resolution}"'
+        assert len(resolution_spec) == 3, (
+            f'error: invalid resolution spec: "{resolution}"'
+        )
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -2635,9 +2635,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert (
-        options.configfile is not None
-    ), "error: need a valid input configuration file"
+    assert options.configfile is not None, (
+        "error: need a valid input configuration file"
+    )
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -2794,7 +2794,7 @@ def main(argv):
 
         if not options.local_workdir:
             rename_workdir = True
-        options = setup_local_workdir(options, f"{int(random.random()*1000)}")
+        options = setup_local_workdir(options, f"{int(random.random() * 1000)}")
 
         test_suite = tests_definitions.TestSuite()
         # let us accept a special case where the test is a single '.'
@@ -2941,9 +2941,9 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert (
-            options.configfile is not None
-        ), "error: need a valid input configuration file"
+        assert options.configfile is not None, (
+            "error: need a valid input configuration file"
+        )
 
         if not options.dry_run:
             # first clear out old result
