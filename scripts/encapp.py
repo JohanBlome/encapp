@@ -784,6 +784,8 @@ def run_codec_tests_file(
                         serial, f"{options.device_workdir}/{basename}", options.debug
                     )
 
+                # Verify the number fo tests and files (if applicable)
+                # TODO:
                 if not results[0]:
                     success = False
                 result_files += results[1]
@@ -836,6 +838,16 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
+                # Verify the number fo tests and files (if applicable)
+                print(f"*** VERIFY RESULT: {len(results)} ***")
+                check = verify_test_result(results, test_suite, protobuf_txt_filepath)
+                if len(check) > 0:
+                    print("ERROR! some tests failed")
+                    df = pd.DataFrame(check)
+                    df.to_csv(
+                        "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
+                    )
+
                 # Run quality
                 success = True
                 if not results[0]:
@@ -862,6 +874,79 @@ def run_codec_tests_file(
         print(
             f"Apparently something is not quite right, check the test definition: {test_suite=}"
         )
+
+
+def is_test(videofilename, test):
+    if test.common.output_filename:
+        if videofilename.split(".mp4")[0] == test.common.output_filename:
+            return True
+    return False
+
+
+def find_test_name(videofilename, test_suite):
+    for test in test_suite.test:
+        if is_test(videofilename, test):
+            return test
+    return ""
+
+
+def verify_test_result(results, test_suite, protobuf_txt_filepath):
+    fail = []
+    if not results[0]:
+        # TODO: report in some other way?
+        print("Error! test case failed")
+        fail.append({"test_id": "", "stats": "", "error": "Test failed"})
+
+    test_count = len(test_suite.test)
+    result_count = len(results[1])
+
+    # TODO: check that outout is expected
+    # result in the same folder as the protobuf
+    folder = os.path.dirname(protobuf_txt_filepath)
+    if test_count != result_count:
+        print(
+            f"ERROR! \nTest count = {test_count}]nTest results = {result_count}\nMissing: {test_count - result_count}"
+        )
+        # In case of named output files we can find them
+        for test in test_suite.test:
+            if test.common.output_filename:
+                name = f"{folder}/{test.common.output_filename}.json"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": name,
+                            "error": "no stat file",
+                        }
+                    )
+
+                name = f"{folder}/{test.common.output_filename}.mp4"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": "",
+                            "error": "no video file present",
+                        }
+                    )
+        if len(fail) == 0:
+            fail.append(
+                {
+                    "test_id": "",
+                    "stats": "missing stat file(s)",
+                    "error": "aborted test",
+                }
+            )
+
+    # Check encoded file
+    for stat in results[1]:
+        name = f"{stat.split('.json')[0]}.mp4"
+        if not os.path.exists(name):
+            # Get test name
+            test_id = find_test_name(name, test_suite)
+            fail.append({"test_id": test_id, "stats": stat, "error": "no encoded file"})
+
+    return fail
 
 
 def abort_test(local_workdir, message):
