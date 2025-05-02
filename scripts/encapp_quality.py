@@ -346,7 +346,7 @@ def parse_quality_vmaf(vmaf_file):
     if "model" in data:
         vmaf_dict["model"] = data["model"]
     # Check for zero frames and frame count
-    vmaf_dict.update({"framecount: ": len(data["frames"])})
+    vmaf_dict.update({"framecount": len(data["frames"])})
     vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
     return vmaf_dict
 
