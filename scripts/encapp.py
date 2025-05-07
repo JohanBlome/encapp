@@ -88,6 +88,7 @@ PIX_FMT_TYPES_VALUES = {
     "nv12": 2,
     "nv21": 3,
     "rgba": 4,
+    "yuv420p10le": 0x36,
 }
 PIX_FMT_TYPES = {
     "yuv420p": "yuv",
@@ -95,6 +96,7 @@ PIX_FMT_TYPES = {
     "nv12": "yuv",
     "nv21": "yuv",
     "rgba": "rgba",
+    "yuv420p10le": "yuv420p10le"
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
