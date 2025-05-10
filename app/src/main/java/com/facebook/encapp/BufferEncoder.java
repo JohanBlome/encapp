@@ -253,8 +253,8 @@ class BufferEncoder extends Encoder {
                     index = mCodec.dequeueOutputBuffer(info, timeoutUs);
                     if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                         // check if the input is already done
-                        if (input_done) {
-                            output_done = true;
+                        if (input_done && mInFramesCount == mOutFramesCount) {
+                            //output_done = true;
                         }
                         // otherwise ignore
                     } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
@@ -300,6 +300,7 @@ class BufferEncoder extends Encoder {
         }
         mStats.stop();
 
+        Log.d(TAG, "Done. Input frames:" + mInFramesCount + ", encoded frames: " + mOutFramesCount);
         Log.d(TAG, "Close muxer and streams");
         if (mCodec != null) {
             mCodec.stop();
