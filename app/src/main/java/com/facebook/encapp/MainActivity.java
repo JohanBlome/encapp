@@ -327,13 +327,13 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         }
 
 
-        TestSuite test_suite = null;
+        TestSuite testSuite = null;
         try {
             if (mExtraData.containsKey(CliSettings.TEST_CONFIG)) {
-                String test_path = mExtraData.getString(CliSettings.TEST_CONFIG);
-                Log.d(TAG, "test_path: " + test_path);
+                String testPath = mExtraData.getString(CliSettings.TEST_CONFIG);
+                Log.d(TAG, "testPath: " + testPath);
                 // read the test file
-                File file = new File(test_path);
+                File file = new File(testPath);
                 int length = (int) file.length();
                 FileInputStream fis = new FileInputStream(file);
                 byte[] bytes = new byte[length];
@@ -342,34 +342,34 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
                 TestSuite.Builder tests_builder = TestSuite.newBuilder();
                 TextFormat.getParser().merge(test_path_contents, tests_builder);
-                test_suite = tests_builder.build();
+                testSuite = tests_builder.build();
 
 
                 // Log.d(TAG, "data: " + Files.readAllBytes(basename));
                 // ERROR
-                if (test_suite.getTestList().size() <= 0) {
+                if (testSuite.getTestList().size() <= 0) {
                     Log.e(TAG, "Failed to read test");
                     return;
                 }
-                if (test_suite == null) {
+                if (testSuite == null) {
                     Log.d(TAG, "No test case");
                     return;
                 }
 
                 // Get test setup params
                 // cli have preference
-                Test test0 = test_suite.getTestList().get(0);
+                Test test0 = testSuite.getTestList().get(0);
                 if (test0.hasTestSetup() && mUIHoldtimeSec == 0) {
                     TestSetup setup = test0.getTestSetup();
                     if (setup.hasUiholdSec()) {
                         mUIHoldtimeSec = setup.getUiholdSec();
                     }
                 }
-                
+
                 int nbrViews = 0;
                 boolean hasCameraPreview = false;
                 // Prepare views for visualization
-                for (Test test : test_suite.getTestList()) {
+                for (Test test : testSuite.getTestList()) {
                     nbrViews += countInputPreviews(test);
                     showCameraPreview(test);
                 }
@@ -400,9 +400,9 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 boolean cameraStarted = false;
                 int pursuit = -1;// TODO: pursuit
                 while (!mPursuitOver) {
-                    Log.d(TAG, "** Starting tests, " + test_suite.getTestCount() +
+                    Log.d(TAG, "** Starting tests, " + testSuite.getTestCount() +
                             " number of combinations (parallels not counted) **");
-                    for (Test test : test_suite.getTestList()) {
+                    for (Test test : testSuite.getTestList()) {
                         // Do not start if power level is low
                         if (test.hasTestSetup() && test.getTestSetup().getIgnorePowerStatus()) {
                             Log.w(TAG, "Power level checks are overridden. Measurements will run regardless of power status.");
@@ -519,8 +519,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                                             // some errors here
                                             p.join(WAIT_TIME_MS);
                                             if (p.getState() == Thread.State.WAITING ||
-                                                p.getState() == Thread.State.TIMED_WAITING ||
-                                                p.getState() == Thread.State.BLOCKED) {
+                                                    p.getState() == Thread.State.TIMED_WAITING ||
+                                                    p.getState() == Thread.State.BLOCKED) {
                                                 Log.d(TAG, p.getName() + " is still waiting (" + p.getState() + ").\nThis is probably not correct.\nTry to release");
                                                 for (Encoder coder: mEncoderList) {
                                                     Log.d(TAG, "Force release");
@@ -706,6 +706,10 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 // TODO: how to integrate with the rest?
                 Log.d(TAG, "0. Custom encoder");
                 coder = new CustomEncoder(test, this.getFilesDir().getPath());
+            } else if (test.getConfigure().getCodec().startsWith("lcevc")) {
+
+                Log.d(TAG, "1. LCEVC decode");
+                coder = new LcevcEncoder(test);
             } else if (!surface && deviceDecode && !deviceEncode) {
 
                 Log.d(TAG, "1. Simple buffer decode");

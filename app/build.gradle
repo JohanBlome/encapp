@@ -11,7 +11,20 @@ android {
         versionCode 1
         versionName "1.23"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)
+
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
+
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'META-INF/Notice.txt'
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -30,6 +43,8 @@ android {
             proto {
                 srcDir '../proto/'
             }
+
+            jniLibs.srcDirs = ['src/main/jniLibs', '../lcevc/x264/libs']
         }
     }
 
@@ -38,6 +53,45 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     ndkVersion '21.3.6528147'
+
+    flavorDimensions = ['layout']
+
+    productFlavors {
+        aosp {
+            dimension 'layout'
+        }
+
+        full {
+            dimension 'layout'
+        }
+
+        fullNoBenchmark {
+            dimension 'layout'
+        }
+
+        demo {
+            dimension 'layout'
+        }
+
+        nonconan {
+            dimension 'layout'
+        }
+    }
+}
+
+configurations {
+    javacpp
+}
+
+task javacppExtract(type: Copy) {
+    dependsOn configurations.javacpp
+
+    from { configurations.javacpp.collect { zipTree(it) } }
+    include "lib/**"
+    into "$buildDir/javacpp/"
+    android.sourceSets.main.jniLibs.srcDirs += ["$buildDir/javacpp/lib/"]
+
+    tasks.getByName('preBuild').dependsOn javacppExtract
 }
 
 dependencies {
@@ -46,8 +100,16 @@ dependencies {
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.12.0'
     implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: '3.12.0'
     implementation 'com.google.code.gson:gson:2.8.0'
-}
 
+    implementation 'com.vnova.lcevc:eil:3.13.2'
+    implementation 'com.vnova.lcevc.eilp:mediacodec:3.13.2'
+    implementation 'com.vnova.lcevc.eilp:x264:3.13.2'
+    implementation 'com.vnova.lcevc:jni:3.13.2'
+    implementation 'com.vnova.lcevc:util:3.13.2'
+
+    implementation group: 'org.bytedeco', name: 'javacv', version: '1.5.11'
+    javacpp group: 'org.bytedeco', name: 'ffmpeg-platform', version: '7.1-1.5.11'
+}
 
 protobuf {
     protoc {
