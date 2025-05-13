@@ -88,6 +88,7 @@ PIX_FMT_TYPES_VALUES = {
     "nv12": 2,
     "nv21": 3,
     "rgba": 4,
+    "yuv420p10le": 0x36,
 }
 PIX_FMT_TYPES = {
     "yuv420p": "yuv",
@@ -95,6 +96,7 @@ PIX_FMT_TYPES = {
     "nv12": "yuv",
     "nv21": "yuv",
     "rgba": "rgba",
+    "yuv420p10le": "yuv420p10le"
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
@@ -334,7 +336,7 @@ def collect_results(
         if encapp_tool.adb_cmds.USE_IDB:
             cmd = f"idb file pull {device_workdir}/{file} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
         else:
-            cmd = f"adb -s {serial} pull {device_workdir}/{file} " f"{local_workdir}"
+            cmd = f"adb -s {serial} pull {device_workdir}/{file} {local_workdir}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
@@ -349,7 +351,7 @@ def collect_results(
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
     else:
-        cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
+        cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
     encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"results collect: {result_json}")
@@ -592,15 +594,15 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    test_suite = create_tests_from_definition_expansion(test_suite)
+    test_suite = create_tests_from_definition_expansion(test_suite, options)
+    # now we need to go through all test and update media
+    for test in test_suite.test:
+        update_media_files(test, options)
+
     if options.dry_run:
         # Write and exit
         configfile_write(test_suite, protobuf_txt_filepath)
         return test_suite, [], protobuf_txt_filepath
-
-    # now we need to go through all test and update media
-    for test in test_suite.test:
-        update_media_files(test, options)
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
@@ -652,7 +654,7 @@ def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     protobuf_txt_filepath = create_tests_from_definition_expansionPath(
-        protobuf_txt_filepath, local_workdir
+        protobuf_txt_filepath, local_workdir, options
     )
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
@@ -751,16 +753,17 @@ def run_codec_tests_file(
             counter = 0
             if debug > 0:
                 print("Clear target and remove known encapp files")
-            # Clear target and run test, collect result and iterate
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, "[encapp_|split.].*", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*pbtxt$", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*[yuv|raw]$", options.device_workdir, options.debug
-            )
+            if not options.dry_run:
+                # Clear target and run test, collect result and iterate
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, "[encapp_|split.].*", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*pbtxt$", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*[yuv|raw]$", options.device_workdir, options.debug
+                )
             success = True
             for testsource in test_collection:
                 files = []
@@ -788,6 +791,9 @@ def run_codec_tests_file(
                     print(f"add {protobuf_txt_filepath}")
                 files.append(protobuf_txt_filepath)
 
+                if options.dry_run:
+                    continue
+
                 results = run_codec_tests(
                     test_suite,
                     files,
@@ -809,6 +815,8 @@ def run_codec_tests_file(
                         serial, f"{options.device_workdir}/{basename}", options.debug
                     )
 
+                # Verify the number fo tests and files (if applicable)
+                # TODO:
                 if not results[0]:
                     success = False
                 result_files += results[1]
@@ -861,6 +869,16 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
+                # Verify the number fo tests and files (if applicable)
+                print(f"*** VERIFY RESULT: {len(results)} ***")
+                check = verify_test_result(results, test_suite, protobuf_txt_filepath)
+                if len(check) > 0:
+                    print("ERROR! some tests failed")
+                    df = pd.DataFrame(check)
+                    df.to_csv(
+                        "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
+                    )
+
                 # Run quality
                 success = True
                 if not results[0]:
@@ -889,6 +907,79 @@ def run_codec_tests_file(
         )
 
 
+def is_test(videofilename, test):
+    if test.common.output_filename:
+        if videofilename.split(".mp4")[0] == test.common.output_filename:
+            return True
+    return False
+
+
+def find_test_name(videofilename, test_suite):
+    for test in test_suite.test:
+        if is_test(videofilename, test):
+            return test
+    return ""
+
+
+def verify_test_result(results, test_suite, protobuf_txt_filepath):
+    fail = []
+    if not results[0]:
+        # TODO: report in some other way?
+        print("Error! test case failed")
+        fail.append({"test_id": "", "stats": "", "error": "Test failed"})
+
+    test_count = len(test_suite.test)
+    result_count = len(results[1])
+
+    # TODO: check that outout is expected
+    # result in the same folder as the protobuf
+    folder = os.path.dirname(protobuf_txt_filepath)
+    if test_count != result_count:
+        print(
+            f"ERROR! \nTest count = {test_count}]nTest results = {result_count}\nMissing: {test_count - result_count}"
+        )
+        # In case of named output files we can find them
+        for test in test_suite.test:
+            if test.common.output_filename:
+                name = f"{folder}/{test.common.output_filename}.json"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": name,
+                            "error": "no stat file",
+                        }
+                    )
+
+                name = f"{folder}/{test.common.output_filename}.mp4"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": "",
+                            "error": "no video file present",
+                        }
+                    )
+        if len(fail) == 0:
+            fail.append(
+                {
+                    "test_id": "",
+                    "stats": "missing stat file(s)",
+                    "error": "aborted test",
+                }
+            )
+
+    # Check encoded file
+    for stat in results[1]:
+        name = f"{stat.split('.json')[0]}.mp4"
+        if not os.path.exists(name):
+            # Get test name
+            test_id = find_test_name(name, test_suite)
+            fail.append({"test_id": test_id, "stats": stat, "error": "no encoded file"})
+
+    return fail
+
+
 def abort_test(local_workdir, message):
     print("\n*** Test failed ***")
     print(f"Remove {local_workdir}")
@@ -897,13 +988,15 @@ def abort_test(local_workdir, message):
     sys.exit(-1)
 
 
-def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_workdir):
+def create_tests_from_definition_expansionPath(
+    protobuf_txt_filepath, local_workdir, options
+):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
     test_suite = configfile_read(protobuf_txt_filepath)
 
-    test_suite_ = create_tests_from_definition_expansion(test_suite)
+    test_suite_ = create_tests_from_definition_expansion(test_suite, options)
     # check if they are the same, if so do nothing
     # if (test_suite_.equals(test_suite)):
     #    return protobuf_txt_filepath
@@ -947,12 +1040,15 @@ def update_single_setting(tests, parent, settings_name, expanded):
 
 # Takes a test definition and looks through all settins
 # every expanded setting will create copies of the previous
-def create_tests_from_definition_expansion(testsuite):
+def create_tests_from_definition_expansion(testsuite, options):
     # First we may have multiple tests already (ouch)
     # They will be handled as separate cases
 
     force_update = False
     updated_testsuite = tests_definitions.TestSuite()
+    regexp = None
+    if options.filter_input:
+        regexp = options.filter_input
     # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
         tests = [test]
@@ -973,7 +1069,7 @@ def create_tests_from_definition_expansion(testsuite):
                             if os.path.exists(path) and os.path.isfile(path):
                                 expanded = [path]
                             else:
-                                expanded = expand_filepath(path)
+                                expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
                             expanded = expand_ranges(setting[1])
@@ -989,7 +1085,7 @@ def create_tests_from_definition_expansion(testsuite):
     return updated_testsuite
 
 
-def expand_filepath(path):
+def expand_filepath(path, regexp=None):
     # Check if path is a folder
     basename = ""
     folder = ""
@@ -1001,6 +1097,11 @@ def expand_filepath(path):
     video_files = []
     for root, _dirs, files in os.walk(folder):
         for file in files:
+            if regexp:
+                print(f"Check reg:{regexp}")
+                m = re.search(regexp, file)
+                if not m:
+                    continue
             if is_video_extension(file):
                 if len(basename) > 0:
                     # let us make one exception to the reg exp
@@ -1082,9 +1183,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert (
-            len(resolution_spec) == 3
-        ), f'error: invalid resolution spec: "{resolution}"'
+        assert len(resolution_spec) == 3, (
+            f'error: invalid resolution spec: "{resolution}"'
+        )
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -2210,6 +2311,12 @@ def add_args(parser):
         type=str,
         help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes",
     )
+    parser.add_argument(
+        "--filter-input",
+        dest="filter_input",
+        type=str,
+        help="Regexp filter on the input files when using a folder input.",
+    )
 
     parser.add_argument(
         "--lcevc",
@@ -2670,9 +2777,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert (
-        options.configfile is not None
-    ), "error: need a valid input configuration file"
+    assert options.configfile is not None, (
+        "error: need a valid input configuration file"
+    )
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -2829,7 +2936,7 @@ def main(argv):
 
         if not options.local_workdir:
             rename_workdir = True
-        options = setup_local_workdir(options, f"{int(random.random()*1000)}")
+        options = setup_local_workdir(options, f"{int(random.random() * 1000)}")
 
         test_suite = tests_definitions.TestSuite()
         # let us accept a special case where the test is a single '.'
@@ -2976,9 +3083,9 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert (
-            options.configfile is not None
-        ), "error: need a valid input configuration file"
+        assert options.configfile is not None, (
+            "error: need a valid input configuration file"
+        )
 
         if not options.dry_run:
             # first clear out old result
