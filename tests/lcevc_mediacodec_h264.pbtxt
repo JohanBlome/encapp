@@ -1,0 +1,20 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    common {
+        id: "lcevc_mediacodec"
+        description: "V-Nova's LCEVC Mediacodec H264 encoding"
+    }
+    configure {
+        codec: "lcevc_h264"
+        bitrate: "500 kbps"
+        framerate: 30
+        i_frame_interval: 3
+        parameter {
+            key: "base_encoder"
+            type: stringType
+            value: "mediacodec_h264"
+        }
+    }
+}
