@@ -727,13 +727,13 @@ def run_codec_tests_file(
             if not options.dry_run:
                 # Clear target and run test, collect result and iterate
                 encapp_tool.adb_cmds.remove_files_using_regex(
-                    serial, "[encapp_|split.].*", options.device_workdir, options.debug
+                    serial, "^encapp_.*|^split.*", options.device_workdir, options.debug
                 )
                 encapp_tool.adb_cmds.remove_files_using_regex(
                     serial, ".*pbtxt$", options.device_workdir, options.debug
                 )
                 encapp_tool.adb_cmds.remove_files_using_regex(
-                    serial, ".*[yuv|raw]$", options.device_workdir, options.debug
+                    serial, ".*yuv$|raw$", options.device_workdir, options.debug
                 )
             success = True
             for testsource in test_collection:
