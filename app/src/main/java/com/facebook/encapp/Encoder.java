@@ -74,7 +74,23 @@ public abstract class Encoder {
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
+    protected static int H264_NALU_TYPE_IDR = 5;
+    protected static int H264_NALU_TYPE_SPS = 7;
+    protected static int H264_NALU_TYPE_PPS = 8;
+    protected static int HEVC_NALU_TYPE_IDR = 16;
+    protected static int HEVC_NALU_TYPE_CRA = 21;
+    protected static int VVC_NALU_TYPE_IDR = 16;
+    protected static int VVC_NALU_TYPE_CRA = 23;
+    public static final String BITRATE = "bitrate";
+    public static final String BITRATE_MODE = "bitrate_mode";
+    public static final String I_FRAME_INTERVAL = "i_frame_interval";
+    public static final String FRAMERATE = "framerate";
 
+    public enum SyntaxType {
+        H264,
+        HEVC,
+        VVC
+    }
 
     public Encoder(Test test) {
         mTest = test;
@@ -107,6 +123,88 @@ public abstract class Encoder {
         }
         // prepend the workdir
         return CliSettings.getWorkDir() + "/" + path;
+    }
+
+    /**
+     * Finds the next start code or the end of the stream.
+     *
+     * @param param_list Vector of encoder parameters to configure Encapp's tests.
+     * @param parameterType The parameter type (int, string, float, long).
+     * @param parameterKey The parameter key.
+     * @param parameterValue The parameter value
+     */
+    public static void addEncoderParameters(Vector<Parameter> param_list, String parameterType, String parameterKey, String parameterValue) {
+        try {
+            DataValueType type = DataValueType.valueOf(parameterType);
+
+            switch (type) {
+                case intType:
+                    param_list.add(Parameter.newBuilder().setType(DataValueType.intType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case longType:
+                    param_list.add(Parameter.newBuilder().setType(DataValueType.longType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case floatType:
+                    param_list.add(Parameter.newBuilder().setType(DataValueType.floatType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case stringType:
+                    param_list.add(Parameter.newBuilder().setType(DataValueType.stringType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown encoder parameter type: " + parameterType);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
+    }
+
+
+
+    /**
+     * Return true if the stream is a key frame
+     *
+     * @param bitstream Byte stream of encoded frames.
+     */
+    public static boolean checkIfKeyFrame(byte[] bitstream, SyntaxType syntaxType) {
+        for (int i = 0; i < bitstream.length - 4; i++) {
+            // Find start code (0x000001 or 0x00000001)
+            if ((bitstream[i] == 0x00 && bitstream[i + 1] == 0x00 &&
+                    bitstream[i + 2] == 0x01) ||
+                    (bitstream[i] == 0x00 && bitstream[i + 1] == 0x00 &&
+                            bitstream[i + 2] == 0x00 && bitstream[i + 3] == 0x01)) {
+
+                int nalHeaderIndex = i + (bitstream[i + 2] == 0x01 ? 3 : 4);
+                if (nalHeaderIndex >= bitstream.length) continue;
+
+                int nalHeader = bitstream[nalHeaderIndex] & 0xFF;
+
+                switch (syntaxType) {
+                    case H264: {
+                        int nalUnitType = nalHeader & 0x1F;
+                        if (nalUnitType == H264_NALU_TYPE_IDR) {
+                            return true;
+                        }
+                        break;
+                    }
+                    case HEVC: {
+                        int nalUnitType = (nalHeader >> 1) & 0x3F;
+                        if (nalUnitType >= HEVC_NALU_TYPE_IDR && nalUnitType <= HEVC_NALU_TYPE_CRA) {
+                            return true;
+                        }
+                        break;
+                    }
+                    case VVC: {
+                        if (nalHeaderIndex + 1 >= bitstream.length) break;
+                        int nalUnitType = (bitstream[nalHeaderIndex + 1] >> 3) & 0x1F;
+                        if (nalUnitType >= VVC_NALU_TYPE_IDR && nalUnitType <= VVC_NALU_TYPE_CRA) {
+                            return true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     protected void sleepUntilNextFrame(double frameTimeUsec) {
@@ -147,8 +245,8 @@ public abstract class Encoder {
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTimeUsec(int frameIndex, double frameTimeUsec) {
-        return mPts + (long) (frameIndex * frameTimeUsec);
+    public static long computePresentationTimeUs(long referencePts, int frameIndex, double frameTimeUs) {
+        return referencePts + (long) (frameIndex * frameTimeUs);
     }
 
     protected double calculateFrameTimingUsec(float frameRate) {
@@ -237,7 +335,7 @@ public abstract class Encoder {
         }
         // 4. stop the reader in non-loop mode:
         // stop when the file is empty
-       if ((!loop && fileReader != null) && fileReader.isClosed()) {
+        if ((!loop && fileReader != null) && fileReader.isClosed()) {
             return true;
         }
         // do not stop the reader
@@ -342,8 +440,8 @@ public abstract class Encoder {
             byteBuffer.clear();
             read = fileReader.fillBuffer(byteBuffer, size);
         }
-        long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
-        mCurrentTimeSec =  ptsUsec / 1000000.0f;
+        long presentationTimeUs = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
+        mCurrentTimeSec =  presentationTimeUs / 1000000.0f;
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);
         // support for dropping frames
@@ -362,10 +460,10 @@ public abstract class Encoder {
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
-            mStats.startEncodingFrame(ptsUsec, frameCount);
-            codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+            mStats.startEncodingFrame(presentationTimeUs, frameCount);
+            codec.queueInputBuffer(index, 0 /* offset */, read, presentationTimeUs /* timeUs */, flags);
         } else if ((flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-            codec.queueInputBuffer(index, 0 /* offset */, 0, ptsUsec /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            codec.queueInputBuffer(index, 0 /* offset */, 0, presentationTimeUs /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
         } else {
             read = -1;
         }
@@ -411,7 +509,7 @@ public abstract class Encoder {
                         }
                         mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                         if (currentOutputFormat == null) {
-                           currentOutputFormat =  mCodec.getOutputFormat();
+                            currentOutputFormat =  mCodec.getOutputFormat();
                         }
                     } else {
                         if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
