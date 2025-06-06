@@ -936,7 +936,7 @@ def run_quality(test_file, options, debug):
             ) as tfo:
                 tf = tfo.name
                 shell_cmd = (
-                    f"ffmpeg  {ref_part} -t 1 "  # {duration} "
+                    f"ffmpeg  {ref_part} "
                     "-filter_complex "
                     f'"siti=print_summary=1 " '
                     f"-f null - &> {tf}"
