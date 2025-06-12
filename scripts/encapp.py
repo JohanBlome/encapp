@@ -697,6 +697,35 @@ def run_codec_tests_file(
             path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
             configfile_write(suite, path)
             files_to_push |= {path}
+
+    if options.lcevc:
+        if debug:
+            print("Verifying LCEVC parameters")
+        assert (
+            test.configure.codec == "lcevc_h264"
+        ), f'error: Codec" {test.configure.codec}" is invalid. Only lcevc_h264 is supported at the moment'
+
+        for param in test.configure.parameter:
+            if param.key == "base_encoder":
+                assert (
+                    param.value == "mediacodec_h264" or param.value == "x264"
+                ), f'Base Encoder "{param.value}" is invalid. Only mediacodec_h264 and x264 are supported at the moment'
+            if param.key == "eil_params_path":
+                assert (
+                    param.value.endswith(".json")
+                ), f'eil_params_path must point to a JSON file'
+                json_file_path = os.path.abspath(param.value)
+
+                if not encapp_tool.adb_cmds.push_file_to_device(
+                    json_file_path,
+                    serial,
+                    options.device_workdir,
+                    False,
+                    debug
+                ):
+                    abort_test(local_workdir, f"Error copying {json_file_path} to {serial}")
+
+
     # Save the complete test if updated
     if updated:
         # remove any older pbtxt in existence
@@ -2289,6 +2318,12 @@ def add_args(parser):
         help="Regexp filter on the input files when using a folder input.",
     )
 
+    parser.add_argument(
+        "--lcevc",
+        action="store_true",
+        help="Verify lcevc test parameters and copy the necessary eil config files"
+    )
+
 
 input_args = {
     # generic
@@ -3055,6 +3090,7 @@ def main(argv):
         if not options.dry_run:
             # first clear out old result
             remove_encapp_gen_files(serial, options.device_workdir, options.debug)
+
         result_ok, result_json = codec_test(options, model, serial, options.debug)
 
         global QUALITY_PROCESSES

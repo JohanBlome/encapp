@@ -30,8 +30,10 @@ SCRIPT_ROOT_DIR = os.path.abspath(
 SCRIPT_PROTO_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
 )
+
 sys.path.append(SCRIPT_ROOT_DIR)
 sys.path.append(SCRIPT_PROTO_DIR)
+
 import tests_pb2 as tests_definitions  # noqa: E402
 
 PSNR_RE = re.compile(
@@ -491,6 +493,16 @@ def run_quality(test_file, options, debug):
             failed["error"] = "Not an encapp file"
             return failed
 
+        # check if the encoder is lcevc
+        use_lcevc = False
+        codec = results.get("test", {}).get("configure", {}).get("codec")
+        if codec is None:
+            print(f"ERROR, 'codec' not found in 'test -> configure' for {test_file}")
+        elif debug:
+            print(f"Codec: {codec}")
+        if codec.startswith("lcevc"):
+            use_lcevc = True
+
     # read device info results
     device_info_file = os.path.join(os.path.dirname(test_file), "device.json")
     if os.path.exists(device_info_file):
@@ -549,7 +561,7 @@ def run_quality(test_file, options, debug):
 
     video_info = None
     try:
-        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
+        video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug, use_lcevc)
     except:
         print("Failed to parse with ffprobe")
         video_info = None

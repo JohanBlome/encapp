@@ -76,15 +76,29 @@ def video_is_y4m(videofile):
     return extension == ".y4m"
 
 
-def get_video_info(videofile, debug=0):
-    assert os.path.exists(videofile), f"input video file {videofile} not exist"
-    assert os.path.isfile(videofile), f"input video file {videofile} is not a file"
-    assert os.access(
-        videofile, os.R_OK
-    ), f"input video file ({videofile}) is not readable"
+def get_video_info(videofile, debug=0, use_lcevc=False):
+    # Verify the file exists and is accessible
+    assert os.path.exists(videofile), f"Input video file {videofile} does not exist"
+    assert os.path.isfile(videofile), f"Input video file {videofile} is not a file"
+    assert os.access(videofile, os.R_OK), f"Input video file ({videofile}) is not readable"
+
+    # If use_lcevc is True, apply the "lcevc" filter and save the output
+    if use_lcevc:
+        video_dir = os.path.dirname(videofile)
+        lcevc_videofile = os.path.join(video_dir, f"lcevc_{os.path.basename(videofile)}")
+        ffmpeg_cmd = f"ffmpeg -i {videofile} -vf lcevc -y {lcevc_videofile}"
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(ffmpeg_cmd, debug)
+
+        assert ret, f"Error: failed to apply LCEVC filter to file {videofile}: {stderr}"
+
+        # Update videofile to point to the LCEVC-encoded file for ffprobe analysis
+        videofile = lcevc_videofile
+
+    # Skip ffprobe if the video file is raw
     if video_is_raw(videofile):
         return {}
-    # check using ffprobe
+
+    # Analyze the file using ffprobe
     cmd = f"ffprobe -v quiet -select_streams v -show_streams {videofile}"
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     assert ret, f"error: failed to analyze file {videofile}: {stderr}"
@@ -93,7 +107,7 @@ def get_video_info(videofile, debug=0):
     return videofile_config
 
 
-def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
+def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug, use_lcevc=False):
     resolution = settings.get("output", {}).get(
         "resolution", settings.get("input", {}).get("resolution")
     )
@@ -115,6 +129,9 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
         f"pad={pad_w}:{pad_h},"
         f"fps={str(settings.get('output', {}).get('framerate', settings.get('input', {}).get('framerate')))}"
     )
+    if use_lcevc:
+        filter_cmd += ",lcevc"
+
     if debug > 0:
         print(f"filter command {filter_cmd}")
     cmd = FFMPEG_SILENT + [
@@ -145,7 +162,7 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
     assert ret, f"error: ffmpeg returned {stderr}"
 
 
-def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
+def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug, use_lcevc=False):
     resolution = settings.get("output", {}).get(
         "resolution", settings.get("input", {}).get("resolution")
     )
@@ -173,6 +190,9 @@ def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
 
     if framerate and float(framerate) > 0:
         filter_cmd = filter_cmd + f",fps={framerate}"
+
+    if use_lcevc:
+        filter_cmd += ",lcevc"
 
     if debug > 0:
         print(f"filter command {filter_cmd}")

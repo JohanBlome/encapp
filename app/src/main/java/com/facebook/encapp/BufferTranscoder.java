@@ -236,34 +236,34 @@ public class BufferTranscoder extends Encoder  {
             mStats.setCodec(mCodec.getName());
         }
 
-    try {
-        MediaFormat mediaFormat = mDecoder.getOutputFormat();
-        Log.d(TAG, "Decoder output format");
-        logMediaFormat(mediaFormat);
-        mediaFormat = TestDefinitionHelper.mergeEncoderSettings(mTest, mediaFormat);
-        //TODO: color handling
-        // The decoder must output same colorformat as input. QC hw encoder does not take same pix fmt android sw decoder.
-        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
-        mStats.pushTimestamp("encoder.configure");
-        mCodec.configure(
-                mediaFormat,
-                null /* surface */,
-                null /* crypto */,
-                MediaCodec.CONFIGURE_FLAG_ENCODE);
-        mStats.pushTimestamp("encoder.configure");
-        Log.d(TAG, "Check input format after encoder is configured");
-        logMediaFormat(mCodec.getInputFormat());
-
-        mMuxer = createMuxer(mCodec, mediaFormat);
         try {
-            Log.d(TAG, "Start encoder");
-            mStats.pushTimestamp("encoder.start");
-            mCodec.start();
-            mStats.pushTimestamp("encoder.start");
-        } catch (Exception ex) {
-            Log.e(TAG, "Start failed: " + ex.getMessage());
-            //return "Start encoding failed";
-        }
+            MediaFormat mediaFormat = mDecoder.getOutputFormat();
+            Log.d(TAG, "Decoder output format");
+            logMediaFormat(mediaFormat);
+            mediaFormat = TestDefinitionHelper.mergeEncoderSettings(mTest, mediaFormat);
+            //TODO: color handling
+            // The decoder must output same colorformat as input. QC hw encoder does not take same pix fmt android sw decoder.
+            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
+            mStats.pushTimestamp("encoder.configure");
+            mCodec.configure(
+                    mediaFormat,
+                    null /* surface */,
+                    null /* crypto */,
+                    MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mStats.pushTimestamp("encoder.configure");
+            Log.d(TAG, "Check input format after encoder is configured");
+            logMediaFormat(mCodec.getInputFormat());
+
+            mMuxer = createMuxer(mCodec, mediaFormat);
+            try {
+                Log.d(TAG, "Start encoder");
+                mStats.pushTimestamp("encoder.start");
+                mCodec.start();
+                mStats.pushTimestamp("encoder.start");
+            } catch (Exception ex) {
+                Log.e(TAG, "Start failed: " + ex.getMessage());
+                //return "Start encoding failed";
+            }
             // This is needed.
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
@@ -405,9 +405,9 @@ public class BufferTranscoder extends Encoder  {
                 mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                 updateDynamicFramerate(mInFramesCount);
                 //Check time, if to far off drop frame, minimize the drops so something is show.
-                long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
+                long presentationTimeUs = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                if (mRealtime &&  mFirstFrameSystemTimeUsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
+                if (mRealtime &&  mFirstFrameSystemTimeUsec > 0 && (diffUsec - presentationTimeUs) > mFrameTimeUsec * 2) {
                     if (mDropcount < mFrameRate) {
                         Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
                         mDropNext = true;
@@ -421,7 +421,7 @@ public class BufferTranscoder extends Encoder  {
                     mDropNext = false;
                     codec.releaseOutputBuffer(index, false);
                 } else {
-                    mStats.startEncodingFrame(ptsUsec, mInFramesCount);
+                    mStats.startEncodingFrame(presentationTimeUs, mInFramesCount);
                     mFramesAdded++;
 
                     ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
@@ -479,15 +479,15 @@ public class BufferTranscoder extends Encoder  {
                     }
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
                     // Source time is always what is read
-                    long ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
+                    long presentationTimeUs = mExtractor.getSampleTime() + mPtsOffset;
                     if (mRealtime) {
                         // Limit the pace of incoming frames to the framerate
                         sleepUntilNextFrameSynched();
                     }
                     if (size > 0) {
-                        mStats.startDecodingFrame(ptsUsec, size, flags);
+                        mStats.startDecodingFrame(presentationTimeUs, size, flags);
                         try {
-                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
+                            mDecoder.queueInputBuffer(index, 0, size, presentationTimeUs, flags);
                         } catch (IllegalStateException ise) {
                             // Ignore this
                         }
@@ -502,11 +502,11 @@ public class BufferTranscoder extends Encoder  {
                     if (eof) {
                         mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                         mCurrentLoop++;
-                        if (ptsUsec > mLastPtsUs) {
-                            mPtsOffset = ptsUsec;
+                        if (presentationTimeUs > mLastPtsUs) {
+                            mPtsOffset = presentationTimeUs;
                         } else {
                             mPtsOffset = mLastPtsUs;
-                            ptsUsec = mPtsOffset;
+                            presentationTimeUs = mPtsOffset;
                         }
 
                         mLoopTime = mPtsOffset /1000000.0;
@@ -515,7 +515,7 @@ public class BufferTranscoder extends Encoder  {
                             mDone = true;
                         }
                     }
-                    mLastPtsUs = ptsUsec;
+                    mLastPtsUs = presentationTimeUs;
                 }
             }
         }

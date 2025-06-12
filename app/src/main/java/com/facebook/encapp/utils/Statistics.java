@@ -259,6 +259,10 @@ public class Statistics {
         return mEncodingFrames.size();
     }
 
+    public ArrayList<FrameInfo> getEncodedFrames() {
+        return mEncodingFrames;
+    }
+
     public int getDecodedFrameCount() {
         return mDecodingFrames.size();
     }
