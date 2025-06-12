@@ -497,6 +497,15 @@ $./scripts/encapp.py tests/bitrate_buffer_naming.pbtxt
 ok: test id: "bitrate_buffer" run_id: akiyo_qcif.100kbps.1af5-c9 result: ok
 ok: test id: "bitrate_buffer" run_id: akiyo_qcif.200kbps.6809-90 result: ok
 
+6.2 VMAF configuration
+VMAF is run using ffmpeg vmaf plugin. Default model is the v.0.6.1neg. Other models cna be chosen on the command line or using a setprop.
+```
+export VMAF_MODEL="vmaf_4k_v0.6.1"
+```
+or to use a model from the github repo:
+```
+$ VMAF_MODEL_PATH="~/code/vmaf/model/vmaf_4k_v0.6.1neg.json"
+```
 
 # 7. Requirements
 
