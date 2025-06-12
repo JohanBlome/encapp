@@ -450,6 +450,8 @@ def run_quality_mp(args):
         result = run_quality(args.get("test"), args.get("options"), args.get("debug"))
     except Exception as ex:
         print(f"Failed run test: {args=}, {ex} {type(ex)}")
+        if ex.__traceback__:
+            print(f"line: {ex.__traceback__.tb_lineno}")
         result = {"file": args.get("test"), "Error": f"Exception: {ex}"}
     return result
 
@@ -458,6 +460,55 @@ def run_quality_mp(args):
 def get_source_length:
     #TODO: fix this
 """
+
+
+def isfloat(text):
+    try:
+        val = float(text)
+    except:
+        return False
+    return True
+
+
+def average_dicts(dicts):
+    outdict = {}
+    if len(dicts) == 0:
+        return outdict
+    for key in dicts[0].keys():
+        print("****KEY = ", key)
+        if isinstance(dicts[0][key], type({})):
+            print("DICTIONMARY ", dicts[0][key])
+            subd = [d[key] for d in dicts]
+            outdict[key] = average_dicts(subd)
+        elif isinstance(dicts[0][key], type([])):
+            vals = []
+            for index in range(0, len(dicts[0][key])):
+                print("Index = ", index)
+                if isinstance(dicts[0][key][index], type({})):
+                    subd = {}
+                    for innerkey in dicts[0][key][index].keys():
+                        print("innerkey = ", innerkey)
+                        if isfloat(dicts[0][key][index][innerkey]):
+                            print("Float")
+                            subd[innerkey] = sum(
+                                float(d[key][index][innerkey]) for d in dicts
+                            ) / len(dicts)
+                            print(subd[innerkey])
+                        else:
+                            print("No float:", innerkey)
+                            tmp = [d[key][index][innerkey] for d in dicts]
+                            subd[innerkey] = average_dicts(tmp)
+                    vals.append(subd)
+            outdict[key] = vals
+        else:
+            if isfloat(dicts[0][key]):
+                outdict[key] = sum(
+                    [float(d[key]) for d in dicts if isfloat(d[key])]
+                ) / len(dicts)
+            else:
+                # Assume string and use the first
+                outdict[key] = dicts[0][key]
+    return outdict
 
 
 def run_quality(test_file, options, debug):
@@ -746,72 +797,151 @@ def run_quality(test_file, options, debug):
 
         # This is jsut a naming scheme for the color scaling
         diststream = "distorted"
+        input_width = input_resolution.split("x")[0]
+        input_height = input_resolution.split("x")[1]
         if len(force_scale) > 0:
             diststream = "d1"
 
-        input_width = input_resolution.split("x")[0]
-        input_height = input_resolution.split("x")[1]
         # We can choose to convert to the input framerate
         # Or convert to the output. This nomrally gives higher score to lower fps and process faster...
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
-        crop = ""
         if input_framerate != output_framerate and not options.get("ignore_timing"):
             print(
                 "WARNING! Encoded file framerate differs from reference and 'ignore-timing' is not set."
             )
-
-        if options.get("crop_input", None):
-            crop = f"crop={options.get('crop_input')},"
         filter_cmd = ""
+        # TODO: add vmaf offset
+        crop = ""
+        dist_vid = "0:v"
+        orig_vid = "1:v"
+        if options.get("vmaf_crop", None):
+            sides = options.get("vmaf_crop")
+            if sides == "source":
+                sides = [input_width, input_height]
+            else:
+                sides = sides.split("x")
+            if input_height > input_width:
+                crop = f"{sides[1]}:{sides[0]}"
+            else:
+                crop = f"{sides[1]}:{sides[0]}"
+
+            crop = f"crop={crop}"
+            filter_cmd = f"[{dist_vid}]{crop}[{diststream}];[{orig_vid}]{crop}[source]"
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
+        scale = ""
+        if options.get("vmaf_scale", None):
+            sides = options.get("vmaf_scale")
+            if sides == "source":
+                sides = [input_width, input_height]
+            else:
+                sides = sides.split("x")
+            if input_height > input_width:
+                scale = f"{sides[1]}x{sides[0]}"
+            else:
+                scale = f"{sides[1]}x{sides[0]}"
+
+            scale = f"scale={scale}:flags={options.get('vmaf_scaler', 'lanczos')}"
+            filter_cmd = (
+                f"[{dist_vid}]{scale}[{diststream}];[{orig_vid}]{scale}[source]"
+            )
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
         if options.get("ignore_timing") or (input_framerate == output_framerate):
-            filter_cmd = f"[0:v]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
+            # TODO: old code cropped distorted and scaled source. Let us have the ability to crop or scale both as needed
             if debug > 0:
                 print(
                     f"No framerate scaling, ref = {referenced}, {input_framerate=} vs {output_framerate=}"
                 )
         else:
-            filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
+            filter_cmd = f"[{dist_vid}]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}]"
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
         # Do calculations
+        info = {}
         if recalc or not os.path.exists(vmaf_file):
-            # important: vmaf must be called with videos in the right order
-            # <distorted_video> <reference_video>
-            # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
-            shell_cmd = (
-                f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
-                "-filter_complex "
-                f'"{filter_cmd}libvmaf=log_path={vmaf_file}:'
-                "n_threads=16:log_fmt=json"
-            )
-            # Allow for an environment variable
-            model = ""
-            if os.environ.get("VMAF_MODEL_PATH", None):
-                if debug:
-                    print("Environment VMAF_PATH override model")
-                model = "path=" + os.environ.get("VMAF_MODEL_PATH")
-            else:
-                model = f"'version={VMAF_MODEL}'"
-            shell_cmd += f":model={model}"
-            shell_cmd += '" -f null - 2>&1'
-            # write a settings file
-            if not os.path.exists(f"{directory}/vmafmodel.txt"):
-                with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
-                    modelfile.write(
-                        f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
-                    )
-            vmaf_model_info = model
-            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-            # Open json and add the info
-            vmafdata = None
-            try:
-                with open(vmaf_file, "r") as fd:
-                    vmafdata = json.load(fd)
+            # Filter timings, for 60fps split in two parta and caclulate odd and even frame separately then average the result
+            timefilter = ""
+            loopmode = False
+
+            vmaf_dicts = []
+            if input_framerate == output_framerate and int(
+                round(input_framerate) == 60
+            ):
+                loopmode = True
+
+            for loop in range(0, 2):
+                vmaf_file_ = vmaf_file
+                if loopmode:
+                    timefilter = f";[{diststream}]select=e='not(mod(n, 2) + {loop} - 1)'[{diststream}];[source]select=e='not(mod(n, 2) + {loop} -1)'[source];[{diststream}][source]"
+                    vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
+                else:
+                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
+
+                # important: vmaf must be called with videos in the right order
+                # <distorted_video> <reference_video>
+                # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
+                shell_cmd = (
+                    f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
+                    "-filter_complex "
+                    f'"{filter_cmd}{timefilter}libvmaf=log_path={vmaf_file_}:'
+                    "n_threads=16:log_fmt=json"
+                )
+                # Allow for an environment variable
+                model = ""
+                if os.environ.get("VMAF_MODEL_PATH", None):
+                    if debug:
+                        print("Environment VMAF_PATH override model")
+                    model = "path=" + os.environ.get("VMAF_MODEL_PATH")
+                else:
+                    model = f"'version={VMAF_MODEL}'"
+                shell_cmd += f":model={model}"
+                shell_cmd += '" -f null - 2>&1'
+                # write a settings file
+                if not os.path.exists(f"{directory}/vmafmodel.txt"):
+                    with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
+                        modelfile.write(
+                            f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
+                        )
+                vmaf_model_info = model
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                # Open json and add the info
+                vmafdata = None
+                try:
+                    with open(vmaf_file_, "r") as fd:
+                        vmafdata = json.load(fd)
+                        vmaf_dicts.append(vmafdata)
+
+                    with open(vmaf_file_, "w") as fd:
+                        paths = model.split("/")
+                        # this will be the same for all
+                        if len(info) == 0:
+                            info["model"] = paths[-1]
+                            info["path"] = model if len(paths) > 1 else ""
+                            if options.get("vmaf_crop", None):
+                                info["resolution"] = options.get("vmaf_crop")
+                            else:
+                                info["resolution"] = input_resolution
+
+                        for key in info.keys():
+                            vmafdata[key] = info[key]
+                        json.dump(vmafdata, fd, indent=4)
+
+                except FileNotFoundError as ferror:
+                    print(f"VMAF calculation failed. {ferror}")
+
+            if loopmode:
+                vmaf_dict = average_dicts(
+                    vmaf_dicts
+                )  # {key: (vmaf_dicts[0].get(key, 0) + vmaf_dicts[1].get(key, 0))/2 for key in vmaf_dicts[0].keys() if isfloat(vmaf_dicts[0][key])}
                 with open(vmaf_file, "w") as fd:
-                    paths = model.split("/")
-                    vmafdata["model"] = paths[-1]
-                    vmafdata["path"] = model if len(paths) > 1 else ""
-                    json.dump(vmafdata, fd, indent=4)
-            except FileNotFoundError as ferror:
-                print(f"VMAF calculation failed. {ferror}")
+                    json.dump(vmaf_dict, fd, indent=4)
 
         elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
@@ -1100,7 +1230,7 @@ def run_quality(test_file, options, debug):
             )
         # Check vmaf for zero vmaf and/or wrong number of frames
         try:
-            if vmaf_dict["zero_vmaf"] == True:
+            if vmaf_dict.get("zero_vmaf", False) == True:
                 error_in_calc = True
                 # raise Exception("Warning! Some frames are zero, most likely a broken calculation.")
                 print(
@@ -1110,7 +1240,7 @@ def run_quality(test_file, options, debug):
                     "Warning! Some frames are zero, most likely a broken calculation."
                 )
 
-            if vmaf_dict["framecount"] != framecount:
+            if vmaf_dict.get("framecount", 0) != framecount:
                 error_in_calc = True
                 print("Warning! Frame count diffes for vmaf and test")
                 failed["warning"] = "Warning! Frame count diffes for vmaf and test"
@@ -1272,9 +1402,28 @@ def get_options(argv):
         default=None,
     )
     parser.add_argument(
-        "--crop_input",
-        help="If there is padding which is not automatically handled, crop: ACTUAL_W:ACTUAL_H'. It will assume that all cropping is right and bottom.",
+        "--vmaf-crop",
+        dest="vmaf_crop",
+        help="Use crop for calculating vmaf, crop: WxH",
         default=None,
+    )
+    parser.add_argument(
+        "--vmaf-offset",
+        dest="vmaf_offset",
+        help="If there is padding which is not automatically handled use this with crop, offset: HxV",
+        default=None,
+    )
+    parser.add_argument(
+        "--vmaf-scale",
+        dest="vmaf_scale",
+        help="Use a specific resolution for the calculation, resolution: WxH. Default scaler is lanczos",
+        default=None,
+    )
+    parser.add_argument(
+        "--vmaf-scaler",
+        dest="vmaf_scaler",
+        help="Scaler used for actual scaling. Default is lanczos",
+        default="lanczos",
     )
     parser.add_argument(
         "-l",
@@ -1437,6 +1586,8 @@ def calculate_quality(tests, source_path, output, quiet, debug):
             quality_dict = run_quality(test, options, False)
         except Exception as ex:
             print(f"{test} failed: {ex}")
+            if ex.__traceback__:
+                print(f"line: {ex.__traceback__.tb_lineno}")
             continue
         now = time.time()
         run_for = now - start
@@ -1507,6 +1658,8 @@ def main(argv):
 
         except Exception as ex:
             print(f"{test} failed: {ex}")
+            if ex.__traceback__:
+                print(f"line: {ex.__traceback__.tb_lineno}")
             continue
         now = time.time()
         run_for = now - start
