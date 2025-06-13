@@ -475,27 +475,20 @@ def average_dicts(dicts):
     if len(dicts) == 0:
         return outdict
     for key in dicts[0].keys():
-        print("****KEY = ", key)
         if isinstance(dicts[0][key], type({})):
-            print("DICTIONMARY ", dicts[0][key])
             subd = [d[key] for d in dicts]
             outdict[key] = average_dicts(subd)
         elif isinstance(dicts[0][key], type([])):
             vals = []
             for index in range(0, len(dicts[0][key])):
-                print("Index = ", index)
                 if isinstance(dicts[0][key][index], type({})):
                     subd = {}
                     for innerkey in dicts[0][key][index].keys():
-                        print("innerkey = ", innerkey)
                         if isfloat(dicts[0][key][index][innerkey]):
-                            print("Float")
                             subd[innerkey] = sum(
                                 float(d[key][index][innerkey]) for d in dicts
                             ) / len(dicts)
-                            print(subd[innerkey])
                         else:
-                            print("No float:", innerkey)
                             tmp = [d[key][index][innerkey] for d in dicts]
                             subd[innerkey] = average_dicts(tmp)
                     vals.append(subd)
