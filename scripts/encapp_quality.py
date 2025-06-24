@@ -939,6 +939,8 @@ def run_quality(test_file, options, debug):
         elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
 
+        # Other filter needs this definitions as well
+        filter_cmd = f"{filter_cmd};[{diststream}][source]"
         if recalc or not os.path.exists(ssim_file):
             shell_cmd = (
                 f"ffmpeg {dist_part} {ref_part} -t {duration} "
