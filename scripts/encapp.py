@@ -2896,6 +2896,27 @@ def merge_options(option1, options2):
     return option1
 
 
+def get_workdir(serial):
+    workdir = ""
+    if not encapp_tool.adb_cmds.USE_IDB:
+        encapp_tool.adb_cmds.reset_logcat(serial)
+        adb_cmd = (
+            f"adb -s {serial} shell am start "
+            f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
+        )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
+        time.sleep(1)
+        # Get logcat and look for:
+        # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
+        logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+        reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
+        m = re.search(reg, logcat_contents)
+        if m:
+            workdir = m.group("workdir")
+
+    return workdir
+
+
 def main(argv):
     options = get_options(argv)
     # check if this is a test run and if these params are defined in the test
@@ -2945,20 +2966,7 @@ def main(argv):
     if options.device_workdir is None:
         # default, check if it works
         if not encapp_tool.adb_cmds.USE_IDB:
-            encapp_tool.adb_cmds.reset_logcat(serial)
-            adb_cmd = (
-                f"adb -s {serial} shell am start "
-                f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
-            )
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
-            time.sleep(1)
-            # Get logcat and look for:
-            # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
-            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
-            reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
-            m = re.search(reg, logcat_contents)
-            if m:
-                options.device_workdir = m.group("workdir")
+            options.device_workdir = get_workdir(serial)
 
         if proto_options is not None and proto_options.device_workdir:
             options.device_workdir = proto_options.device_workdir
