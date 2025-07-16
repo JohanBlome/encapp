@@ -15,6 +15,8 @@ public class CliSettings {
     public static final String TEST_UI_HOLD_TIME_SEC = "ui_hold_sec";
     public static final String OLD_AUTH_METHOD = "old_auth";
     public static final String WORKDIR = "workdir";
+    // Either /sdcard/ or /data/data/com.facebook.encapp
+    public static final String CHECK_WORKDIR = "check_workdir";
 
     private static String mWorkDir = "/sdcard/";
 

@@ -96,7 +96,7 @@ PIX_FMT_TYPES = {
     "nv12": "yuv",
     "nv21": "yuv",
     "rgba": "rgba",
-    "yuv420p10le": "yuv420p10le"
+    "yuv420p10le": "yuv420p10le",
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
@@ -2915,19 +2915,6 @@ def main(argv):
             options.configfile[0] = filepath
         proto_options = check_protobuf_test_setup(options)
 
-    # Default settings will be set where necessary unless it is already set.
-    if not options.device_workdir:
-        if proto_options is not None and proto_options.device_workdir:
-            options.device_workdir = proto_options.device_workdir
-    options = process_options(options)
-
-    # cli should always override
-    if proto_options:
-        options = merge_options(proto_options, options)
-    if options.version:
-        print("version: %s" % encapp_tool.__version__)
-        sys.exit(0)
-
     serial = ""
     # get model and serial number
     if (
@@ -2943,6 +2930,35 @@ def main(argv):
         model, serial = encapp_tool.adb_cmds.get_device_info(
             options.serial, options.debug
         )
+    # Default settings will be set where necessary unless it is already set.
+    if options.device_workdir is None:
+        # default, check if it works
+        if not encapp_tool.adb_cmds.USE_IDB:
+            encapp_tool.adb_cmds.reset_logcat(serial)
+            adb_cmd = (
+                f"adb -s {serial} shell am start "
+                f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
+            )
+            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
+            time.sleep(1)
+            # Get logcat and look for:
+            # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
+            m = re.search(reg, logcat_contents)
+            if m:
+                options.device_workdir = m.group("workdir")
+
+        if proto_options is not None and proto_options.device_workdir:
+            options.device_workdir = proto_options.device_workdir
+
+    options = process_options(options)
+    # cli should always override
+    if proto_options:
+        options = merge_options(proto_options, options)
+    if options.version:
+        print("version: %s" % encapp_tool.__version__)
+        sys.exit(0)
 
     # If needed rename local workfolder
     if rename_workdir:

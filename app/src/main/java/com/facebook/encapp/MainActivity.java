@@ -52,8 +52,10 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
@@ -324,6 +326,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 e.printStackTrace();
             }
             return;
+        } else if (mExtraData.containsKey(CliSettings.CHECK_WORKDIR)) {
+            // Try to write and read from /sdcard/ and if that fails, check /data/data/com.facebook.encapp
+            if (!tryFilePath("/sdcard/")) {
+                tryFilePath("/data/data/com.facebook.encapp");
+            }
         }
 
 
@@ -365,7 +372,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                         mUIHoldtimeSec = setup.getUiholdSec();
                     }
                 }
-                
+
                 int nbrViews = 0;
                 boolean hasCameraPreview = false;
                 // Prepare views for visualization
@@ -577,6 +584,31 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         } catch (IOException iox) {
             report_result("unknown", "unknown", "error", iox.getMessage());
         }
+    }
+
+    private static boolean tryFilePath(String path) {
+        java.io.File file = null;
+        try {
+            file = new File(path + "/_encapp.txt");
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(("encapp workdir:" + path).getBytes(StandardCharsets.UTF_8));
+            fos.close();
+            FileInputStream fis = new FileInputStream(file);
+            byte[] data = fis.readAllBytes();
+
+            Log.d(TAG, "Succeded in writing to "+ path);
+            Log.d(TAG, new String(data, StandardCharsets.UTF_8));
+            fis.close();
+
+            return true;
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to use filepath: " + path);
+        } finally {
+            if (file != null)
+                file.delete();
+        }
+
+        return false;
     }
 
 
