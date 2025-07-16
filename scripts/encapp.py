@@ -1735,6 +1735,17 @@ def run_codec_tests(
             ):
                 abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
+        if len(protobuf_txt_filepath) <= 0:
+            # We need to create the file and push it.
+            protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
+            configfile_write(test_suite, protobuf_txt_filepath)
+
+            if not encapp_tool.adb_cmds.push_file_to_device(
+                protobuf_txt_filepath, serial, device_workdir, False, debug
+            ):
+                abort_test(
+                    local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
+                )
         basename = os.path.basename(protobuf_txt_filepath)
         if encapp_tool.adb_cmds.USE_IDB:
             protobuf_txt_filepath = f"{basename}"
@@ -2953,6 +2964,7 @@ def main(argv):
             options.device_workdir = proto_options.device_workdir
 
     options = process_options(options)
+
     # cli should always override
     if proto_options:
         options = merge_options(proto_options, options)
