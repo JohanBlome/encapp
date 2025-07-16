@@ -2905,7 +2905,8 @@ def get_workdir(serial):
             f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
         )
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
-        time.sleep(1)
+        # it seems some devices have a longer delayuntil logs appear in the log
+        time.sleep(3)
         # Get logcat and look for:
         # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
         logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
