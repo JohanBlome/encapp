@@ -3,8 +3,8 @@ package com.facebook.encapp;
 import static com.facebook.encapp.utils.TestDefinitionHelper.magnitudeToInt;
 
 import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 
@@ -17,7 +17,6 @@ import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
-import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.StringParameter;
@@ -42,14 +41,11 @@ import java.util.Vector;
 
 class CustomEncoder extends Encoder {
     protected static final String TAG = "encapp.buffer_x264_encoder";
-
     public static native int initEncoder(Parameter[] parameters, int width, int height, int colorFormat, int bitDepth);
     public static native byte[] getHeader();
     // TODO: can the size, color and bitdepth change runtime?
     public static native int encode(byte[] input, byte[] output, FrameInfo info);
-
     public static native StringParameter[] getAllEncoderSettings();
-
     public static native void updateSettings(Parameter[] parameters);
     public static native void close();
 
@@ -91,10 +87,6 @@ class CustomEncoder extends Encoder {
         }
     }
 
-    private long computePresentationTimeUs(int frameIndex) {
-        return frameIndex * 1000000 / 30;
-    }
-
     public static byte[] readYUVFromFile(String filePath, int size, int framePosition) throws IOException {
         byte[] inputBuffer = new byte[size];
         try (FileInputStream fis = new FileInputStream(filePath);
@@ -109,7 +101,6 @@ class CustomEncoder extends Encoder {
         return inputBuffer;
     }
 
-
     public static byte[][] extractSpsPps(byte[] headerArray) {
         int spsStart = -1;
         int spsEnd = -1;
@@ -122,9 +113,9 @@ class CustomEncoder extends Encoder {
                     (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
 
                 int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
+                if (nalType == H264_NALU_TYPE_SPS && spsStart == -1) {
                     spsStart = i;
-                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
+                } else if (nalType == H264_NALU_TYPE_PPS && spsStart != -1 && spsEnd == -1) {
                     spsEnd = i;
                     ppsStart = i;
                 }
@@ -143,25 +134,6 @@ class CustomEncoder extends Encoder {
         return new byte[][]{spsBuffer, ppsBuffer};
     }
 
-    public boolean checkIfKeyFrame(byte[] bitstream) {
-        int nalUnitType;
-        for (int i = 0; i < bitstream.length - 4; i++) {
-            // Check for the start code 0x00000001 or 0x000001
-            if ((bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x00 && bitstream[i+3] == 0x01) ||
-                    (bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x01)) {
-
-                nalUnitType = bitstream[i + (bitstream[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-
-                // Check if the NAL unit type is 5 (IDR frame)
-                if (nalUnitType == 5) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-
     public void setRuntimeParameters(int frame) {
         // go through all runtime settings and see which are due
         if (mRuntimeParams == null) return;
@@ -169,14 +141,14 @@ class CustomEncoder extends Encoder {
 
         for (Runtime.VideoBitrateParameter bitrate : mRuntimeParams.getVideoBitrateList()) {
             if (bitrate.getFramenum() == frame) {
-                params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
+                addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
                 break;
             }
         }
 
         for (Long sync : mRuntimeParams.getRequestSyncList()) {
             if (sync == frame) {
-                params.add(Parameter.newBuilder().setKey("request-sync").setValue(String.valueOf("")).setType(DataValueType.stringType).build());
+                addEncoderParameters(params, DataValueType.longType.name(), "request-sync", "");
                 break;
             }
         }
@@ -213,24 +185,23 @@ class CustomEncoder extends Encoder {
 
         int width = sourceResolution.getWidth();
         int height = sourceResolution.getHeight();
-        int pixelformat = mTest.getInput().getPixFmt().getNumber();
-        int bitdepth = (pixelformat == PixFmt.p010le.getNumber())? 10: 8;
+        int pixelFormat = mTest.getInput().getPixFmt().getNumber();
+        int bitdepth = (pixelFormat == PixFmt.p010le.getNumber())? 10: 8;
         int bitrate = magnitudeToInt(mTest.getConfigure().getBitrate());
-        int bitratemode = mTest.getConfigure().getBitrateMode().getNumber();
-        int iframeinterval =  mTest.getConfigure().getIFrameInterval();
+        int bitrateMode = mTest.getConfigure().getBitrateMode().getNumber();
+        int iFrameInterval =  mTest.getConfigure().getIFrameInterval();
+        float framerate =  mTest.getConfigure().getFramerate();
 
         float crf = 23.0f;
-        Log.d(TAG, width + "x" + height + ",  pixelformat: " + pixelformat + ", bitdepth:" + bitdepth + ", bitrate_mode:" + bitratemode + ", bitrate: " + bitrate + ", iframeinterval: "+ iframeinterval);
-        // Create params for this
-
+        Log.d(TAG, width + "x" + height + ",  pixelFormat: " + pixelFormat + ", bitdepth:" + bitdepth + ", bitrate_mode:" + bitrateMode + ", bitrate: " + bitrate + ", iFrameInterval: "+ iFrameInterval);
 
         // Caching vital values and see if they can be set runtime.
         Vector<Parameter> params = new Vector(mTest.getConfigure().getParameterList());
         // This one needs to be set as a native param.
         try {
-            params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("bitrate_mode").setValue(String.valueOf(bitratemode)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("i_frame_interval").setValue(String.valueOf(iframeinterval)).setType(DataValueType.stringType).build());
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE_MODE, String.valueOf(bitrateMode));
+            addEncoderParameters(params, DataValueType.floatType.name(), I_FRAME_INTERVAL, String.valueOf(iFrameInterval));
         } catch (Exception ex) {
             Log.d(TAG, "Exception: " + ex);
         }
@@ -276,7 +247,7 @@ class CustomEncoder extends Encoder {
 
             Parameter[] param_buffer = new Parameter[params.size()];
             params.toArray(param_buffer);
-            int status = initEncoder(param_buffer, width, height, pixelformat, bitdepth);
+            int status = initEncoder(param_buffer, width, height, pixelFormat, bitdepth);
             StringParameter[] settings_ = getAllEncoderSettings();
             //add generic parameters to mTest, this way it can bre exactly reproduced (?) - in the case x264: no
             ArrayList<Parameter> param_list = new ArrayList<>();
@@ -313,7 +284,7 @@ class CustomEncoder extends Encoder {
                             continue;
                         }
 
-                        long pts = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+                        long pts = computePresentationTimeUs(mPts, mFramesAdded, mRefFrameTime);
                         info = mStats.startEncodingFrame(pts, mFramesAdded);
                         // Let us read the setting in native and force key frame if set here.
                         // If (for some reason a key frame is not produced it will be updated in the native code
@@ -345,16 +316,20 @@ class CustomEncoder extends Encoder {
                         format.setInteger(MediaFormat.KEY_WIDTH, width);
                         format.setInteger(MediaFormat.KEY_HEIGHT, height);
                         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
-                        format.setFloat(MediaFormat.KEY_FRAME_RATE, 30);//mFrameRate);
-                        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, 20);//MediaCodecInfoHelper.mapEncappPixFmtToAndroidColorFormat(PixFmt.forNumber(pixelformat)));
-                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3);//iframeinterval);//TODO:
+                        format.setFloat(MediaFormat.KEY_FRAME_RATE, framerate);
+                        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar);
+                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
 
                         byte[][] spsPps = extractSpsPps(headerArray);
 
-                        ByteBuffer sps = ByteBuffer.wrap(spsPps[0]);
-                        ByteBuffer pps = ByteBuffer.wrap(spsPps[1]);
-                        format.setByteBuffer("csd-0", sps);
-                        format.setByteBuffer("csd-1", pps);
+                        try {
+                            ByteBuffer sps = ByteBuffer.wrap(spsPps[0]);
+                            ByteBuffer pps = ByteBuffer.wrap(spsPps[1]);
+                            format.setByteBuffer("csd-0", sps);
+                            format.setByteBuffer("csd-1", pps);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to extract the NAL SPS and PPS ", e);
+                        }
 
                         bufferInfo = new MediaCodec.BufferInfo();
                         videoTrackIndex = mMuxer.addTrack(format);
@@ -368,7 +343,7 @@ class CustomEncoder extends Encoder {
                     bufferInfo.presentationTimeUs = info.getPts();
 
                     //TODO: we get this from FrameInfo instead
-                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer, SyntaxType.H264);
                     if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
 
                     if(mMuxer != null) {

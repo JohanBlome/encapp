@@ -306,14 +306,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                                 mDropNext = false;
                             } else {
                                 mFrameSwapSurface.dropNext(false);
-                                long ptsUsec = 0;
+                                long presentationTimeUs = 0;
                                 if (mUseCameraTimestamp) {
                                     // Use the camera provided timestamp
-                                    ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
+                                    presentationTimeUs = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
-                                    ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+                                    presentationTimeUs = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
                                 }
-                                mStats.startEncodingFrame(ptsUsec, mInFramesCount);
+                                mStats.startEncodingFrame(presentationTimeUs, mInFramesCount);
                                 mFramesAdded++;
                             }
                             mInFramesCount++;
@@ -484,7 +484,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
         byteBuffer.clear();
         int read = fileReader.fillBuffer(byteBuffer, size);
-        long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+        long presentationTimeUs = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
         mDropNext |= dropFromDynamicFramerate(mInFramesCount);
@@ -506,10 +506,10 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             }
 
             if (mFirstFrameTimestampUsec == -1) {
-                mFirstFrameTimestampUsec = ptsUsec;
+                mFirstFrameTimestampUsec = presentationTimeUs;
             }
-            mOutputMult.newBitmapAvailable(mBitmap, ptsUsec);
-            mStats.startEncodingFrame(ptsUsec, frameCount);
+            mOutputMult.newBitmapAvailable(mBitmap, presentationTimeUs);
+            mStats.startEncodingFrame(presentationTimeUs, frameCount);
         } else {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             return -1;

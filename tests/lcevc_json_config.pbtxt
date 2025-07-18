@@ -1,0 +1,20 @@
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.y4m"
+    }
+    common { 
+        id: "lcevc_json_config"
+        description: "V-Nova's LCEVC H264 encoding using json config"
+    }
+    configure {
+        codec: "lcevc_h264"
+        bitrate: "2000k"
+        i_frame_interval: 10
+
+        parameter {
+            key: "eil_params_path"
+            type: stringType
+            value: "/tmp/testConfig.json"
+        }
+    }
+}
