@@ -1082,8 +1082,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
     @Override
     public void shutdown() {
-        Log.e(TAG, "Battery problem, shutdown.");
-        exit();
+        Log.e(TAG, "Battery problem, shutdown. OVERRRIDEN");
+        //exit();
     }
 
 }
