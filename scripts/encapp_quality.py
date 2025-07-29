@@ -874,10 +874,8 @@ def run_quality(test_file, options, debug):
                 if loopmode:
                     timefilter = f";[{diststream}]select=e='not(mod(n, 2) + {loop} - 1)'[{diststream}];[source]select=e='not(mod(n, 2) + {loop} -1)'[source];[{diststream}][source]"
                     vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
-                elif len(filter_cmd) > 0:
-                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
                 else:
-                    filter_cmd = "[{diststream}][source]"
+                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
 
                 # important: vmaf must be called with videos in the right order
                 # <distorted_video> <reference_video>
