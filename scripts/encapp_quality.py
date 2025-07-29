@@ -1631,7 +1631,7 @@ def main(argv):
         voptions = vars(options).copy()
         del voptions["test"]
         mpargs = [
-            ({"test": test, "options": voptions, "debug": False})
+            ({"test": test, "options": voptions, "debug": options.debug})
             for test in options.test
         ]
 
