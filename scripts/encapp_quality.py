@@ -874,8 +874,8 @@ def run_quality(test_file, options, debug):
                 if loopmode:
                     timefilter = f";[{diststream}]select=e='not(mod(n, 2) + {loop} - 1)'[{diststream}];[source]select=e='not(mod(n, 2) + {loop} -1)'[source];[{diststream}][source]"
                     vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
-                else:
-                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
+                elif len(filter_cmd) > 0:
+                     filter_cmd = f"{filter_cmd};[{diststream}][source]"
 
                 # important: vmaf must be called with videos in the right order
                 # <distorted_video> <reference_video>
@@ -903,6 +903,8 @@ def run_quality(test_file, options, debug):
                             f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
                         )
                 vmaf_model_info = model
+                if debug > 0:
+                    print(f"vmaf command: {shell_cmd}")
                 encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 # Open json and add the info
                 vmafdata = None
