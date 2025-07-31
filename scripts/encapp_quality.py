@@ -760,7 +760,8 @@ def run_quality(test_file, options, debug):
 
         tmp_ref = None
         tmp_dist = None
-        if options.get("ignore_timing") and (input_framerate != output_framerate):
+        if options.get("ignore_timing"):
+            # It seems that even wih same framerate we can get into trouble so always use raw.
             # transcode to raw intermidiant file
             tmp_ref = f".ref_{time.time()}.raw"
             tmp_dist = f".dist_{time.time()}.raw"
