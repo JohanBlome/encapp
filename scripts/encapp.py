@@ -3043,10 +3043,8 @@ def main(argv):
 
     if "dry_run" in options and not options.dry_run:
         # ensure the app is correctly installed
-        assert encapp_tool.app_utils.install_ok(serial, options.debug), (
-            "Apps not installed in %s" % serial
-        )
-
+        if not encapp_tool.app_utils.install_ok(serial, options.debug):
+            print(f"=======\nWARNING! Java app is not installed in {serial}\n=======\n")
     # run function
     if options.func == "list":
         codecs_file = None
