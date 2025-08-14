@@ -1674,7 +1674,14 @@ def run_codec_tests(
             run_cmd = ""
             if test.test_setup and test.test_setup.run_cmd:
                 run_cmd = test.test_setup.run_cmd
-            run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug=debug)
+
+            run_encapp_test(
+                protobuf_txt_filepath,
+                serial,
+                device_workdir,
+                run_cmd=run_cmd,
+                debug=debug,
+            )
             with open(tests_run, "a") as passed:
                 passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
 
@@ -1699,7 +1706,6 @@ def run_codec_tests(
                     protobuf_txt_filepath,
                     serial,
                     device_workdir,
-                    run_cmd=run_cmd,
                     debug=debug,
                 )
             )
