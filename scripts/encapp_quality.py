@@ -471,37 +471,54 @@ def isfloat(text):
 
 
 def average_dicts(dicts):
-    outdict = {}
-    if len(dicts) == 0:
-        return outdict
-    for key in dicts[0].keys():
-        if isinstance(dicts[0][key], type({})):
-            subd = [d[key] for d in dicts]
-            outdict[key] = average_dicts(subd)
-        elif isinstance(dicts[0][key], type([])):
+    out = {}
+    if not dicts:
+        return out
+
+    # consider all keys that appear in any dict
+    all_keys = set().union(*(d.keys() for d in dicts))
+
+    for key in all_keys:
+        # find a sample value to infer type
+        sample = next((d[key] for d in dicts if key in d), None)
+
+        if isinstance(sample, dict):
+            sub = [d[key] for d in dicts if key in d and isinstance(d[key], dict)]
+            out[key] = average_dicts(sub)
+
+        elif isinstance(sample, list):
+            lists = [d[key] for d in dicts if key in d and isinstance(d[key], list)]
+            max_len = max((len(lst) for lst in lists), default=0)
+
             vals = []
-            for index in range(0, len(dicts[0][key])):
-                if isinstance(dicts[0][key][index], type({})):
-                    subd = {}
-                    for innerkey in dicts[0][key][index].keys():
-                        if isfloat(dicts[0][key][index][innerkey]):
-                            subd[innerkey] = sum(
-                                float(d[key][index][innerkey]) for d in dicts
-                            ) / len(dicts)
-                        else:
-                            tmp = [d[key][index][innerkey] for d in dicts]
-                            subd[innerkey] = average_dicts(tmp)
-                    vals.append(subd)
-            outdict[key] = vals
+            for i in range(max_len):
+                items = [lst[i] for lst in lists if i < len(lst)]
+
+                if not items:
+                    continue
+
+                if isinstance(items[0], dict):
+                    # average nested dicts at this index (only those present)
+                    vals.append(average_dicts(items))
+                else:
+                    nums = [float(x) for x in items if isfloat(x)]
+                    if nums:
+                        vals.append(sum(nums) / len(nums))
+                    else:
+                        # non-numeric: keep the first present value
+                        vals.append(items[0])
+
+            out[key] = vals
+
         else:
-            if isfloat(dicts[0][key]):
-                outdict[key] = sum(
-                    [float(d[key]) for d in dicts if isfloat(d[key])]
-                ) / len(dicts)
+            nums = [float(d[key]) for d in dicts if key in d and isfloat(d[key])]
+            if nums:
+                out[key] = sum(nums) / len(nums)
             else:
-                # Assume string and use the first
-                outdict[key] = dicts[0][key]
-    return outdict
+                # non-numeric: keep the first present value
+                out[key] = next((d[key] for d in dicts if key in d), None)
+
+    return out
 
 
 def run_quality(test_file, options, debug):
@@ -649,7 +666,10 @@ def run_quality(test_file, options, debug):
         if output_media_format is not None:
             output_width = output_media_format.get("width")
             output_height = output_media_format.get("height")
-            output_framerate = output_media_format.get("frame-rate")
+            if "framerate" in output_media_format:
+                output_framerate = output_media_format.get("framerate")
+            else:
+                output_framerate = output_media_format.get("frame-rate")
         else:
             if test != None:
                 resolution = test["configure"].get("resolution", None)
@@ -865,18 +885,31 @@ def run_quality(test_file, options, debug):
             loopmode = False
 
             vmaf_dicts = []
-            if input_framerate == output_framerate and int(
-                round(input_framerate) == 60
+            loopnum = 1
+            if (
+                round(input_framerate) == round(output_framerate)
+                and round(int(input_framerate)) == 60
             ):
                 loopmode = True
+                loopnum = 2
+            elif (
+                round(input_framerate) == round(output_framerate)
+                and round(int(input_framerate)) == 120
+            ):
+                loopmode = True
+                loopnum = 4
 
-            for loop in range(0, 2):
+            # duration must be updated as well, other wise it will misscalculate at 30fps
+            if loopmode:
+                duration = loopnum * float(duration)
+
+            for loop in range(0, loopnum):
                 vmaf_file_ = vmaf_file
                 if loopmode:
-                    timefilter = f";[{diststream}]select=e='not(mod(n, 2) + {loop} - 1)'[{diststream}];[source]select=e='not(mod(n, 2) + {loop} -1)'[source];[{diststream}][source]"
+                    timefilter = f"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
                     vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
                 elif len(filter_cmd) > 0:
-                     filter_cmd = f"{filter_cmd};[{diststream}][source]"
+                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
 
                 # important: vmaf must be called with videos in the right order
                 # <distorted_video> <reference_video>
@@ -907,6 +940,7 @@ def run_quality(test_file, options, debug):
                 if debug > 0:
                     print(f"vmaf command: {shell_cmd}")
                 encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+
                 # Open json and add the info
                 vmafdata = None
                 try:
@@ -1240,7 +1274,9 @@ def run_quality(test_file, options, debug):
 
             if vmaf_dict.get("framecount", 0) != framecount:
                 error_in_calc = True
-                print("Warning! Frame count diffes for vmaf and test")
+                print(
+                    f"Warning! Frame count differs for vmaf and test ({vmaf_dict.get('framecount', 0)}, {framecount}) (may happen if framerate is  > 30 fps)"
+                )
                 failed["warning"] = "Warning! Frame count diffes for vmaf and test"
         except Exception as ex:
             print(f"VMAF failed: {ex} - {type(ex)}")
@@ -1580,13 +1616,14 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         "keep_quality_files": True,
     }
     for test in tests:
-        try:
-            quality_dict = run_quality(test, options, False)
-        except Exception as ex:
-            print(f"{test} failed: {ex}")
-            if ex.__traceback__:
-                print(f"line: {ex.__traceback__.tb_lineno}")
-            continue
+        # try:
+
+        quality_dict = run_quality(test, options, False)
+        # except Exception as ex:
+        #    print(f"{test} failed: {ex}")
+        #    if ex.__traceback__:
+        #        print(f"line: {ex.__traceback__.tb_lineno}")
+        #    continue
         now = time.time()
         run_for = now - start
         time_per_test = float(run_for) / float(current)
