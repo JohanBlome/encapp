@@ -610,13 +610,12 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     files_to_push = set()
     for test in test_suite.test:
         add_files_to_push(test, files_to_push)
-
     # 3. save the media files
     for filepath in files_to_push:
         # https://stackoverflow.com/a/30359308
         if not os.path.exists(options.mediastore):
             os.mkdir(options.mediastore)
-        basename = os.path.basename(test.input.filepath)
+        basename = os.path.basename(filepath)
         if not os.path.exists(f"{options.mediastore}/{basename}"):
             shutil.copy2(filepath, f"{options.mediastore}/{basename}")
 
