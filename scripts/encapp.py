@@ -630,11 +630,11 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if options.split:
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
-        for test in test_suite.test:
-            output_dir = f"{local_workdir}/{valid_path(test.common.id)}"
+        for num, test in enumerate(test_suite.test):
+            output_dir = f"{local_workdir}"
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
-            filename = f"{output_dir}/{valid_path(test.common.id)}.pbtxt"
+            filename = f"{output_dir}/{get_valid_test_name(test)}.pbtxt"
             configfile_write(test, filename)
             files_to_push |= {filename}
     else:
@@ -694,9 +694,9 @@ def run_codec_tests_file(
         for test in test_suite.test:
             suite = tests_definitions.TestSuite()
             suite.test.extend([test])
-            path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
+            path = f"{local_workdir}/{get_valid_test_name(test)}.pbtxt"
             configfile_write(suite, path)
-            files_to_push |= {path}
+            files_to_push.add(path)
     # Save the complete test if updated
     if updated:
         # remove any older pbtxt in existence
@@ -755,7 +755,7 @@ def run_codec_tests_file(
                     test_suite.test.append(test)
                 counter += 1
                 protobuf_txt_filepath = (
-                    f"{local_workdir}/{valid_path(test.common.id)}_{counter}.pbtxt"
+                    f"{local_workdir}/{get_valid_test_name(test)}_{counter}.pbtxt"
                 )
                 configfile_write(test_suite, protobuf_txt_filepath)
                 if debug > 0:
@@ -815,7 +815,7 @@ def run_codec_tests_file(
             # If we are using the id - we need to replace characters that are problematic in
             # a filepath (i.e. space)
             protobuf_txt_filepath = (
-                f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
+                f"{local_workdir}/{get_valid_test_name(test)}_aggr.pbtxt"
             )
             configfile_write(test_suite, protobuf_txt_filepath)
             if debug > 0:
@@ -827,6 +827,9 @@ def run_codec_tests_file(
                     print("Dry run - do nothing")
                 return None, None
             else:
+                if debug > 0:
+                    print(f"RUN THIS! {text_format.MessageToString(test_suite)}")
+
                 results = run_codec_tests(
                     test_suite,
                     files_to_push,
@@ -841,7 +844,7 @@ def run_codec_tests_file(
                     debug,
                 )
                 # Verify the number fo tests and files (if applicable)
-                print(f"*** VERIFY RESULT: {len(results)} ***")
+                print(f"*** VERIFY RESULT ***")
                 check = verify_test_result(results, test_suite, protobuf_txt_filepath)
                 if len(check) > 0:
                     print("ERROR! some tests failed")
@@ -852,8 +855,9 @@ def run_codec_tests_file(
 
                 # Run quality
                 success = True
-                if not results[0]:
+                if not (results and results[0]):
                     success = False
+                    return success, []
                 result_files += results[1]
                 if success and options.quality:
                     output = f"{local_workdir}/quality.csv"
@@ -894,20 +898,25 @@ def find_test_name(videofilename, test_suite):
 
 def verify_test_result(results, test_suite, protobuf_txt_filepath):
     fail = []
-    if not results[0]:
+    if not (results and results[0]):
         # TODO: report in some other way?
         print("Error! test case failed")
         fail.append({"test_id": "", "stats": "", "error": "Test failed"})
+        return fail
 
     test_count = len(test_suite.test)
+    # TODO: fix this crap
+    # Test result can be [status, [file], status2, [file2]...
     result_count = len(results[1])
+    if len(results) > 2:
+        result_count = len(results) / 2
 
     # TODO: check that outout is expected
     # result in the same folder as the protobuf
     folder = os.path.dirname(protobuf_txt_filepath)
     if test_count != result_count:
         print(
-            f"ERROR! \nTest count = {test_count}]nTest results = {result_count}\nMissing: {test_count - result_count}"
+            f"ERROR! \nTest count = {test_count}, nTest results = {result_count}\nMissing: {test_count - result_count}"
         )
         # In case of named output files we can find them
         for test in test_suite.test:
@@ -1603,6 +1612,14 @@ def update_codec_testsuite(
     return updated_test_suite
 
 
+def get_valid_test_name(test: tests_definitions.TestSuite):
+    name = valid_path(test.common.id)
+    if len(name) > 0 and name[0] == ".":
+        return name[1:]
+    else:
+        return name
+
+
 def run_codec_tests(
     test_suite: tests_definitions.TestSuite,
     files_to_push: list[str],
@@ -1643,7 +1660,7 @@ def run_codec_tests(
             if os.path.exists(tests_run):
                 with open(tests_run, "r+") as passed:
                     data = passed.read()
-                    if f"{valid_path(test.common.id)}.pbtxt" in data:
+                    if f"{get_valid_test_name(test)}.pbtxt" in data:
                         print("Test already done, moving on.")
                         ignore_results = True
                         continue
@@ -1656,7 +1673,7 @@ def run_codec_tests(
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{local_workdir}/{valid_path(test.common.id)}.pbtxt",
+                    f"{local_workdir}/{get_valid_test_name(test)}.pbtxt",
                     serial,
                     device_workdir,
                     fast_copy,
@@ -1665,10 +1682,10 @@ def run_codec_tests(
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
             if encapp_tool.adb_cmds.USE_IDB:
-                protobuf_txt_filepath = f"{valid_path(test.common.id)}.pbtxt"
+                protobuf_txt_filepath = f"{get_valid_test_name(test)}.pbtxt"
             else:
                 protobuf_txt_filepath = (
-                    f"{device_workdir}/{valid_path(test.common.id)}.pbtxt"
+                    f"{device_workdir}/{get_valid_test_name(test)}.pbtxt"
                 )
 
             run_cmd = ""
@@ -1683,7 +1700,7 @@ def run_codec_tests(
                 debug=debug,
             )
             with open(tests_run, "a") as passed:
-                passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
+                passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
 
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
