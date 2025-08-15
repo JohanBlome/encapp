@@ -789,7 +789,10 @@ def run_codec_tests_file(
 
                 # Verify the number fo tests and files (if applicable)
                 # TODO:
-                if not results[0]:
+                if not results:
+                    print("Error: no result")
+                    return False, []
+                if results[0]:
                     success = False
                 result_files += results[1]
                 # Run quality
@@ -1614,7 +1617,7 @@ def update_codec_testsuite(
 
 
 def get_valid_test_name(test: tests_definitions.TestSuite):
-    name = valid_path(test.common.id)
+    name = valid_path(f"{test.common.id}.{test.common.output_filename}")
     if len(name) > 0 and name[0] == ".":
         return name[1:]
     else:
