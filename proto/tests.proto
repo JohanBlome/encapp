@@ -65,6 +65,7 @@ message Parameter {
     // For runtime purposes
     optional int64 framenum = 4;
 }
+
 message Input {
   optional string filepath = 1;
   optional string resolution = 2;
@@ -76,6 +77,8 @@ message Input {
   optional float stoptime_sec = 8;
   optional bool show = 9;
   optional bool device_decode = 10;
+  // This is the area containing actual video data, wxh
+  optional string crop_area = 11;
 }
 
 message Configure {

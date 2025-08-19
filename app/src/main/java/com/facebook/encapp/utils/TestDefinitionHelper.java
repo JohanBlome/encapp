@@ -192,6 +192,15 @@ public class TestDefinitionHelper {
                     ///Should not be here
             }
         }
+
+        // Check crop area
+        if (input.hasCropArea()) {
+            Size cropArea = SizeUtils.parseXString(input.getCropArea());
+            mediaFormat.setInteger(MediaFormat.KEY_CROP_LEFT, 0);
+            mediaFormat.setInteger(MediaFormat.KEY_CROP_TOP, 0);
+            mediaFormat.setInteger(MediaFormat.KEY_CROP_RIGHT, cropArea.getWidth());
+            mediaFormat.setInteger(MediaFormat.KEY_CROP_BOTTOM, cropArea.getHeight());
+        }
         return mediaFormat;
     }
 
