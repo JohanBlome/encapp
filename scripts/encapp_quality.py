@@ -324,30 +324,35 @@ def detailed_media_info(inputfile, options, debug):
 
 def parse_quality_vmaf(vmaf_file):
     """Parse log/output files and return quality score"""
-    with open(vmaf_file) as fd:
-        data = json.load(fd)
-    vmaf_dict = {
-        "mean": data["pooled_metrics"]["vmaf"]["mean"],
-        "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
-        "min": data["pooled_metrics"]["vmaf"]["min"],
-        "max": data["pooled_metrics"]["vmaf"]["max"],
-    }
-    # get per-frame VMAF values
-    vmaf_list = np.array(
-        list(data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"])))
-    )
-    # add some percentiles
-    vmaf_dict.update(
-        {
-            f"p{percentile}": np.percentile(vmaf_list, percentile)
-            for percentile in VMAF_PERCENTILE_LIST
+    vmaf_dict = {}
+    try:
+        with open(vmaf_file) as fd:
+            data = json.load(fd)
+        vmaf_dict = {
+            "mean": data["pooled_metrics"]["vmaf"]["mean"],
+            "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
+            "min": data["pooled_metrics"]["vmaf"]["min"],
+            "max": data["pooled_metrics"]["vmaf"]["max"],
         }
-    )
-    if "model" in data:
-        vmaf_dict["model"] = data["model"]
-    # Check for zero frames and frame count
-    vmaf_dict.update({"framecount": len(data["frames"])})
-    vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
+        # get per-frame VMAF values
+        vmaf_list = np.array(
+            list(data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"])))
+        )
+        # add some percentiles
+        vmaf_dict.update(
+            {
+                f"p{percentile}": np.percentile(vmaf_list, percentile)
+                for percentile in VMAF_PERCENTILE_LIST
+            }
+        )
+        if "model" in data:
+            vmaf_dict["model"] = data["model"]
+        # Check for zero frames and frame count
+        vmaf_dict.update({"framecount": len(data["frames"])})
+        vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
+    except KeyError as ke:
+        print(f"ERROR: {ke=} for {vmaf_file}")
+
     return vmaf_dict
 
 
@@ -545,7 +550,8 @@ def run_quality(test_file, options, debug):
             with open(test_file, "r") as fd:
                 results = json.load(fd)
         except:
-            return None
+            print(f"Failed to open file: {test_file}")
+            return  failed
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}, probably not an Encapp file")
@@ -644,6 +650,11 @@ def run_quality(test_file, options, debug):
             else:
                 pix_fmt = test["input"]["pixFmt"]
                 input_media_format = results.get("encoder_media_format")
+
+            # Is can be a number representation as well as a text (unfortuntaley)
+            if isinstance(pix_fmt, int):
+                pix_fmt = encapp.get_pix_fmt(pix_fmt)
+
             if len(pix_fmt) == 0:
                 # See if source contains a clue
                 pix_fmt = "yuv420p"
@@ -940,7 +951,6 @@ def run_quality(test_file, options, debug):
                 if debug > 0:
                     print(f"vmaf command: {shell_cmd}")
                 encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-
                 # Open json and add the info
                 vmafdata = None
                 try:
@@ -1681,6 +1691,7 @@ def main(argv):
     failed = []
     success = []
     for test in options.test:
+        print(f"{test=}")
         try:
             quality_dict = run_quality(test, vars(options), options.debug)
             if "error" in quality_dict:
@@ -1690,7 +1701,6 @@ def main(argv):
                     success.append({"file": test, "warning": quality_dict["warning"]})
                 else:
                     success.append({"file": test, "warning": "none"})
-
         except Exception as ex:
             print(f"{test} failed: {ex}")
             if ex.__traceback__:
