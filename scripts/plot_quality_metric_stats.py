@@ -10,6 +10,7 @@ import pandas as pd
 import seaborn as sns
 import math
 import itertools as it
+import encapp
 
 sns.set_style("whitegrid")
 sns.set(rc={"xtick.bottom": True})
@@ -67,7 +68,7 @@ def plot_by(data, args):
     fig_size = (
         float(args.graph_size.split("x")[0]),
         float(args.graph_size.split("x")[1]),
-    )
+000    )
     graph_height = fig_size[1]
     aspect_ratio = fig_size[0] / fig_size[1]
     # 1 split by source, plot metric with codec as marker and resolution as hue
@@ -411,7 +412,7 @@ def plot_percentile(data, args):
         max_percentile = pd.DataFrame(percs)
 
     for resolution, fps, bitrate in it.product(*[resolutions, framerates, bitrates]):
-        if (resolution == max_resolution) & (fps == max_fps) & (bitrate == max_bitrate):
+        if (args.high_reference and resolution == max_resolution) & (fps == max_fps) & (bitrate == max_bitrate):
             continue
         df = data.loc[
             (data[bitrate_label] == bitrate)
@@ -696,17 +697,16 @@ def main():
         data = pd.concat([data_1, data_2])
 
     # Filter on bitrates
-    bitrates = None
     if args.bitrates:
-        bitrates = [int(br) for br in args.bitrates.split(",")]
+        bitrates = encapp.parse_bitrate_field(args.bitrates)
 
-    if bitrates:
-        data = data.loc[data["bitrate_bps"].isin(bitrates)]
+        if bitrates:
+            data = data.loc[data["bitrate_bps"].isin(bitrates)]
 
-    # filter on framerates
-    if args.framerate:
-        framerates = [float(x) for x in args.framerate.split(",")]
-        data = data.loc[data["framerate_fps"].isin(framerates)]
+        # filter on framerates
+        if args.framerate:
+            framerates = [float(x) for x in args.framerate.split(",")]
+            data = data.loc[data["framerate_fps"].isin(framerates)]
 
     # Make sorting on absolute size possible
     data["pixel_count"] = data["width"] * data["height"]
