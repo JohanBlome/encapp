@@ -79,6 +79,9 @@ message Input {
   optional bool device_decode = 10;
   // This is the area containing actual video data, wxh
   optional string crop_area = 11;
+  // Restamp input frame timestamps according to the framerate set
+  // in the nput or dynamic upates
+  optional bool restamp = 12;
 }
 
 message Configure {

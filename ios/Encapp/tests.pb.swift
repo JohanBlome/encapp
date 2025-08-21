@@ -401,6 +401,17 @@ struct Input: Sendable {
   /// Clears the value of `cropArea`. Subsequent reads from it will return its default value.
   mutating func clearCropArea() {self._cropArea = nil}
 
+  /// Restamp input frame timestamps according to the framerate set
+  /// in the nput or dynamic upates
+  var restamp: Bool {
+    get {return _restamp ?? false}
+    set {_restamp = newValue}
+  }
+  /// Returns true if `restamp` has been explicitly set.
+  var hasRestamp: Bool {return self._restamp != nil}
+  /// Clears the value of `restamp`. Subsequent reads from it will return its default value.
+  mutating func clearRestamp() {self._restamp = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -416,6 +427,7 @@ struct Input: Sendable {
   fileprivate var _show: Bool? = nil
   fileprivate var _deviceDecode: Bool? = nil
   fileprivate var _cropArea: String? = nil
+  fileprivate var _restamp: Bool? = nil
 }
 
 struct Configure: @unchecked Sendable {
@@ -1166,6 +1178,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     9: .same(proto: "show"),
     10: .standard(proto: "device_decode"),
     11: .standard(proto: "crop_area"),
+    12: .same(proto: "restamp"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1185,6 +1198,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
       case 9: try { try decoder.decodeSingularBoolField(value: &self._show) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self._deviceDecode) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._cropArea) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self._restamp) }()
       default: break
       }
     }
@@ -1228,6 +1242,9 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     try { if let v = self._cropArea {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
     } }()
+    try { if let v = self._restamp {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1243,6 +1260,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     if lhs._show != rhs._show {return false}
     if lhs._deviceDecode != rhs._deviceDecode {return false}
     if lhs._cropArea != rhs._cropArea {return false}
+    if lhs._restamp != rhs._restamp {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
