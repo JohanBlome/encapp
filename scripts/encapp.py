@@ -2598,6 +2598,11 @@ def get_options(argv: list) -> argparse.Namespace:
         parser.print_help()
         sys.exit(0)
 
+    # add serial from os.environ
+    if options.serial is None and "ANDROID_SERIAL" in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ["ANDROID_SERIAL"]
+
     global DEBUG
     DEBUG = options.debug > 0
     return options
