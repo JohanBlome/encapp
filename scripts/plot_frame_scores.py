@@ -54,8 +54,7 @@ class BasePlot:
     def draw(self, frame_nums, scores, curve_label, mean, minval):
         self.x_max = max(self.x_max, np.amax(frame_nums))
         self.y_min = min(self.y_min, np.amin(scores))
-        p = plt.plot(frame_nums, scores, self.get_style(),
-                     label=str(curve_label))
+        p = plt.plot(frame_nums, scores, self.get_style(), label=str(curve_label))
         color = p[0].get_color()
         plt.axhline(mean, color=color)
         plt.axhline(minval, color=color)
@@ -119,10 +118,15 @@ class PSNRPlot(BasePlot):
                 average = np.mean(psnr_scores)
                 minval = np.min(psnr_scores)
                 maxval = np.max(psnr_scores)
-                self.y_min = minval//10 * 10
-                self.y_max = (maxval//10 + 1) * 10
-                self.draw(frame_nums, psnr_scores, label +
-                          f", avg: {average:.2f}, min: {minval:.2f}", average, minval)
+                self.y_min = minval // 10 * 10
+                self.y_max = (maxval // 10 + 1) * 10
+                self.draw(
+                    frame_nums,
+                    psnr_scores,
+                    label + f", avg: {average:.2f}, min: {minval:.2f}",
+                    average,
+                    minval,
+                )
 
         self.finish(fig_file)
 
@@ -139,8 +143,8 @@ class SSIMPlot(BasePlot):
 
     def parse_line(self, line):
 
-       # n:1 Y:0.938221 U:0.946291 V:0.970905 All:0.945013 (12.597431)
-       # n:2 Y:0.933821 U:0.945150 V:0.970634 All:0.941844 (12.354085)
+        # n:1 Y:0.938221 U:0.946291 V:0.970905 All:0.945013 (12.597431)
+        # n:2 Y:0.933821 U:0.945150 V:0.970634 All:0.941844 (12.354085)
         regex = r"^n:(?P<frame>[0-9]*) .*All:(?P<ssim_avg>[0-9.]*)"
         frame = -1
         score = -1
@@ -173,10 +177,15 @@ class SSIMPlot(BasePlot):
                 average = np.mean(ssim_scores)
                 minval = np.min(ssim_scores)
                 maxval = np.max(ssim_scores)
-                self.y_min = minval//10 * 10
-                self.y_max = (maxval//10 + 1) * 10
-                self.draw(frame_nums, ssim_scores, label +
-                          f", avg: {average:.2f}, min: {minval:.2f}", average, minval)
+                self.y_min = minval // 10 * 10
+                self.y_max = (maxval // 10 + 1) * 10
+                self.draw(
+                    frame_nums,
+                    ssim_scores,
+                    label + f", avg: {average:.2f}, min: {minval:.2f}",
+                    average,
+                    minval,
+                )
 
         self.finish(fig_file)
 
@@ -207,8 +216,13 @@ class VMAFPlot(BasePlot):
                 # pooled mean
                 average = rd_results["pooled_metrics"]["vmaf"]["mean"]
                 minval = rd_results["pooled_metrics"]["vmaf"]["min"]
-                self.draw(frame_nums, vmaf_scores, label +
-                          f", avg: {average:.2f}, min: {minval:.2f}", average, minval)
+                self.draw(
+                    frame_nums,
+                    vmaf_scores,
+                    label + f", avg: {average:.2f}, min: {minval:.2f}",
+                    average,
+                    minval,
+                )
 
         self.finish(fig_file)
 
@@ -226,10 +240,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vfiles", nargs="+", help="VMAF Files", type=str)
     parser.add_argument("--labels", nargs="+", help="Curve labels", type=str)
+    parser.add_argument("--fig", help="Specify a file name to save figure", type=str)
     parser.add_argument(
-        "--fig", help="Specify a file name to save figure", type=str)
-    parser.add_argument("--type", type=str, choices=["vmaf", "psnr", "ssim"], default="vmaf",
-                        help="Vmaf should use files with *.vmaf.json ending. Psnr should use *.psnr.all and ssim *.ssim.all")
+        "--type",
+        type=str,
+        choices=["vmaf", "psnr", "ssim"],
+        default="vmaf",
+        help="Vmaf should use files with *.vmaf.json ending. Psnr should use *.psnr.all and ssim *.ssim.all",
+    )
 
     args = parser.parse_args()
     rd_plot = None

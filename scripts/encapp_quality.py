@@ -1590,12 +1590,12 @@ def get_options(argv):
 
     if options.media_path is not None:
         # make sure media_path holds a valid directory
-        assert os.path.isdir(options.media_path), (
-            f"Error: {options.media_path} not a valid directory"
-        )
-        assert os.access(options.media_path, os.R_OK), (
-            f"Error: {options.media_path} not a readable directory"
-        )
+        assert os.path.isdir(
+            options.media_path
+        ), f"Error: {options.media_path} not a valid directory"
+        assert os.access(
+            options.media_path, os.R_OK
+        ), f"Error: {options.media_path} not a readable directory"
 
     return options
 
