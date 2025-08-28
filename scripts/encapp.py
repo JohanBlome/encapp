@@ -98,7 +98,7 @@ PIX_FMT_TYPES = {
     "nv21": "yuv",
     "rgba": "rgba",
     "yuv420p10le": "yuv420p10le",
-    "yuvj420p":"yuv",
+    "yuvj420p": "yuv",
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
@@ -1167,9 +1167,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert len(resolution_spec) == 3, (
-            f'error: invalid resolution spec: "{resolution}"'
-        )
+        assert (
+            len(resolution_spec) == 3
+        ), f'error: invalid resolution spec: "{resolution}"'
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -2785,9 +2785,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert options.configfile is not None, (
-        "error: need a valid input configuration file"
-    )
+    assert (
+        options.configfile is not None
+    ), "error: need a valid input configuration file"
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -3115,9 +3115,9 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert options.configfile is not None, (
-            "error: need a valid input configuration file"
-        )
+        assert (
+            options.configfile is not None
+        ), "error: need a valid input configuration file"
 
         if not options.dry_run:
             # first clear out old result

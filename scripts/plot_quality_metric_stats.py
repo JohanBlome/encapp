@@ -68,7 +68,8 @@ def plot_by(data, args):
     fig_size = (
         float(args.graph_size.split("x")[0]),
         float(args.graph_size.split("x")[1]),
-000    )
+        000,
+    )
     graph_height = fig_size[1]
     aspect_ratio = fig_size[0] / fig_size[1]
     # 1 split by source, plot metric with codec as marker and resolution as hue
@@ -208,7 +209,7 @@ def plot_by(data, args):
             plt.close()
     else:
         hue = "source"
-        if len(args.split_by) >0:
+        if len(args.split_by) > 0:
             hue = args.split_by
 
         style = "codec"
@@ -218,7 +219,7 @@ def plot_by(data, args):
             size = "codec"
         if args.split_on_datasource:
             style = "data source"
-            #hue = "source"
+            # hue = "source"
             size = "codec"
 
         # implicit by height
@@ -412,7 +413,11 @@ def plot_percentile(data, args):
         max_percentile = pd.DataFrame(percs)
 
     for resolution, fps, bitrate in it.product(*[resolutions, framerates, bitrates]):
-        if (args.high_reference and resolution == max_resolution) & (fps == max_fps) & (bitrate == max_bitrate):
+        if (
+            (args.high_reference and resolution == max_resolution)
+            & (fps == max_fps)
+            & (bitrate == max_bitrate)
+        ):
             continue
         df = data.loc[
             (data[bitrate_label] == bitrate)
@@ -458,7 +463,7 @@ def plot_percentile(data, args):
 
     col = "resolution"
     row = "framerate"
-    style="metric"
+    style = "metric"
     if args.metric == "vmaf_mean":
         g = sns.relplot(
             x="percentile",
@@ -503,7 +508,7 @@ def plot_percentile(data, args):
             col=col,
             row=row,
             data=df,
-            #c="red",
+            # c="red",
             linewidth=2,
         )
 
