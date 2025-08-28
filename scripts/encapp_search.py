@@ -183,9 +183,7 @@ def derive_values(data):
         lambda x: (
             encapp.parse_magnitude(x)
             if type(x) == type(str)
-            else 0
-            if np.isnan(0)
-            else x
+            else 0 if np.isnan(0) else x
         )
     )
 
