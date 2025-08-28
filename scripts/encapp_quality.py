@@ -1658,6 +1658,25 @@ def calculate_quality(tests, source_path, output, quiet, debug):
     df.to_csv(output, mode=mode, index=False, header=True)
 
 
+def check_metric_availability(options):
+    ret, std, err = encapp_tool.adb_cmds.run_cmd("ffmpeg -filters")
+
+    # Check ffmpeg filters
+    checks = [" libvmaf ", " psnr ", " ssim "]
+    # These are essential
+    ok = True
+    for check in checks:
+        if check not in std:
+            print(f"\n\n*** ERROR: Quality metric '{check}' not available ***\n\n")
+            ok = False
+
+    if not ok:
+        print("Essential quality metrics needs to be installed")
+        exit(0)
+
+    # todo: check siti, qp etc, if those are requested.
+
+
 def main(argv):
     """Calculate video quality properties (vmaf/ssim/psnr) and write
     a csv with relevant data
@@ -1666,6 +1685,9 @@ def main(argv):
     global CVVDP_AVAILABLE
     options = get_options(argv)
     VMAF_MODEL = options.vmaf_model
+
+    # Check installed metrics
+    check_metric_availability(options)
 
     # run all the tests
     current = 1
