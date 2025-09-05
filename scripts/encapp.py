@@ -3007,7 +3007,7 @@ def main(argv):
     rename_workdir = False
 
     global EXPAND_ALL
-    EXPAND_ALL = options.expand_all
+    EXPAND_ALL = False if "expand_all" not in options else options.expand_all
 
     if options.func == "run":
         # Make sure we are writing to a good place
@@ -3048,7 +3048,7 @@ def main(argv):
             options.serial, options.debug
         )
     # Default settings will be set where necessary unless it is already set.
-    if options.device_workdir is None and not options.dry_run:
+    if options.device_workdir is None and "dry_run" in options and not options.dry_run:
         # default, check if it works
         if not encapp_tool.adb_cmds.USE_IDB:
             options.device_workdir = get_workdir(serial)
