@@ -47,6 +47,8 @@ RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
 
+EXPAND_ALL = False
+
 QUALITY_PROCESSES = []
 
 FUNC_CHOICES = {
@@ -1085,7 +1087,11 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
-                            if parent == "configure" and setting[0].name == "parameter":
+                            if (
+                                parent == "configure"
+                                and setting[0].name == "parameter"
+                                and EXPAND_ALL
+                            ):
                                 for num, param in enumerate(item.parameter):
                                     local_expanded = expand_ranges(param.value)
                                     # Parameters needs to be handled differently
@@ -2368,6 +2374,12 @@ def add_args(parser):
         type=str,
         help="Regexp filter on the input files when using a folder input.",
     )
+    parser.add_argument(
+        "--expand-all",
+        dest="expand_all",
+        action="store_true",
+        help="Expand all parameters where the value is a string and match the x,y,z pr x-y-z pattern.",
+    )
 
 
 input_args = {
@@ -2993,6 +3005,9 @@ def main(argv):
 
     proto_options = None
     rename_workdir = False
+
+    global EXPAND_ALL
+    EXPAND_ALL = options.expand_all
 
     if options.func == "run":
         # Make sure we are writing to a good place
