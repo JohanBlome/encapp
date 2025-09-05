@@ -98,7 +98,7 @@ PIX_FMT_TYPES = {
     "nv21": "yuv",
     "rgba": "rgba",
     "yuv420p10le": "yuv420p10le",
-    "yuvj420p":"yuv",
+    "yuvj420p": "yuv",
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
@@ -522,39 +522,37 @@ def parse_multiply(multiply):
     return definition
 
 
-def update_fileoutput_names(test):
-    """Upate output file name is existing according to placeholders
-    Example: output_filename: "[input.filepath].[configure.bitrate].[XXX]"
-    Where the input.filepath will set the basename from the test def and
-    the bitrate will be set from the configure.bitrate.
-    XXX means three random bytes in hex format.
-    """
-    if test.common.output_filename is not None:
-        # Check if we have any placeholders
-        reg = r"\[[\w.]*\]"
-        filename = test.common.output_filename
-        while True:
-            m = re.search(reg, filename)
+def get_parameter_value(params: tests_definitions.Parameter, name: str) -> str:
+    for param in params:
+        if param.key == name:
+            return str(param.value)
+    return ""
 
-            if m:
-                text = m.group(0)[1:-1]
-                # check if match only contains X
-                m2 = re.search(r"X*", text)
 
-                if len(m2.group(0)) > 0:
-                    # create random byte values and print as hex
-                    nbr = len(m2.group(0))
-                    hex = "".join(
-                        [random.choice("0123456789abcdef") for i in range(nbr)]
-                    )
-                    filename = filename.replace(m.group(0), hex)
-                else:
-                    # split at .
-                    parts = text.split(".")
-                    value = ""
-                    if hasattr(test, parts[0]):
-                        comp = getattr(test, parts[0])
-                        if hasattr(comp, parts[1]):
+def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
+    reg = r"\[[\w.\-]*\]"
+    while True:
+        m = re.search(reg, source)
+        if m:
+            text = m.group(0)[1:-1]
+            # check if match only contains X
+            m2 = re.search(r"X*", text)
+
+            if m2 and len(m2.group(0)) > 0:
+                # create random byte values and print as hex
+                nbr = len(m2.group(0))
+                hex = "".join([random.choice("0123456789abcdef") for i in range(nbr)])
+                source = source.replace(m.group(0), hex)
+            else:
+                # split at .
+                parts = text.split(".")
+                value = ""
+                if hasattr(test, parts[0]):
+                    comp = getattr(test, parts[0])
+                    if hasattr(comp, parts[1]):
+                        if parts[1] == "parameter":
+                            value = get_parameter_value(comp.parameter, parts[2])
+                        else:
                             # If float and has not fractional part make it int
                             value = ""
                             value_ = getattr(comp, parts[1])
@@ -571,10 +569,24 @@ def update_fileoutput_names(test):
                                         lindex = value.index(ex)
                                         if lindex > 0:
                                             value = value[0:lindex]
-                    filename = filename.replace(m.group(0), value)
+                source = source.replace(m.group(0), value)
+        else:
+            break
 
-            else:
-                break
+    return source
+
+
+def update_fileoutput_names(test):
+    """Upate output file name is existing according to placeholders
+    Example: output_filename: "[input.filepath].[configure.bitrate].[XXX]"
+    Where the input.filepath will set the basename from the test def and
+    the bitrate will be set from the configure.bitrate.
+    XXX means three random bytes in hex format.
+    """
+    if test.common.output_filename is not None:
+        # Check if we have any placeholders
+        filename = replace_placeholders(test.common.output_filename, test)
+
     if len(filename) > 0:
         test.common.output_filename = filename
 
@@ -623,9 +635,11 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     for test in test_suite.test:
         update_file_paths(test, options.device_workdir)
 
-    # 4.b Update outputfile name (if present)
+    # 4.b Update outputfile name and id (if present)
     for test in test_suite.test:
         update_fileoutput_names(test)
+        if test.HasField("common") and test.common.HasField("id"):
+            test.common.id = replace_placeholders(test.common.id, test)
 
     # 5. save the full protobuf text file(s)
     if options.split:
@@ -1002,12 +1016,25 @@ def lookup_message_by_name(message, submessage_name):
 
 def multiply_tests_with_tems(test, parent, setting, expanded):
     tests = []
+
+    # for "paramater" we need to work a little different
+    param = None
+    if setting == "parameter":
+        param = expanded[0]
+        expanded = expanded[1]
+
     for item in expanded:
         ntest = tests_definitions.Test()
         ntest.CopyFrom(test)
         submessage = lookup_message_by_name(ntest, parent)
-        if submessage:
+        if submessage and not param:
             setattr(submessage, setting, str(item))
+        elif submessage and param:
+            for subparam in submessage.parameter:
+                if subparam.key == param.key:
+                    setattr(subparam, "value", str(item))
+        else:
+            print(f"Combination not supported: {item=}, {submessage=}")
 
         tests.append(ntest)
     return tests
@@ -1034,6 +1061,7 @@ def create_tests_from_definition_expansion(testsuite, options):
     if options.filter_input:
         regexp = options.filter_input
     # updated_testsuite.test = tests_definitions.Test
+
     for test in testsuite.test:
         tests = [test]
         fields = [[descr.name, val] for descr, val in test.ListFields()]
@@ -1046,6 +1074,7 @@ def create_tests_from_definition_expansion(testsuite, options):
                     settings = [val for val in item.ListFields()]
                     for setting in settings:
                         force_update = False
+                        expanded = []
                         # special case: input file
                         if parent == "input" and setting[0].name == "filepath":
                             # If the filepath match _exactly_ one file, leave it at that.
@@ -1056,7 +1085,21 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
-                            expanded = expand_ranges(setting[1])
+                            if parent == "configure" and setting[0].name == "parameter":
+                                for num, param in enumerate(item.parameter):
+                                    local_expanded = expand_ranges(param.value)
+                                    # Parameters needs to be handled differently
+                                    if len(local_expanded) > 1:
+                                        param_expand = [param, local_expanded]
+                                        tests_ = update_single_setting(
+                                            tests, parent, "parameter", param_expand
+                                        )
+                                        if tests_:
+                                            tests = tests_
+                                        extended = []
+                            else:
+                                expanded = expand_ranges(setting[1])
+
                         if tests:
                             if len(expanded) > 1 or force_update:
                                 tests_ = update_single_setting(
@@ -1064,6 +1107,7 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 )
                                 if tests_:
                                     tests = tests_
+
         updated_testsuite.test.extend(tests)
 
     return updated_testsuite
@@ -1082,7 +1126,6 @@ def expand_filepath(path, regexp=None):
     for root, _dirs, files in os.walk(folder):
         for file in files:
             if regexp:
-                print(f"Check reg:{regexp}")
                 m = re.search(regexp, file)
                 if not m:
                     continue
@@ -1421,9 +1464,7 @@ def update_codec_test(
                 # force integer value
                 if type(val) is str:
                     expanded = expand_ranges(val)
-                    print(expanded)
                     for gop in expanded:
-                        print("Gop is ", gop)
                         # create a new test with the new bitrate
                         if is_parallel:
                             ntest = test
@@ -2060,6 +2101,7 @@ def codec_test(options, model, serial, debug):
                     test.MergeFrom(tmp.test[0])
         else:
             print("ERROR, first config file lacks a test")
+
     basename = os.path.basename(options.configfile[0])
     options.configfile = f"{local_workdir}/{basename}"
 
@@ -2991,7 +3033,7 @@ def main(argv):
             options.serial, options.debug
         )
     # Default settings will be set where necessary unless it is already set.
-    if options.device_workdir is None:
+    if options.device_workdir is None and not options.dry_run:
         # default, check if it works
         if not encapp_tool.adb_cmds.USE_IDB:
             options.device_workdir = get_workdir(serial)
