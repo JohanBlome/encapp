@@ -488,6 +488,14 @@ public abstract class Encoder {
         @Override
         public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
             Log.e(TAG, "onError: " + e.getMessage() + ", error code: " + e.getErrorCode());
+            if (e.isTransient()) {
+                Log.e(TAG, "Transient error. Try to continue");
+            } else if (e.isRecoverable()) {
+                Log.d(TAG, "Error should be recoverable. Try to continue");
+            } else {
+                Log.d(TAG, "Error is fatal. Shutdown.");
+                stopAllActivity();
+            }
         }
 
         @Override
@@ -496,7 +504,7 @@ public abstract class Encoder {
     }
 
     public class DecoderCallbackHandler extends MediaCodec.Callback {
-
+        private static final String TAG = "encapp.decoder";
         @Override
         public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
             //  Log.d(TAG, "DecoderCallbackHandler onInputBufferAvailable");
@@ -510,7 +518,15 @@ public abstract class Encoder {
 
         @Override
         public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.d(TAG, "onError: " + e.getDiagnosticInfo());
+            Log.e(TAG, "onError: " + e.getDiagnosticInfo());
+            if (e.isTransient()) {
+                Log.e(TAG, "Transient error. Try to continue");
+            } else if (e.isRecoverable()) {
+                Log.d(TAG, "Error should be recoverable. Try to continue");
+            } else {
+                Log.d(TAG, "Error is fatal. Shutdown.");
+                stopAllActivity();
+            }
         }
 
         @Override
