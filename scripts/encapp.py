@@ -864,7 +864,8 @@ def run_codec_tests_file(
                     debug,
                 )
                 # Verify the number fo tests and files (if applicable)
-                print(f"*** VERIFY RESULT ***")
+                if debug:
+                    print(f"*** VERIFY RESULT ***")
                 check = verify_test_result(results, test_suite, protobuf_txt_filepath)
                 if len(check) > 0:
                     print("ERROR! some tests failed")
@@ -934,7 +935,8 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
     # TODO: check that outout is expected
     # result in the same folder as the protobuf
     folder = os.path.dirname(protobuf_txt_filepath)
-    if test_count != result_count:
+    # TODO:  Currently it will fail when there are parallel tests
+    if test_count > result_count:
         print(
             f"ERROR! \nTest count = {test_count}, nTest results = {result_count}\nMissing: {test_count - result_count}"
         )
