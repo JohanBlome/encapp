@@ -282,10 +282,7 @@ def collect_results(
         # There seems to be somethign fishy here which causes files to show up late
         # Not a problem if running a single file but multiple is a problem. Sleep...
         time.sleep(2)
-        stdout = encapp_tool.adb_cmds.list_files(serial, {device_workdir}, debug=debug)
-    else:
-        cmd = f"adb -s {serial} shell ls {device_workdir}/"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+    stdout = encapp_tool.adb_cmds.list_files(serial, device_workdir, debug=debug)
     # If we have a output_filename template in the test we need to check the begining
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
     test_suite = configfile_read(local_path)
@@ -315,21 +312,16 @@ def collect_results(
 
     total_number = len(output_files)
     counter = 1
-    for file in output_files:
+    for counter, file in enumerate(output_files):
         if debug > 0:
             print(f"*** Pull file {counter}/{total_number}, {file} **")
-        counter += 1
         if file == "":
             print("No file found")
             continue
         # pull the output file
-        if encapp_tool.adb_cmds.USE_IDB:
-            encapp_tool.adb_cmds.pull_files_from_device(
-                serial, file, device_workdir, local_workdir, debug
-            )
-        else:
-            cmd = f"adb -s {serial} pull {device_workdir}/{file} {local_workdir}"
-            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, file, device_workdir, local_workdir, debug=debug
+        )
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
@@ -340,13 +332,7 @@ def collect_results(
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
     # remove/process the test file
-    if encapp_tool.adb_cmds.USE_IDB:
-        encapp_tool.adb_cmds.pull_files_from_device(
-            serial, protobuf_txt_filepath, device_workdir, local_workdir, debug
-        )
-    else:
-        cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+    encapp_tool.adb_cmds.remove_file(serial, protobuf_txt_filepath, debug)
     if debug > 0:
         print(f"results collect: {result_json}")
     # dump device information
@@ -1780,7 +1766,6 @@ def run_codec_tests(
         protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
-        print(f"Push proto")
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
@@ -2996,7 +2981,6 @@ def main(argv):
     global EXPAND_ALL
     EXPAND_ALL = False if "expand_all" not in options else options.expand_all
 
-    print("SET IDB MODE")
     set_idb_mode(options.idb)
     if options.func == "run":
         # Make sure we are writing to a good place

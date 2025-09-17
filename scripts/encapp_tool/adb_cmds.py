@@ -213,7 +213,6 @@ def get_connected_devices(debug: int) -> typing.Dict:
         Map of found connected devices through adb, with serial no.
         as key.
     """
-    print(f"Get connected devices: {USE_IDB}")
     # list all available devices
     if USE_IDB:
         with tempfile.NamedTemporaryFile(
@@ -676,7 +675,6 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
     # check whether a file with the same name, size, and hash exists.
     # In that case, skip the step.
     if USE_IDB:
-        print("IOS Push")
         device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
@@ -689,7 +687,6 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         if not ret:
             print(f'error: copying "{filepath}" to  {device_workdir}/ : {stdout}')
     else:
-        print("Android push")
         device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
@@ -761,7 +758,7 @@ def push_file_to_device_android(
     ret, stdout, stderr = run_cmd(cmd, debug=debug)
     assert ret, f"error: cannot md5sum {device_filepath}"
     device_md5sum = stdout.split()[0]
-    if local_md5sum != de:
+    if local_md5sum != device_md5sum:
         print(
             f"error: push file was broken: md5sum's differ {local_md5sum}!={device_md5sum}"
         )
@@ -779,7 +776,7 @@ def pull_files_from_device(
         _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
-        for file in output_files:
+        for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
 
             cmd = (
@@ -789,16 +786,14 @@ def pull_files_from_device(
             )
 
             run_cmd(cmd, debug=debug)
-            counter += 1
     else:
         adb_cmd = f"adb -s {serial} shell ls {location}/"
         _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
-        for file in output_files:
+        for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            adb_cmd = f"adb -s {serial} shell pull {location}/{file} {destination} "
+            adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
             run_cmd(adb_cmd, debug=debug)
-            counter += 1
 
 
 def set_idb_mode(mode):
