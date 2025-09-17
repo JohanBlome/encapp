@@ -209,9 +209,7 @@ def wait_for_exit(serial, debug=0):
         state = "Running"
         while state == "Running":
             time.sleep(1)
-            # ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f"idb list-apps  --fetch-process-state  --udid {serial} | grep {encapp_tool.adb_cmds.IDB_BUNDLE_ID}")
-            # state = stdout.split("|")[4].strip()
-            # Since the above does not work (not state info), let us look for the lock file
+            # Since the above does not work (not state info), le us look for the lock file
             if not encapp_tool.adb_cmds.file_exists_in_device("running.lock", serial):
                 state = "Done"
     else:
@@ -251,22 +249,15 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
     else:
         if encapp_tool.adb_cmds.USE_IDB:
             # remove log file first
-            ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb file rm Documents/encapp.log --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} ",
-                debug,
+            regex_str = encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE
+            encapp_tool.adb_cmds.remove_files_using_regex(
+                serial, "encapp.log", device_workdir, debug
             )
-            if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                    f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                    f"test {protobuf_txt_filepath}",
-                    debug,
-                )
-            else:
-                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                    f"test {protobuf_txt_filepath}",
-                    debug,
-                )
+            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
+                f" test {protobuf_txt_filepath}",
+                debug=debug,
+            )
         else:
             # clean the logcat first
             encapp_tool.adb_cmds.reset_logcat(serial)
@@ -286,15 +277,15 @@ def collect_results(
 ):
     if debug > 0:
         print(f"collecting result: {protobuf_txt_filepath}")
+    stdout = ""
     if encapp_tool.adb_cmds.USE_IDB:
         # There seems to be somethign fishy here which causes files to show up late
         # Not a problem if running a single file but multiple is a problem. Sleep...
         time.sleep(2)
-        cmd = f"idb file ls {device_workdir}/ --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
+        stdout = encapp_tool.adb_cmds.list_files(serial, {device_workdir}, debug=debug)
     else:
         cmd = f"adb -s {serial} shell ls {device_workdir}/"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
-
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     # If we have a output_filename template in the test we need to check the begining
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
     test_suite = configfile_read(local_path)
@@ -311,14 +302,9 @@ def collect_results(
 
     if encapp_tool.adb_cmds.USE_IDB:
         # Set app in standby so screen is not locked
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            cmd = (
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-            )
-        else:
-            cmd = (
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-            )
+        cmd = (
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+        )
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"outputfiles: {len(output_files)}")
@@ -338,25 +324,29 @@ def collect_results(
             continue
         # pull the output file
         if encapp_tool.adb_cmds.USE_IDB:
-            cmd = f"idb file pull {device_workdir}/{file} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
+            encapp_tool.adb_cmds.pull_files_from_device(
+                serial, file, device_workdir, local_workdir, debug
+            )
         else:
             cmd = f"adb -s {serial} pull {device_workdir}/{file} {local_workdir}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # append results file (json files) to final results
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
-        cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, protobuf_txt_filepath, device_workdir, local_workdir, debug
+        )
     else:
         cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
-    encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"results collect: {result_json}")
     # dump device information
@@ -364,21 +354,16 @@ def collect_results(
     # get logcat
     result_ok = False
     if encapp_tool.adb_cmds.USE_IDB:
-        cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, "encapp.log", device_workdir, local_workdir, debug
+        )
         # Release the app
         encapp_tool.app_utils.force_stop(serial)
         # Remove test output files
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-                debug,
-            )
-        else:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-                debug,
-            )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
+            debug,
+        )
         # TODO: checks on ios
         result_ok = True
         return result_ok, result_json
@@ -1761,8 +1746,10 @@ def run_codec_tests(
                     "Currently filesystem synch on ios seems to be slow, sleep a little while"
                 )
                 time.sleep(1)
-                cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-                encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+                encapp_tool.adb_cmds.pull_files_from_device(
+                    serial, "encapp.log", device_workdir, local_workdir, debug
+                )
                 try:
                     os.rename(
                         f"{local_workdir}/encapp.log",
@@ -1784,18 +1771,16 @@ def run_codec_tests(
         # (b) one pbtxt for all tests
         # push all the files to the device workdir
         if encapp_tool.adb_cmds.USE_IDB:
-            if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-                cmd = (
-                    f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-                )
-            else:
-                cmd = (
-                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-                )
+            print("IOS Launch")
+            cmd = (
+                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+            )
             encapp_tool.adb_cmds.run_cmd(cmd)
+
         protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
+        print(f"Push proto")
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
@@ -1834,6 +1819,7 @@ def run_codec_tests(
         test = test_suite.test[0]
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
+        print(f"Run test {protobuf_txt_filepath}")
         run_encapp_test(
             protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
         )
@@ -1845,8 +1831,10 @@ def run_codec_tests(
                 "Currently filesystem synch on ios seems to be slow, sleep a little while"
             )
             time.sleep(1)
-            cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+            encapp_tool.adb_cmds.pull_files_from_device(
+                serial, "encapp.log", device_workdir, local_workdir, debug
+            )
             try:
                 os.rename(
                     f"{local_workdir}/encapp.log",
@@ -1905,16 +1893,14 @@ def list_codecs(
             return filename
 
     if encapp_tool.adb_cmds.USE_IDB:
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            cmd = f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
-        else:
-            cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
-        # cmd = {f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"}
+        cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
         # for some bizzare reason if using a destination a directory is created...
-        cmd = f"idb file pull {device_workdir}/codecs.txt . --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, "codecs.txt", device_workdir, local_workdir, debug
+        )
 
         cmd = f"mv codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
@@ -2637,7 +2623,6 @@ def process_target_options(options):
     if options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
-    set_idb_mode(options.idb)
     default_values["device_workdir"] = get_device_dir()
 
     if ("device_workdir" not in options) or (options.device_workdir is None):
@@ -3011,6 +2996,8 @@ def main(argv):
     global EXPAND_ALL
     EXPAND_ALL = False if "expand_all" not in options else options.expand_all
 
+    print("SET IDB MODE")
+    set_idb_mode(options.idb)
     if options.func == "run":
         # Make sure we are writing to a good place
         # It will be a chicken and egg situation i.e.
@@ -3104,20 +3091,19 @@ def main(argv):
     if options.func == "reset":
         print("Removes all encapp_* files in target folder")
         # idb is to slow so let us use the app
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset"
-            )
-        else:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-            )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
+        )
         return
 
     if options.func == "pull_result":
         print("Pulls all encapp_* files in target folder")
         encapp_tool.adb_cmds.pull_files_from_device(
-            options.serial, "encapp_.*", options.device_workdir, options.debug
+            options.serial,
+            "encapp_.*",
+            options.device_workdir,
+            options.workdir,
+            options.debug,
         )
         return
 
