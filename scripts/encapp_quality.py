@@ -916,7 +916,7 @@ def run_quality(test_file, options, debug):
             for loop in range(0, loopnum):
                 vmaf_file_ = vmaf_file
                 if loopmode:
-                    timefilter = f"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
+                    timefilter = fr"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
                     vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
                 elif len(filter_cmd) > 0:
                     filter_cmd = f"{filter_cmd};[{diststream}][source]"
