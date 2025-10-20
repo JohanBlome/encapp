@@ -2964,14 +2964,19 @@ def get_workdir(serial):
         )
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
         # it seems some devices have a longer delayuntil logs appear in the log
-        time.sleep(3)
-        # Get logcat and look for:
-        # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
-        logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
-        reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
-        m = re.search(reg, logcat_contents)
-        if m:
-            workdir = m.group("workdir")
+        sleeptime = 2
+        wait_time = 30
+        while wait_time > 0:
+            time.sleep(sleeptime)
+            # Get logcat and look for:
+            # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
+            m = re.search(reg, logcat_contents)
+            if m:
+                workdir = m.group("workdir")
+                break
+            wait_time -= sleeptime
 
     return workdir
 
@@ -3026,13 +3031,14 @@ def main(argv):
             options.serial, options.debug
         )
     # Default settings will be set where necessary unless it is already set.
-    if options.device_workdir is None and "dry_run" in options and not options.dry_run:
-        # default, check if it works
-        if not encapp_tool.adb_cmds.USE_IDB:
-            options.device_workdir = get_workdir(serial)
+    if options.device_workdir is None:
+        if "dry_run" in options and not options.dry_run:
+            # default, check if it works
+            if not encapp_tool.adb_cmds.USE_IDB:
+                options.device_workdir = get_workdir(serial)
 
-        if proto_options is not None and proto_options.device_workdir:
-            options.device_workdir = proto_options.device_workdir
+            if proto_options is not None and proto_options.device_workdir:
+                options.device_workdir = proto_options.device_workdir
 
     options = process_options(options)
 
