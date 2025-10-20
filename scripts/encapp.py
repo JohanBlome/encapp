@@ -5,32 +5,32 @@ The script will create a directory based on device model and date,
 and save encoded video and rate distortion results in the directory
 """
 
-import os
-import copy
-import humanfriendly
-import json
-import sys
 import argparse
-from argparse_formatter import FlexiFormatter
+import copy
+import datetime
 import itertools
+import json
+import multiprocessing
+import os
+import pprint
+import random
 import re
 import shutil
+import sys
 import tempfile
 import time
-import datetime
-from google.protobuf import text_format
-import google.protobuf.descriptor_pool as descriptor_pool
-import multiprocessing
+
+import encapp_quality
 
 import encapp_tool
-import encapp_tool.app_utils
 import encapp_tool.adb_cmds
+import encapp_tool.app_utils
 import encapp_tool.ffutils
-import encapp_quality
-import copy
-import random
+import google.protobuf.descriptor_pool as descriptor_pool
+import humanfriendly
 import pandas as pd
-import pprint
+from argparse_formatter import FlexiFormatter
+from google.protobuf import text_format
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -693,7 +693,6 @@ def run_codec_tests_file(
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
 
         result_files = []
-        global QUALITY_PROCESSES
         if options.separate_sources:
             # create test(s) for each source
             # dictionary with source as key
@@ -1769,7 +1768,7 @@ def run_codec_tests(
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
-            abort_test(local_workdir, f"Error copying {filepath} to {serial}")
+            abort_test(local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}")
 
         for filepath in files_to_push:
             # Ignore pbtxt, only the test_suite based one will be used.
@@ -1884,7 +1883,7 @@ def list_codecs(
         # for some bizzare reason if using a destination a directory is created...
 
         encapp_tool.adb_cmds.pull_files_from_device(
-            serial, "codecs.txt", device_workdir, local_workdir, debug
+            serial, "codecs.txt", device_workdir, ".", debug
         )
 
         cmd = f"mv codecs.txt {filename}"
