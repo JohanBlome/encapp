@@ -3055,8 +3055,8 @@ def main(argv):
             if not encapp_tool.adb_cmds.USE_IDB:
                 options.device_workdir = get_workdir(serial)
 
-            if proto_options is not None and proto_options.device_workdir:
-                options.device_workdir = proto_options.device_workdir
+        if proto_options is not None and proto_options.device_workdir:
+            options.device_workdir = proto_options.device_workdir
 
     options = process_options(options)
 
