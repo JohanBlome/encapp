@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		CA53D6F729689DB200485E4D /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA53D6F629689DB200485E4D /* Decoder.swift */; };
-		CA8256F6293E7BEB0082B2BE /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CA8256F5293E7BEB0082B2BE /* SwiftProtobuf */; };
-		CA8256F8293E7BEB0082B2BE /* SwiftProtobufPluginLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = CA8256F7293E7BEB0082B2BE /* SwiftProtobufPluginLibrary */; };
+		CA707E7F2E97133C00ABC79F /* X264Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA707E7E2E97133C00ABC79F /* X264Encoder.swift */; };
+		CA707E862E9723C900ABC79F /* libx264.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CA707E842E97238C00ABC79F /* libx264.a */; };
 		CAAB92C6292D2ABB009009B2 /* EncappApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92C5292D2ABB009009B2 /* EncappApp.swift */; };
 		CAAB92C8292D2ABB009009B2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92C7292D2ABB009009B2 /* ContentView.swift */; };
 		CAAB92CA292D2ABC009009B2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CAAB92C9292D2ABC009009B2 /* Assets.xcassets */; };
@@ -18,35 +18,19 @@
 		CAAB92F4292D2ADF009009B2 /* SwiftProtobufPluginLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = CAAB92F3292D2ADF009009B2 /* SwiftProtobufPluginLibrary */; };
 		CAAB92F6292D2B89009009B2 /* tests.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92F5292D2B88009009B2 /* tests.pb.swift */; };
 		CAAB92F8292D2BD5009009B2 /* ListProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92F7292D2BD5009009B2 /* ListProperties.swift */; };
-		CAAB92FB292D380F009009B2 /* ListProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92F7292D2BD5009009B2 /* ListProperties.swift */; };
 		CAAB92FD292D7A44009009B2 /* FileHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92FC292D7A44009009B2 /* FileHandling.swift */; };
-		CAAB92FE292D7A44009009B2 /* FileHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92FC292D7A44009009B2 /* FileHandling.swift */; };
 		CAAB9300292E7C40009009B2 /* Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92FF292E7C40009009B2 /* Encoder.swift */; };
-		CAAB9301292E7C40009009B2 /* Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92FF292E7C40009009B2 /* Encoder.swift */; };
 		CAAB9303292E92EC009009B2 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9302292E92EC009009B2 /* Utils.swift */; };
-		CAAB9304292E92EC009009B2 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9302292E92EC009009B2 /* Utils.swift */; };
 		CAAB9307293910D9009009B2 /* Statistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9306293910D9009009B2 /* Statistics.swift */; };
-		CAAB9308293910D9009009B2 /* Statistics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9306293910D9009009B2 /* Statistics.swift */; };
 		CAAB930A293911E8009009B2 /* FrameInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9309293911E8009009B2 /* FrameInfo.swift */; };
-		CAAB930B293911E8009009B2 /* FrameInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9309293911E8009009B2 /* FrameInfo.swift */; };
 		CAAB930D29392CC8009009B2 /* JsonStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB930C29392CC8009009B2 /* JsonStats.swift */; };
-		CAAB930E29392CC8009009B2 /* JsonStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB930C29392CC8009009B2 /* JsonStats.swift */; };
 		CAAB931029395655009009B2 /* TestRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB930F29395655009009B2 /* TestRunner.swift */; };
-		CAAB931129395655009009B2 /* TestRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB930F29395655009009B2 /* TestRunner.swift */; };
 		CAAB9313293A7478009009B2 /* CodecHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9312293A7478009009B2 /* CodecHelper.swift */; };
-		CAAB9314293A7478009009B2 /* CodecHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9312293A7478009009B2 /* CodecHelper.swift */; };
 		CAE00008293E907400727B6D /* EncappMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE00007293E907400727B6D /* EncappMain.swift */; };
 		CAE0000A293EAA8200727B6D /* LocalLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE00009293EAA8200727B6D /* LocalLogger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		CAAB92D4292D2ABD009009B2 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = CAAB92BA292D2ABB009009B2 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = CAAB92C1292D2ABB009009B2;
-			remoteInfo = Encapp;
-		};
 		CAAB92DE292D2ABD009009B2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CAAB92BA292D2ABB009009B2 /* Project object */;
@@ -58,13 +42,17 @@
 
 /* Begin PBXFileReference section */
 		CA53D6F629689DB200485E4D /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
+		CA707E7E2E97133C00ABC79F /* X264Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X264Encoder.swift; sourceTree = "<group>"; };
+		CA707E812E97238C00ABC79F /* x264.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = x264.h; sourceTree = "<group>"; };
+		CA707E822E97238C00ABC79F /* x264_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = x264_config.h; sourceTree = "<group>"; };
+		CA707E842E97238C00ABC79F /* libx264.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libx264.a; sourceTree = "<group>"; };
+		CA707E8B2E9882E300ABC79F /* X264WrapperBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X264WrapperBridge.h; sourceTree = "<group>"; };
 		CAAB92C2292D2ABB009009B2 /* Encapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Encapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAAB92C5292D2ABB009009B2 /* EncappApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncappApp.swift; sourceTree = "<group>"; };
 		CAAB92C7292D2ABB009009B2 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CAAB92C9292D2ABC009009B2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CAAB92CB292D2ABC009009B2 /* Encapp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Encapp.entitlements; sourceTree = "<group>"; };
 		CAAB92CD292D2ABC009009B2 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		CAAB92D3292D2ABD009009B2 /* EncappTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EncappTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAAB92DD292D2ABD009009B2 /* EncappUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EncappUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAAB92F5292D2B88009009B2 /* tests.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = tests.pb.swift; sourceTree = "<group>"; };
 		CAAB92F7292D2BD5009009B2 /* ListProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListProperties.swift; sourceTree = "<group>"; };
@@ -85,17 +73,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA707E862E9723C900ABC79F /* libx264.a in Frameworks */,
 				CAAB92F4292D2ADF009009B2 /* SwiftProtobufPluginLibrary in Frameworks */,
 				CAAB92F2292D2ADF009009B2 /* SwiftProtobuf in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		CAAB92D0292D2ABD009009B2 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CA8256F8293E7BEB0082B2BE /* SwiftProtobufPluginLibrary in Frameworks */,
-				CA8256F6293E7BEB0082B2BE /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,6 +89,31 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		CA707E832E97238C00ABC79F /* include */ = {
+			isa = PBXGroup;
+			children = (
+				CA707E812E97238C00ABC79F /* x264.h */,
+				CA707E822E97238C00ABC79F /* x264_config.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		CA707E852E97238C00ABC79F /* libs */ = {
+			isa = PBXGroup;
+			children = (
+				CA707E842E97238C00ABC79F /* libx264.a */,
+			);
+			path = libs;
+			sourceTree = "<group>";
+		};
+		CA707E892E97255A00ABC79F /* ObjC */ = {
+			isa = PBXGroup;
+			children = (
+				CA707E8B2E9882E300ABC79F /* X264WrapperBridge.h */,
+			);
+			path = ObjC;
+			sourceTree = "<group>";
+		};
 		CA8256F4293E7BDF0082B2BE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -119,6 +124,9 @@
 		CAAB92B9292D2ABB009009B2 = {
 			isa = PBXGroup;
 			children = (
+				CA707E892E97255A00ABC79F /* ObjC */,
+				CA707E832E97238C00ABC79F /* include */,
+				CA707E852E97238C00ABC79F /* libs */,
 				CAAB92C4292D2ABB009009B2 /* Encapp */,
 				CAAB92C3292D2ABB009009B2 /* Products */,
 				CA8256F4293E7BDF0082B2BE /* Frameworks */,
@@ -129,7 +137,6 @@
 			isa = PBXGroup;
 			children = (
 				CAAB92C2292D2ABB009009B2 /* Encapp.app */,
-				CAAB92D3292D2ABD009009B2 /* EncappTests.xctest */,
 				CAAB92DD292D2ABD009009B2 /* EncappUITests.xctest */,
 			);
 			name = Products;
@@ -142,6 +149,7 @@
 				CAAB92F5292D2B88009009B2 /* tests.pb.swift */,
 				CAAB930F29395655009009B2 /* TestRunner.swift */,
 				CAAB92FF292E7C40009009B2 /* Encoder.swift */,
+				CA707E7E2E97133C00ABC79F /* X264Encoder.swift */,
 				CA53D6F629689DB200485E4D /* Decoder.swift */,
 				CAAB92C5292D2ABB009009B2 /* EncappApp.swift */,
 				CAAB92C7292D2ABB009009B2 /* ContentView.swift */,
@@ -200,28 +208,6 @@
 			productReference = CAAB92C2292D2ABB009009B2 /* Encapp.app */;
 			productType = "com.apple.product-type.application";
 		};
-		CAAB92D2292D2ABD009009B2 /* EncappTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = CAAB92EA292D2ABD009009B2 /* Build configuration list for PBXNativeTarget "EncappTests" */;
-			buildPhases = (
-				CAAB92CF292D2ABD009009B2 /* Sources */,
-				CAAB92D0292D2ABD009009B2 /* Frameworks */,
-				CAAB92D1292D2ABD009009B2 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				CAAB92D5292D2ABD009009B2 /* PBXTargetDependency */,
-			);
-			name = EncappTests;
-			packageProductDependencies = (
-				CA8256F5293E7BEB0082B2BE /* SwiftProtobuf */,
-				CA8256F7293E7BEB0082B2BE /* SwiftProtobufPluginLibrary */,
-			);
-			productName = EncappTests;
-			productReference = CAAB92D3292D2ABD009009B2 /* EncappTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
 		CAAB92DC292D2ABD009009B2 /* EncappUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = CAAB92ED292D2ABD009009B2 /* Build configuration list for PBXNativeTarget "EncappUITests" */;
@@ -253,10 +239,6 @@
 					CAAB92C1292D2ABB009009B2 = {
 						CreatedOnToolsVersion = 14.0;
 					};
-					CAAB92D2292D2ABD009009B2 = {
-						CreatedOnToolsVersion = 14.0;
-						TestTargetID = CAAB92C1292D2ABB009009B2;
-					};
 					CAAB92DC292D2ABD009009B2 = {
 						CreatedOnToolsVersion = 14.0;
 						TestTargetID = CAAB92C1292D2ABB009009B2;
@@ -280,7 +262,6 @@
 			projectRoot = "";
 			targets = (
 				CAAB92C1292D2ABB009009B2 /* Encapp */,
-				CAAB92D2292D2ABD009009B2 /* EncappTests */,
 				CAAB92DC292D2ABD009009B2 /* EncappUITests */,
 			);
 		};
@@ -293,13 +274,6 @@
 			files = (
 				CAAB92CE292D2ABC009009B2 /* Preview Assets.xcassets in Resources */,
 				CAAB92CA292D2ABC009009B2 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		CAAB92D1292D2ABD009009B2 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,25 +303,10 @@
 				CAAB931029395655009009B2 /* TestRunner.swift in Sources */,
 				CAAB9307293910D9009009B2 /* Statistics.swift in Sources */,
 				CAAB92F6292D2B89009009B2 /* tests.pb.swift in Sources */,
+				CA707E7F2E97133C00ABC79F /* X264Encoder.swift in Sources */,
 				CAAB9313293A7478009009B2 /* CodecHelper.swift in Sources */,
 				CA53D6F729689DB200485E4D /* Decoder.swift in Sources */,
 				CAAB930D29392CC8009009B2 /* JsonStats.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		CAAB92CF292D2ABD009009B2 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAAB9304292E92EC009009B2 /* Utils.swift in Sources */,
-				CAAB931129395655009009B2 /* TestRunner.swift in Sources */,
-				CAAB9301292E7C40009009B2 /* Encoder.swift in Sources */,
-				CAAB92FB292D380F009009B2 /* ListProperties.swift in Sources */,
-				CAAB930E29392CC8009009B2 /* JsonStats.swift in Sources */,
-				CAAB930B293911E8009009B2 /* FrameInfo.swift in Sources */,
-				CAAB9308293910D9009009B2 /* Statistics.swift in Sources */,
-				CAAB9314293A7478009009B2 /* CodecHelper.swift in Sources */,
-				CAAB92FE292D7A44009009B2 /* FileHandling.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,11 +320,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		CAAB92D5292D2ABD009009B2 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = CAAB92C1292D2ABB009009B2 /* Encapp */;
-			targetProxy = CAAB92D4292D2ABD009009B2 /* PBXContainerItemProxy */;
-		};
 		CAAB92DF292D2ABD009009B2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = CAAB92C1292D2ABB009009B2 /* Encapp */;
@@ -426,6 +380,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -434,7 +389,9 @@
 				SUPPORTED_PLATFORMS = "watchsimulator watchos macosx iphonesimulator iphoneos driverkit appletvsimulator appletvos";
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = ObjC/X264WrapperBridge.h;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				"USER_HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 			};
 			name = Debug;
 		};
@@ -484,6 +441,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -491,7 +449,9 @@
 				SUPPORTED_PLATFORMS = "watchsimulator watchos macosx iphonesimulator iphoneos driverkit appletvsimulator appletvos";
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = ObjC/X264WrapperBridge.h;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				"USER_HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 			};
 			name = Release;
 		};
@@ -508,10 +468,27 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Encapp/Preview Content\"";
-				DEVELOPMENT_TEAM = HG384GL4RL;
+				DEVELOPMENT_TEAM = PWNNZ9S7WJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -526,10 +503,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/libs",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Meta.Encapp;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = Encapp;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = EncappX;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = Encapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -538,6 +519,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				"USER_HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/inlcude";
 			};
 			name = Debug;
 		};
@@ -554,9 +536,26 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Encapp/Preview Content\"";
-				DEVELOPMENT_TEAM = HG384GL4RL;
+				DEVELOPMENT_TEAM = PWNNZ9S7WJ;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_MUSIC_FOLDER = readwrite;
+				ENABLE_FILE_ACCESS_PICTURE_FOLDER = readwrite;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/include";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -571,10 +570,14 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/libs",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Meta.Encapp;
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = Encapp;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = EncappX;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = Encapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -582,63 +585,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		CAAB92EB292D2ABD009009B2 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = HG384GL4RL;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = HG384GL4RL;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
-				MACOSX_DEPLOYMENT_TARGET = 12.3;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Meta.EncappTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Encapp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Encapp";
-			};
-			name = Debug;
-		};
-		CAAB92EC292D2ABD009009B2 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Mac Developer";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = HG384GL4RL;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = HG384GL4RL;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.5;
-				MACOSX_DEPLOYMENT_TARGET = 12.3;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Meta.EncappTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Encapp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Encapp";
+				"USER_HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/inlcude";
 			};
 			name = Release;
 		};
@@ -709,15 +656,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CAAB92EA292D2ABD009009B2 /* Build configuration list for PBXNativeTarget "EncappTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				CAAB92EB292D2ABD009009B2 /* Debug */,
-				CAAB92EC292D2ABD009009B2 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		CAAB92ED292D2ABD009009B2 /* Build configuration list for PBXNativeTarget "EncappUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -741,16 +679,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		CA8256F5293E7BEB0082B2BE /* SwiftProtobuf */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CAAB92F0292D2ADF009009B2 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
-			productName = SwiftProtobuf;
-		};
-		CA8256F7293E7BEB0082B2BE /* SwiftProtobufPluginLibrary */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CAAB92F0292D2ADF009009B2 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
-			productName = SwiftProtobufPluginLibrary;
-		};
 		CAAB92F1292D2ADF009009B2 /* SwiftProtobuf */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CAAB92F0292D2ADF009009B2 /* XCRemoteSwiftPackageReference "swift-protobuf" */;

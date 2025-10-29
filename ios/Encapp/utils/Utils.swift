@@ -87,7 +87,7 @@ func doneReading(test: Test, stream: InputStream?, frame: Int, time: Float, loop
     if (test.input.hasPlayoutFrames && test.input.playoutFrames > 0) {
         // 2. stop the reader based on explicit playout frames parameter:
         // stop if we reached the explicit playout frames
-    if (frame >= test.input.playoutFrames) {
+        if (frame >= test.input.playoutFrames) {
             return true
         }
     }
