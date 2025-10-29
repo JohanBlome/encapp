@@ -582,6 +582,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
 
     test_suite = updated_test_suite
     test_suite = create_tests_from_definition_expansion(test_suite, options)
+
     # now we need to go through all test and update media
     for test in test_suite.test:
         update_media_files(test, options)
@@ -1367,6 +1368,12 @@ def update_media(test, options):
     )
     # After transcoding input settings may have changed, adjust.
     # now both config and input should be the same i.e. matching config
+
+    # Check crop, if "auto" set the original resolution
+    if test.HasField("input") and test.input.HasField("crop_area"):
+        if test.input.crop_area == "auto":
+            test.input.crop_area = test.input.resolution
+
     test.input.resolution = d["resolution"]
     test.input.framerate = d["framerate"]
     test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
