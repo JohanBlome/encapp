@@ -1606,8 +1606,6 @@ def update_codec_test(
                     )
             return
         else:
-            print(bitrate_list)
-            print(f"{len(bitrate_list)=}")
             # replace the namd and bitrate in the old test
             test.common.id = test.common.id + f".{bitrate_list[0]}bps"
             test.configure.bitrate = str(bitrate_list[0])
@@ -1810,7 +1808,6 @@ def run_codec_tests(
         test = test_suite.test[0]
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
-        print(f"Run test {protobuf_txt_filepath}")
         run_encapp_test(
             protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
         )
