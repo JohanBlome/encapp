@@ -16,6 +16,7 @@ import pandas as pd
 import numpy as np
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
+import encapp_tool.app_utils
 import encapp
 import vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
