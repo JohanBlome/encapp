@@ -36,7 +36,7 @@ import java.util.Stack;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class BufferTranscoder extends Encoder  {
-    private final String TAG = "encapp.buffer_transcoder";
+    private static final String TAG = "encapp.buffer_transcoder";
 
     private final SourceReader mSourceReader;
     private final EncoderWriter mEncoderWriter;
@@ -209,9 +209,9 @@ public class BufferTranscoder extends Encoder  {
         String mime = inputFormat.getString(MediaFormat.KEY_MIME);
         int matchingColor = getMatchingColor(mCodec, mDecoder, defaultColor);
         inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, matchingColor);
-        mCodec.setCallback(new EncoderCallbackHandler());
         Log.d(TAG, "Check input format before config decoder");
         TestDefinitionHelper.setDecoderConfigureParams(mTest, inputFormat);
+        mCodec.setCallback(new EncoderCallbackHandler());
         mDecoder.setCallback(new DecoderCallbackHandler());
 
         mStats.pushTimestamp("decoder.configure");

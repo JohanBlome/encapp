@@ -44,7 +44,7 @@ import java.util.Locale;
  */
 
 class SurfaceEncoder extends Encoder implements VsyncListener {
-    protected static final String TAG = "encapp.surface_encoder";
+    private static final String TAG = "encapp.surface_encoder";
 
     Bitmap mBitmap = null;
     Context mContext;

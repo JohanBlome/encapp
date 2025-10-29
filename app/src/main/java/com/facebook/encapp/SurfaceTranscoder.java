@@ -40,7 +40,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SurfaceTranscoder extends SurfaceEncoder {
-    private final String TAG = "encapp.surface_transcoder";
+    private static final String TAG = "encapp.surface_transcoder";
 
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;

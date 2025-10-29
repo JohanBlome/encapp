@@ -387,7 +387,6 @@ public abstract class Encoder {
             mDone = true;
         }
 
-
         @Override
         public void run() {
             MediaFormat currentOutputFormat = null;
@@ -409,7 +408,7 @@ public abstract class Encoder {
                             Log.d(TAG, "Start muxer, track = " + mVideoTrack);
                             mMuxer.start();
                         }
-                        mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                        mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                         if (currentOutputFormat == null) {
                            currentOutputFormat =  mCodec.getOutputFormat();
                         }
@@ -422,7 +421,7 @@ public abstract class Encoder {
                             long timestampUsec = mPts + (long) (frameBuffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
                             if (timestampUsec < 0) {
                                 Log.w(TAG, "Timestamp < 0");
-                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                                 continue;
                             }
                             try {
@@ -441,14 +440,13 @@ public abstract class Encoder {
                                     mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
                                 }
 
-                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                             } catch (Exception ise) {
-                                // Codec may be closed elsewhere...
                                 Log.e(TAG, "Writing failed: " + ise.getMessage());
                             }
                             mCurrentTimeSec = timestampUsec / 1000000.0;
                         } else {
-                            mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                            mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                         }
                     }
                 }
@@ -473,21 +471,18 @@ public abstract class Encoder {
         }
     }
 
-    public class EncoderCallbackHandler extends MediaCodec.Callback {
+    protected abstract class BaseCallbackHandler extends MediaCodec.Callback {
+        protected final boolean mIsEncoder;
+        protected final String mHandlerName;
 
-        @Override
-        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            writeToBuffer(codec, index, true);
-        }
-
-        @Override
-        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-            mDataWriter.addBuffer(codec, index, info);
+        protected BaseCallbackHandler(boolean isEncoder, String handlerName) {
+            mIsEncoder = isEncoder;
+            mHandlerName = handlerName;
         }
 
         @Override
         public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.e(TAG, "onError: " + e.getMessage() + ", error code: " + e.getErrorCode());
+            Log.e(TAG, mHandlerName + ".onError: " + e.getDiagnosticInfo());
             if (e.isTransient()) {
                 Log.e(TAG, "Transient error. Try to continue");
             } else if (e.isRecoverable()) {
@@ -503,34 +498,35 @@ public abstract class Encoder {
         }
     }
 
-    public class DecoderCallbackHandler extends MediaCodec.Callback {
-        private static final String TAG = "encapp.decoder";
+    public class EncoderCallbackHandler extends BaseCallbackHandler {
+        public EncoderCallbackHandler() {
+            super(true, "EncoderCallbackHandler");
+        }
+
         @Override
         public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            //  Log.d(TAG, "DecoderCallbackHandler onInputBufferAvailable");
-            writeToBuffer(codec, index, false);
+            writeToBuffer(codec, index, mIsEncoder);
         }
 
         @Override
         public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-            readFromBuffer(codec, index, false, info);
+            mDataWriter.addBuffer(codec, index, info);
+        }
+    }
+
+    public class DecoderCallbackHandler extends BaseCallbackHandler {
+        public DecoderCallbackHandler() {
+            super(false, "DecoderCallbackHandler");
         }
 
         @Override
-        public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.e(TAG, "onError: " + e.getDiagnosticInfo());
-            if (e.isTransient()) {
-                Log.e(TAG, "Transient error. Try to continue");
-            } else if (e.isRecoverable()) {
-                Log.d(TAG, "Error should be recoverable. Try to continue");
-            } else {
-                Log.d(TAG, "Error is fatal. Shutdown.");
-                stopAllActivity();
-            }
+        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+            writeToBuffer(codec, index, mIsEncoder);
         }
 
         @Override
-        public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+            readFromBuffer(codec, index, mIsEncoder, info);
         }
     }
 }

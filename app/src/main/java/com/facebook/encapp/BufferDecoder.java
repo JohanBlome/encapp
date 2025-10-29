@@ -29,7 +29,7 @@ import java.util.Dictionary;
 import java.util.Locale;
 
 class BufferDecoder extends Encoder {
-    protected static final String TAG = "encapp.decoder";
+    private static final String TAG = "encapp.decoder";
 
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
