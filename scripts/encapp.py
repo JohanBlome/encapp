@@ -2998,6 +2998,21 @@ def main(argv):
     EXPAND_ALL = False if "expand_all" not in options else options.expand_all
 
     set_idb_mode(options.idb)
+
+    # No need to check with Android/iOS app if not running the Android/iOS app
+    check_app = True
+    check_device_workdir = True
+    if options.configfile:
+        test_suite = tests_definitions.TestSuite() 
+        for proto in options.configfile:
+            configfile_read(proto, test_suite)
+
+        for test in test_suite.test:
+            if test.HasField("test_setup") and test.test_setup.HasField("run_cmd"):
+                check_app = False
+            if test.HasField("test_setup") and test.test_setup.HasField("device_workdir"):
+                check_device_workdir = False
+
     if options.func == "run":
         # Make sure we are writing to a good place
         # It will be a chicken and egg situation i.e.
@@ -3038,7 +3053,7 @@ def main(argv):
         )
     # Default settings will be set where necessary unless it is already set.
     if options.device_workdir is None:
-        if "dry_run" in options and not options.dry_run:
+        if "dry_run" in options and not options.dry_run and check_device_workdir:
             # default, check if it works
             if not encapp_tool.adb_cmds.USE_IDB:
                 options.device_workdir = get_workdir(serial)
@@ -3108,7 +3123,7 @@ def main(argv):
         )
         return
 
-    if "dry_run" in options and not options.dry_run:
+    if "dry_run" in options and not options.dry_run and check_app:
         # ensure the app is correctly installed
         if not encapp_tool.app_utils.install_ok(serial, options.debug):
             print(f"=======\nWARNING! Java app is not installed in {serial}\n=======\n")
