@@ -1,0 +1,3 @@
+Command line invocation:
+    /Users/jblome/Downloads/Xcode.app/Contents/Developer/usr/bin/xcodebuild -showBuildSettings -configuration Debug
+
