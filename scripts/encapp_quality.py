@@ -1475,7 +1475,7 @@ def get_options(argv):
         default=-1,
     )
     parser.add_argument(
-        "--header", help="print header to output", action="store_true", default=False
+        "--no-header", help="omit header from output", action="store_true", default=False
     )
     parser.add_argument(
         "--csv",
@@ -1744,12 +1744,13 @@ def main(argv):
         values.append(quality_dict)
     # write data to csv file
     df = pd.DataFrame(values)
-    mode = "a"
-    if options.header:
-        mode = "w"
-        mode = "w"
+    mode = "w"
+    write_header = True
+    if options.no_header:
+        mode = "a"
+        write_header = False
     if df is not None:
-        df.to_csv(options.output, mode=mode, index=False, header=options.header)
+        df.to_csv(options.output, mode=mode, index=False, header=write_header)
 
     # Summary
     dfs = pd.DataFrame(success)

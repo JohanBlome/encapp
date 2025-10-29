@@ -987,10 +987,10 @@ The `encapp_quality` script processes encapp test results to calculate quality m
 ./scripts/encapp_quality.py test_result.json --media /path/to/source/videos
 
 # Calculate quality for multiple tests with CSV output
-./scripts/encapp_quality.py --header --media /path/to/videos test1.json test2.json test3.json -o results.csv
+./scripts/encapp_quality.py --media /path/to/videos test1.json test2.json test3.json -o results.csv
 
 # Use with encapp_search to process all results in a directory
-./scripts/encapp_quality.py --header --media /path/to/videos $(./scripts/encapp_search.py)
+./scripts/encapp_quality.py --media /path/to/videos $(./scripts/encapp_search.py)
 ```
 
 ## 8.3. Command Line Options
@@ -1002,7 +1002,7 @@ The `encapp_quality` script processes encapp test results to calculate quality m
 ### Output Options
 
 * `-o`, `--output FILE` - Output CSV filename (default: `quality.csv`)
-* `--header` - Print CSV header to output file
+* `--no-header` - Omit CSV header from output file (header is included by default)
 * `--csv` - Output CSV data from calculated results not already in CSV format
 
 ### Source File Options
@@ -1081,7 +1081,6 @@ Calculate quality for a single encoding test:
 ```bash
 ./scripts/encapp_quality.py \
   --media /tmp/test_videos \
-  --header \
   /tmp/results/encapp_abc123.json
 ```
 
@@ -1091,7 +1090,6 @@ Process all test results in a directory:
 ```bash
 # Find all 1080p test results and calculate quality
 ./scripts/encapp_quality.py \
-  --header \
   --media /mnt/video_sources \
   -o quality_1080p.csv \
   $(./scripts/encapp_search.py -s 1920x1080)
@@ -1106,7 +1104,6 @@ Generate RD curve data by processing multiple bitrate tests:
 
 # Calculate quality for all results
 ./scripts/encapp_quality.py \
-  --header \
   --media /tmp/test_videos \
   -o rd_curve.csv \
   /tmp/rd_test/*.json
@@ -1122,7 +1119,6 @@ Calculate VMAF with scaling and cropping:
   --vmaf-scale 1920x1080 \
   --vmaf-crop 1920x1080 \
   --vmaf-scaler lanczos \
-  --header \
   test_result.json
 ```
 
@@ -1134,7 +1130,6 @@ Use a specific VMAF model and keep intermediate files:
   --media /tmp/videos \
   --vmaf_model vmaf_4k_v0.6.1 \
   --keep-quality-files \
-  --header \
   test_4k.json
 ```
 
@@ -1145,7 +1140,6 @@ Process multiple tests in parallel for faster results:
 ./scripts/encapp_quality.py \
   --media /tmp/videos \
   --max-parallel 4 \
-  --header \
   -o batch_quality.csv \
   /tmp/results/*.json
 ```
@@ -1158,7 +1152,6 @@ Analyze spatial and temporal complexity of source videos:
   --media /tmp/videos \
   --siti \
   --qpextract \
-  --header \
   test_result.json
 ```
 
