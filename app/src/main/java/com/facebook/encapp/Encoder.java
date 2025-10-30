@@ -399,6 +399,11 @@ public abstract class Encoder {
                         continue;
                     }
 
+                    if (mCodec == null || mStats == null) {
+                        Log.e(TAG, "Codec or Stats not initialized, skipping buffer");
+                        continue;
+                    }
+
                     if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());

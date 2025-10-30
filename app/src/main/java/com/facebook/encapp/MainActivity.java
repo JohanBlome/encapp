@@ -146,6 +146,9 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Log.d(TAG, "Screen will stay on during encoding to prevent system freezing");
+
         mVsyncHandler = new VsyncHandler();
         mVsyncHandler.start();
         //setContentView(R.layout.activity_main);
