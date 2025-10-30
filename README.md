@@ -163,6 +163,8 @@ The `run` command is the most commonly used and has the most options.
 ./scripts/encapp.py run [OPTIONS] CONFIGFILE [CONFIGFILE ...]
 ```
 
+> **💡 Tip:** Encapp will write the command used to a log file in the current directory. This can be useful for debugging or reproducing a run. The name of the file is ".encapp_run_history".
+
 ### Input/Output Options
 
 * `-i`, `--videofile FILE` - Input video file (overrides config file)
