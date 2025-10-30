@@ -2999,7 +2999,7 @@ def main(argv):
     # No need to check with Android/iOS app if not running the Android/iOS app
     check_app = True
     check_device_workdir = True
-    if options.configfile:
+    if "configfile" in options and options.configfile:
         test_suite = tests_definitions.TestSuite() 
         for proto in options.configfile:
             configfile_read(proto, test_suite)
