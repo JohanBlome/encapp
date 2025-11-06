@@ -14,6 +14,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.Demuxer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
@@ -32,9 +33,11 @@ class BufferDecoder extends Encoder {
     private static final String TAG = "encapp.decoder";
 
     MediaExtractor mExtractor;
+    Demuxer mDemuxer;
     MediaCodec mDecoder;
     // Flag to dump decoded YUV
     boolean mDecodeDump = false;
+    boolean mUseInternalDemux = false;
 
     public BufferDecoder(Test test) {
         super(test);
@@ -58,24 +61,81 @@ class BufferDecoder extends Encoder {
         }
 
         mFrameRate = mTest.getConfigure().getFramerate();
-        Log.d(TAG, "Create extractor");
-        mExtractor = new MediaExtractor();
+
+        mUseInternalDemux = mTest.hasTestSetup() && mTest.getTestSetup().hasInternalDemuxer() &&
+                            mTest.getTestSetup().getInternalDemuxer();
+        Log.d(TAG, "BufferDecoder - Use internal demux: " + mUseInternalDemux);
 
         MediaFormat inputFormat = null;
         int trackNum = 0;
-        try {
-            mExtractor.setDataSource(mTest.getInput().getFilepath());
-            int tracks = mExtractor.getTrackCount();
-            for (int track = 0; track < tracks; track++) {
-                inputFormat = mExtractor.getTrackFormat(track);
-                if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
-                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
-                    trackNum = track;
+
+        if (mUseInternalDemux) {
+            String filepath = mTest.getInput().getFilepath();
+            Log.d(TAG, "BufferDecoder - Creating internal demuxer for file: " + filepath);
+            mDemuxer = new Demuxer(filepath);
+            Log.d(TAG, "BufferDecoder - Demuxer object created, calling initialize()");
+
+            try {
+                if (!mDemuxer.initialize()) {
+                    Log.e(TAG, "Failed to initialize internal demuxer");
+                    return "Failed to initialize internal demuxer";
                 }
+
+                inputFormat = MediaFormat.createVideoFormat(
+                        mDemuxer.isHEVC() ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC,
+                        mDemuxer.getWidth(),
+                        mDemuxer.getHeight());
+
+                byte[] csd = mDemuxer.getCodecSpecificData();
+                if (csd != null && csd.length > 0) {
+                    inputFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd));
+                }
+
+                if (mDemuxer.getFrameRate() > 0) {
+                    inputFormat.setFloat(MediaFormat.KEY_FRAME_RATE, mDemuxer.getFrameRate());
+                }
+
+                Log.d(TAG, "Internal demuxer initialized: " + mDemuxer.getWidth() + "x" + mDemuxer.getHeight() +
+                        ", " + mDemuxer.getFrameRate() + " fps, " + (mDemuxer.isHEVC() ? "HEVC" : "AVC"));
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize internal demuxer: " + e.getMessage());
+                e.printStackTrace();
+                if (mDemuxer != null) {
+                    mDemuxer.close();
+                }
+                return "Failed to initialize internal demuxer";
             }
-            Log.d(TAG, "Select track");
-            mExtractor.selectTrack(trackNum);
-            inputFormat = mExtractor.getTrackFormat(trackNum);
+        } else {
+            Log.d(TAG, "Create MediaExtractor");
+            mExtractor = new MediaExtractor();
+
+            try {
+                mExtractor.setDataSource(mTest.getInput().getFilepath());
+                int tracks = mExtractor.getTrackCount();
+                for (int track = 0; track < tracks; track++) {
+                    inputFormat = mExtractor.getTrackFormat(track);
+                    if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
+                            inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
+                        trackNum = track;
+                    }
+                }
+                Log.d(TAG, "Select track");
+                mExtractor.selectTrack(trackNum);
+                inputFormat = mExtractor.getTrackFormat(trackNum);
+                if (inputFormat == null) {
+                    Log.e(TAG, "no input format");
+                    return "no input format";
+                }
+            } catch (IOException iox) {
+                if (mExtractor != null) {
+                    mExtractor.release();
+                }
+                Log.e(TAG, "Failed to initialize extractor: " + iox.getMessage());
+                return "Failed to initialize extractor";
+            }
+        }
+
+        try {
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
                 return "no input format";
@@ -137,7 +197,11 @@ class BufferDecoder extends Encoder {
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
         if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-            mReferenceFrameRate = (float) (inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
+            try {
+                mReferenceFrameRate = inputFormat.getFloat(MediaFormat.KEY_FRAME_RATE);
+            } catch (ClassCastException e) {
+                mReferenceFrameRate = (float) inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE);
+            }
         }
         if (mFrameRate <= 0) {
             mFrameRate = mReferenceFrameRate;
@@ -181,6 +245,8 @@ class BufferDecoder extends Encoder {
 
         if (mExtractor != null)
             mExtractor.release();
+        if (mDemuxer != null)
+            mDemuxer.close();
         Log.d(TAG, "Stop writer");
         mDataWriter.stopWriter();
 
@@ -241,9 +307,22 @@ class BufferDecoder extends Encoder {
                     index = mDecoder.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US);
                     if (index >= 0) {
                         ByteBuffer inputBuffer = mDecoder.getInputBuffer(index);
-                        // Read the sample data into the ByteBuffer.  This neither respects nor
-                        // updates inputBuffer's position, limit, etc.
-                        int chunkSize = mExtractor.readSampleData(inputBuffer, 0);
+                        int chunkSize = -1;
+
+                        if (mUseInternalDemux) {
+                            Demuxer.Frame frame = new Demuxer.Frame();
+                            if (mDemuxer.getNextFrame(frame)) {
+                                inputBuffer.clear();
+                                inputBuffer.put(frame.data);
+                                chunkSize = frame.size;
+                                presentationTimeUs = frame.timestamp;
+                            } else {
+                                chunkSize = -1;
+                            }
+                        } else {
+                            chunkSize = mExtractor.readSampleData(inputBuffer, 0);
+                        }
+
                         int flags = 0;
                         if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                             flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
@@ -274,19 +353,23 @@ class BufferDecoder extends Encoder {
                             }
 
                         } else {
-                            if (mExtractor.getSampleTrackIndex() != trackIndex) {
-                                Log.w(TAG, "WEIRD: got sample from track " +
-                                        mExtractor.getSampleTrackIndex() + ", expected " + trackIndex);
+                            if (!mUseInternalDemux) {
+                                if (mExtractor.getSampleTrackIndex() != trackIndex) {
+                                    Log.w(TAG, "WEIRD: got sample from track " +
+                                            mExtractor.getSampleTrackIndex() + ", expected " + trackIndex);
+                                }
+                                presentationTimeUs = mExtractor.getSampleTime();
                             }
-                            presentationTimeUs = mExtractor.getSampleTime();
-                            mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
+                            mCurrentTimeSec = presentationTimeUs / 1000000.0;
                             mStats.startDecodingFrame(presentationTimeUs, chunkSize, flags);
 
                             mDecoder.queueInputBuffer(index, 0, chunkSize,
                                     presentationTimeUs, flags /*flags*/);
 
                             mInFramesCount++;
-                            mExtractor.advance();
+                            if (!mUseInternalDemux) {
+                                mExtractor.advance();
+                            }
                         }
 
                     } else {

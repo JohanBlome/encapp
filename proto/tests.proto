@@ -27,6 +27,7 @@ message TestSetup {
   optional bool ignore_power_status = 10;
   // Add a delay before exiting the app. Can be usefull for identifying back to back runs.
   optional int32 uihold_sec = 11;
+  optional bool internal_demuxer = 12;
 }
 
 message Common {

@@ -161,6 +161,15 @@ struct TestSetup: Sendable {
   /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
   mutating func clearUiholdSec() {self._uiholdSec = nil}
 
+  var internalDemuxer: Bool {
+    get {return _internalDemuxer ?? false}
+    set {_internalDemuxer = newValue}
+  }
+  /// Returns true if `internalDemuxer` has been explicitly set.
+  var hasInternalDemuxer: Bool {return self._internalDemuxer != nil}
+  /// Clears the value of `internalDemuxer`. Subsequent reads from it will return its default value.
+  mutating func clearInternalDemuxer() {self._internalDemuxer = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -176,6 +185,7 @@ struct TestSetup: Sendable {
   fileprivate var _firstFrameFastRead: Bool? = nil
   fileprivate var _ignorePowerStatus: Bool? = nil
   fileprivate var _uiholdSec: Int32? = nil
+  fileprivate var _internalDemuxer: Bool? = nil
 }
 
 struct Common: Sendable {
@@ -935,40 +945,16 @@ struct TestSuite: Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 extension DataValueType: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "stringType"),
-    1: .same(proto: "intType"),
-    2: .same(proto: "floatType"),
-    3: .same(proto: "longType"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0stringType\0\u{1}intType\0\u{1}floatType\0\u{1}longType\0")
 }
 
 extension PixFmt: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "yuv420p"),
-    1: .same(proto: "yvu420p"),
-    2: .same(proto: "nv12"),
-    3: .same(proto: "nv21"),
-    4: .same(proto: "rgba"),
-    54: .same(proto: "p010le"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0yuv420p\0\u{1}yvu420p\0\u{1}nv12\0\u{1}nv21\0\u{1}rgba\0\u{2}2p010le\0")
 }
 
 extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSetup"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "device_workdir"),
-    2: .standard(proto: "local_workdir"),
-    3: .same(proto: "serial"),
-    4: .standard(proto: "device_cmd"),
-    5: .standard(proto: "run_cmd"),
-    6: .standard(proto: "separate_sources"),
-    7: .same(proto: "mediastore"),
-    8: .standard(proto: "source_dir"),
-    9: .standard(proto: "first_frame_fast_read"),
-    10: .standard(proto: "ignore_power_status"),
-    11: .standard(proto: "uihold_sec"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -987,6 +973,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self._ignorePowerStatus) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self._uiholdSec) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self._internalDemuxer) }()
       default: break
       }
     }
@@ -1030,6 +1017,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._uiholdSec {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 11)
     } }()
+    try { if let v = self._internalDemuxer {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1045,6 +1035,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
     if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
     if lhs._uiholdSec != rhs._uiholdSec {return false}
+    if lhs._internalDemuxer != rhs._internalDemuxer {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1052,13 +1043,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 
 extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Common"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "id"),
-    2: .same(proto: "description"),
-    3: .same(proto: "operation"),
-    4: .same(proto: "start"),
-    5: .standard(proto: "output_filename"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}description\0\u{1}operation\0\u{1}start\0\u{3}output_filename\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1112,12 +1097,7 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
 
 extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Parameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "key"),
-    2: .same(proto: "type"),
-    3: .same(proto: "value"),
-    4: .same(proto: "framenum"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}type\0\u{1}value\0\u{1}framenum\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1166,20 +1146,7 @@ extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 
 extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Input"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "filepath"),
-    2: .same(proto: "resolution"),
-    3: .standard(proto: "pix_fmt"),
-    4: .same(proto: "framerate"),
-    5: .standard(proto: "playout_frames"),
-    6: .same(proto: "pursuit"),
-    7: .same(proto: "realtime"),
-    8: .standard(proto: "stoptime_sec"),
-    9: .same(proto: "show"),
-    10: .standard(proto: "device_decode"),
-    11: .standard(proto: "crop_area"),
-    12: .same(proto: "restamp"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}filepath\0\u{1}resolution\0\u{3}pix_fmt\0\u{1}framerate\0\u{3}playout_frames\0\u{1}pursuit\0\u{1}realtime\0\u{3}stoptime_sec\0\u{1}show\0\u{3}device_decode\0\u{3}crop_area\0\u{1}restamp\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1268,31 +1235,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
 
 extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "parameter"),
-    2: .same(proto: "codec"),
-    3: .same(proto: "encode"),
-    4: .same(proto: "surface"),
-    5: .same(proto: "mime"),
-    6: .same(proto: "bitrate"),
-    7: .standard(proto: "bitrate_mode"),
-    8: .same(proto: "durationUs"),
-    9: .same(proto: "resolution"),
-    10: .standard(proto: "color_format"),
-    11: .standard(proto: "color_standard"),
-    12: .standard(proto: "color_range"),
-    13: .standard(proto: "color_transfer"),
-    14: .standard(proto: "color_transfer_request"),
-    15: .same(proto: "framerate"),
-    16: .standard(proto: "i_frame_interval"),
-    17: .standard(proto: "intra_refresh_period"),
-    18: .same(proto: "latency"),
-    19: .standard(proto: "repeat_previous_frame_after"),
-    20: .standard(proto: "ts_schema"),
-    21: .same(proto: "quality"),
-    22: .same(proto: "complexity"),
-    23: .standard(proto: "decode_dump"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0")
 
   fileprivate class _StorageClass {
     var _parameter: [Parameter] = []
@@ -1515,48 +1458,24 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 }
 
 extension Configure.BitrateMode: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "cq"),
-    1: .same(proto: "vbr"),
-    2: .same(proto: "cbr"),
-    3: .same(proto: "cbr_fd"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0cq\0\u{1}vbr\0\u{1}cbr\0\u{1}cbr_fd\0")
 }
 
 extension Configure.ColorStandard: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "bt709"),
-    2: .same(proto: "bt601_pal"),
-    4: .same(proto: "bt601_ntsc"),
-    6: .same(proto: "bt2020"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}bt709\0\u{1}bt601_pal\0\u{2}\u{2}bt601_ntsc\0\u{2}\u{2}bt2020\0")
 }
 
 extension Configure.ColorRange: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "full"),
-    2: .same(proto: "limited"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}full\0\u{1}limited\0")
 }
 
 extension Configure.ColorTransfer: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "linear"),
-    3: .same(proto: "sdr_video"),
-    6: .same(proto: "st2084"),
-    7: .same(proto: "hlg"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}linear\0\u{2}\u{2}sdr_video\0\u{2}\u{3}st2084\0\u{1}hlg\0")
 }
 
 extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Runtime"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "parameter"),
-    2: .standard(proto: "video_bitrate"),
-    3: .same(proto: "drop"),
-    4: .standard(proto: "dynamic_framerate"),
-    5: .standard(proto: "request_sync"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{3}video_bitrate\0\u{1}drop\0\u{3}dynamic_framerate\0\u{3}request_sync\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1606,10 +1525,7 @@ extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
 
 extension Runtime.VideoBitrateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = Runtime.protoMessageName + ".VideoBitrateParameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "framenum"),
-    2: .same(proto: "bitrate"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framenum\0\u{1}bitrate\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1648,10 +1564,7 @@ extension Runtime.VideoBitrateParameter: SwiftProtobuf.Message, SwiftProtobuf._M
 
 extension Runtime.DynamicFramerateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = Runtime.protoMessageName + ".DynamicFramerateParameter"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "framenum"),
-    2: .same(proto: "framerate"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framenum\0\u{1}framerate\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1690,10 +1603,7 @@ extension Runtime.DynamicFramerateParameter: SwiftProtobuf.Message, SwiftProtobu
 
 extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "DecoderConfigure"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "parameter"),
-    2: .same(proto: "codec"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1732,9 +1642,7 @@ extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "DecoderRuntime"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "parameter"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1764,9 +1672,7 @@ extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension Parallel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Parallel"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "test"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}test\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1796,9 +1702,7 @@ extension Parallel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
 
 extension Serial: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Serial"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "test"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}test\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1828,16 +1732,7 @@ extension Serial: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
 
 extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Test"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "common"),
-    2: .same(proto: "input"),
-    3: .same(proto: "configure"),
-    4: .same(proto: "runtime"),
-    5: .standard(proto: "decoder_configure"),
-    6: .standard(proto: "decoder_runtime"),
-    7: .same(proto: "parallel"),
-    8: .standard(proto: "test_setup"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}common\0\u{1}input\0\u{1}configure\0\u{1}runtime\0\u{3}decoder_configure\0\u{3}decoder_runtime\0\u{1}parallel\0\u{3}test_setup\0")
 
   fileprivate class _StorageClass {
     var _common: Common? = nil
@@ -1956,9 +1851,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
 
 extension TestSuite: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSuite"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "test"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}test\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

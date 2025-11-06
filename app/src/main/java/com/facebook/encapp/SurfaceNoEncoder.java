@@ -18,6 +18,7 @@ import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderConfigure;
 import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.Demuxer;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameswapControl;
 import com.facebook.encapp.utils.OutputMultiplier;

@@ -18,6 +18,8 @@ import com.facebook.encapp.proto.DecoderRuntime;
 import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.CodecCache;
+import com.facebook.encapp.utils.Demuxer;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
@@ -42,7 +44,9 @@ public class BufferTranscoder extends Encoder  {
     private final EncoderWriter mEncoderWriter;
     private final Stack<Integer> mEncoderInputBuffers = new Stack<>();
     MediaExtractor mExtractor;
+    Demuxer mDemuxer;
     MediaCodec mDecoder;
+    boolean mUseInternalDemux = false;
     DecoderRuntime mDecoderRuntimeParams;
     double mLoopTime = 0;
     int mCurrentLoop = 1;
@@ -88,49 +92,101 @@ public class BufferTranscoder extends Encoder  {
             return "Could not open file";
         }
 
+        mUseInternalDemux = mTest.hasTestSetup() && mTest.getTestSetup().hasInternalDemuxer() &&
+                            mTest.getTestSetup().getInternalDemuxer();
+        Log.d(TAG, "BufferTranscoder - Use internal demux: " + mUseInternalDemux);
+
         // Get source track
-        mExtractor = new MediaExtractor();
         MediaFormat inputFormat = null;
-        try {
-            mExtractor.setDataSource(mTest.getInput().getFilepath());
-            int tracks = mExtractor.getTrackCount();
-            int sourceTrack = 0;
-            for (int track = 0; track < tracks; track++) {
-                inputFormat = mExtractor.getTrackFormat(track);
-                if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
-                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
-                    sourceTrack = track;
+
+        if (mUseInternalDemux) {
+            String filepath = mTest.getInput().getFilepath();
+            Log.d(TAG, "BufferTranscoder - Creating internal demuxer for file: " + filepath);
+            mDemuxer = new Demuxer(filepath);
+            Log.d(TAG, "BufferTranscoder - Demuxer object created, calling initialize()");
+
+            try {
+                if (!mDemuxer.initialize()) {
+                    Log.e(TAG, "Failed to initialize internal demuxer");
+                    return "Failed to initialize internal demuxer";
                 }
+
+                inputFormat = MediaFormat.createVideoFormat(
+                        mDemuxer.isHEVC() ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC,
+                        mDemuxer.getWidth(),
+                        mDemuxer.getHeight());
+
+                byte[] csd = mDemuxer.getCodecSpecificData();
+                if (csd != null && csd.length > 0) {
+                    inputFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd));
+                }
+
+                if (mDemuxer.getFrameRate() > 0) {
+                    inputFormat.setFloat(MediaFormat.KEY_FRAME_RATE, mDemuxer.getFrameRate());
+                }
+
+                Log.d(TAG, "Internal demuxer initialized: " + mDemuxer.getWidth() + "x" + mDemuxer.getHeight() +
+                        ", " + mDemuxer.getFrameRate() + " fps, " + (mDemuxer.isHEVC() ? "HEVC" : "AVC"));
+                Log.d(TAG, "Check parsed input format:");
+                logMediaFormat(inputFormat);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize internal demuxer: " + e.getMessage());
+                e.printStackTrace();
+                if (mDemuxer != null) {
+                    mDemuxer.close();
+                }
+                return "Failed to initialize internal demuxer";
             }
-            mExtractor.selectTrack(sourceTrack);
-            inputFormat = mExtractor.getTrackFormat(sourceTrack);
-            Log.d(TAG, "Extractor input format");
+        } else {
+            mExtractor = new MediaExtractor();
+            try {
+                mExtractor.setDataSource(mTest.getInput().getFilepath());
+                int tracks = mExtractor.getTrackCount();
+                int sourceTrack = 0;
+                for (int track = 0; track < tracks; track++) {
+                    inputFormat = mExtractor.getTrackFormat(track);
+                    if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
+                            inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
+                        sourceTrack = track;
+                    }
+                }
+                mExtractor.selectTrack(sourceTrack);
+                inputFormat = mExtractor.getTrackFormat(sourceTrack);
+                Log.d(TAG, "Extractor input format");
+                if (inputFormat == null) {
+                    Log.e(TAG, "no input format");
+                    return "no input format";
+                }
+                Log.d(TAG, "Check parsed input format:");
+                logMediaFormat(inputFormat);
+            } catch (IOException e) {
+                if (mExtractor != null) {
+                    mExtractor.release();
+                }
+                Log.e(TAG, "Failed to initialize extractor: " + e.getMessage());
+                e.printStackTrace();
+                return "Failed to initialize extractor";
+            }
+        }
+
+        try {
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
                 return "no input format";
             }
-            Log.d(TAG, "Check parsed input format:");
-            logMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
+            String description = inputFormat.getString(MediaFormat.KEY_MIME);
             if (mTest.getDecoderConfigure().hasCodec()) {
-                //TODO: throw error on failed lookup
-                Log.d(TAG, "Create codec by name: " + mTest.getDecoderConfigure().getCodec());
-                try {
-                    mStats.pushTimestamp("decoder.create");
-                    mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
-                    mStats.pushTimestamp("decoder.create");
-                } catch (Exception ex) {
-                    Log.e(TAG, "Failed to create decoder");
-                    return "Failed to create decoder.";
-                }
-
-            } else {
-                Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
-                mStats.pushTimestamp("decoder.create");
-                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
-                mStats.pushTimestamp("decoder.create");
-                Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
+                description = mTest.getDecoderConfigure().getCodec();
             }
+            mStats.pushTimestamp("decoder.create");
+            // TODO: check decoder settings
+            mDecoder = CodecCache.getCache().getDecoder(description);
+            if (mDecoder == null) {
+                mDecoder = CodecCache.getCache().createDecoder(mTest, inputFormat);
+            }
+            mStats.pushTimestamp("decoder.create");
+
         } catch (IOException e) {
             mExtractor.release();
             e.printStackTrace();
@@ -139,11 +195,21 @@ public class BufferTranscoder extends Encoder  {
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
         mTest = TestDefinitionHelper.updateBasicSettings(mTest);
 
-        if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
-            mInputWidth = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
+        mReferenceFrameRate = mTest.getInput().getFramerate();
+        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
+
+        if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+            try {
+                mReferenceFrameRate = inputFormat.getFloat(MediaFormat.KEY_FRAME_RATE);
+            } catch (ClassCastException e) {
+                mReferenceFrameRate = (float) inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE);
+            }
         }
         if (inputFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
             mInputHeight = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        }
+        if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
+            mInputWidth = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
         }
         Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
         mWidth = res.getWidth();
@@ -161,12 +227,7 @@ public class BufferTranscoder extends Encoder  {
         int align = 32;
         mXStride = (mWidth % align != 0)? (mWidth/align + 1) * align: mWidth;
         mYStride = (mHeight % align != 0)? (mHeight/align + 1) * align: mHeight;
-        mReferenceFrameRate = mTest.getInput().getFramerate();
-        mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
-        if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-            mReferenceFrameRate = (float) (inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
-        }
         if (mFrameRate <= 0) {
             mFrameRate = mReferenceFrameRate;
         }
@@ -457,8 +518,26 @@ public class BufferTranscoder extends Encoder  {
                     Integer index = mDecoderBuffers.poll();
                     MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
-                    int size = mExtractor.readSampleData(buffer, 0);
-                    int flags = mExtractor.getSampleFlags();
+                    int size = -1;
+                    int flags = 0;
+                    long ptsUsec = 0;
+
+                    if (mUseInternalDemux) {
+                        Demuxer.Frame frame = new Demuxer.Frame();
+                        if (mDemuxer.getNextFrame(frame)) {
+                            buffer.clear();
+                            buffer.put(frame.data);
+                            size = frame.size;
+                            ptsUsec = frame.timestamp + mPtsOffset;
+                            flags = frame.isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
+                        } else {
+                            size = -1;
+                        }
+                    } else {
+                        size = mExtractor.readSampleData(buffer, 0);
+                        flags = mExtractor.getSampleFlags();
+                        ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
+                    }
 
                     if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec /* runtime*/, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
@@ -478,8 +557,6 @@ public class BufferTranscoder extends Encoder  {
                         continue;
                     }
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
-                    // Source time is always what is read
-                    long ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
                     if (mRealtime) {
                         // Limit the pace of incoming frames to the framerate
                         sleepUntilNextFrameSynched();
@@ -498,9 +575,18 @@ public class BufferTranscoder extends Encoder  {
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
                     }*/
-                    boolean eof = !mExtractor.advance();
+                    boolean eof = false;
+                    if (mUseInternalDemux) {
+                        eof = mDemuxer.isEOS();
+                    } else {
+                        eof = !mExtractor.advance();
+                    }
                     if (eof) {
-                        mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                        if (mUseInternalDemux) {
+                            mDemuxer.reset();
+                        } else {
+                            mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                        }
                         mCurrentLoop++;
                         if (ptsUsec > mLastPtsUs) {
                             mPtsOffset = ptsUsec;
@@ -703,6 +789,8 @@ public class BufferTranscoder extends Encoder  {
 
             if (mExtractor != null)
                 mExtractor.release();
+            if (mDemuxer != null)
+                mDemuxer.close();
             Log.d(TAG, "Stop writer");
             mDataWriter.stopWriter();
         }
