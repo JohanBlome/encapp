@@ -262,12 +262,37 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        stopForegroundService();
         mMemLoad.stop();
         mPowerLoad.stop();
         finishAndRemoveTask();
         Process.killProcess(Process.myPid());
         CodecCache.getCache().clearCodecs();
         Log.d(TAG, "EXIT");
+    }
+
+    private void startForegroundService() {
+        try {
+            Intent serviceIntent = new Intent(this, EncodingForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+            Log.d(TAG, "Foreground service start requested");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start foreground service", e);
+        }
+    }
+
+    private void stopForegroundService() {
+        try {
+            Intent serviceIntent = new Intent(this, EncodingForegroundService.class);
+            stopService(serviceIntent);
+            Log.d(TAG, "Foreground service stop requested");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to stop foreground service", e);
+        }
     }
 
     /**
@@ -304,6 +329,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
      * and exit.
      */
     private void performAllTests() {
+        startForegroundService();
+
         mMemLoad = new MemoryLoad(this);
         mPowerLoad = PowerLoad.getPowerLoad(this);
         mPowerLoad.addStatusListener(this);
