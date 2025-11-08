@@ -752,8 +752,16 @@ For detailed information about TestSetup parameters, see [README.md Section 5.4]
   * Useful for devices with problematic power reporting
 
 * **"uihold_sec"** (int32)
-  * Add a delay (in seconds) before exiting the app
-  * Useful for identifying back-to-back test runs
+  - Add a delay (in seconds) before exiting the app
+  - Useful for identifying back-to-back test runs
+
+* **"internal_demuxer"** (bool)
+  - Use encapp's internal Java-based MP4 demuxer instead of Android's MediaExtractor
+  - Provides a pure Java fallback for parsing MP4/MPEG4 video files
+  - Supports H.264 (AVC) and H.265 (HEVC) codecs
+  - Useful for devices with MediaExtractor compatibility issues or when more control over demuxing is needed
+  - Default: `false` (use Android's MediaExtractor)
+  - Example: `internal_demuxer: true`
 
 ### Example TestSetup
 
