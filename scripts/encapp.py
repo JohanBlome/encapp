@@ -581,7 +581,6 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    test_suite = create_tests_from_definition_expansion(test_suite, options)
 
     # now we need to go through all test and update media
     for test in test_suite.test:
@@ -1036,7 +1035,6 @@ def create_tests_from_definition_expansion(testsuite, options):
     if options.filter_input:
         regexp = options.filter_input
     # updated_testsuite.test = tests_definitions.Test
-
     for test in testsuite.test:
         tests = [test]
         fields = [[descr.name, val] for descr, val in test.ListFields()]
@@ -1088,7 +1086,6 @@ def create_tests_from_definition_expansion(testsuite, options):
                                     tests = tests_
 
         updated_testsuite.test.extend(tests)
-
     return updated_testsuite
 
 
@@ -1449,7 +1446,7 @@ def update_codec_test(
                 # force integer value
                 if type(val) is str:
                     expanded = expand_ranges(val)
-                    for gop in expanded:
+                    for val in expanded:
                         # create a new test with the new bitrate
                         if is_parallel:
                             ntest = test
@@ -1457,12 +1454,12 @@ def update_codec_test(
                             ntest = tests_definitions.Test()
                             ntest.CopyFrom(test)
 
-                        ntest.common.id = test.common.id + f".gop-{gop}"
-                        ntest.configure.i_frame_interval = int(gop)
+                        ntest.common.id = test.common.id + f".{k2}-{val}"
+                        setattr(getattr(test, k1), k2, int(val))
                         if not is_parallel:
                             # remove the options already taken care of
                             rep_copy = copy.deepcopy(replace)
-                            rep_copy["configure"]["i_frame_interval"] = int(gop)
+                            rep_copy["configure"][k2] = int(val)
                             update_codec_test(
                                 ntest,
                                 updated_test_suite,
