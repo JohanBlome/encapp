@@ -57,7 +57,6 @@ public class SurfaceTranscoder extends SurfaceEncoder {
     private FrameswapControl mFrameSwapSurface;
     Surface mSurface = null;
     boolean mDone = false;
-    Object mStopLock = new Object();
     boolean mFirstDecodedFrame = true; // If false read ahead on the first frame
 
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
