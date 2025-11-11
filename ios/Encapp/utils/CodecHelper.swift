@@ -56,6 +56,11 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
 
 func setVTEncodingSessionProperties(definition: Test, compSession: VTCompressionSession) {
     var status = Int32(0)
+
+    // Check pixel format, for the hw encoders only nv12 is ok.
+    if definition.input.pixFmt != PixFmt.nv12 {
+        log.error("WARNING! Only nv12 is supported. We can encode but it will look bad and the colors will be totally wrong")
+    }
     // b frame support, default is on but let us check the requested settings
     let params = definition.configure.parameter
     if params.contains( where: {$0.key ==  "max-bframes"})  {
