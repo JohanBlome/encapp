@@ -1195,12 +1195,18 @@ def run_quality(test_file, options, debug):
             base, extension = os.path.splitext(vmaf_file)
             vmafcsv.process_infile(vmaf_file, f"{base}.csv", debug)
         if not options["keep_quality_files"] and not KEEP_QUALITY_FILES_ENV:
-            os.remove(vmaf_file)
-            os.remove(ssim_file)
-            os.remove(psnr_file)
-            os.remove(cvvdp_file)
-            os.remove(psnr_file + ".all")
-            os.remove(ssim_file + ".all")
+            if os.path.isfile(vmaf_file):
+                os.remove(vmaf_file)
+            if os.path.isfile(ssim_file):
+                os.remove(ssim_file)
+            if os.path.isfile(psnr_file):
+                os.remove(psnr_file)
+            if os.path.isfile(cvvdp_file):
+                os.remove(cvvdp_file)
+            if os.path.isfile(psnr_file + ".all"):
+                os.remove(psnr_file + ".all")
+            if os.path.isfile(ssim_file + ".all"):
+                os.remove(ssim_file + ".all")
 
         # media,codec,gop,framerate,width,height,bitrate,meanbitrate,calculated_bitrate,
         # framecount,size,vmaf,ssim,psnr,testfile,reference_file
@@ -1711,7 +1717,6 @@ def main(argv):
     failed = []
     success = []
     for test in options.test:
-        print(f"{test=}")
         try:
             quality_dict = run_quality(test, vars(options), options.debug)
             if "error" in quality_dict:
