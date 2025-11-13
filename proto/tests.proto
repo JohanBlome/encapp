@@ -4,6 +4,12 @@ option java_multiple_files = true;
 option java_package = "com.facebook.encapp.proto";
 option java_outer_classname = "TestDefinition";
 
+message ProxyVal {
+    optional string id = 1;
+    optional DataValueType type = 2;
+    optional string value = 3;
+}
+
 message TestSetup {
   // Instead of setting device workdir on the cli it can be defined here
   optional string device_workdir = 1;
@@ -28,6 +34,21 @@ message TestSetup {
   // Add a delay before exiting the app. Can be usefull for identifying back to back runs.
   optional int32 uihold_sec = 11;
   optional bool internal_demuxer = 12;
+  // For string values we have had an expansion available e.g. 1-3-1,5 
+  // 1. For non string value this has not been possible
+  // 2. The matrix expansion of parameters is not always desired. There are situation where some
+  //    values needs to have synchronized settings
+  // In this context the parameter is a way to expans use cases in a different way
+  // E.g.
+  // proxy_val {
+  //    id: "-100"
+  //    type: intType
+  //    value: "1,2"
+  //}
+  //
+  //config.quality: "-100"
+  // The id can be anything and if matching the value will be expanded.
+  repeated ProxyVal proxy_val = 13; 
 }
 
 message Common {
