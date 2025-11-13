@@ -614,6 +614,9 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         if test.HasField("common") and test.common.HasField("id"):
             test.common.id = replace_placeholders(test.common.id, test)
 
+    if test.HasField("common") and test.common.HasField("description"):
+            test.common.description = replace_placeholders(test.common.description, test)
+
     # 5. save the full protobuf text file(s)
     if options.split:
         # (a) one pbtxt file per subtest
@@ -1002,7 +1005,7 @@ def multiply_tests_with_tems(test, parent, setting, expanded):
         ntest.CopyFrom(test)
         submessage = lookup_message_by_name(ntest, parent)
         if submessage and not param:
-            setattr(submessage, setting, str(item))
+            setattr(submessage, setting, item)
         elif submessage and param:
             for subparam in submessage.parameter:
                 if subparam.key == param.key:
@@ -1034,10 +1037,18 @@ def create_tests_from_definition_expansion(testsuite, options):
     regexp = None
     if options.filter_input:
         regexp = options.filter_input
+
     # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
         tests = [test]
+        proxies = []
+        # before doing the individual ones we look at the proxy ones.
+        if  test.HasField("test_setup"):
+            proxies = test.test_setup.proxy_val
+
         fields = [[descr.name, val] for descr, val in test.ListFields()]
+        # Run the common last
+
         for field in fields:
             parent = None
             for item in field:
@@ -1058,12 +1069,42 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
+                            for proxy in proxies:
+                                try:
+                                    if setting[1] == proxy.id:
+                                        local_expanded =  expand_ranges(proxy.value)
+                                        if len(local_expanded) > 1:
+                                            tests_ = update_single_setting(
+                                                tests, parent, setting[0].name, local_expanded
+                                            )
+                                            if tests_:
+                                                tests = tests_
+                                            extended = []
+                                except Exception as ex:
+                                    print(f"Failed to convert {ex}")
+                                    pass
                             if (
                                 parent == "configure"
                                 and setting[0].name == "parameter"
                                 and EXPAND_ALL
                             ):
                                 for num, param in enumerate(item.parameter):
+
+                                    for proxy in proxies:
+                                        try:
+                                            if param.value == proxy.id:
+                                                local_expanded =  expand_ranges(proxy.value)
+                                                if len(local_expanded) > 1:
+                                                    param_expand = [param, local_expanded]
+                                                    tests_ = update_single_setting(
+                                                        tests, parent, "parameter", param_expand
+                                                    )
+                                                    if tests_:
+                                                        tests = tests_
+                                                    extended = []
+                                        except Exception as ex:
+                                            print(f"Failed to convert {ex}")
+                                            pass
                                     local_expanded = expand_ranges(param.value)
                                     # Parameters needs to be handled differently
                                     if len(local_expanded) > 1:
