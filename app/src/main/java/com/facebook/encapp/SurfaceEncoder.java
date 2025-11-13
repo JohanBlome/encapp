@@ -375,17 +375,19 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 ex.printStackTrace();
             }
         }
-
         Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
 
         try {
             mCodec.signalEndOfInputStream();
             if (mInFramesCount > mOutFramesCount) {
                 Log.d(TAG, "Give me a sec, waiting for last encodings input: " + mInFramesCount + " > output: " + mOutFramesCount);
-                try {
-                    mStopLock.wait(WAIT_TIME_SHORT_MS);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                synchronized (mStopLock) {
+                    try {
+
+                        mStopLock.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
 
