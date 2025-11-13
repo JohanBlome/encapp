@@ -524,7 +524,7 @@ def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
                     comp = getattr(test, parts[0])
                     if hasattr(comp, parts[1]):
                         if parts[1] == "parameter":
-                            value = get_parameter_value(comp.parameter, parts[2])
+                            value = get_parameter_value(comp.parameter, ".".join(parts[2:]))
                         else:
                             # If float and has not fractional part make it int
                             value = ""
