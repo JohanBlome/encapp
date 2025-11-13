@@ -49,11 +49,14 @@ def ffprobe_parse_output(stdout):
                 if key == "r_frame_rate":
                 '''
                 if key == "avg_frame_rate":
-                    split = value.split("/")
-                    if len(split) > 1:
-                        value = round(float(split[0]) / float(split[1]), 2)
-                    else:
-                        value = float(value)
+                    try:
+                        split = value.split("/")
+                        if len(split) > 1:
+                            value = round(float(split[0]) / float(split[1]), 2)
+                        else:
+                            value = float(value)
+                    except:
+                        value = -1
                 elif key == "width" or key == "height":
                     value = int(value)
                 elif key == "duration":
