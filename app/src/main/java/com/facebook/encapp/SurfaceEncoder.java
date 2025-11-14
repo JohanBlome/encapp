@@ -44,7 +44,7 @@ import java.util.Locale;
  */
 
 class SurfaceEncoder extends Encoder implements VsyncListener {
-    protected static final String TAG = "encapp.surface_encoder";
+    private static final String TAG = "encapp.surface_encoder";
 
     Bitmap mBitmap = null;
     Context mContext;
@@ -62,6 +62,8 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     Object mSyncLock = new Object();
     long mVsyncTimeNs = 0;
     long mFirstSynchNs = -1;
+
+    Object mStopLock = new Object();
 
     public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test);
@@ -266,9 +268,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     Log.d(TAG, mTest.getCommon().getId() + " - Done with input, flag endof stream!");
-                    //mOutputMult.stopAndRelease();
                     done = true;
-                    continue;
                 }
 
                 int size = -1;
@@ -375,10 +375,22 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 ex.printStackTrace();
             }
         }
-
         Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
-        mStats.stop();
+
         try {
+            mCodec.signalEndOfInputStream();
+            if (mInFramesCount > mOutFramesCount) {
+                Log.d(TAG, "Give me a sec, waiting for last encodings input: " + mInFramesCount + " > output: " + mOutFramesCount);
+                synchronized (mStopLock) {
+                    try {
+
+                        mStopLock.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
             mCodec.flush();
         } catch (MediaCodec.CodecException ex) {
             Log.e(TAG, "flush: MediaCodec.CodecException error");
@@ -387,6 +399,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             Log.e(TAG, "flush: IllegalStateException error");
             ex.printStackTrace();
         }
+        mStats.stop();
 
         if (mMuxer != null) {
             try {

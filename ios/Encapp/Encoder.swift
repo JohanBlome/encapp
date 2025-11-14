@@ -34,6 +34,9 @@ class Encoder {
     var inputFrameRate = -1 as Float
     var outputFrameRate = -1 as Float
 
+    var sourceWidth = 0 as Int32
+    var sourceHeight = 0 as Int32
+
     //
     var pts = 0
     var lastPts: CMTime!
@@ -63,11 +66,12 @@ class Encoder {
 
             // Check input
             let resolution = splitX(text: definition.input.resolution)
-            let sourceWidth = resolution[0]
-            let sourceHeight = resolution[1]
+            sourceWidth = Int32(resolution[0])
+            sourceHeight = Int32(resolution[1])
             // TODO: it seems the encoder is expecting aligned planes
-            let width = Int((resolution[0] >> 1) << 1)
-            let height = Int((resolution[1] >> 1) << 1)
+            let width = Int32((resolution[0] >> 1) << 1)
+            let height = Int32((resolution[1] >> 1) << 1)
+            log.debug(String(format: "Encode, source: %dx%d, output: %dx%d", sourceWidth, sourceHeight, width, height))
             inputFrameRate = (definition.input.hasFramerate) ? definition.input.framerate: 30.0
             outputFrameRate = (definition.configure.hasFramerate) ? definition.configure.framerate: inputFrameRate
 
@@ -308,15 +312,42 @@ class Encoder {
         }
         var status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelPool, &pixelBuffer)
         if status != noErr {
-            log.error("Pixel buffer create failed, status: \(status)")
-            //break
+            log.error("!!! Pixel buffer create failed, status: \(status)")
+            return -1;
         }
-
+       
         status = CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0));
         let baseAddress = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer!, 0)
+        var read = 0
 
-        // READ
-        var read = stream.read(baseAddress!, maxLength: frameSize)
+        // Check if this is by checking width and sourceWidth are the same
+        let yStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer!, 0)
+        if (sourceWidth != yStride) {
+            var totalRead = 0
+            let uvHeight = Int(sourceHeight)/2
+            
+            let uvStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer!, 1)
+            
+            // read y
+            var destRow = baseAddress!.assumingMemoryBound(to: UInt8.self)
+            for _ in 0..<sourceHeight {
+                let bytesRead = stream.read(destRow, maxLength: Int(sourceWidth))
+                totalRead += bytesRead
+                destRow = destRow.advanced(by: Int(yStride))
+            }
+            
+            // uv
+            destRow = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer!, 1)!.assumingMemoryBound(to: UInt8.self)
+            for _ in 0..<uvHeight {
+                let bytesRead = stream.read(destRow, maxLength: Int(sourceWidth))
+                totalRead += bytesRead
+                destRow = destRow.advanced(by: Int(uvStride))
+            }
+            read = totalRead
+        } else {
+            // READ
+            read = stream.read(baseAddress!, maxLength: frameSize)
+        }
         var timeInfo = CMSampleTimingInfo()
         let framePts = computePresentationTimeUsec(frameIndex: inputFrameCounter, frameTimeUsec: inputFrameDurationUsec, offset: Int64(pts))
         setRuntimeParameters(frame: Int64(inputFrameCounter));

@@ -684,10 +684,9 @@ public class MediaCodecInfoHelper {
                     MediaCodec codec = MediaCodec.createByCodecName(media_codec_info.getName());
                     List<String> params = codec.getSupportedVendorParameters();
                     JSONObject vendor_params = new JSONObject();
-                    int counter = 0;
                     for (String param : params) {
                         MediaCodec.ParameterDescriptor descr = codec.getParameterDescriptor(param);
-                        vendor_params.put(String.format("%2d", counter++) + ". " + param,mediaFormatTypeToString(descr.getType()));
+                        vendor_params.put(param, mediaFormatTypeToString(descr.getType()));
                     }
                     codec.release();
                     json.put("vendor_params", vendor_params);

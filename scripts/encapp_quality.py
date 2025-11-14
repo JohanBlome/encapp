@@ -16,12 +16,12 @@ import pandas as pd
 import numpy as np
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
+import encapp_tool.app_utils
 import encapp
 import vmaf_json2csv as vmafcsv
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
-import datetime
 import tempfile
 
 SCRIPT_ROOT_DIR = os.path.abspath(
@@ -245,7 +245,6 @@ def detailed_media_info(inputfile, options, debug):
 
         first_pts = -1
         pts = 0
-        recalc_duration = False
 
         # ['key_frame', 'pts_time', 'duration_time', 'pkt_size', 'pict_type']
 
@@ -263,7 +262,7 @@ def detailed_media_info(inputfile, options, debug):
                         dur = float(row[2])
                     except Exception as ex:
                         print(f"{ex}")
-                        recalc_duration = True
+                        # recalc_duration = True
                         dur = -1
 
                     if fps < 0 and dur == 0:
@@ -324,30 +323,37 @@ def detailed_media_info(inputfile, options, debug):
 
 def parse_quality_vmaf(vmaf_file):
     """Parse log/output files and return quality score"""
-    with open(vmaf_file) as fd:
-        data = json.load(fd)
-    vmaf_dict = {
-        "mean": data["pooled_metrics"]["vmaf"]["mean"],
-        "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
-        "min": data["pooled_metrics"]["vmaf"]["min"],
-        "max": data["pooled_metrics"]["vmaf"]["max"],
-    }
-    # get per-frame VMAF values
-    vmaf_list = np.array(
-        list(data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"])))
-    )
-    # add some percentiles
-    vmaf_dict.update(
-        {
-            f"p{percentile}": np.percentile(vmaf_list, percentile)
-            for percentile in VMAF_PERCENTILE_LIST
+    vmaf_dict = {}
+    try:
+        with open(vmaf_file) as fd:
+            data = json.load(fd)
+        vmaf_dict = {
+            "mean": data["pooled_metrics"]["vmaf"]["mean"],
+            "harmonic_mean": data["pooled_metrics"]["vmaf"]["harmonic_mean"],
+            "min": data["pooled_metrics"]["vmaf"]["min"],
+            "max": data["pooled_metrics"]["vmaf"]["max"],
         }
-    )
-    if "model" in data:
-        vmaf_dict["model"] = data["model"]
-    # Check for zero frames and frame count
-    vmaf_dict.update({"framecount: ": len(data["frames"])})
-    vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
+        # get per-frame VMAF values
+        vmaf_list = np.array(
+            list(
+                data["frames"][i]["metrics"]["vmaf"] for i in range(len(data["frames"]))
+            )
+        )
+        # add some percentiles
+        vmaf_dict.update(
+            {
+                f"p{percentile}": np.percentile(vmaf_list, percentile)
+                for percentile in VMAF_PERCENTILE_LIST
+            }
+        )
+        if "model" in data:
+            vmaf_dict["model"] = data["model"]
+        # Check for zero frames and frame count
+        vmaf_dict.update({"framecount": len(data["frames"])})
+        vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
+    except KeyError as ke:
+        print(f"ERROR: {ke=} for {vmaf_file}")
+
     return vmaf_dict
 
 
@@ -393,7 +399,7 @@ def parse_quality_cvvdp(cvvdp_csv_file):
         data = pd.read_csv(cvvdp_csv_file)
         data.columns = data.columns.str.strip()
         return data["cvvdp"].values[0]
-    except FileNotFoundError as fex:
+    except FileNotFoundError:
         pass
     except Exception as ex:
         print(f"Failed to read cvvdp file: {cvvdp_csv_file}, {ex}")
@@ -405,7 +411,7 @@ def parse_quality_siti(csv_file):
         data = pd.read_csv(csv_file)
         data.columns = data.columns.str.strip()
         return data.values[0]
-    except FileNotFoundError as fex:
+    except FileNotFoundError:
         pass
     except Exception as ex:
         print(f"Failed to read siti file: {csv_file}, {ex}")
@@ -427,7 +433,7 @@ def parse_quality_qpextract(qpextract_single_file):
             df["qpv_avg"].values[0],
         )
     # , qpy_min, qpy_max, qpu_avg, qpu_min, qpu_max, qpv_avg, qpv_min,  qpv_max = parse_qpextract(qpextract_file)
-    except FileNotFoundError as fex:
+    except FileNotFoundError:
         pass
     except Exception as ex:
         print(f"Failed to parse qpvals file: {qpextract_single_file}, {ex}")
@@ -450,6 +456,8 @@ def run_quality_mp(args):
         result = run_quality(args.get("test"), args.get("options"), args.get("debug"))
     except Exception as ex:
         print(f"Failed run test: {args=}, {ex} {type(ex)}")
+        if ex.__traceback__:
+            print(f"line: {ex.__traceback__.tb_lineno}")
         result = {"file": args.get("test"), "Error": f"Exception: {ex}"}
     return result
 
@@ -458,6 +466,64 @@ def run_quality_mp(args):
 def get_source_length:
     #TODO: fix this
 """
+
+
+def isfloat(text):
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
+
+
+def average_dicts(dicts):
+    out = {}
+    if not dicts:
+        return out
+
+    # consider all keys that appear in any dict
+    all_keys = set().union(*(d.keys() for d in dicts))
+    for key in all_keys:
+        # find a sample value to infer type
+        sample = next((d[key] for d in dicts if key in d), None)
+
+        if isinstance(sample, dict):
+            sub = [d[key] for d in dicts if key in d and isinstance(d[key], dict)]
+            out[key] = average_dicts(sub)
+
+        elif isinstance(sample, list):
+            lists = [d[key] for d in dicts if key in d and isinstance(d[key], list)]
+            max_len = max((len(lst) for lst in lists), default=0)
+
+            vals = []
+            for i in range(max_len):
+                items = [lst[i] for lst in lists if i < len(lst)]
+
+                if not items:
+                    continue
+
+                if isinstance(items[0], dict):
+                    # average nested dicts at this index (only those present)
+                    vals.append(average_dicts(items))
+                else:
+                    nums = [float(x) for x in items if isfloat(x)]
+                    if nums:
+                        vals.append(sum(nums) / len(nums))
+                    else:
+                        # non-numeric: keep the first present value
+                        vals.append(items[0])
+
+            out[key] = vals
+
+        else:
+            nums = [float(d[key]) for d in dicts if key in d and isfloat(d[key])]
+            if nums:
+                out[key] = sum(nums) / len(nums)
+            else:
+                # non-numeric: keep the first present value
+                out[key] = next((d[key] for d in dicts if key in d), None)
+
+    return out
 
 
 def run_quality(test_file, options, debug):
@@ -483,8 +549,9 @@ def run_quality(test_file, options, debug):
         try:
             with open(test_file, "r") as fd:
                 results = json.load(fd)
-        except:
-            return None
+        except FileNotFoundError:
+            print(f"Failed to open file: {test_file}")
+            return failed
 
         if results.get("sourcefile") is None:
             print(f"ERROR, bad source, {test_file}, probably not an Encapp file")
@@ -508,7 +575,7 @@ def run_quality(test_file, options, debug):
         split = reference_dirname.split(".yuv_")
         split = split[0].rsplit("/")
         reference_pathname = reference_dirname + split[-1] + ".yuv"
-    elif options.get("override_reference", None) == None:
+    elif options.get("override_reference", None) is None:
         # find the reference source
         if reference_dirname is None:
             # get the reference dirname from the test path
@@ -545,18 +612,18 @@ def run_quality(test_file, options, debug):
     qpextract_file = f"{encodedfile}.qpvals.csv"
     siti_file = f"{reference_pathname}.siti.csv"
 
-    vmaf_model_info = None
-
     video_info = None
     try:
         video_info = encapp_tool.ffutils.get_video_info(encodedfile, debug)
-    except:
-        print("Failed to parse with ffprobe")
+    except Exception as ex:
+        print(f"Failed to parse with ffprobe {ex}")
         video_info = None
+        failed["error"] = f"ffprobe failed to parse: {encodedfile}"
+        return failed
 
     recalc = options.get("recalc", None)
     test = results.get("test")
-    if type(test) == str:
+    if isinstance(test, str):
         # Historically this has always been a dictionary but if this is a string describing a protobuf
         # try to parse it into a dict
         test = text_format.Parse(test, tests_definitions.Test())
@@ -583,6 +650,11 @@ def run_quality(test_file, options, debug):
             else:
                 pix_fmt = test["input"]["pixFmt"]
                 input_media_format = results.get("encoder_media_format")
+
+            # Is can be a number representation as well as a text (unfortuntaley)
+            if isinstance(pix_fmt, int):
+                pix_fmt = encapp.get_pix_fmt(pix_fmt)
+
             if len(pix_fmt) == 0:
                 # See if source contains a clue
                 pix_fmt = "yuv420p"
@@ -605,9 +677,12 @@ def run_quality(test_file, options, debug):
         if output_media_format is not None:
             output_width = output_media_format.get("width")
             output_height = output_media_format.get("height")
-            output_framerate = output_media_format.get("frame-rate")
+            if "framerate" in output_media_format:
+                output_framerate = output_media_format.get("framerate")
+            else:
+                output_framerate = output_media_format.get("frame-rate")
         else:
-            if test != None:
+            if test is not None:
                 resolution = test["configure"].get("resolution", None)
                 if not resolution or len(resolution) == 0:
                     resolution = test["input"].get("resolution", None)
@@ -621,7 +696,7 @@ def run_quality(test_file, options, debug):
                 output_width = video_info["width"]
                 output_height = video_info["height"]
 
-            if test != None:
+            if test is not None:
                 output_framerate = test["configure"].get("framerate", None)
                 if not output_framerate or output_framerate == 0:
                     output_framerate = test["input"].get("framerate", None)
@@ -646,7 +721,7 @@ def run_quality(test_file, options, debug):
         if output_framerate is None or output_framerate == 0:
             if video_info is not None:
                 output_framerate = f"{video_info.get('framerate', 30)}"
-        if media_res != None and output_resolution != media_res:
+        if media_res is not None and output_resolution != media_res:
             print("Warning. Discrepancy in resolutions for output")
             print(f"Json {output_resolution}, media {media_res}")
             output_resolution = media_res
@@ -717,9 +792,10 @@ def run_quality(test_file, options, debug):
         tmp_ref = None
         tmp_dist = None
         if options.get("ignore_timing"):
+            # It seems that even wih same framerate we can get into trouble so always use raw.
             # transcode to raw intermidiant file
-            tmp_ref = f"ref_{time.time()}.raw"
-            tmp_dist = f"dist_{time.time()}.raw"
+            tmp_ref = f".ref_{time.time()}.raw"
+            tmp_dist = f".dist_{time.time()}.raw"
         if raw:
             ref_part = (
                 f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} "
@@ -746,63 +822,172 @@ def run_quality(test_file, options, debug):
 
         # This is jsut a naming scheme for the color scaling
         diststream = "distorted"
+        input_width = input_resolution.split("x")[0]
+        input_height = input_resolution.split("x")[1]
         if len(force_scale) > 0:
             diststream = "d1"
 
-        input_width = input_resolution.split("x")[0]
-        input_height = input_resolution.split("x")[1]
         # We can choose to convert to the input framerate
         # Or convert to the output. This nomrally gives higher score to lower fps and process faster...
         # There is not point in scaling first to a intermedient yuv raw file, just chain all operation
-        crop = ""
-
-        if options.get("crop_input", None):
-            crop = f"crop={options.get('crop_input')},"
-        filter_cmd = f"[0:v]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}];[{diststream}][1:v]"
-        # Do calculations
-        if recalc or not os.path.exists(vmaf_file):
-            # important: vmaf must be called with videos in the right order
-            # <distorted_video> <reference_video>
-            # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
-            shell_cmd = (
-                f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
-                "-filter_complex "
-                f'"{filter_cmd}libvmaf=log_path={vmaf_file}:'
-                "n_threads=16:log_fmt=json"
+        if input_framerate != output_framerate and not options.get("ignore_timing"):
+            print(
+                "WARNING! Encoded file framerate differs from reference and 'ignore-timing' is not set."
             )
-            # Allow for an environment variable
-            model = ""
-            if os.environ.get("VMAF_MODEL_PATH", None):
-                if debug:
-                    print("Environment VMAF_PATH override model")
-                model = "path=" + os.environ.get("VMAF_MODEL_PATH")
+        filter_cmd = ""
+        # TODO: add vmaf offset
+        crop = ""
+        dist_vid = "0:v"
+        orig_vid = "1:v"
+        if options.get("vmaf_crop", None):
+            sides = options.get("vmaf_crop")
+            if sides == "source":
+                sides = [input_width, input_height]
             else:
-                model = f"'version={VMAF_MODEL}'"
-            shell_cmd += f":model={model}"
-            shell_cmd += '" -f null - 2>&1'
-            # write a settings file
-            if not os.path.exists(f"{directory}/vmafmodel.txt"):
-                with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
-                    modelfile.write(
-                        f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
-                    )
-            vmaf_model_info = model
-            encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-            # Open json and add the info
-            vmafdata = None
-            try:
-                with open(vmaf_file, "r") as fd:
-                    vmafdata = json.load(fd)
+                sides = sides.split("x")
+            if input_height > input_width:
+                crop = f"{sides[1]}:{sides[0]}"
+            else:
+                crop = f"{sides[1]}:{sides[0]}"
+
+            crop = f"crop={crop}"
+            filter_cmd = f"[{dist_vid}]{crop}[{diststream}];[{orig_vid}]{crop}[source]"
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
+        scale = ""
+        if options.get("vmaf_scale", None):
+            sides = options.get("vmaf_scale")
+            if sides == "source":
+                sides = [input_width, input_height]
+            else:
+                sides = sides.split("x")
+            if input_height > input_width:
+                scale = f"{sides[1]}x{sides[0]}"
+            else:
+                scale = f"{sides[1]}x{sides[0]}"
+
+            scale = f"scale={scale}:flags={options.get('vmaf_scaler', 'lanczos')}"
+            filter_cmd = (
+                f"[{dist_vid}]{scale}[{diststream}];[{orig_vid}]{scale}[source]"
+            )
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
+        if options.get("ignore_timing") or (input_framerate == output_framerate):
+            # TODO: old code cropped distorted and scaled source. Let us have the ability to crop or scale both as needed
+            if debug > 0:
+                print(
+                    f"No framerate scaling, ref = {referenced}, {input_framerate=} vs {output_framerate=}"
+                )
+        else:
+            filter_cmd = f"[{dist_vid}]fps={input_framerate}[d0];[d0]{crop}scale={input_width}:{input_height}[{diststream}]"
+
+            dist_vid = f"{diststream}"
+            orig_vid = "source"
+
+        # Do calculations
+        info = {}
+        if recalc or not os.path.exists(vmaf_file):
+            # Filter timings, for 60fps split in two parta and caclulate odd and even frame separately then average the result
+            timefilter = ""
+            loopmode = False
+
+            vmaf_dicts = []
+            loopnum = 1
+            if (
+                round(input_framerate) == round(output_framerate)
+                and round(int(input_framerate)) == 60
+            ):
+                loopmode = True
+                loopnum = 2
+            elif (
+                round(input_framerate) == round(output_framerate)
+                and round(int(input_framerate)) == 120
+            ):
+                loopmode = True
+                loopnum = 4
+
+            # duration must be updated as well, other wise it will misscalculate at 30fps
+            if loopmode:
+                duration = loopnum * float(duration)
+
+            for loop in range(0, loopnum):
+                vmaf_file_ = vmaf_file
+                if loopmode:
+                    timefilter = fr"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
+                    vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
+                elif len(filter_cmd) > 0:
+                    filter_cmd = f"{filter_cmd};[{diststream}][source]"
+
+                # important: vmaf must be called with videos in the right order
+                # <distorted_video> <reference_video>
+                # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
+                shell_cmd = (
+                    f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
+                    "-filter_complex "
+                    f'"{filter_cmd}{timefilter}libvmaf=log_path={vmaf_file_}:'
+                    "n_threads=16:log_fmt=json"
+                )
+                # Allow for an environment variable
+                model = ""
+                if os.environ.get("VMAF_MODEL_PATH", None):
+                    if debug:
+                        print("Environment VMAF_PATH override model")
+                    model = "path=" + os.environ.get("VMAF_MODEL_PATH")
+                else:
+                    model = f"'version={VMAF_MODEL}'"
+                shell_cmd += f":model={model}"
+                shell_cmd += '" -f null - 2>&1'
+                # write a settings file
+                if not os.path.exists(f"{directory}/vmafmodel.txt"):
+                    with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
+                        modelfile.write(
+                            f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
+                        )
+                if debug > 0:
+                    print(f"vmaf command: {shell_cmd}")
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                # Open json and add the info
+                vmafdata = None
+                try:
+                    with open(vmaf_file_, "r") as fd:
+                        vmafdata = json.load(fd)
+                        vmaf_dicts.append(vmafdata)
+
+                    with open(vmaf_file_, "w") as fd:
+                        paths = model.split("/")
+                        # this will be the same for all
+                        if len(info) == 0:
+                            info["model"] = paths[-1]
+                            info["path"] = model if len(paths) > 1 else ""
+                            if options.get("vmaf_crop", None):
+                                info["resolution"] = options.get("vmaf_crop")
+                            else:
+                                info["resolution"] = input_resolution
+
+                        for key in info.keys():
+                            vmafdata[key] = info[key]
+                        json.dump(vmafdata, fd, indent=4)
+
+                except FileNotFoundError as ferror:
+                    print(f"VMAF calculation failed. {ferror}")
+
+            if loopmode:
+                vmaf_dict = average_dicts(
+                    vmaf_dicts
+                )  # {key: (vmaf_dicts[0].get(key, 0) + vmaf_dicts[1].get(key, 0))/2 for key in vmaf_dicts[0].keys() if isfloat(vmaf_dicts[0][key])}
                 with open(vmaf_file, "w") as fd:
-                    paths = model.split("/")
-                    vmafdata["model"] = paths[-1]
-                    vmafdata["path"] = model if len(paths) > 1 else ""
-                    json.dump(vmafdata, fd, indent=4)
-            except FileNotFoundError as ferror:
-                print(f"VMAF calculation failed. {ferror}")
+                    json.dump(vmaf_dict, fd, indent=4)
 
         elif options.get("debug", False) > 0:
             print(f"vmaf already calculated for media, {vmaf_file}")
+
+        # Other filter needs this definitions as well
+        if filter_cmd:
+            filter_cmd = f"{filter_cmd};[{diststream}][source]"
 
         if recalc or not os.path.exists(ssim_file):
             shell_cmd = (
@@ -894,7 +1079,7 @@ def run_quality(test_file, options, debug):
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 qpydata = pd.read_csv(f"{qpextract_file}_y")
                 qpcbdata = pd.read_csv(f"{qpextract_file}_cb")
-                qpcrdata = pd.read_csv(f"{qpextract_file}_cr")
+                pd.read_csv(f"{qpextract_file}_cr")
 
                 vals = {
                     "source": distorted,
@@ -924,12 +1109,12 @@ def run_quality(test_file, options, debug):
             ) as tfo:
                 tf = tfo.name
                 shell_cmd = (
-                    f"ffmpeg  {ref_part} -t 1 "  # {duration} "
+                    f"ffmpeg  {ref_part} "
                     "-filter_complex "
                     f'"siti=print_summary=1 " '
                     f"-f null - &> {tf}"
                 )
-                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug=1)
+                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 # Parse the text and create a csv
                 with open(tf, "r") as fd:
                     """
@@ -989,7 +1174,6 @@ def run_quality(test_file, options, debug):
             os.remove(referenced)
 
     if os.path.exists(vmaf_file):
-        error_in_calc = False
         vmaf_dict = parse_quality_vmaf(vmaf_file)
         ssim = parse_quality_ssim(ssim_file)
         psnr, psnr_y, psnr_u, psnr_v = parse_quality_psnr(psnr_file)
@@ -1088,8 +1272,7 @@ def run_quality(test_file, options, debug):
             )
         # Check vmaf for zero vmaf and/or wrong number of frames
         try:
-            if vmaf_dict["vmaf_zero"] == True:
-                error_in_calc = True
+            if vmaf_dict.get("zero_vmaf", False):
                 # raise Exception("Warning! Some frames are zero, most likely a broken calculation.")
                 print(
                     "Warning! Some frames are zero, most likely a broken calculation."
@@ -1098,11 +1281,13 @@ def run_quality(test_file, options, debug):
                     "Warning! Some frames are zero, most likely a broken calculation."
                 )
 
-            if vmaf_dict["framecount"] != framecount:
-                error_in_calc = True
-                print("Warning! Frame count diffes for vmaf and test")
+            if vmaf_dict.get("framecount", 0) != framecount:
+                print(
+                    f"Warning! Frame count differs for vmaf and test ({vmaf_dict.get('framecount', 0)}, {framecount}) (may happen if framerate is  > 30 fps)"
+                )
                 failed["warning"] = "Warning! Frame count diffes for vmaf and test"
         except Exception as ex:
+            print(f"VMAF failed: {ex} - {type(ex)}")
             pass
 
         iframes = ffmpeg_data.loc[ffmpeg_data["pict_type"] == "I"]
@@ -1113,7 +1298,7 @@ def run_quality(test_file, options, debug):
             iframeinterval = iframes["pts"].diff().max()
             if np.isna(iframeinterval):
                 iframeinterval = 0
-        iframe_size = pframes_size = bframes_size = 0
+        pframes_size = bframes_size = 0
         if len(iframes) > 0:
             iframes_size = iframes["size"].mean()
         if len(pframes) > 0:
@@ -1188,9 +1373,9 @@ def run_quality(test_file, options, debug):
                 "si_min": si_min,
                 "si_max": si_max,
                 "si_avg": si_avg,
-                "ti_min": si_min,
-                "ti_max": si_max,
-                "ti_avg": si_avg,
+                "ti_min": ti_min,
+                "ti_max": ti_max,
+                "ti_avg": ti_avg,
                 "testfile": f"{test_file}",
                 "reference_file": f"{filepath}",
                 "source_complexity": source_complexity,
@@ -1259,9 +1444,28 @@ def get_options(argv):
         default=None,
     )
     parser.add_argument(
-        "--crop_input",
-        help="If there is padding which is not automatically handled, crop: ACTUAL_W:ACTUAL_H'. It will assume that all cropping is right and bottom.",
+        "--vmaf-crop",
+        dest="vmaf_crop",
+        help="Use crop for calculating vmaf, crop: WxH",
         default=None,
+    )
+    parser.add_argument(
+        "--vmaf-offset",
+        dest="vmaf_offset",
+        help="If there is padding which is not automatically handled use this with crop, offset: HxV",
+        default=None,
+    )
+    parser.add_argument(
+        "--vmaf-scale",
+        dest="vmaf_scale",
+        help="Use a specific resolution for the calculation, resolution: WxH. Default scaler is lanczos",
+        default=None,
+    )
+    parser.add_argument(
+        "--vmaf-scaler",
+        dest="vmaf_scaler",
+        help="Scaler used for actual scaling. Default is lanczos",
+        default="lanczos",
     )
     parser.add_argument(
         "-l",
@@ -1271,7 +1475,7 @@ def get_options(argv):
         default=-1,
     )
     parser.add_argument(
-        "--header", help="print header to output", action="store_true", default=False
+        "--no-header", help="omit header from output", action="store_true", default=False
     )
     parser.add_argument(
         "--csv",
@@ -1340,14 +1544,16 @@ def get_options(argv):
         "--keep-quality-files",
         dest="keep_quality_files",
         action="store_true",
-        help=f'Keep the intermediant results of quality calculations. Can also be set using a environment variable: "ENCAPP_KEEP_QUALITY_FILES"',
+        help='Keep the intermediant results of quality calculations. Can also be set using a environment variable: "ENCAPP_KEEP_QUALITY_FILES"',
     )
     parser.add_argument(
         "--ignore-timing",
         dest="ignore_timing",
-        action="store_true",
+        type=bool,
+        default=True,
         help="Ignore all timing information and compare frame by frame between source and reference. "
-        "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken.",
+        "This will create temporary file without andy framerate information. Slower but can help when the timing has been broken. "
+        "The transcoding will only happen if there is a difference in the framerates.",
     )
     parser.add_argument(
         "--max-parallel",
@@ -1385,12 +1591,12 @@ def get_options(argv):
 
     if options.media_path is not None:
         # make sure media_path holds a valid directory
-        assert os.path.isdir(options.media_path), (
-            f"Error: {options.media_path} not a valid directory"
-        )
-        assert os.access(options.media_path, os.R_OK), (
-            f"Error: {options.media_path} not a readable directory"
-        )
+        assert os.path.isdir(
+            options.media_path
+        ), f"Error: {options.media_path} not a valid directory"
+        assert os.access(
+            options.media_path, os.R_OK
+        ), f"Error: {options.media_path} not a readable directory"
 
     return options
 
@@ -1418,11 +1624,14 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         "keep_quality_files": True,
     }
     for test in tests:
-        try:
-            quality_dict = run_quality(test, options, False)
-        except Exception as ex:
-            print(f"{test} failed: {ex}")
-            continue
+        # try:
+
+        quality_dict = run_quality(test, options, False)
+        # except Exception as ex:
+        #    print(f"{test} failed: {ex}")
+        #    if ex.__traceback__:
+        #        print(f"line: {ex.__traceback__.tb_lineno}")
+        #    continue
         now = time.time()
         run_for = now - start
         time_per_test = float(run_for) / float(current)
@@ -1447,6 +1656,25 @@ def calculate_quality(tests, source_path, output, quiet, debug):
     df.to_csv(output, mode=mode, index=False, header=True)
 
 
+def check_metric_availability(options):
+    ret, std, err = encapp_tool.adb_cmds.run_cmd("ffmpeg -filters")
+
+    # Check ffmpeg filters
+    checks = [" libvmaf ", " psnr ", " ssim "]
+    # These are essential
+    ok = True
+    for check in checks:
+        if check not in std:
+            print(f"\n\n*** ERROR: Quality metric '{check}' not available ***\n\n")
+            ok = False
+
+    if not ok:
+        print("Essential quality metrics needs to be installed")
+        exit(0)
+
+    # todo: check siti, qp etc, if those are requested.
+
+
 def main(argv):
     """Calculate video quality properties (vmaf/ssim/psnr) and write
     a csv with relevant data
@@ -1455,6 +1683,9 @@ def main(argv):
     global CVVDP_AVAILABLE
     options = get_options(argv)
     VMAF_MODEL = options.vmaf_model
+
+    # Check installed metrics
+    check_metric_availability(options)
 
     # run all the tests
     current = 1
@@ -1468,18 +1699,19 @@ def main(argv):
         voptions = vars(options).copy()
         del voptions["test"]
         mpargs = [
-            ({"test": test, "options": voptions, "debug": False})
+            ({"test": test, "options": voptions, "debug": options.debug})
             for test in options.test
         ]
 
         with mp.Pool(processes=options.max_parallel) as p:
-            results = p.map(run_quality_mp, mpargs, chunksize=1)
+            p.map(run_quality_mp, mpargs, chunksize=1)
 
         # rerun to get complete csv, quality files are kept so it will just read the files and compile the dataset
 
     failed = []
     success = []
     for test in options.test:
+        print(f"{test=}")
         try:
             quality_dict = run_quality(test, vars(options), options.debug)
             if "error" in quality_dict:
@@ -1489,9 +1721,10 @@ def main(argv):
                     success.append({"file": test, "warning": quality_dict["warning"]})
                 else:
                     success.append({"file": test, "warning": "none"})
-
         except Exception as ex:
             print(f"{test} failed: {ex}")
+            if ex.__traceback__:
+                print(f"line: {ex.__traceback__.tb_lineno}")
             continue
         now = time.time()
         run_for = now - start
@@ -1511,12 +1744,13 @@ def main(argv):
         values.append(quality_dict)
     # write data to csv file
     df = pd.DataFrame(values)
-    mode = "a"
-    if options.header:
-        mode = "w"
-        mode = "w"
+    mode = "w"
+    write_header = True
+    if options.no_header:
+        mode = "a"
+        write_header = False
     if df is not None:
-        df.to_csv(options.output, mode=mode, index=False, header=options.header)
+        df.to_csv(options.output, mode=mode, index=False, header=write_header)
 
     # Summary
     dfs = pd.DataFrame(success)

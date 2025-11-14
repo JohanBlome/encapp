@@ -52,8 +52,10 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
@@ -143,6 +145,9 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Log.d(TAG, "Screen will stay on during encoding to prevent system freezing");
 
         mVsyncHandler = new VsyncHandler();
         mVsyncHandler.start();
@@ -257,12 +262,37 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        stopForegroundService();
         mMemLoad.stop();
         mPowerLoad.stop();
         finishAndRemoveTask();
         Process.killProcess(Process.myPid());
         CodecCache.getCache().clearCodecs();
         Log.d(TAG, "EXIT");
+    }
+
+    private void startForegroundService() {
+        try {
+            Intent serviceIntent = new Intent(this, EncodingForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+            Log.d(TAG, "Foreground service start requested");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start foreground service", e);
+        }
+    }
+
+    private void stopForegroundService() {
+        try {
+            Intent serviceIntent = new Intent(this, EncodingForegroundService.class);
+            stopService(serviceIntent);
+            Log.d(TAG, "Foreground service stop requested");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to stop foreground service", e);
+        }
     }
 
     /**
@@ -299,6 +329,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
      * and exit.
      */
     private void performAllTests() {
+        startForegroundService();
+
         mMemLoad = new MemoryLoad(this);
         mPowerLoad = PowerLoad.getPowerLoad(this);
         mPowerLoad.addStatusListener(this);
@@ -324,6 +356,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 e.printStackTrace();
             }
             return;
+        } else if (mExtraData.containsKey(CliSettings.CHECK_WORKDIR)) {
+            // Try to write and read from /sdcard/ and if that fails, check /data/data/com.facebook.encapp
+            if (!tryFilePath("/sdcard/")) {
+                tryFilePath("/data/data/com.facebook.encapp");
+            }
         }
 
 
@@ -365,7 +402,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                         mUIHoldtimeSec = setup.getUiholdSec();
                     }
                 }
-                
+
                 int nbrViews = 0;
                 boolean hasCameraPreview = false;
                 // Prepare views for visualization
@@ -577,6 +614,31 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         } catch (IOException iox) {
             report_result("unknown", "unknown", "error", iox.getMessage());
         }
+    }
+
+    private static boolean tryFilePath(String path) {
+        java.io.File file = null;
+        try {
+            file = new File(path + "/_encapp.txt");
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(("encapp workdir:" + path).getBytes(StandardCharsets.UTF_8));
+            fos.close();
+            FileInputStream fis = new FileInputStream(file);
+            byte[] data = fis.readAllBytes();
+
+            Log.d(TAG, "Succeded in writing to "+ path);
+            Log.d(TAG, new String(data, StandardCharsets.UTF_8));
+            fis.close();
+
+            return true;
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to use filepath: " + path);
+        } finally {
+            if (file != null)
+                file.delete();
+        }
+
+        return false;
     }
 
 
@@ -1073,8 +1135,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
     @Override
     public void shutdown() {
-        Log.e(TAG, "Battery problem, shutdown.");
-        exit();
+        Log.e(TAG, "Battery problem, shutdown. OVERRRIDEN");
+        //exit();
     }
 
 }

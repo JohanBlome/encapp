@@ -22,6 +22,7 @@ import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.ClockTimes;
 import com.facebook.encapp.utils.CodecCache;
+import com.facebook.encapp.utils.Demuxer;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
@@ -40,11 +41,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SurfaceTranscoder extends SurfaceEncoder {
-    private final String TAG = "encapp.surface_transcoder";
+    private static final String TAG = "encapp.surface_transcoder";
 
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;
+    Demuxer mDemuxer;
     MediaCodec mDecoder;
+    boolean mUseInternalDemux = false;
     DecoderRuntime mDecoderRuntimeParams;
     double mLoopTime = 0;
     int mCurrentLoop = 1;
@@ -54,7 +57,6 @@ public class SurfaceTranscoder extends SurfaceEncoder {
     private FrameswapControl mFrameSwapSurface;
     Surface mSurface = null;
     boolean mDone = false;
-    Object mStopLock = new Object();
     boolean mFirstDecodedFrame = true; // If false read ahead on the first frame
 
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
@@ -92,28 +94,88 @@ public class SurfaceTranscoder extends SurfaceEncoder {
         if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
             return "Could not open file";
         }
-        mExtractor = new MediaExtractor();
+
+        mUseInternalDemux = mTest.hasTestSetup() && mTest.getTestSetup().hasInternalDemuxer() &&
+                            mTest.getTestSetup().getInternalDemuxer();
+        Log.d(TAG, "SurfaceTranscoder - Use internal demux: " + mUseInternalDemux);
+
         MediaFormat inputFormat = null;
-        try {
-            mExtractor.setDataSource(mTest.getInput().getFilepath());
-            int trackNum = 0;
-            int tracks = mExtractor.getTrackCount();
-            for (int track = 0; track < tracks; track++) {
-                inputFormat = mExtractor.getTrackFormat(track);
-                if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
-                        inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
-                    trackNum = track;
+
+        if (mUseInternalDemux) {
+            String filepath = mTest.getInput().getFilepath();
+            Log.d(TAG, "SurfaceTranscoder - Creating internal demuxer for file: " + filepath);
+            mDemuxer = new Demuxer(filepath);
+            Log.d(TAG, "SurfaceTranscoder - Demuxer object created, calling initialize()");
+
+            try {
+                if (!mDemuxer.initialize()) {
+                    Log.e(TAG, "Failed to initialize internal demuxer");
+                    return "Failed to initialize internal demuxer";
                 }
+
+                inputFormat = MediaFormat.createVideoFormat(
+                        mDemuxer.isHEVC() ? MediaFormat.MIMETYPE_VIDEO_HEVC : MediaFormat.MIMETYPE_VIDEO_AVC,
+                        mDemuxer.getWidth(),
+                        mDemuxer.getHeight());
+
+                byte[] csd = mDemuxer.getCodecSpecificData();
+                if (csd != null && csd.length > 0) {
+                    inputFormat.setByteBuffer("csd-0", ByteBuffer.wrap(csd));
+                }
+
+                if (mDemuxer.getFrameRate() > 0) {
+                    inputFormat.setFloat(MediaFormat.KEY_FRAME_RATE, mDemuxer.getFrameRate());
+                }
+
+                Log.d(TAG, "Internal demuxer initialized: " + mDemuxer.getWidth() + "x" + mDemuxer.getHeight() +
+                        ", " + mDemuxer.getFrameRate() + " fps, " + (mDemuxer.isHEVC() ? "HEVC" : "AVC"));
+                Log.d(TAG, "Check parsed input format:");
+                logMediaFormat(inputFormat);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize internal demuxer: " + e.getMessage());
+                e.printStackTrace();
+                if (mDemuxer != null) {
+                    mDemuxer.close();
+                }
+                return "Failed to initialize internal demuxer";
             }
-            mExtractor.selectTrack(trackNum);
-            inputFormat = mExtractor.getTrackFormat(trackNum);
-            Log.d(TAG, "Extractor input format");
+        } else {
+            mExtractor = new MediaExtractor();
+            try {
+                mExtractor.setDataSource(mTest.getInput().getFilepath());
+                int trackNum = 0;
+                int tracks = mExtractor.getTrackCount();
+                for (int track = 0; track < tracks; track++) {
+                    inputFormat = mExtractor.getTrackFormat(track);
+                    if (inputFormat.containsKey(MediaFormat.KEY_MIME) &&
+                            inputFormat.getString(MediaFormat.KEY_MIME).toLowerCase(Locale.US).contains("video")) {
+                        trackNum = track;
+                    }
+                }
+                mExtractor.selectTrack(trackNum);
+                inputFormat = mExtractor.getTrackFormat(trackNum);
+                Log.d(TAG, "Extractor input format");
+                if (inputFormat == null) {
+                    Log.e(TAG, "no input format");
+                    return "no input format";
+                }
+                Log.d(TAG, "Check parsed input format:");
+                logMediaFormat(inputFormat);
+            } catch (IOException e) {
+                if (mExtractor != null) {
+                    mExtractor.release();
+                }
+                Log.e(TAG, "Failed to initialize extractor: " + e.getMessage());
+                e.printStackTrace();
+                return "Failed to initialize extractor";
+            }
+        }
+
+        try {
             if (inputFormat == null) {
                 Log.e(TAG, "no input format");
                 return "no input format";
             }
-            Log.d(TAG, "Check parsed input format:");
-            logMediaFormat(inputFormat);
             // Allow explicit decoder only for non encoding tests (!?)
             String description = inputFormat.getString(MediaFormat.KEY_MIME);
             if (mTest.getDecoderConfigure().hasCodec()) {
@@ -145,7 +207,11 @@ public class SurfaceTranscoder extends SurfaceEncoder {
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
         if (inputFormat.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-            mReferenceFrameRate = (float) (inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE));
+            try {
+                mReferenceFrameRate = inputFormat.getFloat(MediaFormat.KEY_FRAME_RATE);
+            } catch (ClassCastException e) {
+                mReferenceFrameRate = (float) inputFormat.getInteger(MediaFormat.KEY_FRAME_RATE);
+            }
         }
         if (mFrameRate <= 0) {
             mFrameRate = mReferenceFrameRate;
@@ -389,7 +455,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     mCurrentTimeSec = diffUsec/1000000.0f;
                     if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
-                            Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder: " + (diffUsec - ptsUsec)/1000 + " ms"  );
+                            if (!mNoEncoding) {
+                                Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder: " + (diffUsec - ptsUsec)/1000 + " ms"  );
+                            }
                             mDropNext = true;
                             mDropcount++;
                         } else {
@@ -411,7 +479,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     long diff =(diffUsec - timestamp);
                     if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
-                            Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
+                            if (!mNoEncoding) {
+                                Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
+                            }
                             mDropNext = false;//true;
                             mDropcount++;
                         } else {
@@ -465,8 +535,26 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     Integer index = mDecoderBuffers.poll();
                     MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
                     ByteBuffer buffer = mDecoder.getInputBuffer(index);
-                    int size = mExtractor.readSampleData(buffer, 0);
-                    int flags = mExtractor.getSampleFlags();
+                    int size = -1;
+                    int flags = 0;
+                    long ptsUsec = 0;
+
+                    if (mUseInternalDemux) {
+                        Demuxer.Frame frame = new Demuxer.Frame();
+                        if (mDemuxer.getNextFrame(frame)) {
+                            buffer.clear();
+                            buffer.put(frame.data);
+                            size = frame.size;
+                            ptsUsec = frame.timestamp + mPtsOffset;
+                            flags = frame.isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
+                        } else {
+                            size = -1;
+                        }
+                    } else {
+                        size = mExtractor.readSampleData(buffer, 0);
+                        flags = mExtractor.getSampleFlags();
+                        ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
+                    }
 
                     double runtime = mCurrentTimeSec;
                     if (mFirstFrameTimestampUsec > 0) {
@@ -491,8 +579,6 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                         continue;
                     }
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
-                    // Source time is always what is read
-                    long ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
                     if (size > 0) {
                         mStats.startDecodingFrame(ptsUsec, size, flags);
                         try {
@@ -506,9 +592,18 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
                     }
-                    boolean eof = !mExtractor.advance();
+                    boolean eof = false;
+                    if (mUseInternalDemux) {
+                        eof = mDemuxer.isEOS();
+                    } else {
+                        eof = !mExtractor.advance();
+                    }
                     if (eof) {
-                        mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                        if (mUseInternalDemux) {
+                            mDemuxer.reset();
+                        } else {
+                            mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                        }
                         mCurrentLoop++;
                         if (ptsUsec > mLastPtsUs) {
                             mPtsOffset = ptsUsec;
@@ -634,6 +729,8 @@ public class SurfaceTranscoder extends SurfaceEncoder {
 
             if (mExtractor != null)
                 mExtractor.release();
+            if (mDemuxer != null)
+                mDemuxer.close();
             Log.d(TAG, "Stop writer");
             mDataWriter.stopWriter();
         }

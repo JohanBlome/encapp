@@ -2,14 +2,15 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.google.protobuf'
 
 android {
-    compileSdkVersion 31
+    namespace 'com.facebook.encapp'
+    compileSdkVersion 33
 
     defaultConfig {
         applicationId "com.facebook.encapp"
         minSdkVersion 27
         targetSdkVersion 31
         versionCode 1
-        versionName "1.23"
+        versionName "1.27"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)
     }
 
@@ -100,10 +101,14 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.18.0'
+        artifact = 'com.google.protobuf:protoc:3.24.0'
     }
+    plugins {
+        java {}
+    }
+
     generateProtoTasks {
-        all().each { task ->
+        all().configureEach { task ->
             task.plugins {
                 java {}
             }

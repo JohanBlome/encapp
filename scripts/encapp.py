@@ -5,32 +5,32 @@ The script will create a directory based on device model and date,
 and save encoded video and rate distortion results in the directory
 """
 
-import os
-import copy
-import humanfriendly
-import json
-import sys
 import argparse
-from argparse_formatter import FlexiFormatter
+import copy
+import datetime
 import itertools
+import json
+import multiprocessing
+import os
+import pprint
+import random
 import re
 import shutil
+import sys
 import tempfile
 import time
-import datetime
-from google.protobuf import text_format
-import google.protobuf.descriptor_pool as descriptor_pool
-import multiprocessing
+
+import encapp_quality
 
 import encapp_tool
-import encapp_tool.app_utils
 import encapp_tool.adb_cmds
+import encapp_tool.app_utils
 import encapp_tool.ffutils
-import encapp_quality
-import copy
-import random
+import google.protobuf.descriptor_pool as descriptor_pool
+import humanfriendly
 import pandas as pd
-import pprint
+from argparse_formatter import FlexiFormatter
+from google.protobuf import text_format
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -46,6 +46,8 @@ import tests_pb2 as tests_definitions  # noqa: E402
 RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
+
+EXPAND_ALL = False
 
 QUALITY_PROCESSES = []
 
@@ -88,6 +90,8 @@ PIX_FMT_TYPES_VALUES = {
     "nv12": 2,
     "nv21": 3,
     "rgba": 4,
+    "yuvj420p": 0,
+    "yuv420p10le": 0x36,
 }
 PIX_FMT_TYPES = {
     "yuv420p": "yuv",
@@ -95,6 +99,8 @@ PIX_FMT_TYPES = {
     "nv12": "yuv",
     "nv21": "yuv",
     "rgba": "rgba",
+    "yuv420p10le": "yuv420p10le",
+    "yuvj420p": "yuv",
 }
 PREFERRED_PIX_FMT = "yuv420p"
 KNOWN_CONFIGURE_TYPES = {
@@ -203,9 +209,7 @@ def wait_for_exit(serial, debug=0):
         state = "Running"
         while state == "Running":
             time.sleep(1)
-            # ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f"idb list-apps  --fetch-process-state  --udid {serial} | grep {encapp_tool.adb_cmds.IDB_BUNDLE_ID}")
-            # state = stdout.split("|")[4].strip()
-            # Since the above does not work (not state info), let us look for the lock file
+            # Since the above does not work (not state info), le us look for the lock file
             if not encapp_tool.adb_cmds.file_exists_in_device("running.lock", serial):
                 state = "Done"
     else:
@@ -245,22 +249,15 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
     else:
         if encapp_tool.adb_cmds.USE_IDB:
             # remove log file first
-            ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb file rm Documents/encapp.log --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} ",
-                debug,
+            regex_str = encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE
+            encapp_tool.adb_cmds.remove_files_using_regex(
+                serial, "encapp.log", device_workdir, debug
             )
-            if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                    f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                    f"test {protobuf_txt_filepath}",
-                    debug,
-                )
-            else:
-                ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                    f"test {protobuf_txt_filepath}",
-                    debug,
-                )
+            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
+                f" test {protobuf_txt_filepath}",
+                debug=debug,
+            )
         else:
             # clean the logcat first
             encapp_tool.adb_cmds.reset_logcat(serial)
@@ -280,15 +277,12 @@ def collect_results(
 ):
     if debug > 0:
         print(f"collecting result: {protobuf_txt_filepath}")
+    stdout = ""
     if encapp_tool.adb_cmds.USE_IDB:
         # There seems to be somethign fishy here which causes files to show up late
         # Not a problem if running a single file but multiple is a problem. Sleep...
         time.sleep(2)
-        cmd = f"idb file ls {device_workdir}/ --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-    else:
-        cmd = f"adb -s {serial} shell ls {device_workdir}/"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
-
+    stdout = encapp_tool.adb_cmds.list_files(serial, device_workdir, debug=debug)
     # If we have a output_filename template in the test we need to check the begining
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
     test_suite = configfile_read(local_path)
@@ -305,14 +299,9 @@ def collect_results(
 
     if encapp_tool.adb_cmds.USE_IDB:
         # Set app in standby so screen is not locked
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            cmd = (
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-            )
-        else:
-            cmd = (
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-            )
+        cmd = (
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+        )
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
     if debug > 0:
         print(f"outputfiles: {len(output_files)}")
@@ -323,34 +312,27 @@ def collect_results(
 
     total_number = len(output_files)
     counter = 1
-    for file in output_files:
+    for counter, file in enumerate(output_files):
         if debug > 0:
             print(f"*** Pull file {counter}/{total_number}, {file} **")
-        counter += 1
         if file == "":
             print("No file found")
             continue
         # pull the output file
-        if encapp_tool.adb_cmds.USE_IDB:
-            cmd = f"idb file pull {device_workdir}/{file} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        else:
-            cmd = f"adb -s {serial} pull {device_workdir}/{file} " f"{local_workdir}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, file, device_workdir, local_workdir, debug=debug
+        )
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         # append results file (json files) to final results
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
     # remove/process the test file
-    if encapp_tool.adb_cmds.USE_IDB:
-        cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-    else:
-        cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
-    encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+    encapp_tool.adb_cmds.remove_file(serial, protobuf_txt_filepath, debug)
     if debug > 0:
         print(f"results collect: {result_json}")
     # dump device information
@@ -358,21 +340,16 @@ def collect_results(
     # get logcat
     result_ok = False
     if encapp_tool.adb_cmds.USE_IDB:
-        cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, "encapp.log", device_workdir, local_workdir, debug
+        )
         # Release the app
         encapp_tool.app_utils.force_stop(serial)
         # Remove test output files
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-                debug,
-            )
-        else:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-                debug,
-            )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
+            debug,
+        )
         # TODO: checks on ios
         result_ok = True
         return result_ok, result_json
@@ -518,39 +495,37 @@ def parse_multiply(multiply):
     return definition
 
 
-def update_fileoutput_names(test):
-    """Upate output file name is existing according to placeholders
-    Example: output_filename: "[input.filepath].[configure.bitrate].[XXX]"
-    Where the input.filepath will set the basename from the test def and
-    the bitrate will be set from the configure.bitrate.
-    XXX means three random bytes in hex format.
-    """
-    if test.common.output_filename is not None:
-        # Check if we have any placeholders
-        reg = r"\[[\w.]*\]"
-        filename = test.common.output_filename
-        while True:
-            m = re.search(reg, filename)
+def get_parameter_value(params: tests_definitions.Parameter, name: str) -> str:
+    for param in params:
+        if param.key == name:
+            return str(param.value)
+    return ""
 
-            if m:
-                text = m.group(0)[1:-1]
-                # check if match only contains X
-                m2 = re.search(r"X*", text)
 
-                if len(m2.group(0)) > 0:
-                    # create random byte values and print as hex
-                    nbr = len(m2.group(0))
-                    hex = "".join(
-                        [random.choice("0123456789abcdef") for i in range(nbr)]
-                    )
-                    filename = filename.replace(m.group(0), hex)
-                else:
-                    # split at .
-                    parts = text.split(".")
-                    value = ""
-                    if hasattr(test, parts[0]):
-                        comp = getattr(test, parts[0])
-                        if hasattr(comp, parts[1]):
+def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
+    reg = r"\[[\w.\-]*\]"
+    while True:
+        m = re.search(reg, source)
+        if m:
+            text = m.group(0)[1:-1]
+            # check if match only contains X
+            m2 = re.search(r"X*", text)
+
+            if m2 and len(m2.group(0)) > 0:
+                # create random byte values and print as hex
+                nbr = len(m2.group(0))
+                hex = "".join([random.choice("0123456789abcdef") for i in range(nbr)])
+                source = source.replace(m.group(0), hex)
+            else:
+                # split at .
+                parts = text.split(".")
+                value = ""
+                if hasattr(test, parts[0]):
+                    comp = getattr(test, parts[0])
+                    if hasattr(comp, parts[1]):
+                        if parts[1] == "parameter":
+                            value = get_parameter_value(comp.parameter, ".".join(parts[2:]))
+                        else:
                             # If float and has not fractional part make it int
                             value = ""
                             value_ = getattr(comp, parts[1])
@@ -567,10 +542,24 @@ def update_fileoutput_names(test):
                                         lindex = value.index(ex)
                                         if lindex > 0:
                                             value = value[0:lindex]
-                    filename = filename.replace(m.group(0), value)
+                source = source.replace(m.group(0), value)
+        else:
+            break
 
-            else:
-                break
+    return source
+
+
+def update_fileoutput_names(test):
+    """Upate output file name is existing according to placeholders
+    Example: output_filename: "[input.filepath].[configure.bitrate].[XXX]"
+    Where the input.filepath will set the basename from the test def and
+    the bitrate will be set from the configure.bitrate.
+    XXX means three random bytes in hex format.
+    """
+    if test.common.output_filename is not None:
+        # Check if we have any placeholders
+        filename = replace_placeholders(test.common.output_filename, test)
+
     if len(filename) > 0:
         test.common.output_filename = filename
 
@@ -592,27 +581,26 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    test_suite = create_tests_from_definition_expansion(test_suite)
-    if options.dry_run:
-        # Write and exit
-        configfile_write(test_suite, protobuf_txt_filepath)
-        return test_suite, [], protobuf_txt_filepath
 
     # now we need to go through all test and update media
     for test in test_suite.test:
         update_media_files(test, options)
 
+    if options.dry_run:
+        # Write and exit
+        configfile_write(test_suite, protobuf_txt_filepath)
+        return test_suite, [], protobuf_txt_filepath
+
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
     for test in test_suite.test:
         add_files_to_push(test, files_to_push)
-
     # 3. save the media files
     for filepath in files_to_push:
         # https://stackoverflow.com/a/30359308
         if not os.path.exists(options.mediastore):
             os.mkdir(options.mediastore)
-        basename = os.path.basename(test.input.filepath)
+        basename = os.path.basename(filepath)
         if not os.path.exists(f"{options.mediastore}/{basename}"):
             shutil.copy2(filepath, f"{options.mediastore}/{basename}")
 
@@ -620,19 +608,21 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     for test in test_suite.test:
         update_file_paths(test, options.device_workdir)
 
-    # 4.b Update outputfile name (if present)
+    # 4.b Update outputfile name and id (if present)
     for test in test_suite.test:
         update_fileoutput_names(test)
+        if test.HasField("common") and test.common.HasField("id"):
+            test.common.id = replace_placeholders(test.common.id, test)
 
     # 5. save the full protobuf text file(s)
     if options.split:
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
-        for test in test_suite.test:
-            output_dir = f"{local_workdir}/{valid_path(test.common.id)}"
+        for num, test in enumerate(test_suite.test):
+            output_dir = f"{local_workdir}"
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
-            filename = f"{output_dir}/{valid_path(test.common.id)}.pbtxt"
+            filename = f"{output_dir}/{get_valid_test_name(test)}.pbtxt"
             configfile_write(test, filename)
             files_to_push |= {filename}
     else:
@@ -652,7 +642,7 @@ def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     protobuf_txt_filepath = create_tests_from_definition_expansionPath(
-        protobuf_txt_filepath, local_workdir
+        protobuf_txt_filepath, local_workdir, options
     )
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
@@ -692,9 +682,9 @@ def run_codec_tests_file(
         for test in test_suite.test:
             suite = tests_definitions.TestSuite()
             suite.test.extend([test])
-            path = f"{local_workdir}/{valid_path(test.common.id)}.pbtxt"
+            path = f"{local_workdir}/{get_valid_test_name(test)}.pbtxt"
             configfile_write(suite, path)
-            files_to_push |= {path}
+            files_to_push.add(path)
     # Save the complete test if updated
     if updated:
         # remove any older pbtxt in existence
@@ -703,7 +693,6 @@ def run_codec_tests_file(
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
 
         result_files = []
-        global QUALITY_PROCESSES
         if options.separate_sources:
             # create test(s) for each source
             # dictionary with source as key
@@ -722,16 +711,17 @@ def run_codec_tests_file(
             counter = 0
             if debug > 0:
                 print("Clear target and remove known encapp files")
-            # Clear target and run test, collect result and iterate
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, "[encapp_|split.].*", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*pbtxt$", options.device_workdir, options.debug
-            )
-            encapp_tool.adb_cmds.remove_files_using_regex(
-                serial, ".*[yuv|raw]$", options.device_workdir, options.debug
-            )
+            if not options.dry_run:
+                # Clear target and run test, collect result and iterate
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, "^encapp_.*|^split.*", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*pbtxt$", options.device_workdir, options.debug
+                )
+                encapp_tool.adb_cmds.remove_files_using_regex(
+                    serial, ".*yuv$|raw$", options.device_workdir, options.debug
+                )
             success = True
             for testsource in test_collection:
                 files = []
@@ -752,12 +742,15 @@ def run_codec_tests_file(
                     test_suite.test.append(test)
                 counter += 1
                 protobuf_txt_filepath = (
-                    f"{local_workdir}/{valid_path(test.common.id)}_{counter}.pbtxt"
+                    f"{local_workdir}/{get_valid_test_name(test)}_{counter}.pbtxt"
                 )
                 configfile_write(test_suite, protobuf_txt_filepath)
                 if debug > 0:
                     print(f"add {protobuf_txt_filepath}")
                 files.append(protobuf_txt_filepath)
+
+                if options.dry_run:
+                    continue
 
                 results = run_codec_tests(
                     test_suite,
@@ -780,7 +773,12 @@ def run_codec_tests_file(
                         serial, f"{options.device_workdir}/{basename}", options.debug
                     )
 
-                if not results[0]:
+                # Verify the number fo tests and files (if applicable)
+                # TODO:
+                if not results:
+                    print("Error: no result")
+                    return False, []
+                if results[0]:
                     success = False
                 result_files += results[1]
                 # Run quality
@@ -807,7 +805,7 @@ def run_codec_tests_file(
             # If we are using the id - we need to replace characters that are problematic in
             # a filepath (i.e. space)
             protobuf_txt_filepath = (
-                f"{local_workdir}/{valid_path(test.common.id)}_aggr.pbtxt"
+                f"{local_workdir}/{get_valid_test_name(test)}_aggr.pbtxt"
             )
             configfile_write(test_suite, protobuf_txt_filepath)
             if debug > 0:
@@ -819,6 +817,9 @@ def run_codec_tests_file(
                     print("Dry run - do nothing")
                 return None, None
             else:
+                if debug > 0:
+                    print(f"RUN THIS! {text_format.MessageToString(test_suite)}")
+
                 results = run_codec_tests(
                     test_suite,
                     files_to_push,
@@ -832,10 +833,22 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
+                # Verify the number fo tests and files (if applicable)
+                if debug:
+                    print(f"*** VERIFY RESULT ***")
+                check = verify_test_result(results, test_suite, protobuf_txt_filepath)
+                if len(check) > 0:
+                    print("ERROR! some tests failed")
+                    df = pd.DataFrame(check)
+                    df.to_csv(
+                        "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
+                    )
+
                 # Run quality
                 success = True
-                if not results[0]:
+                if not (results and results[0]):
                     success = False
+                    return success, []
                 result_files += results[1]
                 if success and options.quality:
                     output = f"{local_workdir}/quality.csv"
@@ -860,6 +873,85 @@ def run_codec_tests_file(
         )
 
 
+def is_test(videofilename, test):
+    if test.common.output_filename:
+        if videofilename.split(".mp4")[0] == test.common.output_filename:
+            return True
+    return False
+
+
+def find_test_name(videofilename, test_suite):
+    for test in test_suite.test:
+        if is_test(videofilename, test):
+            return test
+    return ""
+
+
+def verify_test_result(results, test_suite, protobuf_txt_filepath):
+    fail = []
+    if not (results and results[0]):
+        # TODO: report in some other way?
+        print("Error! test case failed")
+        fail.append({"test_id": "", "stats": "", "error": "Test failed"})
+        return fail
+
+    test_count = len(test_suite.test)
+    # TODO: fix this crap
+    # Test result can be [status, [file], status2, [file2]...
+    result_count = len(results[1])
+    if len(results) > 2:
+        result_count = len(results) / 2
+
+    # TODO: check that outout is expected
+    # result in the same folder as the protobuf
+    folder = os.path.dirname(protobuf_txt_filepath)
+    # TODO:  Currently it will fail when there are parallel tests
+    if test_count > result_count:
+        print(
+            f"ERROR! \nTest count = {test_count}, nTest results = {result_count}\nMissing: {test_count - result_count}"
+        )
+        # In case of named output files we can find them
+        for test in test_suite.test:
+            if test.common.output_filename:
+                name = f"{folder}/{test.common.output_filename}.json"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": name,
+                            "error": "no stat file",
+                        }
+                    )
+
+                name = f"{folder}/{test.common.output_filename}.mp4"
+                if not os.path.exists(name):
+                    fail.append(
+                        {
+                            "test_id": test.common.id,
+                            "stats": "",
+                            "error": "no video file present",
+                        }
+                    )
+        if len(fail) == 0:
+            fail.append(
+                {
+                    "test_id": "",
+                    "stats": "missing stat file(s)",
+                    "error": "aborted test",
+                }
+            )
+
+    # Check encoded file
+    for stat in results[1]:
+        name = f"{stat.split('.json')[0]}.mp4"
+        if not os.path.exists(name):
+            # Get test name
+            test_id = find_test_name(name, test_suite)
+            fail.append({"test_id": test_id, "stats": stat, "error": "no encoded file"})
+
+    return fail
+
+
 def abort_test(local_workdir, message):
     print("\n*** Test failed ***")
     print(f"Remove {local_workdir}")
@@ -868,13 +960,15 @@ def abort_test(local_workdir, message):
     sys.exit(-1)
 
 
-def create_tests_from_definition_expansionPath(protobuf_txt_filepath, local_workdir):
+def create_tests_from_definition_expansionPath(
+    protobuf_txt_filepath, local_workdir, options
+):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
     test_suite = configfile_read(protobuf_txt_filepath)
 
-    test_suite_ = create_tests_from_definition_expansion(test_suite)
+    test_suite_ = create_tests_from_definition_expansion(test_suite, options)
     # check if they are the same, if so do nothing
     # if (test_suite_.equals(test_suite)):
     #    return protobuf_txt_filepath
@@ -896,12 +990,25 @@ def lookup_message_by_name(message, submessage_name):
 
 def multiply_tests_with_tems(test, parent, setting, expanded):
     tests = []
+
+    # for "paramater" we need to work a little different
+    param = None
+    if setting == "parameter":
+        param = expanded[0]
+        expanded = expanded[1]
+
     for item in expanded:
         ntest = tests_definitions.Test()
         ntest.CopyFrom(test)
         submessage = lookup_message_by_name(ntest, parent)
-        if submessage:
+        if submessage and not param:
             setattr(submessage, setting, str(item))
+        elif submessage and param:
+            for subparam in submessage.parameter:
+                if subparam.key == param.key:
+                    setattr(subparam, "value", str(item))
+        else:
+            print(f"Combination not supported: {item=}, {submessage=}")
 
         tests.append(ntest)
     return tests
@@ -918,12 +1025,15 @@ def update_single_setting(tests, parent, settings_name, expanded):
 
 # Takes a test definition and looks through all settins
 # every expanded setting will create copies of the previous
-def create_tests_from_definition_expansion(testsuite):
+def create_tests_from_definition_expansion(testsuite, options):
     # First we may have multiple tests already (ouch)
     # They will be handled as separate cases
 
     force_update = False
     updated_testsuite = tests_definitions.TestSuite()
+    regexp = None
+    if options.filter_input:
+        regexp = options.filter_input
     # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
         tests = [test]
@@ -937,6 +1047,7 @@ def create_tests_from_definition_expansion(testsuite):
                     settings = [val for val in item.ListFields()]
                     for setting in settings:
                         force_update = False
+                        expanded = []
                         # special case: input file
                         if parent == "input" and setting[0].name == "filepath":
                             # If the filepath match _exactly_ one file, leave it at that.
@@ -944,10 +1055,28 @@ def create_tests_from_definition_expansion(testsuite):
                             if os.path.exists(path) and os.path.isfile(path):
                                 expanded = [path]
                             else:
-                                expanded = expand_filepath(path)
+                                expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
-                            expanded = expand_ranges(setting[1])
+                            if (
+                                parent == "configure"
+                                and setting[0].name == "parameter"
+                                and EXPAND_ALL
+                            ):
+                                for num, param in enumerate(item.parameter):
+                                    local_expanded = expand_ranges(param.value)
+                                    # Parameters needs to be handled differently
+                                    if len(local_expanded) > 1:
+                                        param_expand = [param, local_expanded]
+                                        tests_ = update_single_setting(
+                                            tests, parent, "parameter", param_expand
+                                        )
+                                        if tests_:
+                                            tests = tests_
+                                        extended = []
+                            else:
+                                expanded = expand_ranges(setting[1])
+
                         if tests:
                             if len(expanded) > 1 or force_update:
                                 tests_ = update_single_setting(
@@ -955,12 +1084,12 @@ def create_tests_from_definition_expansion(testsuite):
                                 )
                                 if tests_:
                                     tests = tests_
-        updated_testsuite.test.extend(tests)
 
+        updated_testsuite.test.extend(tests)
     return updated_testsuite
 
 
-def expand_filepath(path):
+def expand_filepath(path, regexp=None):
     # Check if path is a folder
     basename = ""
     folder = ""
@@ -972,6 +1101,10 @@ def expand_filepath(path):
     video_files = []
     for root, _dirs, files in os.walk(folder):
         for file in files:
+            if regexp:
+                m = re.search(regexp, file)
+                if not m:
+                    continue
             if is_video_extension(file):
                 if len(basename) > 0:
                     # let us make one exception to the reg exp
@@ -1232,6 +1365,12 @@ def update_media(test, options):
     )
     # After transcoding input settings may have changed, adjust.
     # now both config and input should be the same i.e. matching config
+
+    # Check crop, if "auto" set the original resolution
+    if test.HasField("input") and test.input.HasField("crop_area"):
+        if test.input.crop_area == "auto":
+            test.input.crop_area = test.input.resolution
+
     test.input.resolution = d["resolution"]
     test.input.framerate = d["framerate"]
     test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
@@ -1307,9 +1446,7 @@ def update_codec_test(
                 # force integer value
                 if type(val) is str:
                     expanded = expand_ranges(val)
-                    print(expanded)
-                    for gop in expanded:
-                        print("Gop is ", gop)
+                    for val in expanded:
                         # create a new test with the new bitrate
                         if is_parallel:
                             ntest = test
@@ -1317,12 +1454,12 @@ def update_codec_test(
                             ntest = tests_definitions.Test()
                             ntest.CopyFrom(test)
 
-                        ntest.common.id = test.common.id + f".gop-{gop}"
-                        ntest.configure.i_frame_interval = int(gop)
+                        ntest.common.id = test.common.id + f".{k2}-{val}"
+                        setattr(getattr(test, k1), k2, int(val))
                         if not is_parallel:
                             # remove the options already taken care of
                             rep_copy = copy.deepcopy(replace)
-                            rep_copy["configure"]["i_frame_interval"] = int(gop)
+                            rep_copy["configure"][k2] = int(val)
                             update_codec_test(
                                 ntest,
                                 updated_test_suite,
@@ -1466,8 +1603,6 @@ def update_codec_test(
                     )
             return
         else:
-            print(bitrate_list)
-            print(f"{len(bitrate_list)=}")
             # replace the namd and bitrate in the old test
             test.common.id = test.common.id + f".{bitrate_list[0]}bps"
             test.configure.bitrate = str(bitrate_list[0])
@@ -1500,6 +1635,14 @@ def update_codec_testsuite(
         )
 
     return updated_test_suite
+
+
+def get_valid_test_name(test: tests_definitions.TestSuite):
+    name = valid_path(f"{test.common.id}.{test.common.output_filename}")
+    if len(name) > 0 and name[0] == ".":
+        return name[1:]
+    else:
+        return name
 
 
 def run_codec_tests(
@@ -1542,7 +1685,7 @@ def run_codec_tests(
             if os.path.exists(tests_run):
                 with open(tests_run, "r+") as passed:
                     data = passed.read()
-                    if f"{valid_path(test.common.id)}.pbtxt" in data:
+                    if f"{get_valid_test_name(test)}.pbtxt" in data:
                         print("Test already done, moving on.")
                         ignore_results = True
                         continue
@@ -1555,7 +1698,7 @@ def run_codec_tests(
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{local_workdir}/{valid_path(test.common.id)}.pbtxt",
+                    f"{local_workdir}/{get_valid_test_name(test)}.pbtxt",
                     serial,
                     device_workdir,
                     fast_copy,
@@ -1564,18 +1707,25 @@ def run_codec_tests(
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
             if encapp_tool.adb_cmds.USE_IDB:
-                protobuf_txt_filepath = f"{valid_path(test.common.id)}.pbtxt"
+                protobuf_txt_filepath = f"{get_valid_test_name(test)}.pbtxt"
             else:
                 protobuf_txt_filepath = (
-                    f"{device_workdir}/{valid_path(test.common.id)}.pbtxt"
+                    f"{device_workdir}/{get_valid_test_name(test)}.pbtxt"
                 )
 
             run_cmd = ""
             if test.test_setup and test.test_setup.run_cmd:
                 run_cmd = test.test_setup.run_cmd
-            run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug=debug)
+
+            run_encapp_test(
+                protobuf_txt_filepath,
+                serial,
+                device_workdir,
+                run_cmd=run_cmd,
+                debug=debug,
+            )
             with open(tests_run, "a") as passed:
-                passed.write(f"{valid_path(test.common.id)}.pbtxt\n")
+                passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
 
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
@@ -1583,8 +1733,10 @@ def run_codec_tests(
                     "Currently filesystem synch on ios seems to be slow, sleep a little while"
                 )
                 time.sleep(1)
-                cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-                encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+                encapp_tool.adb_cmds.pull_files_from_device(
+                    serial, "encapp.log", device_workdir, local_workdir, debug
+                )
                 try:
                     os.rename(
                         f"{local_workdir}/encapp.log",
@@ -1598,7 +1750,6 @@ def run_codec_tests(
                     protobuf_txt_filepath,
                     serial,
                     device_workdir,
-                    run_cmd=run_cmd,
                     debug=debug,
                 )
             )
@@ -1607,22 +1758,19 @@ def run_codec_tests(
         # (b) one pbtxt for all tests
         # push all the files to the device workdir
         if encapp_tool.adb_cmds.USE_IDB:
-            if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-                cmd = (
-                    f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-                )
-            else:
-                cmd = (
-                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
-                )
+            print("IOS Launch")
+            cmd = (
+                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+            )
             encapp_tool.adb_cmds.run_cmd(cmd)
+
         protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
         with open(protobuf_txt_filepath, "w") as f:
             f.write(text_format.MessageToString(test_suite))
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
-            abort_test(local_workdir, f"Error copying {filepath} to {serial}")
+            abort_test(local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}")
 
         for filepath in files_to_push:
             # Ignore pbtxt, only the test_suite based one will be used.
@@ -1634,6 +1782,17 @@ def run_codec_tests(
             ):
                 abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
+        if len(protobuf_txt_filepath) <= 0:
+            # We need to create the file and push it.
+            protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
+            configfile_write(test_suite, protobuf_txt_filepath)
+
+            if not encapp_tool.adb_cmds.push_file_to_device(
+                protobuf_txt_filepath, serial, device_workdir, False, debug
+            ):
+                abort_test(
+                    local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
+                )
         basename = os.path.basename(protobuf_txt_filepath)
         if encapp_tool.adb_cmds.USE_IDB:
             protobuf_txt_filepath = f"{basename}"
@@ -1657,8 +1816,10 @@ def run_codec_tests(
                 "Currently filesystem synch on ios seems to be slow, sleep a little while"
             )
             time.sleep(1)
-            cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+            encapp_tool.adb_cmds.pull_files_from_device(
+                serial, "encapp.log", device_workdir, local_workdir, debug
+            )
             try:
                 os.rename(
                     f"{local_workdir}/encapp.log",
@@ -1717,16 +1878,14 @@ def list_codecs(
             return filename
 
     if encapp_tool.adb_cmds.USE_IDB:
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            cmd = f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
-        else:
-            cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
-        # cmd = {f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"}
+        cmd = f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} list_codecs"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
         # for some bizzare reason if using a destination a directory is created...
-        cmd = f"idb file pull {device_workdir}/codecs.txt . --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+
+        encapp_tool.adb_cmds.pull_files_from_device(
+            serial, "codecs.txt", device_workdir, ".", debug
+        )
 
         cmd = f"mv codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
@@ -1921,6 +2080,7 @@ def codec_test(options, model, serial, debug):
                     test.MergeFrom(tmp.test[0])
         else:
             print("ERROR, first config file lacks a test")
+
     basename = os.path.basename(options.configfile[0])
     options.configfile = f"{local_workdir}/{basename}"
 
@@ -2181,6 +2341,18 @@ def add_args(parser):
         type=str,
         help=f"Split large files in chunks. Default chunk size is {encapp_tool.adb_cmds.SPLIT_SIZE_BYTES} bytes",
     )
+    parser.add_argument(
+        "--filter-input",
+        dest="filter_input",
+        type=str,
+        help="Regexp filter on the input files when using a folder input.",
+    )
+    parser.add_argument(
+        "--expand-all",
+        dest="expand_all",
+        action="store_true",
+        help="Expand all parameters where the value is a string and match the x,y,z pr x-y-z pattern.",
+    )
 
 
 input_args = {
@@ -2426,6 +2598,11 @@ def get_options(argv: list) -> argparse.Namespace:
         parser.print_help()
         sys.exit(0)
 
+    # add serial from os.environ
+    if options.serial is None and "ANDROID_SERIAL" in os.environ:
+        # read serial number from ANDROID_SERIAL env variable
+        options.serial = os.environ["ANDROID_SERIAL"]
+
     global DEBUG
     DEBUG = options.debug > 0
     return options
@@ -2436,7 +2613,6 @@ def process_target_options(options):
     if options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
-    set_idb_mode(options.idb)
     default_values["device_workdir"] = get_device_dir()
 
     if ("device_workdir" not in options) or (options.device_workdir is None):
@@ -2778,12 +2954,58 @@ def merge_options(option1, options2):
     return option1
 
 
+def get_workdir(serial):
+    workdir = ""
+    if not encapp_tool.adb_cmds.USE_IDB:
+        encapp_tool.adb_cmds.reset_logcat(serial)
+        adb_cmd = (
+            f"adb -s {serial} shell am start "
+            f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
+        )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
+        # it seems some devices have a longer delayuntil logs appear in the log
+        sleeptime = 2
+        wait_time = 30
+        while wait_time > 0:
+            time.sleep(sleeptime)
+            # Get logcat and look for:
+            # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
+            m = re.search(reg, logcat_contents)
+            if m:
+                workdir = m.group("workdir")
+                break
+            wait_time -= sleeptime
+
+    return workdir
+
+
 def main(argv):
     options = get_options(argv)
     # check if this is a test run and if these params are defined in the test
 
     proto_options = None
     rename_workdir = False
+
+    global EXPAND_ALL
+    EXPAND_ALL = False if "expand_all" not in options else options.expand_all
+
+    set_idb_mode(options.idb)
+
+    # No need to check with Android/iOS app if not running the Android/iOS app
+    check_app = True
+    check_device_workdir = True
+    if "configfile" in options and options.configfile:
+        test_suite = tests_definitions.TestSuite() 
+        for proto in options.configfile:
+            configfile_read(proto, test_suite)
+
+        for test in test_suite.test:
+            if test.HasField("test_setup") and test.test_setup.HasField("run_cmd"):
+                check_app = False
+            if test.HasField("test_setup") and test.test_setup.HasField("device_workdir"):
+                check_device_workdir = False
 
     if options.func == "run":
         # Make sure we are writing to a good place
@@ -2794,7 +3016,7 @@ def main(argv):
 
         if not options.local_workdir:
             rename_workdir = True
-        options = setup_local_workdir(options, f"{int(random.random()*1000)}")
+        options = setup_local_workdir(options, f"{int(random.random() * 1000)}")
 
         test_suite = tests_definitions.TestSuite()
         # let us accept a special case where the test is a single '.'
@@ -2807,19 +3029,6 @@ def main(argv):
             configfile_write(test_suite, filepath)
             options.configfile[0] = filepath
         proto_options = check_protobuf_test_setup(options)
-
-    # Default settings will be set where necessary unless it is already set.
-    if not options.device_workdir:
-        if proto_options is not None and proto_options.device_workdir:
-            options.device_workdir = proto_options.device_workdir
-    options = process_options(options)
-
-    # cli should always override
-    if proto_options:
-        options = merge_options(proto_options, options)
-    if options.version:
-        print("version: %s" % encapp_tool.__version__)
-        sys.exit(0)
 
     serial = ""
     # get model and serial number
@@ -2836,6 +3045,24 @@ def main(argv):
         model, serial = encapp_tool.adb_cmds.get_device_info(
             options.serial, options.debug
         )
+    # Default settings will be set where necessary unless it is already set.
+    if options.device_workdir is None:
+        if "dry_run" in options and not options.dry_run and check_device_workdir:
+            # default, check if it works
+            if not encapp_tool.adb_cmds.USE_IDB:
+                options.device_workdir = get_workdir(serial)
+
+        if proto_options is not None and proto_options.device_workdir:
+            options.device_workdir = proto_options.device_workdir
+
+    options = process_options(options)
+
+    # cli should always override
+    if proto_options:
+        options = merge_options(proto_options, options)
+    if options.version:
+        print("version: %s" % encapp_tool.__version__)
+        sys.exit(0)
 
     # If needed rename local workfolder
     if rename_workdir:
@@ -2874,29 +3101,26 @@ def main(argv):
     if options.func == "reset":
         print("Removes all encapp_* files in target folder")
         # idb is to slow so let us use the app
-        if encapp_tool.adb_cmds.IOS_MAJOR_VERSION < 17:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset"
-            )
-        else:
-            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-            )
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+            f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
+        )
         return
 
     if options.func == "pull_result":
         print("Pulls all encapp_* files in target folder")
         encapp_tool.adb_cmds.pull_files_from_device(
-            options.serial, "encapp_.*", options.device_workdir, options.debug
+            options.serial,
+            "encapp_.*",
+            options.device_workdir,
+            options.workdir,
+            options.debug,
         )
         return
 
-    if "dry_run" in options and not options.dry_run:
+    if "dry_run" in options and not options.dry_run and check_app:
         # ensure the app is correctly installed
-        assert encapp_tool.app_utils.install_ok(serial, options.debug), (
-            "Apps not installed in %s" % serial
-        )
-
+        if not encapp_tool.app_utils.install_ok(serial, options.debug):
+            print(f"=======\nWARNING! Java app is not installed in {serial}\n=======\n")
     # run function
     if options.func == "list":
         codecs_file = None

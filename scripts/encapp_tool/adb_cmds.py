@@ -9,6 +9,7 @@ import tempfile
 import time
 import typing
 import sys
+import json
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
@@ -17,10 +18,13 @@ IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
 
 # size for split adb push
-MAX_SIZE_BYTES = sys.maxsize # Can handle andy size
-SPLIT_SIZE_BYTES = int(20e6) # 20MB
+MAX_SIZE_BYTES = sys.maxsize  # Can handle andy size
+SPLIT_SIZE_BYTES = int(20e6)  # 20MB
 
-def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tuple[bool, str, str]:
+
+def run_cmd(
+    cmd: str, ignore_errors: bool = False, debug: int = 0
+) -> typing.Tuple[bool, str, str]:
     """Run sh command
 
     Args:
@@ -39,7 +43,11 @@ def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tup
         if debug > 0:
             print(cmd, sep=" ")
         with subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, errors=errors,
+            cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            errors=errors,
         ) as process:
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
@@ -57,7 +65,7 @@ def run_cmd(cmd: str, ignore_errors: bool = False, debug: int = 0) -> typing.Tup
         errstr = stderr.decode()
 
     return ret, stdstr, errstr
-    #return ret, stdout.decode(), stderr.decode()
+    # return ret, stdout.decode(), stderr.decode()
 
 
 def get_device_info(
@@ -89,7 +97,7 @@ def get_device_info(
         # device available
         assert len(device_info) > 0, "error: no devices available"
         assert len(device_info) == 1, (
-            "error: need to choose a device " f'[{", ".join(device_info.keys())}]'
+            f"error: need to choose a device [{', '.join(device_info.keys())}]"
         )
         serial = list(device_info.keys())[0]
     # ensure the serial number is available
@@ -122,12 +130,39 @@ def remove_file(serial: str, file: str, debug: int) -> None:
     """
     if USE_IDB:
         # remove the output
-        cmd = f"idb file rm {file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+
+        cmd = (
+            "xcrun devicectl device process launch "
+            f"--device {serial} "
+            f" --domain-identifier {IDB_BUNDLE_ID} -rm {file}"
+        )
         run_cmd(cmd, debug=debug)
     else:
         # remove the output
         adb_cmd = f"adb -s {serial} shell rm {file}"
         run_cmd(adb_cmd, debug=debug)
+
+
+def list_files(serial: str, location: str, debug: int) -> str:
+    """List files from an android device specific path.
+
+    Args:
+        serial (str): Android device serial no.
+        location (str): Path/directory to analyz
+        debug (int): Debug level
+
+    Return:
+        return a list of file paths
+    """
+    if USE_IDB:
+        cmd = f"xcrun devicectl device info files --device {serial}  --domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID}"
+        _, stdout, _ = run_cmd(cmd, debug=debug)
+
+        return str(stdout)
+    else:
+        adb_cmd = f"adb -s {serial} shell ls {location}/"
+        _, stdout, _ = run_cmd(adb_cmd, debug=debug)
+        return str(stdout)
 
 
 def remove_files_using_regex(
@@ -142,14 +177,18 @@ def remove_files_using_regex(
         debug (int): Debug level
     """
     if USE_IDB:
-        cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        cmd = f"xcrun devicectl device info files --device {serial} --domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
         for file in output_files:
             # remove the output
             print(f"Removing {counter}/{len(output_files)}", end="\r")
-            cmd = f"idb file rm {location}/{file} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+            cmd = (
+                "xcrun devicectl device process launch "
+                f"--device {serial} "
+                f" --domain-identifier {IDB_BUNDLE_ID} -rm {location}/{file}"
+            )
             run_cmd(cmd, debug=debug)
             counter += 1
     else:
@@ -176,20 +215,31 @@ def get_connected_devices(debug: int) -> typing.Dict:
     """
     # list all available devices
     if USE_IDB:
-        cmd = "idb list-targets | grep -i booted"
-        ret, stdout, _ = run_cmd(cmd, debug=debug)
-        assert ret, "error: failed to get adb devices"
-        # parse list
-        device_info = {}
-        for line in stdout.splitlines():
-            item_dict = {}
-            items = line.split("|")
-            item_dict["model"] = items[0].strip()
-            item_dict["type"] = items[3].strip()
-            item_dict["version"] = items[4].strip()
-            item_dict["platform"] = items[5].strip()
-            device_info[items[1].strip()] = item_dict
-        return device_info
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", prefix="encapp.ios.devices."
+        ) as devices_data:
+            filename = devices_data.name
+            cmd = f"xcrun devicectl list devices -j {filename}"
+            ret, stdout, _ = run_cmd(cmd, debug=debug)
+            assert ret, "error: failed to get adb devices"
+            # parse list<D-s>
+            device_info = {}
+            with open(filename, "r") as datafile:
+                jd = json.load(datafile)
+                if "result" in jd:
+                    for device in jd["result"]["devices"]:
+                        props = device["deviceProperties"]
+                        hwprops = device["hardwareProperties"]
+                        item_dict = {}
+                        item_dict["name"] = props["name"]
+                        item_dict["os_version"] = props["osVersionNumber"]
+                        item_dict["model"] = hwprops["marketingName"]
+                        item_dict["type"] = hwprops["deviceType"]
+                        item_dict["version"] = hwprops["hardwareModel"]
+                        item_dict["platform"] = hwprops["platform"]
+                        device_info[hwprops["udid"]] = item_dict
+
+            return device_info
 
     adb_cmd = "adb devices -l"
     ret, stdout, _ = run_cmd(adb_cmd, debug=debug)
@@ -228,7 +278,7 @@ def get_app_pid(serial: str, package_name: str, debug=0):
     pid = -1
     if USE_IDB:
         # This is only for >= V17 but lower version do not need the pid (at this point)
-        cmd = f" xcrun devicectl device info processes --device  {serial} | grep Encapp.app"
+        cmd = f"xcrun devicectl device info processes --device  {serial} | grep Encapp.app"
         ret, stdout, _ = run_cmd(cmd, debug=debug)
         if ret and stdout:
             m = re.search(r"^[0-9]*", stdout)
@@ -260,7 +310,7 @@ def install_apk(serial: str, apk_to_install: str, debug=0):
     r_code, _, err = run_cmd(f"adb -s {serial} install -g {apk_to_install}", debug)
     if r_code is False:
         raise RuntimeError(
-            f"Unable to install {apk_to_install} " f"at device {serial} due to {err}"
+            f"Unable to install {apk_to_install} at device {serial} due to {err}"
         )
 
 
@@ -289,7 +339,9 @@ def installed_apps(serial: str, debug=0) -> typing.List:
     Returns:
         List of packages installed at android device.
     """
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell pm list packages", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell pm list packages", debug=debug
+    )
     assert ret, f"error: failed to get installed app list: {stderr}"
     return _parse_pm_list_packages(stdout)
 
@@ -347,7 +399,8 @@ def grant_camera_permission(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     run_cmd(
-        f"adb -s {serial} shell pm grant {package} " "android.permission.CAMERA", debug=debug
+        f"adb -s {serial} shell pm grant {package} android.permission.CAMERA",
+        debug=debug,
     )
 
 
@@ -360,17 +413,12 @@ def force_stop(serial: str, package: str, debug=0):
         debug (int): Debug level
     """
     if USE_IDB:
-        # for iso 17 devicectl needs to be used and it cannot terminate an application directly
-        # lookup pid and send sigterm
-        if IOS_MAJOR_VERSION < 17:
-            run_cmd(f"idb terminate --udid {serial}  {IDB_BUNDLE_ID}", debug=debug)
-        else:
-            pid = get_app_pid(serial, package, debug)
-            if pid > 0:
-                run_cmd(
-                    f"xcrun devicectl device process signal --signal sigterm --device  {serial} --pid {pid}  ",
-                    debug,
-                )
+        pid = get_app_pid(serial, package, debug)
+        if pid > 0:
+            run_cmd(
+                f"xcrun devicectl device process signal --signal sigterm --device  {serial} --pid {pid}  ",
+                debug,
+            )
     else:
         run_cmd(f"adb -s {serial} shell am force-stop {package}", debug=debug)
 
@@ -396,7 +444,9 @@ def logcat_dump(serial: str, debug=0) -> str:
       Current logcat dump
     """
     # For some reason logcat often produce errors in the form of broken utf-8, ignore it.
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} logcat -d", ignore_errors=True, debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} logcat -d", ignore_errors=True, debug=debug
+    )
     assert ret, f"error: failed to dump logcat: {stderr}"
     return stdout
 
@@ -512,9 +562,12 @@ def getprop(serial: str, debug=0) -> dict:
       Current props dump
     """
     if USE_IDB:
-        ret, stdout, stderr = run_cmd(f"idb describe --udid {serial}", debug=debug)
+        # TODO: pull info and store
+        """
         assert ret, f"error: failed to getprop: {stderr}"
         return parse_getprop(stdout)
+        """
+        return {}
     else:
         ret, stdout, stderr = run_cmd(f"adb -s {serial} shell getprop", debug=debug)
         assert ret, f"error: failed to getprop: {stderr}"
@@ -523,7 +576,9 @@ def getprop(serial: str, debug=0) -> dict:
 
 def get_device_size(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell test -e {filepath}", debug=debug
+    )
     if not ret:
         return -1
     # get the size in bytes
@@ -540,12 +595,16 @@ def get_device_size(serial, filepath, debug):
 
 def get_device_hash(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(f"adb -s {serial} shell test -e {filepath}", debug=debug)
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell test -e {filepath}", debug=debug
+    )
     if not ret:
         return -1
     # get a hash
     try:
-        ret, stdout, stderr = run_cmd(f"adb -s {serial} shell md5sum {filepath}", debug=debug)
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} shell md5sum {filepath}", debug=debug
+        )
         filehash = stdout.split()[0]
     except:
         print(f"Failed to calc hash for {filepath}")
@@ -563,7 +622,7 @@ def get_host_hash(filepath, debug):
 
 def file_exists_in_device(filename, serial, debug=False):
     if USE_IDB:
-        cmd = f"idb file ls /Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        cmd = f"xcrun devicectl device info files --device {serial} --domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
         return len(output_files) > 0
@@ -574,10 +633,13 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
     if host_filepath[-6] == ".pbtxt":
         return False
 
-    if USE_IDB and fast_copy:
+    if USE_IDB:  # ???? and fast_copy:
         # TODO: fix
         basename = os.path.basename(device_filepath)
-        cmd = f"idb file ls Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        cmd = (
+            f"xcrun devicectl device info files --device {serial}  "
+            f"--domain-type appDataContainer   --domain-identifier  {IDB_BUNDLE_ID}"
+        )
         _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(f"{basename}", stdout, re.MULTILINE)
         return len(output_files) > 0
@@ -617,8 +679,10 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
         ret, stdout, _ = run_cmd(
-            f"idb file push  {filepath} {device_workdir}/ --udid {serial} --bundle-id {IDB_BUNDLE_ID}",
-            debug,
+            f"xcrun devicectl device copy to --device {serial} "
+            f"--domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID} "
+            f"--source {filepath} --destination {device_workdir}/ ",
+            debug=debug,
         )
         if not ret:
             print(f'error: copying "{filepath}" to  {device_workdir}/ : {stdout}')
@@ -636,7 +700,7 @@ def push_file_to_device_android(
 ):
     # 0. try a one-off copy. Limit this for devices that fail and reboot (or worse).
     ret = stdout = stderr = None
-    if os.path.getsize(filepath) <= MAX_SIZE_BYTES: 
+    if os.path.getsize(filepath) <= MAX_SIZE_BYTES:
         cmd = f"adb -s {serial} push {filepath} {device_workdir}/"
         ret, stdout, stderr = run_cmd(cmd, debug=debug)
         if ret:
@@ -646,7 +710,9 @@ def push_file_to_device_android(
     if max_size_bytes == 0:
         return ret
     # 1. try split copy
-    print(f'warning: trying split push for "{filepath}", split size = {SPLIT_SIZE_BYTES}')
+    print(
+        f'warning: trying split push for "{filepath}", split size = {SPLIT_SIZE_BYTES}'
+    )
     # 1.1. split filepath in pieces
     prefix = tempfile.NamedTemporaryFile(prefix="split.").name + "."
     cmd = f"split -b {SPLIT_SIZE_BYTES} {filepath} {prefix}"
@@ -703,27 +769,31 @@ def push_file_to_device_android(
 
 
 def pull_files_from_device(
-    serial: str, regex_str: str, location: str, debug: int
+    serial: str, regex_str: str, location: str, destination: str, debug: int
 ) -> None:
     if USE_IDB:
-        cmd = f"idb file ls {location} --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+        cmd = f"xcrun devicectl device info files --device {serial} --domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         counter = 1
-        for file in output_files:
+        for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            cmd = f"idb file pull {location}/{file} .  --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
+
+            cmd = (
+                f"xcrun devicectl device copy to --device {serial} "
+                f"--domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID} "
+                f"--source {location}/file --destination {destination} "
+            )
+
             run_cmd(cmd, debug=debug)
-            counter += 1
     else:
         adb_cmd = f"adb -s {serial} shell ls {location}/"
         _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
-        for file in output_files:
+        for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            adb_cmd = f"adb -s {serial} shell pull {location}/{file} . "
+            adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
             run_cmd(adb_cmd, debug=debug)
-            counter += 1
 
 
 def set_idb_mode(mode):

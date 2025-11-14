@@ -43,7 +43,7 @@ def install_ok(serial: str, debug=0) -> bool:
     """
     if encapp_tool.adb_cmds.USE_IDB:
         # TODO: check app
-        print("Check app")
+        print("Skip check app")
     else:
         package_list = encapp_tool.adb_cmds.installed_apps(serial, debug)
         if APPNAME_MAIN not in package_list:

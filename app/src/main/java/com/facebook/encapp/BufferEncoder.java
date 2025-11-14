@@ -34,7 +34,7 @@ import java.util.Set;
  */
 
 class BufferEncoder extends Encoder {
-    protected static final String TAG = "encapp.buffer_encoder";
+    private static final String TAG = "encapp.buffer_encoder";
 
     public BufferEncoder(Test test) {
         super(test);
@@ -123,7 +123,7 @@ class BufferEncoder extends Encoder {
             return "Start encoding failed";
         }
 
-        float mReferenceFrameRate = mTest.getInput().getFramerate();
+        mReferenceFrameRate = mTest.getInput().getFramerate();
         mKeepInterval = mReferenceFrameRate / mFrameRate;
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
