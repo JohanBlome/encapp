@@ -1049,20 +1049,28 @@ def run_quality(test_file, options, debug):
             and QPEXTRACT_AVAILABLE
             and video_info["codec-name"].lower() == "hevc"
         ):
+            # this is for really short files (single i-frames a.k.a heic)
+            if float(duration) <= 0:
+                duration = 1
             # Need a .265 (and also on hevc)
             with tempfile.NamedTemporaryFile(
                 suffix=".265", prefix="encapp.qp."
             ) as mediafile:
+                # We must use the encoded file (duh!)
                 media = mediafile.name
-                shell_cmd = f"ffmpeg -y -i {distorted} -t {duration} -vcodec copy -bsf hevc_mp4toannexb {media}"
-                encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                shell_cmd = f"ffmpeg -y -i {encodedfile} -t {duration} -vcodec copy -bsf hevc_mp4toannexb {media}"
+                ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                print("Converted")
+                if not ret:
+                    print("f{ret}")
+
                 shell_cmd = (
                     f"qpextract -i {media} --dump  --qpymode -o {qpextract_file}_y"
                 )
 
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 if stderr:
-                    print(f"Failed to run cvvdp: {stderr}")
+                    print(f"Failed to run qpextract: {stderr}")
                     if "command not found" in stderr:
                         print("** qpextract needs to be installed! **\n\n")
                         QPEXTRACT_AVAILABLE = False
@@ -1075,25 +1083,24 @@ def run_quality(test_file, options, debug):
                 shell_cmd = (
                     f"qpextract -i {media} --dump  --qpcrmode -o {qpextract_file}_cr"
                 )
-
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 qpydata = pd.read_csv(f"{qpextract_file}_y")
                 qpcbdata = pd.read_csv(f"{qpextract_file}_cb")
-                pd.read_csv(f"{qpextract_file}_cr")
-
+                print(f"{vals=}")
+                t
+                qpcrdata = pd.read_csv(f"{qpextract_file}_cr")
                 vals = {
                     "source": distorted,
-                    "qpy_avg": qpydata["qp_avg"].mean(),
-                    "qpy_min": qpydata["qp_min"].min(),
-                    "qpy_max": qpydata["qp_max"].max(),
-                    "qpu_avg": qpcbdata["qp_avg"].mean(),
-                    "qpu_min": qpcbdata["qp_min"].min(),
-                    "qpu_max": qpcbdata["qp_max"].max(),
-                    "qpv_avg": qpcbdata["qp_avg"].mean(),
-                    "qpv_min": qpcbdata["qp_min"].min(),
-                    "qpv_max": qpcbdata["qp_max"].max(),
+                    "qpy_avg": qpydata["qpy.avg"].mean(),
+                    "qpy_min": qpydata["qpy.min"].min(),
+                    "qpy_max": qpydata["qpy.max"].max(),
+                    "qpu_avg": qpcbdata["qpcb.avg"].mean(),
+                    "qpu_min": qpcbdata["qpcb.min"].min(),
+                    "qpu_max": qpcbdata["qpcb.max"].max(),
+                    "qpv_avg": qpcrdata["qpcr.avg"].mean(),
+                    "qpv_min": qpcrdata["qpcr.min"].min(),
+                    "qpv_max": qpcrdata["qpcr.max"].max(),
                 }
-
                 df = pd.DataFrame([vals])
                 df.to_csv(qpextract_file, index=False, header=True)
                 os.remove(f"{qpextract_file}_y")
@@ -1284,7 +1291,7 @@ def run_quality(test_file, options, debug):
                     "Warning! Some frames are zero, most likely a broken calculation."
                 )
                 failed["warning"] = (
-                    "Warning! Some frames are zero, most likely a broken calculation."
+                    "Warning! Some frames are zero, most likely a broken calculatio."
                 )
 
             if vmaf_dict.get("framecount", 0) != framecount:
