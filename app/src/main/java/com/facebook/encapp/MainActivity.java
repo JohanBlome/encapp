@@ -613,6 +613,22 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return t;
     }
 
+    public Thread skipTest(Test test, String logMessage) {
+        // Create a tiny thread that records the skip and finishes cleanly.
+        Thread t = new Thread(() -> {
+            try {
+                report_result(test.getCommon().getId(),
+                        "unknown",
+                        "skipped",
+                        (logMessage != null ? logMessage : "skipped"));
+            } finally {
+                decreaseTestsInflight();
+            }
+        }, "Skip " + test.getCommon().getId());
+        t.start();
+        return t;
+    }
+
     public void report_result(String test_name, String run_id, String result, String error_code) {
         if (result == "ok") {
             Log.d(TAG, "Test finished id: \"" + test_name + "\" run_id: " + run_id + " result: \"ok\"");
