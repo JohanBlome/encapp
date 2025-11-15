@@ -675,6 +675,22 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return t;
     }
 
+    public Thread skipTest(Test test, String logMessage) {
+        // Create a tiny thread that records the skip and finishes cleanly.
+        Thread t = new Thread(() -> {
+            try {
+                report_result(test.getCommon().getId(),
+                        "unknown",
+                        "skipped",
+                        (logMessage != null ? logMessage : "skipped"));
+            } finally {
+                decreaseTestsInflight();
+            }
+        }, "Skip " + test.getCommon().getId());
+        t.start();
+        return t;
+    }
+
     public void report_result(String test_name, String run_id, String result, String error_code) {
         if (result == "ok") {
             Log.d(TAG, "Test finished id: \"" + test_name + "\" run_id: " + run_id + " result: \"ok\"");
@@ -768,29 +784,36 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 // TODO: how to integrate with the rest?
                 Log.d(TAG, "0. Custom encoder");
                 coder = new CustomEncoder(test, this.getFilesDir().getPath());
+            } else if (test.getConfigure().getCodec().startsWith("lcevc")) {
+                
+                Log.d(TAG, "1. LCEVC encoder");
+                coder = LcevcFactory.createEncoderOrNull(test);
+                if (coder == null) {
+                    skipTest(test, "LCEVC not available in this build");
+                    return null;
+                }
             } else if (!surface && deviceDecode && !deviceEncode) {
 
-                Log.d(TAG, "1. Simple buffer decode");
+                Log.d(TAG, "2. Simple buffer decode");
                 coder = new BufferDecoder(test);
             } else if (!surface && !deviceDecode && deviceEncode) {
 
-                Log.d(TAG, "2. Simple buffer encode");
+                Log.d(TAG, "3. Simple buffer encode");
                 coder = new BufferEncoder(test);
             } else if (!surface && deviceDecode && deviceEncode) {
-
-                Log.d(TAG, "3. Buffer transcode");
+                Log.d(TAG, "4. Buffer transcode");
                 coder = new BufferTranscoder(test);
             } else if (surface && deviceDecode && !deviceEncode) {
 
-                Log.d(TAG, "4. Surface decode");
+                Log.d(TAG, "5. Surface decode");
                 //TODO: SurfaceNoEncoder does is only for camera source basically (maybe remove?)
                 coder = new SurfaceTranscoder(test, mult, mVsyncHandler);
             } else if (surface && !deviceDecode && deviceEncode) {
 
-                Log.d(TAG, "5. Surface encode");
+                Log.d(TAG, "6. Surface encode");
                 coder = new SurfaceEncoder(test, this, mult, mVsyncHandler);
             } else if (surface && deviceDecode && deviceEncode) {
-                Log.d(TAG, "6. Surface transcode");
+                Log.d(TAG, "7. Surface transcode");
                 coder = new SurfaceTranscoder(test, mult, mVsyncHandler);
             }
 

@@ -90,10 +90,7 @@ class CustomEncoder extends Encoder {
             Log.e(TAG, "Failed to load library, " + name + ", " + targetPath + ": " + e.getMessage());
         }
     }
-
-    private long computePresentationTimeUs(int frameIndex) {
-        return frameIndex * 1000000 / 30;
-    }
+    
 
     public static byte[] readYUVFromFile(String filePath, int size, int framePosition) throws IOException {
         byte[] inputBuffer = new byte[size];
@@ -122,9 +119,9 @@ class CustomEncoder extends Encoder {
                     (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
 
                 int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
+                if (nalType == H264_NALU_TYPE_SPS && spsStart == -1) { // SPS NAL unit type is 7
                     spsStart = i;
-                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
+                } else if (nalType == H264_NALU_TYPE_PPS && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
                     spsEnd = i;
                     ppsStart = i;
                 }
@@ -153,7 +150,7 @@ class CustomEncoder extends Encoder {
                 nalUnitType = bitstream[i + (bitstream[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
 
                 // Check if the NAL unit type is 5 (IDR frame)
-                if (nalUnitType == 5) {
+                if (nalUnitType == H264_NALU_TYPE_IDR) {
                     return true;
                 }
             }
@@ -169,14 +166,14 @@ class CustomEncoder extends Encoder {
 
         for (Runtime.VideoBitrateParameter bitrate : mRuntimeParams.getVideoBitrateList()) {
             if (bitrate.getFramenum() == frame) {
-                params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
+                addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
                 break;
             }
         }
 
         for (Long sync : mRuntimeParams.getRequestSyncList()) {
-            if (sync == frame) {
-                params.add(Parameter.newBuilder().setKey("request-sync").setValue(String.valueOf("")).setType(DataValueType.stringType).build());
+            if (sync == frame) {                
+                addEncoderParameters(params, DataValueType.longType.name(), "request-sync", "");
                 break;
             }
         }
@@ -228,9 +225,9 @@ class CustomEncoder extends Encoder {
         Vector<Parameter> params = new Vector(mTest.getConfigure().getParameterList());
         // This one needs to be set as a native param.
         try {
-            params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("bitrate_mode").setValue(String.valueOf(bitratemode)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("i_frame_interval").setValue(String.valueOf(iframeinterval)).setType(DataValueType.stringType).build());
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE_MODE, String.valueOf(bitratemode));
+            addEncoderParameters(params, DataValueType.floatType.name(), I_FRAME_INTERVAL, String.valueOf(iframeinterval));
         } catch (Exception ex) {
             Log.d(TAG, "Exception: " + ex);
         }
@@ -313,7 +310,7 @@ class CustomEncoder extends Encoder {
                             continue;
                         }
 
-                        long pts = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+                        long pts = computePresentationTimeUs(mPts, mFramesAdded, mRefFrameTime);
                         info = mStats.startEncodingFrame(pts, mFramesAdded);
                         // Let us read the setting in native and force key frame if set here.
                         // If (for some reason a key frame is not produced it will be updated in the native code
