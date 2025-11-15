@@ -23,6 +23,7 @@ from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
 import tempfile
+import traceback
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -674,13 +675,13 @@ def run_quality(test_file, options, debug):
         output_width = -1
         output_height = -1
         output_framerate = -1
-        if output_media_format is not None:
+        if output_media_format is not None and len(output_media_format) > 0:
             output_width = output_media_format.get("width")
             output_height = output_media_format.get("height")
             if "framerate" in output_media_format:
-                output_framerate = output_media_format.get("framerate")
-            else:
-                output_framerate = output_media_format.get("frame-rate")
+                output_framerate = float(output_media_format.get("framerate"))
+            elif "frame-rate" in output_media_format:
+                output_framerate = float(output_media_format.get("frame-rate"))
         else:
             if test is not None:
                 resolution = test["configure"].get("resolution", None)
@@ -697,11 +698,11 @@ def run_quality(test_file, options, debug):
                 output_height = video_info["height"]
 
             if test is not None:
-                output_framerate = test["configure"].get("framerate", None)
+                output_framerate = float(test["configure"].get("framerate", None))
                 if not output_framerate or output_framerate == 0:
-                    output_framerate = test["input"].get("framerate", None)
+                    output_framerate = float(test["input"].get("framerate", None))
             if not output_framerate or output_framerate <= 0:
-                output_framerate = video_info["framerate"]
+                output_framerate = float(video_info["framerate"])
             print("WARNING! output media format is missing, guessing values...")
             print(
                 f"outputres: {output_width}x{output_height}\noutput_framerate: {output_framerate}"
@@ -728,7 +729,7 @@ def run_quality(test_file, options, debug):
 
         if options.get("resolution", None):
             input_resolution = options.resolution
-        if input_media_format is not None:
+        if input_media_format is not None and len(input_media_format) > 0:
             try:
                 input_width = int(input_media_format.get("width"))
                 input_height = int(input_media_format.get("height"))
@@ -748,9 +749,9 @@ def run_quality(test_file, options, debug):
             input_resolution = output_resolution
 
         if options.get("framerate", None):
-            input_framerate = options.framerate
+            input_framerate = float(options.framerate)
         elif reference_info:
-            input_framerate = reference_info["framerate"]
+            input_framerate = float(reference_info["framerate"])
         elif (
             input_media_format is not None
             and input_media_format.get("framerate") is not None
@@ -1060,7 +1061,6 @@ def run_quality(test_file, options, debug):
                 media = mediafile.name
                 shell_cmd = f"ffmpeg -y -i {encodedfile} -t {duration} -vcodec copy -bsf hevc_mp4toannexb {media}"
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-                print("Converted")
                 if not ret:
                     print("f{ret}")
 
@@ -1086,8 +1086,6 @@ def run_quality(test_file, options, debug):
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 qpydata = pd.read_csv(f"{qpextract_file}_y")
                 qpcbdata = pd.read_csv(f"{qpextract_file}_cb")
-                print(f"{vals=}")
-                t
                 qpcrdata = pd.read_csv(f"{qpextract_file}_cr")
                 vals = {
                     "source": distorted,
@@ -1177,7 +1175,7 @@ def run_quality(test_file, options, debug):
 
         if distorted != encodedfile:
             os.remove(distorted)
-        if referenced != reference_pathname:
+        if referenced != reference_pathname and os.path.isfile(referenced):
             os.remove(referenced)
 
     if os.path.exists(vmaf_file):
@@ -1735,8 +1733,8 @@ def main(argv):
                     success.append({"file": test, "warning": "none"})
         except Exception as ex:
             print(f"{test} failed: {ex}")
-            if ex.__traceback__:
-                print(f"line: {ex.__traceback__.tb_lineno}")
+            if options.debug:
+                traceback.print_exc()
             continue
         now = time.time()
         run_for = now - start
