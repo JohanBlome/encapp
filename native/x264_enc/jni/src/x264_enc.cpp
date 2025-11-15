@@ -15,7 +15,7 @@
 #include <string.h>
 using namespace std;
 
-#include "x264.h"
+#include <x264.h>
 #ifdef DEBUG
 #define LOGD(...)                                                              \
   __android_log_print(ANDROID_LOG_DEBUG, "encapp.native", __VA_ARGS__)
