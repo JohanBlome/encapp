@@ -943,8 +943,10 @@ def run_quality(test_file, options, debug):
                 shell_cmd += f":model={model}"
                 shell_cmd += '" -f null - 2>&1'
                 # write a settings file
-                if not os.path.exists(f"{directory}/vmafmodel.txt"):
-                    with open(f"{directory}/vmafmodel.txt", "w") as modelfile:
+                if directory and directory[-1] != "/":
+                    directory += "/"
+                if not os.path.exists(f"{directory}vmafmodel.txt"):
+                    with open(f"{directory}vmafmodel.txt", "w") as modelfile:
                         modelfile.write(
                             f"vmaf model: {model}\nUnless stated above phone mode is NOT used.\n"
                         )
