@@ -39,6 +39,11 @@ def run_cmd(
     if ignore_errors:
         errors = "ignore"
 
+    # We may have a -s NONE if running adb, we cannot have that. Instead of patching all places
+    # check here.
+    if "-s None" in cmd:
+        print("ERROR: serial is None, adb cannot run")
+        return False, "", ""
     try:
         if debug > 0:
             print(cmd, sep=" ")
