@@ -35,7 +35,7 @@ import tests_pb2 as tests_definitions  # noqa: E402
 DEFAULT_TESTS = [
     "bitrate_buffer.pbtxt",
     "bitrate_surface.pbtxt",
-    "bitrate_transcoder_show.pbtxt",
+    "bitrate_surface_transcoder_show.pbtxt",
     "dynamic_bitrate.pbtxt",
     "dynamic_framerate.pbtxt",
     "dynamic_idr.pbtxt",
@@ -75,7 +75,6 @@ class MeanBitrateResult(TestResult):
         result_string = TestResult.printResult(self)
 
         data = self.data.sort_values(by=["bitrate"])
-        print(f"data = {data}")
         test_names = np.unique(data["test"])
         for name in test_names:
             result_string += f"\n\n----- test case: [{self.name}] -----"
@@ -132,7 +131,6 @@ def get_nal_data(videopath, codec):
                 encapp_tool.adb_cmds.run_cmd(cmd, True)
                 cmd = f"h265nal {filename}.{ending} > {filename}.{ending}.nal"
 
-            print(f"cmd = {cmd}")
             encapp_tool.adb_cmds.run_cmd(cmd)
         return f"{filename}.{ending}.nal"
 
@@ -396,7 +394,7 @@ def check_idr_placement(resultpath):
                 print(f"Error: test {testname} failed")
                 continue
             # codec = encoder_settings.codec
-            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             frames = result.get("frames")
 
             iframes = list(filter(lambda x: (x["iframe"] == 1), frames))
@@ -484,7 +482,7 @@ def parse_dynamic_settings(settings):
         else:
             serie[param.framenum] = param.value
     for param in settings.video_bitrate:
-        bitrates[param.framenum] = encapp.convert_to_bps(param.bitrate)
+        bitrates[param.framenum] = encapp.parse_magnitude(param.bitrate)
     for param in settings.dynamic_framerate:
         framerates[param.framenum] = param.framerate
     for param in settings.request_sync:
@@ -558,7 +556,7 @@ def run_bitrate_verification(
         )
         if limit in dynamic_video_bitrate:
             if is_fps == 0:  # looking at bitrates
-                target_bitrate = encapp.convert_to_bps(dynamic_video_bitrate[limit])
+                target_bitrate = encapp.parse_magnitude(dynamic_video_bitrate[limit])
             else:
                 fps = dynamic_video_bitrate[limit]
 
@@ -596,7 +594,7 @@ def check_mean_bitrate_deviation(resultpath):
                 continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             fps = encoder_settings.framerate
             if fps == 0:
                 if test_.input.framerate > 0:
@@ -707,7 +705,7 @@ def check_framerate_deviation(resultpath):
                 continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             # encoder_media_format = result.get("encoder_media_format")
             fps = encoder_settings.framerate
             if fps == 0:
@@ -909,6 +907,17 @@ def get_options(argv):
         help="Set acceptance lmit on bitrate in percentage",
         default=10,
     )
+    parser.add_argument(
+        "--serial",
+        default=None,
+    )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        default=0,
+        action="count",
+    )
+
 
     options = parser.parse_args(argv[1:])
     return options
@@ -916,18 +925,22 @@ def get_options(argv):
 
 def main(argv):
     options = get_options(argv)
-    options = encapp.process_options(options)
     result_string = ""
     model = None
     serial = None
 
+    # get model and serial number
+    model, serial = encapp_tool.adb_cmds.get_device_info(
+        options.serial, options.debug
+    )
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
-
+    options.device_workdir = encapp.get_workdir(serial)
     if options.debug > 0:
         print(options)
 
+    options = encapp.process_options(options)
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ""
@@ -992,7 +1005,6 @@ def main(argv):
             settings.output_framerate = options.output_fps
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
-            print(f"{options.device_workdir} (dev dir)")
             result_ok, result = encapp.codec_test(
                 settings, model, serial, settings.debug
             )
