@@ -17,7 +17,7 @@ android {
     flavorDimensions "feature"
 
     productFlavors {
-        vanilla {
+        Default {
             dimension "feature"
         }
 
