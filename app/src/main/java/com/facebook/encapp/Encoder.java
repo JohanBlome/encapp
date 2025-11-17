@@ -75,6 +75,14 @@ public abstract class Encoder {
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
 
+    public static final String BITRATE = "bitrate";
+    public static final String BITRATE_MODE = "bitrate_mode";
+    public static final String I_FRAME_INTERVAL = "i_frame_interval";
+    public static final String FRAMERATE = "framerate";
+    public static final int H264_NALU_TYPE_IDR = 5;
+    public static final int H264_NALU_TYPE_SPS = 7;
+    public static final int H264_NALU_TYPE_PPS = 8;
+
 
     public Encoder(Test test) {
         mTest = test;
@@ -107,6 +115,39 @@ public abstract class Encoder {
         }
         // prepend the workdir
         return CliSettings.getWorkDir() + "/" + path;
+    }
+
+    /**
+     * Finds the next start code or the end of the stream.
+     *
+     * @param paramList Vector of encoder parameters to configure Encapp's tests.
+     * @param parameterType The parameter type (int, string, float, long).
+     * @param parameterKey The parameter key.
+     * @param parameterValue The parameter value
+     */
+    public static void addEncoderParameters(Vector<Parameter> paramList, String parameterType, String parameterKey, String parameterValue) {
+        try {
+            DataValueType type = DataValueType.valueOf(parameterType);
+
+            switch (type) {
+                case intType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.intType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case longType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.longType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case floatType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.floatType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case stringType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.stringType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown encoder parameter type: " + parameterType);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
     }
 
     protected void sleepUntilNextFrame(double frameTimeUsec) {
@@ -147,8 +188,8 @@ public abstract class Encoder {
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTimeUsec(int frameIndex, double frameTimeUsec) {
-        return mPts + (long) (frameIndex * frameTimeUsec);
+    public static long computePresentationTimeUs(long referencePts, int frameIndex, double frameTimeUs) {
+        return referencePts + (long) (frameIndex * frameTimeUs);
     }
 
     protected double calculateFrameTimingUsec(float frameRate) {
@@ -341,8 +382,8 @@ public abstract class Encoder {
             //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying " + size + " bytes to the ByteBuffer");
             byteBuffer.clear();
             read = fileReader.fillBuffer(byteBuffer, size);
-        }
-        long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
+        }         
+        long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
         mCurrentTimeSec =  ptsUsec / 1000000.0f;
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);

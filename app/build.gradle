@@ -13,6 +13,27 @@ android {
         versionName "1.27"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)
     }
+
+    flavorDimensions "feature"
+
+    productFlavors {
+        Default {
+            dimension "feature"
+        }
+
+        lcevc {
+            dimension "feature"
+        }
+    }
+
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'META-INF/Notice.txt'
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -32,6 +53,10 @@ android {
                 srcDir '../proto/'
             }
         }
+
+        lcevc {
+            jniLibs.srcDirs = ['src/main/jniLibs', 'src/lcevc/jniLibs']
+        }
     }
 
     compileOptions {
@@ -41,12 +66,36 @@ android {
     ndkVersion '21.3.6528147'
 }
 
+configurations {
+    javacpp
+}
+
+task javacppExtract(type: Copy) {
+    dependsOn configurations.javacpp
+
+    from { configurations.javacpp.collect { zipTree(it) } }
+    include "lib/**"
+    into "$buildDir/javacpp/"
+    android.sourceSets.main.jniLibs.srcDirs += ["$buildDir/javacpp/lib/"]
+
+    tasks.getByName('preBuild').dependsOn javacppExtract
+}
+
 dependencies {
     api fileTree(include: ['*.jar'], dir: 'libs')
     api 'androidx.appcompat:appcompat:1.0.0'
-    implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.24.0'
-    implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: '3.24.0'
+    implementation 'com.google.protobuf:protobuf-java:3.24.0'
+    implementation 'com.google.protobuf:protobuf-java-util:3.24.0'
     implementation 'com.google.code.gson:gson:2.8.0'
+
+    lcevcImplementation 'com.vnova.lcevc:eil:3.14.7'
+    lcevcImplementation 'com.vnova.lcevc.eilp:mediacodec:3.14.7'
+    lcevcImplementation 'com.vnova.lcevc.eilp:x264:3.14.7'
+    lcevcImplementation 'com.vnova.lcevc:jni:3.14.7'
+    lcevcImplementation 'com.vnova.lcevc:util:3.14.7'
+    lcevcImplementation 'org.bytedeco:javacv:1.5.11'
+
+    javacpp 'org.bytedeco:ffmpeg-platform:7.1-1.5.11'
 }
 
 

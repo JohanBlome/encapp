@@ -311,7 +311,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                                     // Use the camera provided timestamp
                                     ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
-                                    ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+                                    ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
                                 }
                                 mStats.startEncodingFrame(ptsUsec, mInFramesCount);
                                 mFramesAdded++;
@@ -497,7 +497,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
         byteBuffer.clear();
         int read = fileReader.fillBuffer(byteBuffer, size);
-        long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+        long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
         mDropNext |= dropFromDynamicFramerate(mInFramesCount);
