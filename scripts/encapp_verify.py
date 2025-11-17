@@ -20,6 +20,7 @@ import encapp_search
 import encapp_tool
 import encapp_tool.adb_cmds
 import google.protobuf.json_format
+import multiprocessing
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -40,12 +41,18 @@ DEFAULT_TESTS = [
     "dynamic_framerate.pbtxt",
     "dynamic_idr.pbtxt",
     "tl2.pbtxt",
-    "ltr-2ref.pbtxt",
     "camera.pbtxt",
     "camera_parallel.pbtxt",
 ]
-TESTS_DIR = "tests"
 
+# TODO: sort parameters for difference vendors
+# Add tests with spcific vendor extensions. 
+# Currently hardcoded for Qualcomm
+VENDOR_TESTS = [
+    "ltr-2ref.pbtxt",
+]
+
+TESTS_DIR = "tests"
 
 class TestResult:
     name = None
@@ -183,7 +190,6 @@ def check_long_term_ref(resultpath):
 
             runtime_setting = test_def.runtime
             dynamic_settings = parse_dynamic_settings(runtime_setting)["params"]
-            print(f"{dynamic_settings}")
             if dynamic_settings is not None and len(dynamic_settings) > 0:
                 mark_frame = dynamic_settings["vendor.qti-ext-enc-ltr.mark-frame"]
                 use_frame = dynamic_settings["vendor.qti-ext-enc-ltr.use-frame"]
@@ -463,7 +469,6 @@ def parse_dynamic_settings(settings):
     syncs = []
     if settings is None:
         return {}
-    print(f"{settings}")
     for param in settings.parameter:
         # TODO: fix this
         # print(f'{param}')
@@ -509,9 +514,6 @@ def run_bitrate_verification(
     original_bitrate=None,
     is_fps=False,
 ):
-    print(
-        f"run_bitrate_verification: of: {original_fps}, ob: {original_bitrate}, fps? {is_fps}"
-    )
     previous_limit = 0
     dyn_data = []
     target_bitrate = original_bitrate
@@ -615,7 +617,6 @@ def check_mean_bitrate_deviation(resultpath):
             calc_result = None
             failed = False
             if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
-                print("Check dynamic bitrate")
                 calc_result = run_bitrate_verification(
                     testname,
                     encoder_settings,
@@ -731,8 +732,6 @@ def check_framerate_deviation(resultpath):
                 status = "passed"
                 limit_too_high = False
                 target_rate = fps
-                print(f"frames: {len(frames)}")
-                print(f"limits: {limits}")
                 for limit in limits:
                     filtered = list(
                         filter(
@@ -917,11 +916,36 @@ def get_options(argv):
         default=0,
         action="count",
     )
-
+    parser.add_argument(
+        "--vendor",
+        default=None,
+    )
+    parser.add_argument(
+        "--device-workdir",
+        dest="device_workdir",
+        default=None
+    )
 
     options = parser.parse_args(argv[1:])
     return options
 
+def _wrapper(queue, func, *args, **kwargs):
+    queue.put(func(*args, **kwargs))
+
+# Allow 5 minutes before throwing in the towel.
+def call_with_timeout(func, args=(), kwarg={}, timeout=300):
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(target=_wrapper, args=(queue, func, *args), kwargs=kwarg)
+    process.start()
+    process.join(timeout)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        print("ERROR: test timed out")
+        encapp_tool.app_utils.force_stop(serial, options.debug)
+        return False,{}
+    else:
+        return queue.get()
 
 def main(argv):
     options = get_options(argv)
@@ -936,7 +960,8 @@ def main(argv):
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
-    options.device_workdir = encapp.get_workdir(serial)
+    if not options.device_workdir:
+        options.device_workdir = encapp.get_workdir(serial)
     if options.debug > 0:
         print(options)
 
@@ -977,6 +1002,8 @@ def main(argv):
             tests = options.test
         else:
             tests = DEFAULT_TESTS
+            if options.vendor:
+                tests += VENDOR_TESTS
 
         for test in tests:
             directory, _ = os.path.split(__file__)
@@ -991,23 +1018,21 @@ def main(argv):
             if os.path.exists(encapp_search.INDEX_FILE_NAME):
                 os.remove(encapp_search.INDEX_FILE_NAME)
                 print(f"removed path: {encapp_search.INDEX_FILE_NAME}")
-
+            # we do this strange manuever since we do notneed to fill out all parameters
+            # and we may have unimoportant holes in out defintiions.
             settings = encapp.get_options(["", "run", ""])
             settings.configfile = [test_path]
             settings.debug = options.debug
-
-            if "input" in options.replace:
-                settings.videofile = options.replace["input"]["filepath"]
-            settings.encoder = options.codec
+            settings.device_workdir = options.device_workdir
+            settings.replace = options.replace
             settings.input_resolution = options.input_res
             settings.output_resolution = options.output_res
             settings.input_framerate = options.input_fps
             settings.output_framerate = options.output_fps
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
-            result_ok, result = encapp.codec_test(
-                settings, model, serial, settings.debug
-            )
+            # Set a timeout
+            result_ok, result = call_with_timeout(encapp.codec_test, args=(settings, model, serial, settings.debug))
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)

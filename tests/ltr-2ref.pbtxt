@@ -10,7 +10,7 @@ test {
         playout_frames: 900
     }
     configure {
-        codec: "encoder.avc"
+        codec: "OMX.google.h264.encoder"
         bitrate: "100 kbps"
         bitrate_mode: cbr
         i_frame_interval: 2000

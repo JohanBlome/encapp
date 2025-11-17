@@ -4,7 +4,7 @@ test {
         description: "B-Frame Testing"
     }
     configure {
-        codec: "encoder.avc"
+        codec: "OMX.google.h264.encoder"
         bitrate: "1000 kbps"
         bitrate_mode: vbr
         i_frame_interval: 2000
