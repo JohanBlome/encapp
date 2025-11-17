@@ -2651,7 +2651,7 @@ def get_options(argv: list) -> argparse.Namespace:
 
 def process_target_options(options):
     global default_values
-    if options.bundleid:
+    if "bundleid" in options and options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
     default_values["device_workdir"] = get_device_dir()
@@ -2995,15 +2995,15 @@ def merge_options(option1, options2):
     return option1
 
 
-def get_workdir(serial):
+def get_workdir(serial, debug=0):
     workdir = ""
     if not encapp_tool.adb_cmds.USE_IDB:
-        encapp_tool.adb_cmds.reset_logcat(serial)
+        encapp_tool.adb_cmds.reset_logcat(serial, debug)
         adb_cmd = (
             f"adb -s {serial} shell am start "
             f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
         )
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
         # it seems some devices have a longer delayuntil logs appear in the log
         sleeptime = 2
         wait_time = 30
@@ -3011,7 +3011,7 @@ def get_workdir(serial):
             time.sleep(sleeptime)
             # Get logcat and look for:
             # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
-            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug)
             reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
             m = re.search(reg, logcat_contents)
             if m:
