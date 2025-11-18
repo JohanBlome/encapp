@@ -110,10 +110,21 @@ public class TestDefinitionHelper {
         Size targetResolution = (config.hasResolution()) ?
                 SizeUtils.parseXString(config.getResolution()):
                 SizeUtils.parseXString(test.getInput().getResolution());
+        
+        // Translate any image/* MIME types to video MIME types for encoder configuration
+        // The encoder needs video MIME types (e.g., "video/av01", "video/hevc")
+        // but we allow users to specify "image/*" in configs for convenience
+        String mimeType = config.getMime();
+        if (mimeType.toLowerCase().startsWith("image/")) {
+            String originalMime = mimeType;
+            mimeType = getVideoMimeTypeForCodec(config.getCodec());
+            Log.d(TAG, "Translated image MIME '" + originalMime + "' to '" + mimeType + "' for codec: " + config.getCodec());
+        }
+        
         // start with the default MediaFormat
-        Log.d(TAG, "mime: " +  config.getMime()  + ", res = " + targetResolution);
+        Log.d(TAG, "mime: " +  mimeType  + ", res = " + targetResolution);
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(
-                config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
+                mimeType, targetResolution.getWidth(), targetResolution.getHeight());
 
         // optional config parameters
         if (config.hasBitrate()) {
@@ -323,5 +334,50 @@ public class TestDefinitionHelper {
             encoderFormat.setInteger(MediaFormat.KEY_BIT_RATE, decBitrate);
         }
         return encoderFormat;
+    }
+
+    /**
+     * Translate image/heif MIME type to the actual video MIME type based on codec name.
+     * This allows using "image/heif" in test configurations with any encoder.
+     * 
+     * @param codecName The codec name (e.g., "c2.android.av1.encoder")
+     * @return The video MIME type (e.g., "video/av01", "video/hevc", "video/avc")
+     */
+    private static String getVideoMimeTypeForCodec(String codecName) {
+        if (codecName == null || codecName.isEmpty()) {
+            Log.w(TAG, "No codec name provided, defaulting to video/hevc");
+            return MediaFormat.MIMETYPE_VIDEO_HEVC;
+        }
+        
+        String codec = codecName.toLowerCase();
+        
+        // Check for AV1
+        if (codec.contains("av1") || codec.contains("av01")) {
+            return "video/av01";
+        }
+        
+        // Check for AVC/H.264
+        if (codec.contains("avc") || codec.contains("h264") || codec.contains(".264")) {
+            return MediaFormat.MIMETYPE_VIDEO_AVC;
+        }
+        
+        // Check for HEVC/H.265 (most common for HEIF)
+        if (codec.contains("hevc") || codec.contains("h265") || codec.contains(".265")) {
+            return MediaFormat.MIMETYPE_VIDEO_HEVC;
+        }
+        
+        // Check for VP9
+        if (codec.contains("vp9") || codec.contains("vp09")) {
+            return "video/x-vnd.on2.vp9";
+        }
+        
+        // Check for VP8
+        if (codec.contains("vp8") || codec.contains("vp08")) {
+            return "video/x-vnd.on2.vp8";
+        }
+        
+        // Default to HEVC for unknown codecs with HEIF
+        Log.w(TAG, "Unknown codec for image/heif translation: " + codecName + ", defaulting to video/hevc");
+        return MediaFormat.MIMETYPE_VIDEO_HEVC;
     }
 }

@@ -32,7 +32,10 @@ message TestSetup {
   // Useful for devices with problem in the power reporting.
   optional bool ignore_power_status = 10;
   // Add a delay before exiting the app. Can be usefull for identifying back to back runs.
-  optional int32 uihold_sec = 11;
+  optional int32 uihold_sec = 11;    
+  // Use internal Java muxer instead of Android MediaMuxer
+  // Note: HEIC output always uses internal muxer (MediaMuxer doesn't support HEIC)
+  optional bool internal_muxer = 14;
   optional bool internal_demuxer = 12;
   // For string values we have had an expansion available e.g. 1-3-1,5 
   // 1. For non string value this has not been possible
