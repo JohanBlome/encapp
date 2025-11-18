@@ -524,7 +524,9 @@ def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
                     comp = getattr(test, parts[0])
                     if hasattr(comp, parts[1]):
                         if parts[1] == "parameter":
-                            value = get_parameter_value(comp.parameter, ".".join(parts[2:]))
+                            value = get_parameter_value(
+                                comp.parameter, ".".join(parts[2:])
+                            )
                         else:
                             # If float and has not fractional part make it int
                             value = ""
@@ -615,7 +617,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             test.common.id = replace_placeholders(test.common.id, test)
 
     if test.HasField("common") and test.common.HasField("description"):
-            test.common.description = replace_placeholders(test.common.description, test)
+        test.common.description = replace_placeholders(test.common.description, test)
 
     # 5. save the full protobuf text file(s)
     if options.split:
@@ -1043,7 +1045,7 @@ def create_tests_from_definition_expansion(testsuite, options):
         tests = [test]
         proxies = []
         # before doing the individual ones we look at the proxy ones.
-        if  test.HasField("test_setup"):
+        if test.HasField("test_setup"):
             proxies = test.test_setup.proxy_val
 
         fields = [[descr.name, val] for descr, val in test.ListFields()]
@@ -1072,10 +1074,13 @@ def create_tests_from_definition_expansion(testsuite, options):
                             for proxy in proxies:
                                 try:
                                     if setting[1] == proxy.id:
-                                        local_expanded =  expand_ranges(proxy.value)
+                                        local_expanded = expand_ranges(proxy.value)
                                         if len(local_expanded) > 1:
                                             tests_ = update_single_setting(
-                                                tests, parent, setting[0].name, local_expanded
+                                                tests,
+                                                parent,
+                                                setting[0].name,
+                                                local_expanded,
                                             )
                                             if tests_:
                                                 tests = tests_
@@ -1089,15 +1094,22 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 and EXPAND_ALL
                             ):
                                 for num, param in enumerate(item.parameter):
-
                                     for proxy in proxies:
                                         try:
                                             if param.value == proxy.id:
-                                                local_expanded =  expand_ranges(proxy.value)
+                                                local_expanded = expand_ranges(
+                                                    proxy.value
+                                                )
                                                 if len(local_expanded) > 1:
-                                                    param_expand = [param, local_expanded]
+                                                    param_expand = [
+                                                        param,
+                                                        local_expanded,
+                                                    ]
                                                     tests_ = update_single_setting(
-                                                        tests, parent, "parameter", param_expand
+                                                        tests,
+                                                        parent,
+                                                        "parameter",
+                                                        param_expand,
                                                     )
                                                     if tests_:
                                                         tests = tests_
@@ -1227,9 +1239,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert (
-            len(resolution_spec) == 3
-        ), f'error: invalid resolution spec: "{resolution}"'
+        assert len(resolution_spec) == 3, (
+            f'error: invalid resolution spec: "{resolution}"'
+        )
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -1279,7 +1291,7 @@ def update_media(test, options):
     input_is_raw = encapp_tool.ffutils.video_is_raw(test.input.filepath)
     generate = False
     info = None
-    if test.input.filepath != "[generate]": 
+    if test.input.filepath != "[generate]":
         # if there are not settings for res and rate check the file itself
         info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
     else:
@@ -1404,14 +1416,12 @@ def update_media(test, options):
     replace["input"] = input
     replace["output"] = output
 
-
-
-    if test.input.filepath == "[generate]": 
+    if test.input.filepath == "[generate]":
         resolution = "1280x720"
         framerate = 30.0
         pix_fmt = "nv12"
         duration = 5
-        output_filepath = output["output_filepath"] 
+        output_filepath = output["output_filepath"]
         if "resolution" in test.input:
             resolution = test.input.resolution
         if "framerate" in test.input:
@@ -1425,7 +1435,9 @@ def update_media(test, options):
         # TODO: lookup
         extension = "raw"
         output_filepath = f"{options.mediastore}/generate_{resolution}p{framerate}_{pix_fmt}.{extension}"
-        ret = generate_source(resolution, framerate, pix_fmt, f"{output_filepath}", debug=2)
+        ret = generate_source(
+            resolution, framerate, pix_fmt, f"{output_filepath}", debug
+        )
         test.input.filepath = output_filepath
         test.input.resolution = resolution
         test.input.framerate = framerate
@@ -1851,7 +1863,9 @@ def run_codec_tests(
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
-            abort_test(local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}")
+            abort_test(
+                local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
+            )
 
         for filepath in files_to_push:
             # Ignore pbtxt, only the test_suite based one will be used.
@@ -2185,14 +2199,15 @@ def codec_test(options, model, serial, debug):
     )
 
 
-# TODO: 
+# TODO:
 # make it possible to generate encoded files so that e.g. verify can be run
-def generate_source(resolution, framerate, pix_fmt, output_file, duration_sec=5.0, debug=0):
+def generate_source(
+    resolution, framerate, pix_fmt, output_file, duration_sec=5.0, debug=0
+):
     cmd = f"ffmpeg -y -f lavfi -i 'testsrc2=size={resolution}:rate={framerate}' -f rawvideo -pix_fmt {pix_fmt} -color_primaries bt709 -t {duration_sec} {output_file}"
-   
+
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     return ret
-
 
 
 def get_device_dir():
@@ -2904,9 +2919,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert (
-        options.configfile is not None
-    ), "error: need a valid input configuration file"
+    assert options.configfile is not None, (
+        "error: need a valid input configuration file"
+    )
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -3090,14 +3105,16 @@ def main(argv):
     check_app = True
     check_device_workdir = True
     if "configfile" in options and options.configfile:
-        test_suite = tests_definitions.TestSuite() 
+        test_suite = tests_definitions.TestSuite()
         for proto in options.configfile:
             configfile_read(proto, test_suite)
 
         for test in test_suite.test:
             if test.HasField("test_setup") and test.test_setup.HasField("run_cmd"):
                 check_app = False
-            if test.HasField("test_setup") and test.test_setup.HasField("device_workdir"):
+            if test.HasField("test_setup") and test.test_setup.HasField(
+                "device_workdir"
+            ):
                 check_device_workdir = False
 
     if options.func == "run":
@@ -3258,9 +3275,9 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert (
-            options.configfile is not None
-        ), "error: need a valid input configuration file"
+        assert options.configfile is not None, (
+            "error: need a valid input configuration file"
+        )
 
         if not options.dry_run:
             # first clear out old result
