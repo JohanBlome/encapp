@@ -1498,6 +1498,14 @@ def update_codec_test(
         "decode_dump",
     )
     INPUT_BOOL_KEYS = ("show", "realtime")
+    TEST_SETUP_BOOL_KEYS = (
+        "separate_sources",
+        "first_frame_fast_read",
+        "ignore_power_status",
+        "ignore_power_status",
+        "internal_muxer",
+        "internal_demuxer",
+    )
 
     for k1 in replace:
         for k2, val in replace[k1].items():
@@ -1530,7 +1538,7 @@ def update_codec_test(
                         if not is_parallel:
                             # remove the options already taken care of
                             rep_copy = copy.deepcopy(replace)
-                            rep_copy["configure"][k2] = int(val)
+                            rep_copy[k1][k2] = int(val)
                             update_codec_test(
                                 ntest,
                                 updated_test_suite,
@@ -1551,8 +1559,10 @@ def update_codec_test(
                 val = float(val)
 
             # process boolean keys
-            if (k1 == "configure" and k2 in CONFIGURE_BOOL_KEYS) or (
-                k1 == "input" and k2 in INPUT_BOOL_KEYS
+            if (
+                (k1 == "configure" and k2 in CONFIGURE_BOOL_KEYS)
+                or (k1 == "input" and k2 in INPUT_BOOL_KEYS)
+                or (k1 == "test_setup" and k2 in TEST_SETUP_BOOL_KEYS)
             ):
                 # force float value
                 val = bool(val)
