@@ -1277,13 +1277,16 @@ def update_input_section(
 def update_media(test, options):
     debug = options.debug
     input_is_raw = encapp_tool.ffutils.video_is_raw(test.input.filepath)
-
-    # if there are not settings for res and rate check the file itself
-    info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
-
+    generate = False
+    info = None
+    if test.input.filepath != "[generate]": 
+        # if there are not settings for res and rate check the file itself
+        info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
+    else:
+        generate = True
     # Let us help support function later by checking the file and populate the input
     # fields where we can
-    if not input_is_raw:
+    if not input_is_raw and not generate:
         test = update_input_section(test, info)
 
     in_res = test.input.resolution
@@ -1401,23 +1404,50 @@ def update_media(test, options):
     replace["input"] = input
     replace["output"] = output
 
-    d = process_input_path(
-        test.input.filepath, replace, test.input, options.mediastore, options.debug
-    )
-    # After transcoding input settings may have changed, adjust.
-    # now both config and input should be the same i.e. matching config
+
+
+    if test.input.filepath == "[generate]": 
+        resolution = "1280x720"
+        framerate = 30.0
+        pix_fmt = "nv12"
+        duration = 5
+        output_filepath = output["output_filepath"] 
+        if "resolution" in test.input:
+            resolution = test.input.resolution
+        if "framerate" in test.input:
+            framerate = test.input.framerate
+        if "nv12" in get_pix_fmt(test.input.pix_fmt):
+            pix_fmt = get_pix_fmt(test.input.pix_fmt)
+        if "stoptime_sec" in test.input:
+            duration = test.input.stoptime_sec
+        if "playout_frames" in test.input:
+            duration = int(test.input.playout_frames) * framerate
+        # TODO: lookup
+        extension = "raw"
+        output_filepath = f"{options.mediastore}/generate_{resolution}p{framerate}_{pix_fmt}.{extension}"
+        ret = generate_source(resolution, framerate, pix_fmt, f"{output_filepath}", debug=2)
+        test.input.filepath = output_filepath
+        test.input.resolution = resolution
+        test.input.framerate = framerate
+        test.input.pix_fmt = pix_fmt
+    else:
+        d = process_input_path(
+            test.input.filepath, replace, test.input, options.mediastore, options.debug
+        )
+        # After transcoding input settings may have changed, adjust.
+        # now both config and input should be the same i.e. matching config
+
+        test.input.resolution = d["resolution"]
+        test.input.framerate = d["framerate"]
+        test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+        test.input.filepath = d["filepath"]
+        # Maybe not necessary but would just indicate that the input resolution was used.
+        test.configure.resolution = d["resolution"]
 
     # Check crop, if "auto" set the original resolution
     if test.HasField("input") and test.input.HasField("crop_area"):
         if test.input.crop_area == "auto":
             test.input.crop_area = test.input.resolution
-
-    test.input.resolution = d["resolution"]
-    test.input.framerate = d["framerate"]
-    test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
-    test.input.filepath = d["filepath"]
-    # Maybe not necessary but would just indicate that the input resolution was used.
-    test.configure.resolution = d["resolution"]
 
 
 # Update a set of tests with the CLI arguments.
@@ -2130,6 +2160,7 @@ def codec_test(options, model, serial, debug):
         for test in test_suite.test:
             if test.input.filepath:
                 test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
+
     configfile_write(test_suite, options.configfile)
 
     if options.mediastore is None:
@@ -2142,6 +2173,16 @@ def codec_test(options, model, serial, debug):
     return run_codec_tests_file(
         protobuf_txt_filepath, model, serial, local_workdir, options, debug
     )
+
+
+# TODO: 
+# make it possible to generate encoded files so that e.g. verify can be run
+def generate_source(resolution, framerate, pix_fmt, output_file, duration_sec=5.0, debug=0):
+    cmd = f"ffmpeg -y -f lavfi -i 'testsrc2=size={resolution}:rate={framerate}' -f rawvideo -pix_fmt {pix_fmt} -color_primaries bt709 -t {duration_sec} {output_file}"
+   
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    return ret
+
 
 
 def get_device_dir():
@@ -2700,11 +2741,12 @@ def process_options(options):
         options.replace = {}
     if options.replace.get("input", {}).get("filepath", ""):
         videofile = options.replace.get("input", {}).get("filepath", "")
-        assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
-            f"file {videofile} does not exist"
-            if os.path.exists(videofile)
-            else f"file {videofile} is not readable"
-        )
+        if videofile != "[generate]":
+            assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
+                f"file {videofile} does not exist"
+                if os.path.exists(videofile)
+                else f"file {videofile} is not readable"
+            )
     if "dim_align" in options and options.dim_align:
         options.width_align = options.dim_align
         options.height_align = options.dim_align
