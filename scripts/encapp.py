@@ -947,10 +947,17 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
             )
 
     # Check encoded file
+    extensions = ["mp4", "vpx", "heic", "heif", "jpeg", "avif", "avci", "webp"]
     for stat in results[1]:
-        name = f"{stat.split('.json')[0]}.mp4"
-        if not os.path.exists(name):
-            # Get test name
+        found = False
+        for extension in extensions:
+            name = f"{stat.split('.json')[0]}.{extension}"
+            if os.path.exists(name):
+                found = True
+                break
+
+        # Get test name
+        if not found:
             test_id = find_test_name(name, test_suite)
             fail.append({"test_id": test_id, "stats": stat, "error": "no encoded file"})
 
@@ -1422,12 +1429,15 @@ def update_media(test, options):
         pix_fmt = "nv12"
         duration = 5
         output_filepath = output["output_filepath"]
-        if "resolution" in test.input:
+        if "resolution" in test.input and len(test.input.resolution):
             resolution = test.input.resolution
-        if "framerate" in test.input:
+        if "framerate" in test.input and float(test.input.framerate) > 0:
             framerate = test.input.framerate
-        if "nv12" in get_pix_fmt(test.input.pix_fmt):
-            pix_fmt = get_pix_fmt(test.input.pix_fmt)
+        if "pix_fmt" in test.input:
+            try:
+                pix_fmt = get_pix_fmt(test.input.pix_fmt)
+            except:
+                pix_fmt = test.input.pix_fmt
         if "stoptime_sec" in test.input:
             duration = test.input.stoptime_sec
         if "playout_frames" in test.input:
@@ -1436,7 +1446,7 @@ def update_media(test, options):
         extension = "raw"
         output_filepath = f"{options.mediastore}/generate_{resolution}p{framerate}_{pix_fmt}.{extension}"
         ret = generate_source(
-            resolution, framerate, pix_fmt, f"{output_filepath}", debug
+            resolution, framerate, pix_fmt, f"{output_filepath}", debug=2
         )
         test.input.filepath = output_filepath
         test.input.resolution = resolution
