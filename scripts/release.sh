@@ -199,7 +199,7 @@ run_tests() {
         if [ -d "$PROJECT_ROOT/app/src/androidTest" ]; then
             print_warning "Running instrumented tests on emulator..."
             cd "$PROJECT_ROOT"
-            ./gradlew connectedDebugAndroidTest || {
+            ./gradlew connectedDefaultDebugAndroidTest || {
                 print_error "Instrumented tests failed"
                 if ! confirm "Continue despite test failures?"; then
                     exit 1
@@ -212,7 +212,7 @@ run_tests() {
         
         # Run basic smoke test - install and launch app
         print_warning "Running smoke test - installing and launching app..."
-        local apk_path=$(find "$PROJECT_ROOT/app/build/outputs/apk/debug" -name "*.apk" | head -n 1)
+        local apk_path=$(find "$PROJECT_ROOT/app/build/outputs/apk/Default/debug" -name "*.apk" | head -n 1)
         
         if [ -n "$apk_path" ]; then
             adb install -r "$apk_path" && print_success "APK installed successfully"
@@ -276,7 +276,7 @@ build_apk() {
     
     # Clean build
     print_warning "Running clean build..."
-    ./gradlew clean assembleDebug || {
+    ./gradlew clean assembleDefaultDebug || {
         print_error "Build failed"
         exit 1
     }
@@ -288,7 +288,7 @@ build_apk() {
 copy_to_releases() {
     print_header "Copying APK to Releases"
     
-    local apk_path=$(find "$PROJECT_ROOT/app/build/outputs/apk/debug" -name "*.apk" | head -n 1)
+    local apk_path=$(find "$PROJECT_ROOT/app/build/outputs/apk/Default/debug" -name "*.apk" | head -n 1)
     
     if [ -z "$apk_path" ]; then
         print_error "APK not found in build outputs"
@@ -296,19 +296,24 @@ copy_to_releases() {
     fi
     
     local apk_name=$(basename "$apk_path")
+    # Remove the "-Default" flavor suffix from the name so tests can find it
+    # e.g., com.facebook.encapp-v1.28-Default-debug.apk -> com.facebook.encapp-v1.28-debug.apk
+    local release_apk_name=$(echo "$apk_name" | sed 's/-Default//')
     
     # Create releases directory if it doesn't exist
     mkdir -p "$RELEASES_DIR"
     
-    # Copy APK
-    cp "$apk_path" "$RELEASES_DIR/"
-    print_success "Copied $apk_name to releases folder"
+    # Copy APK with the renamed filename (without flavor)
+    cp "$apk_path" "$RELEASES_DIR/$release_apk_name"
+    print_success "Copied $apk_name as $release_apk_name to releases folder"
     
     # Show APK info
     echo ""
     echo "APK Details:"
-    echo "  Path: $RELEASES_DIR/$apk_name"
-    echo "  Size: $(du -h "$RELEASES_DIR/$apk_name" | cut -f1)"
+    echo "  Original: $apk_name"
+    echo "  Released: $release_apk_name"
+    echo "  Path: $RELEASES_DIR/$release_apk_name"
+    echo "  Size: $(du -h "$RELEASES_DIR/$release_apk_name" | cut -f1)"
 }
 
 # Git operations
@@ -332,7 +337,21 @@ git_commit() {
         
         # Add modified files
         git add app/build.gradle
-        git add app/releases/
+        
+        # Force add the APK file (in case it's in .gitignore)
+        local apk_file="$RELEASES_DIR/com.facebook.encapp-v${version}-debug.apk"
+        if [ -f "$apk_file" ]; then
+            git add -f "$apk_file"
+            print_success "Force-added APK: com.facebook.encapp-v${version}-debug.apk"
+        else
+            print_error "APK file not found: $apk_file"
+            if ! confirm "Continue without adding APK?"; then
+                exit 1
+            fi
+        fi
+        
+        # Add releases directory (for any other changes)
+        git add app/releases/ 2>/dev/null || true
         
         # Check if proto files changed
         if ! git diff --quiet proto/ 2>/dev/null; then
@@ -418,8 +437,8 @@ main() {
     check_documentation
     update_version "$new_version"
     build_apk
+    copy_to_releases  # Copy APK to releases BEFORE running tests (tests expect it there)
     run_tests
-    copy_to_releases
     git_commit "$new_version"
     
     print_header "Release Complete!"
