@@ -76,7 +76,8 @@ task javacppExtract(type: Copy) {
     from { configurations.javacpp.collect { zipTree(it) } }
     include "lib/**"
     into "$buildDir/javacpp/"
-    android.sourceSets.main.jniLibs.srcDirs += ["$buildDir/javacpp/lib/"]
+    // Only add to lcevc flavor, not the main sourceset
+    android.sourceSets.lcevc.jniLibs.srcDirs += ["$buildDir/javacpp/lib/"]
 
     tasks.getByName('preBuild').dependsOn javacppExtract
 }
