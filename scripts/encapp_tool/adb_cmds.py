@@ -807,7 +807,6 @@ def set_idb_mode(mode):
 
 
 def is_using_idb():
-    global USE_IDB
     return USE_IDB
 
 

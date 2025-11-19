@@ -531,7 +531,6 @@ def run_quality(test_file, options, debug):
     """Compare the output found in test_file with the source/reference
     found in options.media_path directory or overriden
     """
-    global VMAF_MODEL
     global CVVDP_AVAILABLE
     global QPEXTRACT_AVAILABLE
 
@@ -1693,7 +1692,6 @@ def main(argv):
     a csv with relevant data
     """
     global VMAF_MODEL
-    global CVVDP_AVAILABLE
     options = get_options(argv)
     VMAF_MODEL = options.vmaf_model
 

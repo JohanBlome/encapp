@@ -26,7 +26,6 @@ import encapp_tool
 import encapp_tool.adb_cmds
 import encapp_tool.app_utils
 import encapp_tool.ffutils
-import google.protobuf.descriptor_pool as descriptor_pool
 import humanfriendly
 import pandas as pd
 from argparse_formatter import FlexiFormatter
@@ -55,7 +54,10 @@ FUNC_CHOICES = {
     "help": "show help options",
     "install": "install apks",
     "uninstall": "uninstall apks",
-    "list": "list codecs and devices supported. It can be used to search and file. For more options use 'list -h'.",
+    "list": (
+        "list codecs and devices supported. It can be used to "
+        "search and file. For more options use 'list -h'."
+    ),
     "run": "run codec test case",
     "kill": "kill application",
     "clear": "remove all encapp associated files",
@@ -1765,7 +1767,6 @@ def run_codec_tests(
     The testsuite will be written to a file for pushing along with files_to_push.
     """
 
-    global default_values
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
 
@@ -2228,7 +2229,6 @@ def get_device_dir():
 
 
 def set_idb_mode(mode):
-    global default_values
     encapp_tool.adb_cmds.set_idb_mode(mode)
     default_values["device_workdir"] = get_device_dir()
 
@@ -2726,7 +2726,6 @@ def get_options(argv: list) -> argparse.Namespace:
 
 
 def process_target_options(options):
-    global default_values
     if "bundleid" in options and options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
@@ -3293,8 +3292,6 @@ def main(argv):
             # first clear out old result
             remove_encapp_gen_files(serial, options.device_workdir, options.debug)
         result_ok, result_json = codec_test(options, model, serial, options.debug)
-
-        global QUALITY_PROCESSES
 
         if options.quality:
             csvdata = []
