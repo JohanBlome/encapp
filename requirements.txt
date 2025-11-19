@@ -1,5 +1,5 @@
 argparse-formatter>=1.4
-fonttools>=4.57.0
+fonttools>=4.57
 humanfriendly>=10.0
 iniconfig>=2.1.0
 kiwisolver>=1.4
