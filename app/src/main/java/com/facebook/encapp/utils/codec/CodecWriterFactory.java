@@ -4,7 +4,7 @@ package com.facebook.encapp.utils.codec;
  * Factory for creating codec-specific writers.
  */
 public class CodecWriterFactory {
-    
+
     /**
      * Create a codec writer for the specified codec type.
      */
@@ -22,7 +22,7 @@ public class CodecWriterFactory {
                 throw new IllegalArgumentException("Unsupported codec type: " + codecType);
         }
     }
-    
+
     /**
      * Create a codec writer from MIME type.
      */

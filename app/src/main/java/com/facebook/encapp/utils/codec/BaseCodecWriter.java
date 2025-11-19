@@ -10,23 +10,23 @@ import java.io.IOException;
  */
 public abstract class BaseCodecWriter implements CodecWriter {
     private static final String TAG = "encapp.codec";
-    
+
     protected final CodecType codecType;
-    
+
     protected BaseCodecWriter(CodecType codecType) {
         this.codecType = codecType;
     }
-    
+
     @Override
     public CodecType getCodecType() {
         return codecType;
     }
-    
+
     @Override
     public String getItemType() {
         return codecType.getItemType();
     }
-    
+
     protected void writeInt8(FileOutputStream file, int value) throws IOException {
         file.write(value & 0xFF);
     }
@@ -73,11 +73,11 @@ public abstract class BaseCodecWriter implements CodecWriter {
         writeInt32(file, size);
         seek(file, currentPos);
     }
-    
+
     protected void log(String message) {
         Log.d(TAG, "[" + codecType.name() + "] " + message);
     }
-    
+
     protected void logError(String message) {
         Log.e(TAG, "[" + codecType.name() + "] " + message);
     }

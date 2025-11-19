@@ -86,7 +86,7 @@ public class MuxerWrapper {
         Log.d(TAG, "mUseInternalMuxer: " + mUseInternalMuxer);
         Log.d(TAG, "mInternalMuxer: " + (mInternalMuxer != null ? "not null" : "null"));
         Log.d(TAG, "MediaFormat: " + format);
-        
+
         if (mUseInternalMuxer && mInternalMuxer != null) {
             // Get codec-specific data from MediaFormat
             ByteBuffer csdBuffer = format.getByteBuffer("csd-0");
@@ -95,7 +95,7 @@ public class MuxerWrapper {
                 codecData = new byte[csdBuffer.remaining()];
                 csdBuffer.get(codecData);
                 Log.d(TAG, "Got codec config data from MediaFormat: " + codecData.length + " bytes");
-                
+
                 // Log first few bytes
                 if (codecData.length > 0) {
                     StringBuilder hex = new StringBuilder();
@@ -109,6 +109,47 @@ public class MuxerWrapper {
 
             String mime = format.getString(MediaFormat.KEY_MIME);
             Log.d(TAG, "MediaFormat MIME type: " + mime);
+
+            // Auto-detect tile grid from MediaFormat using standard Android keys (API 31+)
+            // Try standard keys first, then fall back to custom keys
+            boolean tileDetected = false;
+
+            // Check for standard Android tile keys (MediaFormat.KEY_GRID_COLUMNS, KEY_GRID_ROWS)
+            if (format.containsKey(MediaFormat.KEY_GRID_COLUMNS) && format.containsKey(MediaFormat.KEY_GRID_ROWS)) {
+                int gridCols = format.getInteger(MediaFormat.KEY_GRID_COLUMNS);
+                int gridRows = format.getInteger(MediaFormat.KEY_GRID_ROWS);
+                Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (standard keys): %dx%d", gridCols, gridRows));
+                mInternalMuxer.setTileMode(gridCols, gridRows);
+                tileDetected = true;
+            }
+            // Fall back to custom keys for older implementations
+            else if (format.containsKey("grid-cols") && format.containsKey("grid-rows")) {
+                int gridCols = format.getInteger("grid-cols");
+                int gridRows = format.getInteger("grid-rows");
+                Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (custom keys): %dx%d", gridCols, gridRows));
+                mInternalMuxer.setTileMode(gridCols, gridRows);
+                tileDetected = true;
+            }
+
+            // Auto-detect tile dimensions from MediaFormat
+            // Try standard keys first (MediaFormat.KEY_TILE_WIDTH, KEY_TILE_HEIGHT)
+            if (format.containsKey(MediaFormat.KEY_TILE_WIDTH) && format.containsKey(MediaFormat.KEY_TILE_HEIGHT)) {
+                int tileWidth = format.getInteger(MediaFormat.KEY_TILE_WIDTH);
+                int tileHeight = format.getInteger(MediaFormat.KEY_TILE_HEIGHT);
+                Log.d(TAG, String.format("Auto-detected tile dimensions from MediaFormat (standard keys): %dx%d", tileWidth, tileHeight));
+                mInternalMuxer.setTileDimensions(tileWidth, tileHeight);
+            }
+            // Fall back to custom keys
+            else if (format.containsKey("tile-width") && format.containsKey("tile-height")) {
+                int tileWidth = format.getInteger("tile-width");
+                int tileHeight = format.getInteger("tile-height");
+                Log.d(TAG, String.format("Auto-detected tile dimensions from MediaFormat (custom keys): %dx%d", tileWidth, tileHeight));
+                mInternalMuxer.setTileDimensions(tileWidth, tileHeight);
+            }
+
+            if (tileDetected) {
+                Log.d(TAG, "Tile mode auto-detected and enabled from MediaFormat!");
+            }
 
             if (codecData != null && codecData.length > 0) {
                 // Use MIME type auto-detection instead of isHEVC flag
@@ -133,7 +174,7 @@ public class MuxerWrapper {
             Log.d(TAG, "MediaMuxer.addTrack returned: " + trackId);
             return trackId;
         }
-        
+
         Log.e(TAG, "=== addTrack returning -1 (no muxer available) ===");
         return -1;
     }
@@ -166,12 +207,7 @@ public class MuxerWrapper {
      * @param bufferInfo Buffer info with size, timestamp, flags
      */
     public void writeSampleData(int trackIndex, ByteBuffer encodedData, MediaCodec.BufferInfo bufferInfo) {
-        Log.d(TAG, String.format("=== writeSampleData called: track=%d, size=%d, flags=0x%x, pts=%d ===",
-            trackIndex, bufferInfo.size, bufferInfo.flags, bufferInfo.presentationTimeUs));
-        
         if (mUseInternalMuxer && mInternalMuxer != null) {
-            Log.d(TAG, "Using internal muxer to write sample");
-            
             // Extract frame data
             byte[] frameData = new byte[bufferInfo.size];
             encodedData.position(bufferInfo.offset);
@@ -234,6 +270,41 @@ public class MuxerWrapper {
             mInternalMuxer.setCleanAperture(cleanWidth, cleanHeight);
         } else {
             Log.w(TAG, "Clean aperture not supported by MediaMuxer");
+        }
+    }
+
+    /**
+     * Enable tile mode for HEIC images.
+     * When enabled, muxer will accept multiple frames/tiles and create a tiled HEIC image.
+    /**
+     * Set tile mode for tiled HEIC images.
+     * Call this after creating the muxer wrapper to enable tile mode.
+     *
+     * @param tileColumns Number of tile columns
+     * @param tileRows Number of tile rows
+     */
+    public void setTileMode(int tileColumns, int tileRows) {
+        if (mUseInternalMuxer && mInternalMuxer != null) {
+            mInternalMuxer.setTileMode(tileColumns, tileRows);
+            Log.d(TAG, String.format("Tile mode enabled: %dx%d grid", tileColumns, tileRows));
+        } else {
+            Log.w(TAG, "Tile mode only supported with internal muxer");
+        }
+    }
+
+    /**
+     * Set actual tile dimensions (from MediaFormat or encoder).
+     * Call this to provide the actual tile size from the encoder.
+     *
+     * @param tileWidth Actual tile width in pixels
+     * @param tileHeight Actual tile height in pixels
+     */
+    public void setTileDimensions(int tileWidth, int tileHeight) {
+        if (mUseInternalMuxer && mInternalMuxer != null) {
+            mInternalMuxer.setTileDimensions(tileWidth, tileHeight);
+            Log.d(TAG, String.format("Tile dimensions set: %dx%d", tileWidth, tileHeight));
+        } else {
+            Log.w(TAG, "Tile dimensions only supported with internal muxer");
         }
     }
 
