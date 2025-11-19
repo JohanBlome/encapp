@@ -942,7 +942,13 @@ def call_with_timeout(func, args=(), kwarg={}, timeout=300):
         process.terminate()
         process.join()
         print("ERROR: test timed out")
+<<<<<<< Updated upstream
         encapp_tool.app_utils.force_stop(serial, options.debug)
+=======
+        serial = args(2)
+        debug = args(1)["debug"]
+        encapp_tool.app_utils.force_stop(serial, debug)
+>>>>>>> Stashed changes
         return False,{}
     else:
         return queue.get()
