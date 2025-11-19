@@ -8,40 +8,40 @@ import java.io.IOException;
  * Each codec implementation handles its own brand codes, configuration boxes, and data conversion.
  */
 public interface CodecWriter {
-    
+
     /**
      * Get the codec type this writer handles.
      */
     CodecType getCodecType();
-    
+
     /**
      * Get the major brand for ftyp box.
      * For video: "avc1", "hvc1", "av01", etc.
      * For images: "mif1", "avif", etc.
      */
     String getMajorBrand(boolean isImage);
-    
+
     /**
      * Get compatible brands for ftyp box.
      * Returns an array of FourCC brand codes.
      */
     String[] getCompatibleBrands(boolean isImage);
-    
+
     /**
      * Write the codec configuration box (avcC, hvcC, av1C, vpcC, etc.).
-     * 
+     *
      * @param file Output file stream
      * @param codecData Raw codec configuration data (can be Annex-B or native format)
      * @param width Video/image width
      * @param height Video/image height
      * @throws IOException if write fails
      */
-    void writeCodecConfigBox(FileOutputStream file, byte[] codecData, int width, int height) 
+    void writeCodecConfigBox(FileOutputStream file, byte[] codecData, int width, int height)
             throws IOException;
-    
+
     /**
      * Write the sample entry box (avc1, hvc1, av01, vp09, etc.) for MP4 video.
-     * 
+     *
      * @param file Output file stream
      * @param codecData Codec configuration data
      * @param width Video width
@@ -52,9 +52,9 @@ public interface CodecWriter {
      * @throws IOException if write fails
      */
     void writeSampleEntryBox(FileOutputStream file, byte[] codecData, int width, int height,
-                            boolean hasCleanAperture, int cleanWidth, int cleanHeight) 
+                            boolean hasCleanAperture, int cleanWidth, int cleanHeight)
             throws IOException;
-    
+
     /**
      * Convert frame data to the format required for mdat.
      * For AVC/HEVC: Convert Annex-B to AVCC format.
@@ -64,7 +64,19 @@ public interface CodecWriter {
      * @return Converted frame data ready for mdat, or null on error
      */
     byte[] convertFrameData(byte[] frameData);
-    
+
+    /**
+     * Extract dimensions from encoded frame data (SPS parsing).
+     * Used to detect actual tile dimensions from encoder output.
+     *
+     * @param frameData Encoded frame data (AVCC format)
+     * @return int[2] with {width, height}, or null if cannot parse
+     */
+    default int[] extractDimensionsFromFrame(byte[] frameData) {
+        // Default: dimensions cannot be extracted
+        return null;
+    }
+
     /**
      * Get the item type for HEIF images (used in infe box).
      * Returns values like "hvc1", "av01", etc.

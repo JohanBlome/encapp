@@ -257,7 +257,7 @@ public abstract class Encoder {
         if (encoder != null) {
             String codecName = encoder.getCodecInfo().getName().toLowerCase(Locale.US);
             isHEVC = codecName.contains("hevc") || codecName.contains("h265");
-            
+
             if (codecName.contains("vp") && !isImageOutput) {
                 mFilename = mStats.getId() + ".webm";
             }
@@ -309,7 +309,7 @@ public abstract class Encoder {
 
     /**
      * Determine the correct file extension for image output based on codec type.
-     * 
+     *
      * @param encoder MediaCodec encoder instance
      * @param format MediaFormat from the encoder
      * @return File extension including the dot (e.g., ".heic", ".avif", ".avci")
@@ -318,7 +318,7 @@ public abstract class Encoder {
         // Try to determine from encoder codec name first
         if (encoder != null) {
             String codecName = encoder.getCodecInfo().getName().toLowerCase(Locale.US);
-            
+
             if (codecName.contains("hevc") || codecName.contains("h265")) {
                 Log.d(TAG, "Detected HEVC codec, using .heic extension");
                 return ".heic";
@@ -333,11 +333,11 @@ public abstract class Encoder {
                 return ".webp";
             }
         }
-        
+
         // Try to determine from MediaFormat MIME type
         if (format != null && format.containsKey(MediaFormat.KEY_MIME)) {
             String mime = format.getString(MediaFormat.KEY_MIME);
-            
+
             if (mime.contains("hevc") || mime.contains("h265")) {
                 Log.d(TAG, "Detected HEVC from MIME, using .heic extension");
                 return ".heic";
@@ -352,7 +352,7 @@ public abstract class Encoder {
                 return ".webp";
             }
         }
-        
+
         // Default to .heic if unable to determine
         Log.w(TAG, "Unable to determine codec type, defaulting to .heic extension");
         return ".heic";
@@ -582,7 +582,7 @@ public abstract class Encoder {
                     if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());
-                        
+
                         // Use MuxerWrapper if available, otherwise fall back to MediaMuxer
                         if (mWriteFile && mMuxerWrapper != null) {
                             Log.d(TAG, "Start MuxerWrapper");
@@ -593,7 +593,7 @@ public abstract class Encoder {
                             mVideoTrack = mMuxer.addTrack(oformat);
                             mMuxer.start();
                         }
-                        
+
                         mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                         if (currentOutputFormat == null) {
                            currentOutputFormat =  mCodec.getOutputFormat();
@@ -621,11 +621,11 @@ public abstract class Encoder {
                                     currentOutputFormat = oformat;
                                     info.addInfo(latestFrameChanges);
                                 }
-                                
+
                                 // Write sample data using MuxerWrapper if available, otherwise MediaMuxer
                                 if (mVideoTrack != -1) {
                                     ByteBuffer data = mCodec.getOutputBuffer(frameBuffer.mBufferId);
-                                    
+
                                     if (mMuxerWrapper != null) {
                                         mMuxerWrapper.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
                                     } else if (mMuxer != null) {

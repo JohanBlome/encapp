@@ -8,17 +8,17 @@ public enum CodecType {
      * H.264/AVC - Advanced Video Coding
      */
     AVC("avc1", "avcC"),
-    
+
     /**
      * H.265/HEVC - High Efficiency Video Coding
      */
     HEVC("hvc1", "hvcC"),
-    
+
     /**
      * AV1 - AOMedia Video 1
      */
     AV1("av01", "av1C"),
-    
+
     /**
      * VP9 - Google's VP9 codec
      */
@@ -54,9 +54,9 @@ public enum CodecType {
         if (mimeType == null) {
             return HEVC; // Default
         }
-        
+
         String mime = mimeType.toLowerCase();
-        
+
         // Check for AV1 first (before AVC to avoid "av" substring match)
         if (mime.contains("av01") || mime.contains("av1") || mime.contains("avif")) {
             return AV1;
@@ -67,7 +67,7 @@ public enum CodecType {
         } else if (mime.contains("vp9") || mime.contains("vp09")) {
             return VP9;
         }
-        
+
         return HEVC; // Default fallback
     }
 
