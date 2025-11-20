@@ -1001,10 +1001,32 @@ def lookup_message_by_name(message, submessage_name):
     else:
         return None
 
+def set_attribute(subparam, setting, item):
+    while True:
+        try:
+            setattr(subparam, setting, int(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, float(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, bool(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, str(item))
+            break
+        except:
+            print(f"ERROR. Could not set {item} in {setting} for {subparam}")
 
-def multiply_tests_with_tems(test, parent, setting, expanded):
+
+def multiply_tests_with_items(test, parent, setting, expanded):
     tests = []
-
     # for "paramater" we need to work a little different
     param = None
     if setting == "parameter":
@@ -1016,11 +1038,12 @@ def multiply_tests_with_tems(test, parent, setting, expanded):
         ntest.CopyFrom(test)
         submessage = lookup_message_by_name(ntest, parent)
         if submessage and not param:
-            setattr(submessage, setting, item)
+            set_attribute(submessage, setting, item)
+            #setattr(submessage, setting, str(item))
         elif submessage and param:
             for subparam in submessage.parameter:
                 if subparam.key == param.key:
-                    setattr(subparam, "value", str(item))
+                    set_attribute(subparam, "value", item)
         else:
             print(f"Combination not supported: {item=}, {submessage=}")
 
@@ -1031,7 +1054,7 @@ def multiply_tests_with_tems(test, parent, setting, expanded):
 def update_single_setting(tests, parent, settings_name, expanded):
     updated = []
     for test in tests:
-        tests_ = multiply_tests_with_tems(test, parent, settings_name, expanded)
+        tests_ = multiply_tests_with_items(test, parent, settings_name, expanded)
         if tests_:
             updated.extend(tests_)
     return updated
@@ -1082,7 +1105,7 @@ def create_tests_from_definition_expansion(testsuite, options):
                         else:
                             for proxy in proxies:
                                 try:
-                                    if setting[1] == proxy.id:
+                                    if str(setting[1]) == proxy.id:
                                         local_expanded = expand_ranges(proxy.value)
                                         if len(local_expanded) > 1:
                                             tests_ = update_single_setting(
@@ -1097,11 +1120,9 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 except Exception as ex:
                                     print(f"Failed to convert {ex}")
                                     pass
-                            if (
-                                parent == "configure"
-                                and setting[0].name == "parameter"
-                                and EXPAND_ALL
-                            ):
+                            if parent == "configure"\
+                                and ((setting[0].name == "parameter" and EXPAND_ALL)\
+                                or setting[0].name == "proxy_val"):
                                 for num, param in enumerate(item.parameter):
                                     for proxy in proxies:
                                         try:
@@ -1335,6 +1356,7 @@ def update_media(test, options):
             or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
         )
         and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+        and not test.input.filepath == "[generate]"
     ):
         if debug:
             print("Surface with compatible pixel formats")
@@ -1349,22 +1371,6 @@ def update_media(test, options):
             print("Configure is same format as input")
         return
 
-    # Passed this point, always transcode to a raw file
-    if debug:
-        print("Transcode input")
-    reason = ""
-    if in_res != out_res:
-        reason = f" res ({in_res} != {out_res})"
-    if in_rate != out_rate:
-        reason = f" rate ({in_rate} != {out_rate})"
-    if in_pix_fmt != out_pix_fmt:
-        reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
-    if options.raw:
-        reason = "Always decode to raw set"
-
-    reason = reason.strip()
-    if options.debug > 0:
-        print(f"Transcode raw input: {test.input.filepath} {reason = }")
     replace = {}
     input = {}
     output = {}
@@ -1455,6 +1461,23 @@ def update_media(test, options):
         test.input.framerate = framerate
         test.input.pix_fmt = pix_fmt
     else:
+
+        # Passed this point, always transcode to a raw file
+        if debug:
+            print("Transcode input")
+        reason = ""
+        if in_res != out_res:
+            reason = f" res ({in_res} != {out_res})"
+        if in_rate != out_rate:
+            reason = f" rate ({in_rate} != {out_rate})"
+        if in_pix_fmt != out_pix_fmt:
+            reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
+        if options.raw:
+            reason = "Always decode to raw set"
+
+        reason = reason.strip()
+        if options.debug > 0:
+            print(f"Transcode raw input: {test.input.filepath} {reason = }")
         d = process_input_path(
             test.input.filepath, replace, test.input, options.mediastore, options.debug
         )
