@@ -315,7 +315,7 @@ public class BufferTranscoder extends Encoder  {
         Log.d(TAG, "Check input format after encoder is configured");
         logMediaFormat(mCodec.getInputFormat());
 
-        mMuxer = createMuxer(mCodec, mediaFormat);
+        mMuxerWrapper = createMuxerWrapper(mCodec, mediaFormat);
         try {
             Log.d(TAG, "Start encoder");
             mStats.pushTimestamp("encoder.start");
@@ -743,14 +743,14 @@ public class BufferTranscoder extends Encoder  {
             mStats.stop();
             Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
             Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
-            if (mMuxer != null) {
+            if (mMuxerWrapper != null) {
                 try {
-                    mMuxer.release(); //Release calls stop
+                    mMuxerWrapper.release(); //Release calls stop
                 } catch (IllegalStateException ise) {
                     //Most likely mean that the muxer is already released. Stupid API
                     Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
                 }
-                mMuxer = null;
+                mMuxerWrapper = null;
             }
 
             try {

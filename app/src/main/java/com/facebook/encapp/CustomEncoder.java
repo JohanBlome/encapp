@@ -255,7 +255,7 @@ class CustomEncoder extends Encoder {
         }
         mStats.start();
 
-        mMuxer = createMuxer(null, mediaFormat);
+        mMuxerWrapper = createMuxerWrapper(null, mediaFormat);
         try {
             int currentFramePosition = 0;
             boolean input_done = false;
@@ -354,8 +354,8 @@ class CustomEncoder extends Encoder {
                         format.setByteBuffer("csd-1", pps);
 
                         bufferInfo = new MediaCodec.BufferInfo();
-                        videoTrackIndex = mMuxer.addTrack(format);
-                        mMuxer.start();
+                        videoTrackIndex = mMuxerWrapper.addTrack(format);
+                        mMuxerWrapper.start();
                         muxerStarted = true;
                     }
 
@@ -368,11 +368,11 @@ class CustomEncoder extends Encoder {
                     boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
 
-                    if(mMuxer != null) {
+                    if(mMuxerWrapper != null) {
                         buffer.position(bufferInfo.offset);
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 
-                        mMuxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                        mMuxerWrapper.writeSampleData(videoTrackIndex, buffer, bufferInfo);
                     }
                 } catch (MediaCodec.CodecException ex) {
                     Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
@@ -385,9 +385,9 @@ class CustomEncoder extends Encoder {
             Log.d(TAG, "Close encoder and streams");
             close();
 
-            if (mMuxer != null) {
+            if (mMuxerWrapper != null) {
                 try {
-                    mMuxer.release();
+                    mMuxerWrapper.release();
                 } catch (IllegalStateException ise) {
                     Log.e(TAG, "Illegal state exception when trying to release the muxer");
                 }

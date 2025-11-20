@@ -307,13 +307,13 @@ public class SurfaceTranscoder extends SurfaceEncoder {
 
             if (!mNoEncoding) {
                 Log.d(TAG, "Create muxer");
-                mMuxer = createMuxer(mCodec, format);
+                mMuxerWrapper = createMuxerWrapper(mCodec, format);
 
                 // This is needed.
                 boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
                 if (isVP) {
-                    mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
-                    mMuxer.start();
+                    mVideoTrack = mMuxerWrapper.addTrack(mCodec.getOutputFormat());
+                    mMuxerWrapper.start();
                 }
             }
 
@@ -664,14 +664,14 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             mStats.stop();
             Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
             Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
-            if (mMuxer != null) {
+            if (mMuxerWrapper != null) {
                 try {
-                    mMuxer.release(); //Release calls stop
+                    mMuxerWrapper.release(); //Release calls stop
                 } catch (IllegalStateException ise) {
                     //Most likely mean that the muxer is already released. Stupid API
                     Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
                 }
-                mMuxer = null;
+                mMuxerWrapper = null;
             }
 
             try {
