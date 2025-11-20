@@ -106,7 +106,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         mRefFramesizeInBytes = (int) (width * height * 1.5);
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
-        if (mTest.getInput().getFilepath().endsWith("rgba")) {
+        if (mTest.getInput().getPixFmt().getNumber() == PixFmt.rgba_VALUE) {
             mIsRgbaSource = true;
             mRefFramesizeInBytes = width * height * 4;
         } else if (mTest.getInput().getFilepath().equals("camera")) {
@@ -220,15 +220,15 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         }
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat());
+        mMuxerWrapper = createMuxerWrapper(mCodec, mCodec.getOutputFormat());
 
 
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
-            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mVideoTrack = mMuxerWrapper.addTrack(mCodec.getOutputFormat());
             Log.d(TAG, "Start muxer, track = " + mVideoTrack);
-            mMuxer.start();
+            mMuxerWrapper.start();
         }
 
         Log.d(TAG, "Create fps measure: " + this);
@@ -401,14 +401,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         }
         mStats.stop();
 
-        if (mMuxer != null) {
+        if (mMuxerWrapper != null) {
             try {
-                mMuxer.release(); //Release calls stop
+                mMuxerWrapper.release(); //Release calls stop
             } catch (IllegalStateException ise) {
                 //Most likely mean that the muxer is already released. Stupid API
                 Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
             }
-            mMuxer = null;
+            mMuxerWrapper = null;
         }
         if (mCodec != null) {
             try {
