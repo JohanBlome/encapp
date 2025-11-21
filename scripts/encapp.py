@@ -618,8 +618,8 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         if test.HasField("common") and test.common.HasField("id"):
             test.common.id = replace_placeholders(test.common.id, test)
 
-    if test.HasField("common") and test.common.HasField("description"):
-        test.common.description = replace_placeholders(test.common.description, test)
+        if test.HasField("common") and test.common.HasField("description"):
+            test.common.description = replace_placeholders(test.common.description, test)
 
     # 5. save the full protobuf text file(s)
     if options.split:
