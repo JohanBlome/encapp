@@ -278,6 +278,7 @@ public abstract class Encoder {
         // Image output (HEIF) always requires internal muxer
         if (isImageOutput) {
             useInternalMuxer = true;
+            mStats.setIsImage(true);
             Log.d(TAG, "Image format requires internal muxer, forcing internal_muxer=true");
         }
 
