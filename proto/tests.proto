@@ -52,6 +52,10 @@ message TestSetup {
   //config.quality: "-100"
   // The id can be anything and if matching the value will be expanded.
   repeated ProxyVal proxy_val = 13; 
+  // Same as the cli option to expand all fields in parameters
+  // This is not default since we may end up in a situatin were settings may clash
+  // with some other intent
+  optional bool expand_all = 15;
 }
 
 message Common {
