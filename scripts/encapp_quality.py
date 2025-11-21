@@ -24,6 +24,11 @@ from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
 import tempfile
 import traceback
+# Define color codes
+
+RED = "\033[91m"
+GREEN = "\033[92m"
+END = "\033[0m"  # Reset to default
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -353,7 +358,7 @@ def parse_quality_vmaf(vmaf_file):
         vmaf_dict.update({"framecount": len(data["frames"])})
         vmaf_dict.update({"zero_vmaf": np.any(vmaf_list == 0)})
     except KeyError as ke:
-        print(f"ERROR: {ke=} for {vmaf_file}")
+        print(f"{RED} ERROR: {ke=} for {vmaf_file} {END}")
 
     return vmaf_dict
 
@@ -554,7 +559,7 @@ def run_quality(test_file, options, debug):
             return failed
 
         if results.get("sourcefile") is None:
-            print(f"ERROR, bad source, {test_file}, probably not an Encapp file")
+            print(f"{RED} ERROR, bad source, {test_file}, probably not an Encapp file {END}")
             failed["error"] = "Not an encapp file"
             return failed
 
@@ -1768,8 +1773,11 @@ def main(argv):
     if "warning" in dfs.columns:
         warn = dfs.loc[dfs["warning"] != "none"]
     summary = "\n***********************\n"
-    summary += f"Succesfully parsed :{len(success)}\n"
-    summary += f"number of warnings:{len(warn)}\n"
+    if len(success) > 0:
+        summary += f"{GREEN}Succesfully parsed: {len(success)}{END}\n"
+    else:
+        summary += f"{RED}Succesfully parsed: {len(success)}{END}\n"
+    summary += f"number of warnings: {len(warn)}\n"
     summary += f"Failed: {len(failed)}\n\n\n"
 
     print(summary)
