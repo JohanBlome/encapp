@@ -50,6 +50,7 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
+    private boolean mIsImage = false;
     private int START_STOP_EXTRA = 0;
     private PowerSnapshot mStartPower;
     private PowerSnapshot mEndPower;
@@ -316,6 +317,8 @@ public class Statistics {
 
     public void setDecoderIsHardwareAccelerated(boolean accelerated) { mIsDecoderHw = accelerated; }
 
+    public void setIsImage(boolean isImage) { mIsImage = isImage; }
+
     private JSONObject getSettingsFromMediaFormat(MediaFormat mediaFormat) {
         // Log.d(TAG, "mediaFormat: " + mediaFormat);
         JSONObject json = new JSONObject();
@@ -429,7 +432,8 @@ public class Statistics {
             Log.d(TAG, "log app version: " + mAppVersion);
             json.put("encapp_version", mAppVersion);
             json.put("proctime", getProcessingTime());
-            json.put("framecount", getEncodedFrameCount());
+            // For image encoding, always report framecount as 1 for easier analysis
+            json.put("framecount", mIsImage ? 1 : getEncodedFrameCount());
             json.put("encodedfile", mEncodedfile);
             String[] tmp = mTest.getInput().getFilepath().split("/");
             json.put("sourcefile", tmp[tmp.length - 1]);
