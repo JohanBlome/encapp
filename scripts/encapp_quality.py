@@ -121,10 +121,15 @@ def calc_stats(pdata, options, label, print_text=False):
         bmax = np.max(bframes["size"])
         bmin = np.min(bframes["size"])
 
-    mean_ratio = imean / (pmean + bmean) / 2
-    size_ratio = np.sum(iframes["size"]) / (
-        np.sum(pframes["size"]) + np.sum(bframes["size"])
-    )
+    mean_ratio = 1
+    if pmean + bmean > 0:
+        mean_ratio = imean / (pmean + bmean) / 2
+    size_ratio = 1
+
+    if np.sum(pframes["size"]) + np.sum(bframes["size"] > 0):
+        size_ratio = np.sum(iframes["size"]) / (
+            np.sum(pframes["size"]) + np.sum(bframes["size"])
+        )
 
     if options.get("info", False):
         print(f"ime,imx,imi = {imean}, {imax}, {imin}")
