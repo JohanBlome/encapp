@@ -1552,6 +1552,7 @@ def update_codec_test(
         "ignore_power_status",
         "internal_muxer",
         "internal_demuxer",
+        "expand_all",
     )
 
     for k1 in replace:
@@ -3148,6 +3149,10 @@ def main(argv):
                 "device_workdir"
             ):
                 check_device_workdir = False
+            if test.HasField("test_setup") and test.test_setup.HasField(
+                "expand_all"
+            ):
+                EXPAND_ALL = test.test_setup.expand_all
 
     if options.func == "run":
         # Make sure we are writing to a good place

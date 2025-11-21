@@ -202,6 +202,17 @@ struct TestSetup: Sendable {
   /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
   mutating func clearUiholdSec() {self._uiholdSec = nil}
 
+  /// Use internal Java muxer instead of Android MediaMuxer
+  /// Note: HEIC output always uses internal muxer (MediaMuxer doesn't support HEIC)
+  var internalMuxer: Bool {
+    get {return _internalMuxer ?? false}
+    set {_internalMuxer = newValue}
+  }
+  /// Returns true if `internalMuxer` has been explicitly set.
+  var hasInternalMuxer: Bool {return self._internalMuxer != nil}
+  /// Clears the value of `internalMuxer`. Subsequent reads from it will return its default value.
+  mutating func clearInternalMuxer() {self._internalMuxer = nil}
+
   var internalDemuxer: Bool {
     get {return _internalDemuxer ?? false}
     set {_internalDemuxer = newValue}
@@ -227,6 +238,18 @@ struct TestSetup: Sendable {
   /// The id can be anything and if matching the value will be expanded.
   var proxyVal: [ProxyVal] = []
 
+  /// Same as the cli option to expand all fields in parameters
+  /// This is not default since we may end up in a situatin were settings may clash
+  /// with some other intent
+  var expandAll: Bool {
+    get {return _expandAll ?? false}
+    set {_expandAll = newValue}
+  }
+  /// Returns true if `expandAll` has been explicitly set.
+  var hasExpandAll: Bool {return self._expandAll != nil}
+  /// Clears the value of `expandAll`. Subsequent reads from it will return its default value.
+  mutating func clearExpandAll() {self._expandAll = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -242,7 +265,9 @@ struct TestSetup: Sendable {
   fileprivate var _firstFrameFastRead: Bool? = nil
   fileprivate var _ignorePowerStatus: Bool? = nil
   fileprivate var _uiholdSec: Int32? = nil
+  fileprivate var _internalMuxer: Bool? = nil
   fileprivate var _internalDemuxer: Bool? = nil
+  fileprivate var _expandAll: Bool? = nil
 }
 
 struct Common: Sendable {
@@ -1055,7 +1080,7 @@ extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
 
 extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSetup"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1076,6 +1101,8 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 11: try { try decoder.decodeSingularInt32Field(value: &self._uiholdSec) }()
       case 12: try { try decoder.decodeSingularBoolField(value: &self._internalDemuxer) }()
       case 13: try { try decoder.decodeRepeatedMessageField(value: &self.proxyVal) }()
+      case 14: try { try decoder.decodeSingularBoolField(value: &self._internalMuxer) }()
+      case 15: try { try decoder.decodeSingularBoolField(value: &self._expandAll) }()
       default: break
       }
     }
@@ -1125,6 +1152,12 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if !self.proxyVal.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.proxyVal, fieldNumber: 13)
     }
+    try { if let v = self._internalMuxer {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
+    } }()
+    try { if let v = self._expandAll {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1140,8 +1173,10 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
     if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
     if lhs._uiholdSec != rhs._uiholdSec {return false}
+    if lhs._internalMuxer != rhs._internalMuxer {return false}
     if lhs._internalDemuxer != rhs._internalDemuxer {return false}
     if lhs.proxyVal != rhs.proxyVal {return false}
+    if lhs._expandAll != rhs._expandAll {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
