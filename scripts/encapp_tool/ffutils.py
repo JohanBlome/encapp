@@ -56,12 +56,15 @@ def ffprobe_parse_output(stdout):
                         else:
                             value = float(value)
                     except:
-                        value = -1
+                        value = 0
                 elif key == "width" or key == "height":
                     value = int(value)
                 elif key == "duration":
-                    value = float(value)
-
+                    try:
+                        value = float(value)
+                    except ValueError as ex:
+                        print(f"Warning! {ex}, {key=} - {value=}")
+                        value = -1
                 key = FFPROBE_FIELDS[key]
                 videofile_config[key] = value
             except Exception as ex:

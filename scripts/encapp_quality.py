@@ -796,6 +796,12 @@ def run_quality(test_file, options, debug):
 
         tmp_ref = None
         tmp_dist = None
+        duration_s = ""
+        if float(duration) > 0:
+            duration_s = "{duration_s}"
+        elif int(duration) == -1:
+            # Assume this is image comparison
+            duration_s = "-vframes 1"
         if options.get("ignore_timing"):
             # It seems that even wih same framerate we can get into trouble so always use raw.
             # transcode to raw intermidiant file
@@ -816,9 +822,9 @@ def run_quality(test_file, options, debug):
         if tmp_dist is not None:
             pix_fmt = "yuv420p"
             # create them
-            shell_cmd = f"{FFMPEG_SILENT} -i {encodedfile} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {tmp_dist} -y"
+            shell_cmd = f"{FFMPEG_SILENT} -i {encodedfile} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_dist} -y"
             ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
-            shell_cmd = f"{FFMPEG_SILENT} {ref_part} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {tmp_ref} -y"
+            shell_cmd = f"{FFMPEG_SILENT} {ref_part} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_ref} -y"
             ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
             dist_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} -r 30 -i {tmp_dist}"
             ref_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} -r 30 -i {tmp_ref}"
@@ -931,7 +937,7 @@ def run_quality(test_file, options, debug):
                 # <distorted_video> <reference_video>
                 # https://jina-liu.medium.com/a-practical-guide-for-vmaf-481b4d420d9c
                 shell_cmd = (
-                    f"{FFMPEG_SILENT} {dist_part} {ref_part} -t {duration} "
+                    f"{FFMPEG_SILENT} {dist_part} {ref_part} {duration_s} "
                     "-filter_complex "
                     f'"{filter_cmd}{timefilter}libvmaf=log_path={vmaf_file_}:'
                     "n_threads=16:log_fmt=json"
@@ -998,7 +1004,7 @@ def run_quality(test_file, options, debug):
 
         if recalc or not os.path.exists(ssim_file):
             shell_cmd = (
-                f"ffmpeg {dist_part} {ref_part} -t {duration} "
+                f"ffmpeg {dist_part} {ref_part} {duration_s} "
                 "-filter_complex "
                 f'"{filter_cmd}ssim=stats_file={ssim_file}.all" '
                 f"-f null - 2>&1 | grep SSIM > {ssim_file}"
@@ -1009,7 +1015,7 @@ def run_quality(test_file, options, debug):
 
         if recalc or not os.path.exists(psnr_file):
             shell_cmd = (
-                f"ffmpeg {dist_part} {ref_part} -t {duration} "
+                f"ffmpeg {dist_part} {ref_part} {duration_s} "
                 "-filter_complex "
                 f'"{filter_cmd}psnr=stats_file={psnr_file}.all" '
                 f"-f null - 2>&1 | grep PSNR > {psnr_file}"
@@ -1026,7 +1032,7 @@ def run_quality(test_file, options, debug):
                 suffix=".y4m", prefix="encapp.jod."
             ) as y4mfile:
                 y4m = y4mfile.name
-                shell_cmd = f"ffmpeg -y {ref_part} -t {duration} -pix_fmt yuv420p {y4m}"
+                shell_cmd = f"ffmpeg -y {ref_part} {duration_s} -pix_fmt yuv420p {y4m}"
                 encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 shell_cmd = (
                     f"cvvdp --test {distorted} --ref {y4m} "
@@ -1056,16 +1062,13 @@ def run_quality(test_file, options, debug):
             and QPEXTRACT_AVAILABLE
             and video_info["codec-name"].lower() == "hevc"
         ):
-            # this is for really short files (single i-frames a.k.a heic)
-            if float(duration) <= 0:
-                duration = 1
             # Need a .265 (and also on hevc)
             with tempfile.NamedTemporaryFile(
                 suffix=".265", prefix="encapp.qp."
             ) as mediafile:
                 # We must use the encoded file (duh!)
                 media = mediafile.name
-                shell_cmd = f"ffmpeg -y -i {encodedfile} -t {duration} -vcodec copy -bsf hevc_mp4toannexb {media}"
+                shell_cmd = f"ffmpeg -y -i {encodedfile} {duration_s} -vcodec copy -bsf hevc_mp4toannexb {media}"
                 ret, std, stderr = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 if not ret:
                     print("f{ret}")
