@@ -631,6 +631,10 @@ def run_quality(test_file, options, debug):
         failed["error"] = f"ffprobe failed to parse: {encodedfile}"
         return failed
 
+    is_image = False
+    if "image" in video_info:
+        is_image = video_info["image"]
+
     recalc = options.get("recalc", None)
     test = results.get("test")
     if isinstance(test, str):
@@ -813,10 +817,10 @@ def run_quality(test_file, options, debug):
             tmp_ref = f".ref_{time.time()}.raw"
             tmp_dist = f".dist_{time.time()}.raw"
         if raw:
-            ref_part = (
-                f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} "
-                f" -r {input_framerate} -i {reference_pathname} "
-            )
+            ref_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} "
+            if input_framerate > 0:
+                ref_part += f" -r {input_framerate}"
+            ref_part += f" -i {reference_pathname} "
         else:
             ref_part = f"-i {reference_pathname} "
 
@@ -826,11 +830,25 @@ def run_quality(test_file, options, debug):
         dist_part = f"-i {encodedfile} "
         if tmp_dist is not None:
             pix_fmt = "yuv420p"
+            _tmp = encodedfile
             # create them
-            shell_cmd = f"{FFMPEG_SILENT} -i {encodedfile} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_dist} -y"
+            if is_image:
+                _tmp = '.'.join(encodedfile.split('.')[:-1]) + ".y4m"
+                shell_cmd = f"heif-dec {encodedfile} -s {_tmp}"
+                ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+                if not ret or not os.path.exists(_tmp):
+                    print(f"ERROR: failed to run heif-dec: {shell_cmd=}, is it on path?")
+                    # TODO: Return?
+            shell_cmd = f"{FFMPEG_SILENT} -i {_tmp} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_dist} -y"
             ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            if not ret:
+                print(f"ERROR: failed to generate the distorted yuv: {shell_cmd=}")
+                # TODO: Return?
             shell_cmd = f"{FFMPEG_SILENT} {ref_part} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_ref} -y"
             ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
+            if not ret:
+                print(f"failed to generate the reference yuv: {shell_cmd=}")
+                # TODO: Return?
             dist_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} -r 30 -i {tmp_dist}"
             ref_part = f"-f rawvideo -pix_fmt {pix_fmt} -s {input_resolution} -r 30 -i {tmp_ref}"
             distorted = tmp_dist

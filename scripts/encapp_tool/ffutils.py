@@ -5,6 +5,7 @@
 import os
 
 import encapp_tool
+import re
 
 RAW_EXTENSION_LIST = (".yuv", ".rgb", ".rgba", ".raw")
 FFPROBE_FIELDS = {
@@ -92,9 +93,20 @@ def get_video_info(videofile, debug=0):
         return {}
     # check using ffprobe
     cmd = f"ffprobe -v quiet -select_streams v -show_streams {videofile}"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret, f"error: failed to analyze file {videofile}: {stderr}"
     videofile_config = ffprobe_parse_output(stdout)
+    # This totally falls apart for heif images where the tiles will say this is low resoltuion...
+    if "Main Still Picture" in stdout:
+        # Still image
+        cmd = f"ffprobe {videofile}"
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        m = re.search("([0-9]{2,})x([0-9]{2,})", stderr)
+        if m:
+            videofile_config["width"] = m.group(1)
+            videofile_config["height"] = m.group(2)
+        videofile_config["image"] = True
+
     videofile_config["filepath"] = videofile
     return videofile_config
 
