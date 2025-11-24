@@ -1281,19 +1281,15 @@ def run_quality(test_file, options, debug):
             framecount = len(results.get("frames"))
             codec = test.get("configure").get("codec")
             bitrate = test.get("configure").get("bitrate")
+            if not bitrate:
+                bitrate = 0
             meanbitrate = results.get("meanbitrate")
             iframeinterval = test.get("configure").get("iFrameInterval", -1)
             description = test.get("common").get("description")
             id = test.get("common").get("id")
             filepath = test.get("input").get("filepath")
             bitratemode = test.get("configure").get("bitrateMode")
-            if bitratemode == "cq":
-                # look for a quality parameter
-                parameters = test.get("configure").get("parameter")
-                for par in parameters:
-                    if par.get("key") == "quality":
-                        quality = int(par.get("value"))
-                        continue
+            quality = test.get("configure").get("quality")
         else:
             framerate = video_info["framerate"]
             resolution = f"{video_info['width']}x{video_info['height']}"
