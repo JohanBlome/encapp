@@ -61,7 +61,7 @@ KEEP_QUALITY_FILES_ENV = os.environ.get("ENCAPP_KEEP_QUALITY_FILES", False) in [
 # until proven not be around
 CVVDP_AVAILABLE = True
 QPEXTRACT_AVAILABLE = True
-
+QUIET = False
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -1614,6 +1614,9 @@ def get_options(argv):
         parser.print_help()
         sys.exit()
 
+    global QUIET
+    QUIET = options.quiet
+
     if options.media_path is not None:
         # make sure media_path holds a valid directory
         assert os.path.isdir(
@@ -1638,7 +1641,7 @@ def calculate_quality(tests, source_path, output, quiet, debug):
     # run all the tests
     current = 1
     total = len(tests)
-    if not quiet:
+    if not QUIET and not quiet:
         print(f"Total number of tests: {total}")
     df = None
     start = time.time()
@@ -1663,7 +1666,7 @@ def calculate_quality(tests, source_path, output, quiet, debug):
         time_left = round(time_per_test * (total - current))
         time_left_m = int(time_left / 60)
         time_left_s = int(time_left) % 60
-        if not quiet:
+        if not QUIET or not quiet:
             print(
                 f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
             )
@@ -1755,9 +1758,10 @@ def main(argv):
         time_left = round(time_per_test * (total - current))
         time_left_m = int(time_left / 60)
         time_left_s = int(time_left) % 60
-        print(
-            f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
-        )
+        if not QUIET:
+            print(
+                f"Running {current}/{total}, Running for: {round(run_for)} sec, estimated time left {time_left_m}:{time_left_s:02} m:s"
+            )
         current += 1
         if quality_dict is None:
             continue

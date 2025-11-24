@@ -45,7 +45,7 @@ import tests_pb2 as tests_definitions  # noqa: E402
 RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
-
+QUIET=False
 EXPAND_ALL = False
 
 QUALITY_PROCESSES = []
@@ -389,9 +389,10 @@ def parse_logcat(logcat_contents, local_workdir):
         if line_match:
             if line_match.group("result").lower() == "ok":
                 # experiment went well
-                print(
-                    f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
-                )
+                if not QUIET:
+                    print(
+                        f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
+                    )
                 result_ok = True
             elif line_match.group("result") == "error":
                 if "error:" not in line_match.group("rem"):
@@ -2746,6 +2747,8 @@ def get_options(argv: list) -> argparse.Namespace:
 
     global DEBUG
     DEBUG = options.debug > 0
+    global QUIET
+    QUIET = options.quiet
     return options
 
 
