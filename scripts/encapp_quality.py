@@ -1448,9 +1448,7 @@ def get_options(argv):
     )
     parser.add_argument(
         "--quiet",
-        action="store_const",
-        dest="debug",
-        const=-1,
+        action="store_true",
         help="Zero verbosity",
     )
     parser.add_argument("test", nargs="*", help="Test result in JSON format.")
