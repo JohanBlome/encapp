@@ -24,6 +24,7 @@ class Statistics {
     var decodedFrames: Array<FrameInfo>
     var frameLock = NSLock()
     var props: Array<JsonProperties>
+    var timeScale_ = 1 as Int
 
     init(description: String, test: Test) {
         self.description = description
@@ -112,14 +113,31 @@ class Statistics {
         return frameInfo
     }
 
-    func getAverageBitrate(frames: Array<FrameInfo>)->Int {
-        return 0
+    // bps
+    func getAverageBitrate()->Int64 {
+        let frames = encodedFrames
+        if frames.count == 0 {
+            return 0
+        }
+        var sum: Int64 = 0
+        for info in frames {
+            sum += Int64(info.size!)
+        }
+        let bps0 = frames[0].pts
+        let bpsN = frames[frames.count-1].pts
+        let duration: Int64 = (bpsN - bps0)/Int64(timeScale_)
+        log.debug("duration: \(duration)")
+        return sum/duration
     }
 
     func getProcessingTime() -> Int64 {
         return (stopTime! - startTime!);
     }
 
+    func setTimescale(timeScale: Int) {
+        timeScale_ = timeScale
+    }
+    
     func setEncoderName(encoderName: String) {
         self.encoderName = encoderName
     }
@@ -201,7 +219,7 @@ class Statistics {
                               test: jtest,
                               environment: environment,
                               codec: encoderName,
-                              meanbitrate: getAverageBitrate(frames: encodedFrames),
+                              meanbitrate: Int(getAverageBitrate()),
                               date:  DateFormatter().string(from: date!),
                               encapp_version: appVersion,
                               proctime: getProcessingTime(),

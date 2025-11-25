@@ -74,10 +74,11 @@ struct FileIO {
             var text = ""
             do {
                 text = try String(contentsOf: fileURL, encoding: .utf8)
+                log.info("\(text)")
                 tests = try TestSuite.init(textFormatString: text)
             }
             catch {/* error handling here */
-                log.error("Failed to read data: \(text)")
+                log.error("Failed to read data: \(text), missmatch in protobuf?")
             }
 
         }
@@ -159,5 +160,23 @@ struct FileIO {
             }
         }
         return false
+    }
+    
+    func listFiles() {
+        let fileManager = FileManager.default
+        if let dir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            do {
+                let directoryContents = try fileManager.contentsOfDirectory(
+                    at: dir,
+                    includingPropertiesForKeys: nil
+                    , options: .skipsHiddenFiles)
+                
+                for d in directoryContents {
+                    log.debug(d.absoluteString)
+                }
+            } catch {
+                log.error("Failed to read directory contents")
+            }
+        }
     }
 }

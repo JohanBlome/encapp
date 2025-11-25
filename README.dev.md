@@ -310,3 +310,14 @@ Run with verbose output:
 ```bash
 $ python3 -m pytest -v scripts/tests/
 ```
+## 5. native modules
+
+### 5.1 libX264
+
+#### 5.1.1 ios:
+export CC="xcrun --sdk iphoneos clang"                                            
+export CFLAGS="-arch arm64 -mios-version-min=11.0 -isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
+export LDFLAGS="-arch arm64 -mios-version-min=11.0 -isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
+./configure --host=aarch64-apple-darwin --enable-static --enable-pic --disable-cli
+make -jX
+
