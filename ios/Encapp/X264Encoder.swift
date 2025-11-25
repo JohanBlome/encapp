@@ -58,7 +58,7 @@ class X264Encoder: Encoder{
         return 0
     }
     
-    
+    //
     override func Encode() throws  -> String {
         log.info("Starting x264 encoder")
         statistics = Statistics(description: "raw encoder", test: definition)
@@ -86,6 +86,7 @@ class X264Encoder: Encoder{
             inputFrameDurationUsec = calculateFrameTimingUsec(frameRate: inputFrameRate);
             inputFrameDurationMs = Float(frameDurationUsec) / 1000.0
             scale = 1000_000 //should be 90000?
+            statistics.setTimescale(timeScale: scale)
             frameDurationUsec =  calculateFrameTimingUsec(frameRate: outputFrameRate);
             frameDurationMs = Float(frameDurationUsec) / 1000.0
             frameDurationSec = Float(frameDurationUsec) / 1000_000.0
@@ -122,8 +123,28 @@ class X264Encoder: Encoder{
             params.pointee.i_fps_den = 1
             
             // TODO: Bitrate mode is a mess, to bps
-            params.pointee.rc.i_bitrate = Int32(magnitudeToInt(stringValue: definition.configure.bitrate))
+            params.pointee.rc.i_bitrate = Int32(magnitudeToInt(stringValue: definition.configure.bitrate)/1000) //x264 is using kbps
+            log.debug("Bitrate set: \(definition.configure.bitrate) to \(params.pointee.rc.i_bitrate) kbps")
             
+            let bitrate_mode = definition.configure.bitrateMode
+            if bitrate_mode == Configure.BitrateMode.cbr {
+                params.pointee.rc.i_rc_method = X264_RC_ABR
+                params.pointee.rc.i_vbv_max_bitrate = params.pointee.rc.i_bitrate
+                params.pointee.rc.i_vbv_buffer_size = params.pointee.rc.i_vbv_max_bitrate * 2
+            } else if bitrate_mode == Configure.BitrateMode.cq {
+                // map 0-100 to 0-51
+                params.pointee.rc.i_rc_method = X264_RC_CRF
+                params.pointee.rc.i_vbv_max_bitrate = params.pointee.rc.i_bitrate
+                params.pointee.rc.i_vbv_buffer_size = params.pointee.rc.i_vbv_max_bitrate * 2
+                params.pointee.rc.f_rf_constant = Float(definition.configure.quality) / 100.0 * 51.0
+            } else {
+                // vbr or crf in this case
+                params.pointee.rc.i_rc_method = X264_RC_CRF
+                params.pointee.rc.i_vbv_max_bitrate = params.pointee.rc.i_bitrate
+                params.pointee.rc.i_vbv_buffer_size = params.pointee.rc.i_vbv_max_bitrate * 2
+                params.pointee.rc.f_rf_constant = 18
+                params.pointee.rc.f_rf_constant_max = 25
+            }
             // i frame interval is in seconds on Android and in frames here, translate
             params.pointee.i_frame_reference = Int32(frameRate)
             
@@ -133,7 +154,7 @@ class X264Encoder: Encoder{
             params.pointee.i_timebase_den = 1
             params.pointee.i_timebase_num = 1000000
 
-            self.x264Encoder = x264_encoder_open_157(&params.pointee)
+            self.x264Encoder = x264_encoder_open_165(&params.pointee)
             self.x264InputFrame = UnsafeMutablePointer<x264_picture_t>.allocate(capacity: 1)
             self.x264OutputFrame = UnsafeMutablePointer<x264_picture_t>.allocate(capacity: 1)
             x264_picture_init(x264InputFrame)
@@ -229,6 +250,7 @@ class X264Encoder: Encoder{
             x264OutputFrame!.deallocate()
         }
         log.info("Done, leaving encoder, encoded: \(statistics.encodedFrames.count)")
+        log.debug("Average bitrate: \(Float(statistics.getAverageBitrate())) kbps")
         return ""
     }
     
