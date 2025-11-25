@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		CA53D6F729689DB200485E4D /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA53D6F629689DB200485E4D /* Decoder.swift */; };
-		CA707E7F2E97133C00ABC79F /* X264Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA707E7E2E97133C00ABC79F /* X264Encoder.swift */; };
-		CA707E862E9723C900ABC79F /* libx264.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CA707E842E97238C00ABC79F /* libx264.a */; };
 		CA84B4C02ED6264F00D19FBE /* FrameInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB9309293911E8009009B2 /* FrameInfo.swift */; };
 		CA84B4C12ED6264F00D19FBE /* ListProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAAB92F7292D2BD5009009B2 /* ListProperties.swift */; };
 		CA84B4C22ED6264F00D19FBE /* EncappMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE00007293E907400727B6D /* EncappMain.swift */; };
@@ -103,7 +101,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CA707E862E9723C900ABC79F /* libx264.a in Frameworks */,
 				CAAB92F4292D2ADF009009B2 /* SwiftProtobufPluginLibrary in Frameworks */,
 				CAAB92F2292D2ADF009009B2 /* SwiftProtobuf in Frameworks */,
 			);
@@ -119,13 +116,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		CA707E832E97238C00ABC79F /* include */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = include;
-			sourceTree = "<group>";
-		};
 		CA707E852E97238C00ABC79F /* libs */ = {
 			isa = PBXGroup;
 			children = (
@@ -153,7 +143,6 @@
 			isa = PBXGroup;
 			children = (
 				CA707E892E97255A00ABC79F /* ObjC */,
-				CA707E832E97238C00ABC79F /* include */,
 				CA707E852E97238C00ABC79F /* libs */,
 				CAAB92C4292D2ABB009009B2 /* Encapp */,
 				CAAB92C3292D2ABB009009B2 /* Products */,
@@ -386,7 +375,6 @@
 				CAAB931029395655009009B2 /* TestRunner.swift in Sources */,
 				CAAB9307293910D9009009B2 /* Statistics.swift in Sources */,
 				CAAB92F6292D2B89009009B2 /* tests.pb.swift in Sources */,
-				CA707E7F2E97133C00ABC79F /* X264Encoder.swift in Sources */,
 				CAAB9313293A7478009009B2 /* CodecHelper.swift in Sources */,
 				CA53D6F729689DB200485E4D /* Decoder.swift in Sources */,
 				CAAB930D29392CC8009009B2 /* JsonStats.swift in Sources */,
@@ -443,6 +431,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "X264=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/../modules/x264/";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -472,6 +461,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[arch=*]" = X264;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -510,6 +500,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = "X264=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				"HEADER_SEARCH_PATHS[arch=*]" = "$(SRCROOT)/../modules/x264/";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -538,6 +529,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				"SWIFT_ACTIVE_COMPILATION_CONDITIONS[arch=*]" = X264;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

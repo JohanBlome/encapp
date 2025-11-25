@@ -29,7 +29,6 @@ class TestRunner: Thread {
         log.info("Starting threaded test")
         let io = FileIO()
         let testsuite = io.readTestDefinition(inputfile: filename)
-        log.info("Test definition: \(testsuite)")
         
         if testsuite.test.count == 0 {
             log.error("No test, probably faulty path or definition")
@@ -110,7 +109,12 @@ class TestRunner: Thread {
                     // Check the encoder if x264 choose the x264 encoder (duh)
                     let encoder: Encoder
                     if test.configure.codec.contains("x264") {
+                        #if X264
                         encoder = X264Encoder(test: test)
+                        #else
+                        log.error("X264 build is not included in this build")
+                        throw EncappErrors.x264NotAvailable
+                        #endif
                     } else {
                         encoder = Encoder(test: test)
                     }
@@ -119,12 +123,12 @@ class TestRunner: Thread {
                     log.info("\(result)")
                     log.info("Done testing: ")
                 }
-
+                done = true
+                self.completion(self)
             }  catch {
                 log.error("Error running single test")
             }
-            done = true
-            self.completion(self)
+
             sem.signal()
         }
 
