@@ -286,6 +286,7 @@ class Encoder {
 
 
     func sleepUntilNextFrame() {
+        log.debug("*** Sleep until next frame *****")
         let now = timeStampNs() / 1000000
         if lastTimeMs <= 0 {
             lastTimeMs = now

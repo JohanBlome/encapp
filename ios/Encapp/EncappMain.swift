@@ -43,6 +43,7 @@ class EncappMain {
             completion()
         } else if command.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "test" {
             log.info("Running a test suite.")
+
             let io = FileIO()
             io.writeData(filename: runningLockName, data: "Running")
             if CommandLine.arguments.count < 3 {
@@ -55,12 +56,22 @@ class EncappMain {
                 log.error("Non existing test file: \(testToRun)")
                 completion()
             }
+            var overrideSource = ""
+            if CommandLine.arguments.count > 3 {
+                let c2 = CommandLine.arguments[3] as String
+                if c2 == "-i" {
+                    overrideSource = (CommandLine.arguments[4] as String)
+                }
+            }
             log.info("Start testing: '\(testToRun)'")
             overview.updateTestsLog(text: "Starting test: '\(testToRun)'")
-            let runner = TestRunner(filename: testToRun, completion: completion)
+            let runner = TestRunner(filename: testToRun, input: overrideSource, completion: completion)
             runner.start()
         } else if command == "standby" {
            // This is only to keep the screen on while doing slow io
+        } else if command == "files" {
+            let io = FileIO()
+            io.listFiles()
         }
 
     }

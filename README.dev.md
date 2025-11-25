@@ -848,18 +848,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       - name: Set up JDK
         uses: actions/setup-java@v2
         with:
           distribution: 'adopt'
           java-version: '17'
-      
+
       - name: Run dry-run tests
         run: |
           export ANDROID_SERIAL=${{ secrets.DEVICE_SERIAL }}
           ./scripts/release.sh --dry-run
-      
+
       - name: Upload APK
         uses: actions/upload-artifact@v2
         with:
@@ -872,18 +872,18 @@ jobs:
 ```groovy
 pipeline {
     agent any
-    
+
     environment {
         ANDROID_SERIAL = credentials('android-device-serial')
     }
-    
+
     stages {
         stage('Test') {
             steps {
                 sh './scripts/release.sh --dry-run'
             }
         }
-        
+
         stage('Build Release') {
             when {
                 branch 'main'
@@ -893,7 +893,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             archiveArtifacts 'app/releases/*.apk'
@@ -936,3 +936,19 @@ export ANDROID_SERIAL=emulator-5554
 
 - `0` - Success
 - `1` - Error (build failure, test failure, user abort, etc.)
+
+# 6. Native Modules
+
+## 6.1. libX264
+
+### 6.1.1. iOS
+
+Building libX264 for iOS:
+
+```bash
+export CC="xcrun --sdk iphoneos clang"
+export CFLAGS="-arch arm64 -mios-version-min=11.0 -isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
+export LDFLAGS="-arch arm64 -mios-version-min=11.0 -isysroot $(xcrun --sdk iphoneos --show-sdk-path)"
+./configure --host=aarch64-apple-darwin --enable-static --enable-pic --disable-cli
+make -jX
+```
