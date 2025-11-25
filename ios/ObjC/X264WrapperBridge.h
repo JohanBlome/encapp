@@ -17,8 +17,8 @@ void x264_swift_log_callback(void *p_unused, int i_level, const char *psz, va_li
 void x264_set_log_callback(x264_param_t *params);
 
 //
-//x264_t *x264_encoder_open( x264_param_t * );
-x264_t *x264_encoder_open_157(x264_param_t *);
+x264_t *x264_encoder_open( x264_param_t * );
+//x264_t *x264_encoder_open_157(x264_param_t *);
 void    x264_encoder_close( x264_t * );
 int     x264_param_default_preset( x264_param_t *, const char *preset, const char *tune );
 int     x264_encoder_encode( x264_t *, x264_nal_t **pp_nal, int *pi_nal, x264_picture_t *pic_in, x264_picture_t *pic_out );
