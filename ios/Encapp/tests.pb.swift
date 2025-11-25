@@ -46,6 +46,47 @@ enum PixFmt: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+struct ProxyVal: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var id: String {
+    get {return _id ?? String()}
+    set {_id = newValue}
+  }
+  /// Returns true if `id` has been explicitly set.
+  var hasID: Bool {return self._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  mutating func clearID() {self._id = nil}
+
+  var type: DataValueType {
+    get {return _type ?? .stringType}
+    set {_type = newValue}
+  }
+  /// Returns true if `type` has been explicitly set.
+  var hasType: Bool {return self._type != nil}
+  /// Clears the value of `type`. Subsequent reads from it will return its default value.
+  mutating func clearType() {self._type = nil}
+
+  var value: String {
+    get {return _value ?? String()}
+    set {_value = newValue}
+  }
+  /// Returns true if `value` has been explicitly set.
+  var hasValue: Bool {return self._value != nil}
+  /// Clears the value of `value`. Subsequent reads from it will return its default value.
+  mutating func clearValue() {self._value = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _id: String? = nil
+  fileprivate var _type: DataValueType? = nil
+  fileprivate var _value: String? = nil
+}
+
 struct TestSetup: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -161,6 +202,54 @@ struct TestSetup: Sendable {
   /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
   mutating func clearUiholdSec() {self._uiholdSec = nil}
 
+  /// Use internal Java muxer instead of Android MediaMuxer
+  /// Note: HEIC output always uses internal muxer (MediaMuxer doesn't support HEIC)
+  var internalMuxer: Bool {
+    get {return _internalMuxer ?? false}
+    set {_internalMuxer = newValue}
+  }
+  /// Returns true if `internalMuxer` has been explicitly set.
+  var hasInternalMuxer: Bool {return self._internalMuxer != nil}
+  /// Clears the value of `internalMuxer`. Subsequent reads from it will return its default value.
+  mutating func clearInternalMuxer() {self._internalMuxer = nil}
+
+  var internalDemuxer: Bool {
+    get {return _internalDemuxer ?? false}
+    set {_internalDemuxer = newValue}
+  }
+  /// Returns true if `internalDemuxer` has been explicitly set.
+  var hasInternalDemuxer: Bool {return self._internalDemuxer != nil}
+  /// Clears the value of `internalDemuxer`. Subsequent reads from it will return its default value.
+  mutating func clearInternalDemuxer() {self._internalDemuxer = nil}
+
+  /// For string values we have had an expansion available e.g. 1-3-1,5 
+  /// 1. For non string value this has not been possible
+  /// 2. The matrix expansion of parameters is not always desired. There are situation where some
+  ///    values needs to have synchronized settings
+  /// In this context the parameter is a way to expans use cases in a different way
+  /// E.g.
+  /// proxy_val {
+  ///    id: "-100"
+  ///    type: intType
+  ///    value: "1,2"
+  ///}
+  ///
+  ///config.quality: "-100"
+  /// The id can be anything and if matching the value will be expanded.
+  var proxyVal: [ProxyVal] = []
+
+  /// Same as the cli option to expand all fields in parameters
+  /// This is not default since we may end up in a situatin were settings may clash
+  /// with some other intent
+  var expandAll: Bool {
+    get {return _expandAll ?? false}
+    set {_expandAll = newValue}
+  }
+  /// Returns true if `expandAll` has been explicitly set.
+  var hasExpandAll: Bool {return self._expandAll != nil}
+  /// Clears the value of `expandAll`. Subsequent reads from it will return its default value.
+  mutating func clearExpandAll() {self._expandAll = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -176,6 +265,9 @@ struct TestSetup: Sendable {
   fileprivate var _firstFrameFastRead: Bool? = nil
   fileprivate var _ignorePowerStatus: Bool? = nil
   fileprivate var _uiholdSec: Int32? = nil
+  fileprivate var _internalMuxer: Bool? = nil
+  fileprivate var _internalDemuxer: Bool? = nil
+  fileprivate var _expandAll: Bool? = nil
 }
 
 struct Common: Sendable {
@@ -942,9 +1034,53 @@ extension PixFmt: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0yuv420p\0\u{1}yvu420p\0\u{1}nv12\0\u{1}nv21\0\u{1}rgba\0\u{2}2p010le\0")
 }
 
+extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "ProxyVal"
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}type\0\u{1}value\0")
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self._id) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._value) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._id {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._type {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._value {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: ProxyVal, rhs: ProxyVal) -> Bool {
+    if lhs._id != rhs._id {return false}
+    if lhs._type != rhs._type {return false}
+    if lhs._value != rhs._value {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSetup"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -963,6 +1099,10 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self._ignorePowerStatus) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self._uiholdSec) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self._internalDemuxer) }()
+      case 13: try { try decoder.decodeRepeatedMessageField(value: &self.proxyVal) }()
+      case 14: try { try decoder.decodeSingularBoolField(value: &self._internalMuxer) }()
+      case 15: try { try decoder.decodeSingularBoolField(value: &self._expandAll) }()
       default: break
       }
     }
@@ -1006,6 +1146,18 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     try { if let v = self._uiholdSec {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 11)
     } }()
+    try { if let v = self._internalDemuxer {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
+    } }()
+    if !self.proxyVal.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.proxyVal, fieldNumber: 13)
+    }
+    try { if let v = self._internalMuxer {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
+    } }()
+    try { if let v = self._expandAll {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1021,6 +1173,10 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
     if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
     if lhs._uiholdSec != rhs._uiholdSec {return false}
+    if lhs._internalMuxer != rhs._internalMuxer {return false}
+    if lhs._internalDemuxer != rhs._internalDemuxer {return false}
+    if lhs.proxyVal != rhs.proxyVal {return false}
+    if lhs._expandAll != rhs._expandAll {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

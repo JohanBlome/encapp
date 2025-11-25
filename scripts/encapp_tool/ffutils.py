@@ -5,6 +5,7 @@
 import os
 
 import encapp_tool
+import re
 
 RAW_EXTENSION_LIST = (".yuv", ".rgb", ".rgba", ".raw")
 FFPROBE_FIELDS = {
@@ -49,16 +50,22 @@ def ffprobe_parse_output(stdout):
                 if key == "r_frame_rate":
                 '''
                 if key == "avg_frame_rate":
-                    split = value.split("/")
-                    if len(split) > 1:
-                        value = round(float(split[0]) / float(split[1]), 2)
-                    else:
-                        value = float(value)
+                    try:
+                        split = value.split("/")
+                        if len(split) > 1:
+                            value = round(float(split[0]) / float(split[1]), 2)
+                        else:
+                            value = float(value)
+                    except:
+                        value = 0
                 elif key == "width" or key == "height":
                     value = int(value)
                 elif key == "duration":
-                    value = float(value)
-
+                    try:
+                        value = float(value)
+                    except ValueError as ex:
+                        print(f"Warning! {ex}, {key=} - {value=}")
+                        value = -1
                 key = FFPROBE_FIELDS[key]
                 videofile_config[key] = value
             except Exception as ex:
@@ -86,9 +93,20 @@ def get_video_info(videofile, debug=0):
         return {}
     # check using ffprobe
     cmd = f"ffprobe -v quiet -select_streams v -show_streams {videofile}"
-    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret, f"error: failed to analyze file {videofile}: {stderr}"
     videofile_config = ffprobe_parse_output(stdout)
+    # This totally falls apart for heif images where the tiles will say this is low resoltuion...
+    if "Main Still Picture" in stdout:
+        # Still image
+        cmd = f"ffprobe {videofile}"
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+        m = re.search("([0-9]{2,})x([0-9]{2,})", stderr)
+        if m:
+            videofile_config["width"] = m.group(1)
+            videofile_config["height"] = m.group(2)
+        videofile_config["image"] = True
+
     videofile_config["filepath"] = videofile
     return videofile_config
 

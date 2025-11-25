@@ -14,14 +14,14 @@ test:
 
 
 verify: /tmp/akiyo_qcif.y4m
-	./scripts/encapp_verify.py -i /tmp/akiyo_qcif.y4m -ddd
+	./scripts/encapp_verify.py -i /tmp/akiyo_qcif.y4m 
 
 
 build:
 	./gradlew build
 
 install:
-	./gradlew installDebug
+	./gradlew installDefaultDebug
 
 clean:
 	./gradlew clean

@@ -23,6 +23,7 @@ def test_install():
             ],
             shell=True,
             check=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -40,7 +41,7 @@ def test_uninstall():
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )

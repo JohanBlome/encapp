@@ -20,6 +20,7 @@ import encapp_search
 import encapp_tool
 import encapp_tool.adb_cmds
 import google.protobuf.json_format
+import multiprocessing
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -35,17 +36,23 @@ import tests_pb2 as tests_definitions  # noqa: E402
 DEFAULT_TESTS = [
     "bitrate_buffer.pbtxt",
     "bitrate_surface.pbtxt",
-    "bitrate_transcoder_show.pbtxt",
+    "bitrate_surface_transcoder_show.pbtxt",
     "dynamic_bitrate.pbtxt",
     "dynamic_framerate.pbtxt",
     "dynamic_idr.pbtxt",
     "tl2.pbtxt",
-    "ltr-2ref.pbtxt",
     "camera.pbtxt",
     "camera_parallel.pbtxt",
 ]
-TESTS_DIR = "tests"
 
+# TODO: sort parameters for difference vendors
+# Add tests with spcific vendor extensions. 
+# Currently hardcoded for Qualcomm
+VENDOR_TESTS = [
+    "ltr-2ref.pbtxt",
+]
+
+TESTS_DIR = "tests"
 
 class TestResult:
     name = None
@@ -75,7 +82,6 @@ class MeanBitrateResult(TestResult):
         result_string = TestResult.printResult(self)
 
         data = self.data.sort_values(by=["bitrate"])
-        print(f"data = {data}")
         test_names = np.unique(data["test"])
         for name in test_names:
             result_string += f"\n\n----- test case: [{self.name}] -----"
@@ -132,7 +138,6 @@ def get_nal_data(videopath, codec):
                 encapp_tool.adb_cmds.run_cmd(cmd, True)
                 cmd = f"h265nal {filename}.{ending} > {filename}.{ending}.nal"
 
-            print(f"cmd = {cmd}")
             encapp_tool.adb_cmds.run_cmd(cmd)
         return f"{filename}.{ending}.nal"
 
@@ -185,7 +190,6 @@ def check_long_term_ref(resultpath):
 
             runtime_setting = test_def.runtime
             dynamic_settings = parse_dynamic_settings(runtime_setting)["params"]
-            print(f"{dynamic_settings}")
             if dynamic_settings is not None and len(dynamic_settings) > 0:
                 mark_frame = dynamic_settings["vendor.qti-ext-enc-ltr.mark-frame"]
                 use_frame = dynamic_settings["vendor.qti-ext-enc-ltr.use-frame"]
@@ -396,7 +400,7 @@ def check_idr_placement(resultpath):
                 print(f"Error: test {testname} failed")
                 continue
             # codec = encoder_settings.codec
-            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             frames = result.get("frames")
 
             iframes = list(filter(lambda x: (x["iframe"] == 1), frames))
@@ -465,7 +469,6 @@ def parse_dynamic_settings(settings):
     syncs = []
     if settings is None:
         return {}
-    print(f"{settings}")
     for param in settings.parameter:
         # TODO: fix this
         # print(f'{param}')
@@ -484,7 +487,7 @@ def parse_dynamic_settings(settings):
         else:
             serie[param.framenum] = param.value
     for param in settings.video_bitrate:
-        bitrates[param.framenum] = encapp.convert_to_bps(param.bitrate)
+        bitrates[param.framenum] = encapp.parse_magnitude(param.bitrate)
     for param in settings.dynamic_framerate:
         framerates[param.framenum] = param.framerate
     for param in settings.request_sync:
@@ -511,9 +514,6 @@ def run_bitrate_verification(
     original_bitrate=None,
     is_fps=False,
 ):
-    print(
-        f"run_bitrate_verification: of: {original_fps}, ob: {original_bitrate}, fps? {is_fps}"
-    )
     previous_limit = 0
     dyn_data = []
     target_bitrate = original_bitrate
@@ -558,7 +558,7 @@ def run_bitrate_verification(
         )
         if limit in dynamic_video_bitrate:
             if is_fps == 0:  # looking at bitrates
-                target_bitrate = encapp.convert_to_bps(dynamic_video_bitrate[limit])
+                target_bitrate = encapp.parse_magnitude(dynamic_video_bitrate[limit])
             else:
                 fps = dynamic_video_bitrate[limit]
 
@@ -596,7 +596,7 @@ def check_mean_bitrate_deviation(resultpath):
                 continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             fps = encoder_settings.framerate
             if fps == 0:
                 if test_.input.framerate > 0:
@@ -617,7 +617,6 @@ def check_mean_bitrate_deviation(resultpath):
             calc_result = None
             failed = False
             if dynamic_video_bitrate is not None and len(dynamic_video_bitrate) > 0:
-                print("Check dynamic bitrate")
                 calc_result = run_bitrate_verification(
                     testname,
                     encoder_settings,
@@ -707,7 +706,7 @@ def check_framerate_deviation(resultpath):
                 continue
             height = encoder_mediaformat["height"]
             codec = encoder_settings.codec
-            # bitrate = encapp.convert_to_bps(encoder_settings.bitrate)
+            # bitrate = encapp.parse_magnitude(encoder_settings.bitrate)
             # encoder_media_format = result.get("encoder_media_format")
             fps = encoder_settings.framerate
             if fps == 0:
@@ -733,8 +732,6 @@ def check_framerate_deviation(resultpath):
                 status = "passed"
                 limit_too_high = False
                 target_rate = fps
-                print(f"frames: {len(frames)}")
-                print(f"limits: {limits}")
                 for limit in limits:
                     filtered = list(
                         filter(
@@ -909,25 +906,68 @@ def get_options(argv):
         help="Set acceptance lmit on bitrate in percentage",
         default=10,
     )
+    parser.add_argument(
+        "--serial",
+        default=None,
+    )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        default=0,
+        action="count",
+    )
+    parser.add_argument(
+        "--vendor",
+        default=None,
+    )
+    parser.add_argument(
+        "--device-workdir",
+        dest="device_workdir",
+        default=None
+    )
 
     options = parser.parse_args(argv[1:])
     return options
 
+def _wrapper(queue, func, *args, **kwargs):
+    queue.put(func(*args, **kwargs))
+
+# Allow 5 minutes before throwing in the towel.
+def call_with_timeout(func, args=(), kwarg={}, timeout=300):
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(target=_wrapper, args=(queue, func, *args), kwargs=kwarg)
+    process.start()
+    process.join(timeout)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        print("ERROR: test timed out")
+        serial = args(2)
+        debug = args(1)["debug"]
+        encapp_tool.app_utils.force_stop(serial, debug)
+        return False,{}
+    else:
+        return queue.get()
 
 def main(argv):
     options = get_options(argv)
-    options = encapp.process_options(options)
     result_string = ""
     model = None
     serial = None
 
+    # get model and serial number
+    model, serial = encapp_tool.adb_cmds.get_device_info(
+        options.serial, options.debug
+    )
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
-
+    if not options.device_workdir:
+        options.device_workdir = encapp.get_workdir(serial)
     if options.debug > 0:
         print(options)
 
+    options = encapp.process_options(options)
     global ERROR_LIMIT
     ERROR_LIMIT = int(options.bitrate_limit)
     bitrate_string = ""
@@ -964,6 +1004,8 @@ def main(argv):
             tests = options.test
         else:
             tests = DEFAULT_TESTS
+            if options.vendor:
+                tests += VENDOR_TESTS
 
         for test in tests:
             directory, _ = os.path.split(__file__)
@@ -978,24 +1020,21 @@ def main(argv):
             if os.path.exists(encapp_search.INDEX_FILE_NAME):
                 os.remove(encapp_search.INDEX_FILE_NAME)
                 print(f"removed path: {encapp_search.INDEX_FILE_NAME}")
-
+            # we do this strange manuever since we do notneed to fill out all parameters
+            # and we may have unimoportant holes in out defintiions.
             settings = encapp.get_options(["", "run", ""])
             settings.configfile = [test_path]
             settings.debug = options.debug
-
-            if "input" in options.replace:
-                settings.videofile = options.replace["input"]["filepath"]
-            settings.encoder = options.codec
+            settings.device_workdir = options.device_workdir
+            settings.replace = options.replace
             settings.input_resolution = options.input_res
             settings.output_resolution = options.output_res
             settings.input_framerate = options.input_fps
             settings.output_framerate = options.output_fps
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
-            print(f"{options.device_workdir} (dev dir)")
-            result_ok, result = encapp.codec_test(
-                settings, model, serial, settings.debug
-            )
+            # Set a timeout
+            result_ok, result = call_with_timeout(encapp.codec_test, args=(settings, model, serial, settings.debug))
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)

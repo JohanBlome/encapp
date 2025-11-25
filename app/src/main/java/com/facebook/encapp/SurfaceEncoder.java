@@ -44,7 +44,7 @@ import java.util.Locale;
  */
 
 class SurfaceEncoder extends Encoder implements VsyncListener {
-    protected static final String TAG = "encapp.surface_encoder";
+    private static final String TAG = "encapp.surface_encoder";
 
     Bitmap mBitmap = null;
     Context mContext;
@@ -62,6 +62,8 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     Object mSyncLock = new Object();
     long mVsyncTimeNs = 0;
     long mFirstSynchNs = -1;
+
+    Object mStopLock = new Object();
 
     public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test);
@@ -104,7 +106,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         mRefFramesizeInBytes = (int) (width * height * 1.5);
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
-        if (mTest.getInput().getFilepath().endsWith("rgba")) {
+        if (mTest.getInput().getPixFmt().getNumber() == PixFmt.rgba_VALUE) {
             mIsRgbaSource = true;
             mRefFramesizeInBytes = width * height * 4;
         } else if (mTest.getInput().getFilepath().equals("camera")) {
@@ -218,15 +220,15 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         }
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat());
+        mMuxerWrapper = createMuxerWrapper(mCodec, mCodec.getOutputFormat());
 
 
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
         if (isVP) {
-            mVideoTrack = mMuxer.addTrack(mCodec.getOutputFormat());
+            mVideoTrack = mMuxerWrapper.addTrack(mCodec.getOutputFormat());
             Log.d(TAG, "Start muxer, track = " + mVideoTrack);
-            mMuxer.start();
+            mMuxerWrapper.start();
         }
 
         Log.d(TAG, "Create fps measure: " + this);
@@ -266,9 +268,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     Log.d(TAG, mTest.getCommon().getId() + " - Done with input, flag endof stream!");
-                    //mOutputMult.stopAndRelease();
                     done = true;
-                    continue;
                 }
 
                 int size = -1;
@@ -311,7 +311,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                                     // Use the camera provided timestamp
                                     ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
-                                    ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+                                    ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
                                 }
                                 mStats.startEncodingFrame(ptsUsec, mInFramesCount);
                                 mFramesAdded++;
@@ -375,10 +375,22 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 ex.printStackTrace();
             }
         }
-
         Log.d(TAG, "Close muxer and streams, " + mTest.getCommon().getDescription());
-        mStats.stop();
+
         try {
+            mCodec.signalEndOfInputStream();
+            if (mInFramesCount > mOutFramesCount) {
+                Log.d(TAG, "Give me a sec, waiting for last encodings input: " + mInFramesCount + " > output: " + mOutFramesCount);
+                synchronized (mStopLock) {
+                    try {
+
+                        mStopLock.wait(WAIT_TIME_SHORT_MS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
             mCodec.flush();
         } catch (MediaCodec.CodecException ex) {
             Log.e(TAG, "flush: MediaCodec.CodecException error");
@@ -387,15 +399,16 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             Log.e(TAG, "flush: IllegalStateException error");
             ex.printStackTrace();
         }
+        mStats.stop();
 
-        if (mMuxer != null) {
+        if (mMuxerWrapper != null) {
             try {
-                mMuxer.release(); //Release calls stop
+                mMuxerWrapper.release(); //Release calls stop
             } catch (IllegalStateException ise) {
                 //Most likely mean that the muxer is already released. Stupid API
                 Log.e(TAG, "Illegal state exception when trying to release the muxer: " + ise.getMessage());
             }
-            mMuxer = null;
+            mMuxerWrapper = null;
         }
         if (mCodec != null) {
             try {
@@ -484,7 +497,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
         byteBuffer.clear();
         int read = fileReader.fillBuffer(byteBuffer, size);
-        long ptsUsec = computePresentationTimeUsec(mInFramesCount, mRefFrameTime);
+        long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);
         mDropNext |= dropFromDynamicFramerate(mInFramesCount);

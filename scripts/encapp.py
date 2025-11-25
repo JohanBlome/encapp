@@ -26,7 +26,6 @@ import encapp_tool
 import encapp_tool.adb_cmds
 import encapp_tool.app_utils
 import encapp_tool.ffutils
-import google.protobuf.descriptor_pool as descriptor_pool
 import humanfriendly
 import pandas as pd
 from argparse_formatter import FlexiFormatter
@@ -46,7 +45,7 @@ import tests_pb2 as tests_definitions  # noqa: E402
 RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
-
+QUIET=False
 EXPAND_ALL = False
 
 QUALITY_PROCESSES = []
@@ -55,7 +54,10 @@ FUNC_CHOICES = {
     "help": "show help options",
     "install": "install apks",
     "uninstall": "uninstall apks",
-    "list": "list codecs and devices supported. It can be used to search and file. For more options use 'list -h'.",
+    "list": (
+        "list codecs and devices supported. It can be used to "
+        "search and file. For more options use 'list -h'."
+    ),
     "run": "run codec test case",
     "kill": "kill application",
     "clear": "remove all encapp associated files",
@@ -387,9 +389,10 @@ def parse_logcat(logcat_contents, local_workdir):
         if line_match:
             if line_match.group("result").lower() == "ok":
                 # experiment went well
-                print(
-                    f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
-                )
+                if not QUIET:
+                    print(
+                        f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
+                    )
                 result_ok = True
             elif line_match.group("result") == "error":
                 if "error:" not in line_match.group("rem"):
@@ -524,7 +527,9 @@ def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
                     comp = getattr(test, parts[0])
                     if hasattr(comp, parts[1]):
                         if parts[1] == "parameter":
-                            value = get_parameter_value(comp.parameter, parts[2])
+                            value = get_parameter_value(
+                                comp.parameter, ".".join(parts[2:])
+                            )
                         else:
                             # If float and has not fractional part make it int
                             value = ""
@@ -581,7 +586,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     )
 
     test_suite = updated_test_suite
-    test_suite = create_tests_from_definition_expansion(test_suite, options)
+
     # now we need to go through all test and update media
     for test in test_suite.test:
         update_media_files(test, options)
@@ -613,6 +618,9 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         update_fileoutput_names(test)
         if test.HasField("common") and test.common.HasField("id"):
             test.common.id = replace_placeholders(test.common.id, test)
+
+        if test.HasField("common") and test.common.HasField("description"):
+            test.common.description = replace_placeholders(test.common.description, test)
 
     # 5. save the full protobuf text file(s)
     if options.split:
@@ -942,10 +950,17 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
             )
 
     # Check encoded file
+    extensions = ["mp4", "vpx", "heic", "heif", "jpeg", "avif", "avci", "webp"]
     for stat in results[1]:
-        name = f"{stat.split('.json')[0]}.mp4"
-        if not os.path.exists(name):
-            # Get test name
+        found = False
+        for extension in extensions:
+            name = f"{stat.split('.json')[0]}.{extension}"
+            if os.path.exists(name):
+                found = True
+                break
+
+        # Get test name
+        if not found:
             test_id = find_test_name(name, test_suite)
             fail.append({"test_id": test_id, "stats": stat, "error": "no encoded file"})
 
@@ -987,10 +1002,32 @@ def lookup_message_by_name(message, submessage_name):
     else:
         return None
 
+def set_attribute(subparam, setting, item):
+    while True:
+        try:
+            setattr(subparam, setting, int(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, float(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, bool(item))
+            break
+        except:
+            pass
+        try:
+            setattr(subparam, setting, str(item))
+            break
+        except:
+            print(f"ERROR. Could not set {item} in {setting} for {subparam}")
 
-def multiply_tests_with_tems(test, parent, setting, expanded):
+
+def multiply_tests_with_items(test, parent, setting, expanded):
     tests = []
-
     # for "paramater" we need to work a little different
     param = None
     if setting == "parameter":
@@ -1002,11 +1039,12 @@ def multiply_tests_with_tems(test, parent, setting, expanded):
         ntest.CopyFrom(test)
         submessage = lookup_message_by_name(ntest, parent)
         if submessage and not param:
-            setattr(submessage, setting, str(item))
+            set_attribute(submessage, setting, item)
+            #setattr(submessage, setting, str(item))
         elif submessage and param:
             for subparam in submessage.parameter:
                 if subparam.key == param.key:
-                    setattr(subparam, "value", str(item))
+                    set_attribute(subparam, "value", item)
         else:
             print(f"Combination not supported: {item=}, {submessage=}")
 
@@ -1017,7 +1055,7 @@ def multiply_tests_with_tems(test, parent, setting, expanded):
 def update_single_setting(tests, parent, settings_name, expanded):
     updated = []
     for test in tests:
-        tests_ = multiply_tests_with_tems(test, parent, settings_name, expanded)
+        tests_ = multiply_tests_with_items(test, parent, settings_name, expanded)
         if tests_:
             updated.extend(tests_)
     return updated
@@ -1034,11 +1072,18 @@ def create_tests_from_definition_expansion(testsuite, options):
     regexp = None
     if options.filter_input:
         regexp = options.filter_input
-    # updated_testsuite.test = tests_definitions.Test
 
+    # updated_testsuite.test = tests_definitions.Test
     for test in testsuite.test:
         tests = [test]
+        proxies = []
+        # before doing the individual ones we look at the proxy ones.
+        if test.HasField("test_setup"):
+            proxies = test.test_setup.proxy_val
+
         fields = [[descr.name, val] for descr, val in test.ListFields()]
+        # Run the common last
+
         for field in fields:
             parent = None
             for item in field:
@@ -1059,12 +1104,50 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 expanded = expand_filepath(path, regexp)
                             force_update = True
                         else:
-                            if (
-                                parent == "configure"
-                                and setting[0].name == "parameter"
-                                and EXPAND_ALL
-                            ):
+                            for proxy in proxies:
+                                try:
+                                    if str(setting[1]) == proxy.id:
+                                        local_expanded = expand_ranges(proxy.value)
+                                        if len(local_expanded) > 1:
+                                            tests_ = update_single_setting(
+                                                tests,
+                                                parent,
+                                                setting[0].name,
+                                                local_expanded,
+                                            )
+                                            if tests_:
+                                                tests = tests_
+                                            extended = []
+                                except Exception as ex:
+                                    print(f"Failed to convert {ex}")
+                                    pass
+                            if parent == "configure"\
+                                and ((setting[0].name == "parameter" and EXPAND_ALL)\
+                                or setting[0].name == "proxy_val"):
                                 for num, param in enumerate(item.parameter):
+                                    for proxy in proxies:
+                                        try:
+                                            if param.value == proxy.id:
+                                                local_expanded = expand_ranges(
+                                                    proxy.value
+                                                )
+                                                if len(local_expanded) > 1:
+                                                    param_expand = [
+                                                        param,
+                                                        local_expanded,
+                                                    ]
+                                                    tests_ = update_single_setting(
+                                                        tests,
+                                                        parent,
+                                                        "parameter",
+                                                        param_expand,
+                                                    )
+                                                    if tests_:
+                                                        tests = tests_
+                                                    extended = []
+                                        except Exception as ex:
+                                            print(f"Failed to convert {ex}")
+                                            pass
                                     local_expanded = expand_ranges(param.value)
                                     # Parameters needs to be handled differently
                                     if len(local_expanded) > 1:
@@ -1087,7 +1170,6 @@ def create_tests_from_definition_expansion(testsuite, options):
                                     tests = tests_
 
         updated_testsuite.test.extend(tests)
-
     return updated_testsuite
 
 
@@ -1188,9 +1270,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert (
-            len(resolution_spec) == 3
-        ), f'error: invalid resolution spec: "{resolution}"'
+        assert len(resolution_spec) == 3, (
+            f'error: invalid resolution spec: "{resolution}"'
+        )
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -1238,13 +1320,16 @@ def update_input_section(
 def update_media(test, options):
     debug = options.debug
     input_is_raw = encapp_tool.ffutils.video_is_raw(test.input.filepath)
-
-    # if there are not settings for res and rate check the file itself
-    info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
-
+    generate = False
+    info = None
+    if test.input.filepath != "[generate]":
+        # if there are not settings for res and rate check the file itself
+        info = encapp_tool.ffutils.get_video_info(test.input.filepath, options.debug)
+    else:
+        generate = True
     # Let us help support function later by checking the file and populate the input
     # fields where we can
-    if not input_is_raw:
+    if not input_is_raw and not generate:
         test = update_input_section(test, info)
 
     in_res = test.input.resolution
@@ -1272,6 +1357,7 @@ def update_media(test, options):
             or out_pix_fmt == PIX_FMT_TYPES_VALUES["rgba"]
         )
         and not encapp_tool.ffutils.video_is_y4m(test.input.filepath)
+        and not test.input.filepath == "[generate]"
     ):
         if debug:
             print("Surface with compatible pixel formats")
@@ -1286,22 +1372,6 @@ def update_media(test, options):
             print("Configure is same format as input")
         return
 
-    # Passed this point, always transcode to a raw file
-    if debug:
-        print("Transcode input")
-    reason = ""
-    if in_res != out_res:
-        reason = f" res ({in_res} != {out_res})"
-    if in_rate != out_rate:
-        reason = f" rate ({in_rate} != {out_rate})"
-    if in_pix_fmt != out_pix_fmt:
-        reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
-    if options.raw:
-        reason = "Always decode to raw set"
-
-    reason = reason.strip()
-    if options.debug > 0:
-        print(f"Transcode raw input: {test.input.filepath} {reason = }")
     replace = {}
     input = {}
     output = {}
@@ -1362,17 +1432,70 @@ def update_media(test, options):
     replace["input"] = input
     replace["output"] = output
 
-    d = process_input_path(
-        test.input.filepath, replace, test.input, options.mediastore, options.debug
-    )
-    # After transcoding input settings may have changed, adjust.
-    # now both config and input should be the same i.e. matching config
-    test.input.resolution = d["resolution"]
-    test.input.framerate = d["framerate"]
-    test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
-    test.input.filepath = d["filepath"]
-    # Maybe not necessary but would just indicate that the input resolution was used.
-    test.configure.resolution = d["resolution"]
+    if test.input.filepath == "[generate]":
+        resolution = "1280x720"
+        framerate = 30.0
+        pix_fmt = "nv12"
+        duration = 5
+        output_filepath = output["output_filepath"]
+        if "resolution" in test.input and len(test.input.resolution):
+            resolution = test.input.resolution
+        if "framerate" in test.input and float(test.input.framerate) > 0:
+            framerate = test.input.framerate
+        if "pix_fmt" in test.input:
+            try:
+                pix_fmt = get_pix_fmt(test.input.pix_fmt)
+            except:
+                pix_fmt = test.input.pix_fmt
+        if "stoptime_sec" in test.input:
+            duration = test.input.stoptime_sec
+        if "playout_frames" in test.input:
+            duration = int(test.input.playout_frames) * framerate
+        # TODO: lookup
+        extension = "raw"
+        output_filepath = f"{options.mediastore}/generate_{resolution}p{framerate}_{pix_fmt}.{extension}"
+        ret = generate_source(
+            resolution, framerate, pix_fmt, f"{output_filepath}", debug=2
+        )
+        test.input.filepath = output_filepath
+        test.input.resolution = resolution
+        test.input.framerate = framerate
+        test.input.pix_fmt = pix_fmt
+    else:
+
+        # Passed this point, always transcode to a raw file
+        if debug:
+            print("Transcode input")
+        reason = ""
+        if in_res != out_res:
+            reason = f" res ({in_res} != {out_res})"
+        if in_rate != out_rate:
+            reason = f" rate ({in_rate} != {out_rate})"
+        if in_pix_fmt != out_pix_fmt:
+            reason = f" pix_fmt ({in_pix_fmt} != {out_pix_fmt})"
+        if options.raw:
+            reason = "Always decode to raw set"
+
+        reason = reason.strip()
+        if options.debug > 0:
+            print(f"Transcode raw input: {test.input.filepath} {reason = }")
+        d = process_input_path(
+            test.input.filepath, replace, test.input, options.mediastore, options.debug
+        )
+        # After transcoding input settings may have changed, adjust.
+        # now both config and input should be the same i.e. matching config
+
+        test.input.resolution = d["resolution"]
+        test.input.framerate = d["framerate"]
+        test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+        test.input.filepath = d["filepath"]
+        # Maybe not necessary but would just indicate that the input resolution was used.
+        test.configure.resolution = d["resolution"]
+
+    # Check crop, if "auto" set the original resolution
+    if test.HasField("input") and test.input.HasField("crop_area"):
+        if test.input.crop_area == "auto":
+            test.input.crop_area = test.input.resolution
 
 
 # Update a set of tests with the CLI arguments.
@@ -1423,6 +1546,15 @@ def update_codec_test(
         "decode_dump",
     )
     INPUT_BOOL_KEYS = ("show", "realtime")
+    TEST_SETUP_BOOL_KEYS = (
+        "separate_sources",
+        "first_frame_fast_read",
+        "ignore_power_status",
+        "ignore_power_status",
+        "internal_muxer",
+        "internal_demuxer",
+        "expand_all",
+    )
 
     for k1 in replace:
         for k2, val in replace[k1].items():
@@ -1442,7 +1574,7 @@ def update_codec_test(
                 # force integer value
                 if type(val) is str:
                     expanded = expand_ranges(val)
-                    for gop in expanded:
+                    for val in expanded:
                         # create a new test with the new bitrate
                         if is_parallel:
                             ntest = test
@@ -1450,12 +1582,12 @@ def update_codec_test(
                             ntest = tests_definitions.Test()
                             ntest.CopyFrom(test)
 
-                        ntest.common.id = test.common.id + f".gop-{gop}"
-                        ntest.configure.i_frame_interval = int(gop)
+                        ntest.common.id = test.common.id + f".{k2}-{val}"
+                        setattr(getattr(test, k1), k2, int(val))
                         if not is_parallel:
                             # remove the options already taken care of
                             rep_copy = copy.deepcopy(replace)
-                            rep_copy["configure"]["i_frame_interval"] = int(gop)
+                            rep_copy[k1][k2] = int(val)
                             update_codec_test(
                                 ntest,
                                 updated_test_suite,
@@ -1476,8 +1608,10 @@ def update_codec_test(
                 val = float(val)
 
             # process boolean keys
-            if (k1 == "configure" and k2 in CONFIGURE_BOOL_KEYS) or (
-                k1 == "input" and k2 in INPUT_BOOL_KEYS
+            if (
+                (k1 == "configure" and k2 in CONFIGURE_BOOL_KEYS)
+                or (k1 == "input" and k2 in INPUT_BOOL_KEYS)
+                or (k1 == "test_setup" and k2 in TEST_SETUP_BOOL_KEYS)
             ):
                 # force float value
                 val = bool(val)
@@ -1599,8 +1733,6 @@ def update_codec_test(
                     )
             return
         else:
-            print(bitrate_list)
-            print(f"{len(bitrate_list)=}")
             # replace the namd and bitrate in the old test
             test.common.id = test.common.id + f".{bitrate_list[0]}bps"
             test.configure.bitrate = str(bitrate_list[0])
@@ -1660,7 +1792,6 @@ def run_codec_tests(
     The testsuite will be written to a file for pushing along with files_to_push.
     """
 
-    global default_values
     if device_workdir is None:
         device_workdir = default_values["device_workdir"]
 
@@ -1768,7 +1899,9 @@ def run_codec_tests(
         if not encapp_tool.adb_cmds.push_file_to_device(
             protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
         ):
-            abort_test(local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}")
+            abort_test(
+                local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
+            )
 
         for filepath in files_to_push:
             # Ignore pbtxt, only the test_suite based one will be used.
@@ -1803,7 +1936,6 @@ def run_codec_tests(
         test = test_suite.test[0]
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
-        print(f"Run test {protobuf_txt_filepath}")
         run_encapp_test(
             protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
         )
@@ -2088,6 +2220,7 @@ def codec_test(options, model, serial, debug):
         for test in test_suite.test:
             if test.input.filepath:
                 test.input.filepath = f"{options.source_dir}/{test.input.filepath}"
+
     configfile_write(test_suite, options.configfile)
 
     if options.mediastore is None:
@@ -2102,6 +2235,17 @@ def codec_test(options, model, serial, debug):
     )
 
 
+# TODO:
+# make it possible to generate encoded files so that e.g. verify can be run
+def generate_source(
+    resolution, framerate, pix_fmt, output_file, duration_sec=5.0, debug=0
+):
+    cmd = f"ffmpeg -y -f lavfi -i 'testsrc2=size={resolution}:rate={framerate}' -f rawvideo -pix_fmt {pix_fmt} -color_primaries bt709 -t {duration_sec} {output_file}"
+
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    return ret
+
+
 def get_device_dir():
     if encapp_tool.adb_cmds.is_using_idb():
         return "Documents"
@@ -2110,7 +2254,6 @@ def get_device_dir():
 
 
 def set_idb_mode(mode):
-    global default_values
     encapp_tool.adb_cmds.set_idb_mode(mode)
     default_values["device_workdir"] = get_device_dir()
 
@@ -2604,12 +2747,13 @@ def get_options(argv: list) -> argparse.Namespace:
 
     global DEBUG
     DEBUG = options.debug > 0
+    global QUIET
+    QUIET = options.quiet
     return options
 
 
 def process_target_options(options):
-    global default_values
-    if options.bundleid:
+    if "bundleid" in options and options.bundleid:
         encapp_tool.adb_cmds.set_bundleid(options.bundleid)
         options.idb = True
     default_values["device_workdir"] = get_device_dir()
@@ -2658,11 +2802,12 @@ def process_options(options):
         options.replace = {}
     if options.replace.get("input", {}).get("filepath", ""):
         videofile = options.replace.get("input", {}).get("filepath", "")
-        assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
-            f"file {videofile} does not exist"
-            if os.path.exists(videofile)
-            else f"file {videofile} is not readable"
-        )
+        if videofile != "[generate]":
+            assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
+                f"file {videofile} does not exist"
+                if os.path.exists(videofile)
+                else f"file {videofile} is not readable"
+            )
     if "dim_align" in options and options.dim_align:
         options.width_align = options.dim_align
         options.height_align = options.dim_align
@@ -2810,9 +2955,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert (
-        options.configfile is not None
-    ), "error: need a valid input configuration file"
+    assert options.configfile is not None, (
+        "error: need a valid input configuration file"
+    )
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -2953,15 +3098,15 @@ def merge_options(option1, options2):
     return option1
 
 
-def get_workdir(serial):
+def get_workdir(serial, debug=0):
     workdir = ""
     if not encapp_tool.adb_cmds.USE_IDB:
-        encapp_tool.adb_cmds.reset_logcat(serial)
+        encapp_tool.adb_cmds.reset_logcat(serial, debug)
         adb_cmd = (
             f"adb -s {serial} shell am start "
             f"-e check_workdir  a {encapp_tool.app_utils.ACTIVITY}"
         )
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd)
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug)
         # it seems some devices have a longer delayuntil logs appear in the log
         sleeptime = 2
         wait_time = 30
@@ -2969,7 +3114,7 @@ def get_workdir(serial):
             time.sleep(sleeptime)
             # Get logcat and look for:
             # encapp.clisettings: workdir: /data/user/0/com.facebook.encapp/files
-            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial)
+            logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug)
             reg = r"encapp workdir:[\w]*(?P<workdir>.*)"
             m = re.search(reg, logcat_contents)
             if m:
@@ -2991,6 +3136,27 @@ def main(argv):
     EXPAND_ALL = False if "expand_all" not in options else options.expand_all
 
     set_idb_mode(options.idb)
+
+    # No need to check with Android/iOS app if not running the Android/iOS app
+    check_app = True
+    check_device_workdir = True
+    if "configfile" in options and options.configfile:
+        test_suite = tests_definitions.TestSuite()
+        for proto in options.configfile:
+            configfile_read(proto, test_suite)
+
+        for test in test_suite.test:
+            if test.HasField("test_setup") and test.test_setup.HasField("run_cmd"):
+                check_app = False
+            if test.HasField("test_setup") and test.test_setup.HasField(
+                "device_workdir"
+            ):
+                check_device_workdir = False
+            if test.HasField("test_setup") and test.test_setup.HasField(
+                "expand_all"
+            ):
+                EXPAND_ALL = test.test_setup.expand_all
+
     if options.func == "run":
         # Make sure we are writing to a good place
         # It will be a chicken and egg situation i.e.
@@ -3031,13 +3197,13 @@ def main(argv):
         )
     # Default settings will be set where necessary unless it is already set.
     if options.device_workdir is None:
-        if "dry_run" in options and not options.dry_run:
+        if "dry_run" in options and not options.dry_run and check_device_workdir:
             # default, check if it works
             if not encapp_tool.adb_cmds.USE_IDB:
                 options.device_workdir = get_workdir(serial)
 
-            if proto_options is not None and proto_options.device_workdir:
-                options.device_workdir = proto_options.device_workdir
+        if proto_options is not None and proto_options.device_workdir:
+            options.device_workdir = proto_options.device_workdir
 
     options = process_options(options)
 
@@ -3101,7 +3267,7 @@ def main(argv):
         )
         return
 
-    if "dry_run" in options and not options.dry_run:
+    if "dry_run" in options and not options.dry_run and check_app:
         # ensure the app is correctly installed
         if not encapp_tool.app_utils.install_ok(serial, options.debug):
             print(f"=======\nWARNING! Java app is not installed in {serial}\n=======\n")
@@ -3149,16 +3315,14 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert (
-            options.configfile is not None
-        ), "error: need a valid input configuration file"
+        assert options.configfile is not None, (
+            "error: need a valid input configuration file"
+        )
 
         if not options.dry_run:
             # first clear out old result
             remove_encapp_gen_files(serial, options.device_workdir, options.debug)
         result_ok, result_json = codec_test(options, model, serial, options.debug)
-
-        global QUALITY_PROCESSES
 
         if options.quality:
             csvdata = []

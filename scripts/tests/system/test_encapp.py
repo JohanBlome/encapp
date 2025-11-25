@@ -28,7 +28,7 @@ def uninstall():
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -45,6 +45,7 @@ def install():
             ],
             shell=True,
             check=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -65,7 +66,7 @@ def setup_data():
         [f"{ENCAPP_SCRIPTS_DIR}/prepare_test_data.sh"],
         shell=True,
         check=True,
-        universal_newlines=True,
+        text=True,
         stderr=subprocess.STDOUT,
         stdout=subprocess.PIPE,
     )
@@ -85,7 +86,7 @@ def test_help_option():
             [f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} " f"--help"],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -103,7 +104,7 @@ def test_list(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
             cwd=tmp_path,
@@ -122,7 +123,7 @@ def test_find_sw_h264_codec(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -143,7 +144,7 @@ def test_surface_transcoding(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -158,7 +159,7 @@ def test_surface_transcoding(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -178,7 +179,7 @@ def test_buffer_encoding(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -189,7 +190,7 @@ def test_buffer_encoding(tmp_path, setup_data):
             [f"{ENCAPP_SCRIPTS_DIR}/prepare_test_data.sh"],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
@@ -201,7 +202,7 @@ def test_buffer_encoding(tmp_path, setup_data):
             ],
             shell=True,
             check=True,
-            universal_newlines=True,
+            text=True,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )

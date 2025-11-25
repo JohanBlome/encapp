@@ -25,6 +25,7 @@ import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
+import com.facebook.encapp.utils.MuxerWrapper;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
 
@@ -52,7 +53,8 @@ public abstract class Encoder {
     long mLastTimeMs = -1;
     protected float mKeepInterval = 1.0f;
     protected MediaCodec mCodec;
-    protected MediaMuxer mMuxer;
+    protected MediaMuxer mMuxer;  // Deprecated: Use mMuxerWrapper instead
+    protected MuxerWrapper mMuxerWrapper;
     protected int mSkipped = 0;
     protected int mFramesAdded = 0;
     // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
@@ -74,6 +76,14 @@ public abstract class Encoder {
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
+
+    public static final String BITRATE = "bitrate";
+    public static final String BITRATE_MODE = "bitrate_mode";
+    public static final String I_FRAME_INTERVAL = "i_frame_interval";
+    public static final String FRAMERATE = "framerate";
+    public static final int H264_NALU_TYPE_IDR = 5;
+    public static final int H264_NALU_TYPE_SPS = 7;
+    public static final int H264_NALU_TYPE_PPS = 8;
 
 
     public Encoder(Test test) {
@@ -107,6 +117,39 @@ public abstract class Encoder {
         }
         // prepend the workdir
         return CliSettings.getWorkDir() + "/" + path;
+    }
+
+    /**
+     * Finds the next start code or the end of the stream.
+     *
+     * @param paramList Vector of encoder parameters to configure Encapp's tests.
+     * @param parameterType The parameter type (int, string, float, long).
+     * @param parameterKey The parameter key.
+     * @param parameterValue The parameter value
+     */
+    public static void addEncoderParameters(Vector<Parameter> paramList, String parameterType, String parameterKey, String parameterValue) {
+        try {
+            DataValueType type = DataValueType.valueOf(parameterType);
+
+            switch (type) {
+                case intType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.intType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case longType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.longType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case floatType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.floatType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                case stringType:
+                    paramList.add(Parameter.newBuilder().setType(DataValueType.stringType).setKey(parameterKey).setValue(parameterValue).build());
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown encoder parameter type: " + parameterType);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+        }
     }
 
     protected void sleepUntilNextFrame(double frameTimeUsec) {
@@ -147,8 +190,8 @@ public abstract class Encoder {
     /**
      * Generates the presentation time for frameIndex, in microseconds.
      */
-    protected long computePresentationTimeUsec(int frameIndex, double frameTimeUsec) {
-        return mPts + (long) (frameIndex * frameTimeUsec);
+    public static long computePresentationTimeUs(long referencePts, int frameIndex, double frameTimeUs) {
+        return referencePts + (long) (frameIndex * frameTimeUs);
     }
 
     protected double calculateFrameTimingUsec(float frameRate) {
@@ -182,6 +225,138 @@ public abstract class Encoder {
             mStats.setEncoderIsHardwareAccelerated(encoder.getCodecInfo().isHardwareAccelerated());
         }
         return mMuxer;
+    }
+
+    /**
+     * Create a muxer wrapper (uses internal muxer or MediaMuxer based on configuration).
+    /**
+     * This is the preferred method for creating muxers.
+     */
+    protected MuxerWrapper createMuxerWrapper(MediaCodec encoder, MediaFormat format) {
+        // Determine output format and filename
+        // Initialize codec detection flags (legacy - ignored by internal muxer)
+        boolean isHEVC = false;
+        boolean isImageOutput = false;
+        // Default filename for video output
+        mFilename = mStats.getId() + ".mp4";
+
+        // Check for image output format in test configuration
+        if (mTest.hasConfigure() && mTest.getConfigure().hasMime()) {
+            String configMime = mTest.getConfigure().getMime().toLowerCase(Locale.US);
+            // Any image/* MIME type indicates image output (HEIF container)
+            if (configMime.startsWith("image/")) {
+                isImageOutput = true;
+                // Determine correct extension based on codec
+                mFilename = mStats.getId() + getImageFileExtension(encoder, format);
+                Log.d(TAG, "Image output detected from configure.mime: " + configMime);
+            }
+        }
+
+        // Note: isHEVC flag is IGNORED by internal muxer (which detects codec from MediaFormat)
+        // Only set it for logging/legacy purposes
+        if (encoder != null) {
+            String codecName = encoder.getCodecInfo().getName().toLowerCase(Locale.US);
+            isHEVC = codecName.contains("hevc") || codecName.contains("h265");
+
+            if (codecName.contains("vp") && !isImageOutput) {
+                mFilename = mStats.getId() + ".webm";
+            }
+        }
+
+        // Check if MediaFormat specifies HEVC MIME type (legacy)
+        if (format != null && format.containsKey(MediaFormat.KEY_MIME)) {
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            isHEVC = MediaFormat.MIMETYPE_VIDEO_HEVC.equals(mime);
+        }
+
+        // Determine if we should use internal muxer
+        boolean useInternalMuxer = false;
+        if (mTest.hasTestSetup() && mTest.getTestSetup().hasInternalMuxer()) {
+            useInternalMuxer = mTest.getTestSetup().getInternalMuxer();
+        }
+
+        // Image output (HEIF) always requires internal muxer
+        if (isImageOutput) {
+            useInternalMuxer = true;
+            mStats.setIsImage(true);
+            Log.d(TAG, "Image format requires internal muxer, forcing internal_muxer=true");
+        }
+
+        // Get video dimensions and framerate
+        int width = mTest.getConfigure().hasResolution() ?
+                    Integer.parseInt(mTest.getConfigure().getResolution().split("x")[0]) : 1920;
+        int height = mTest.getConfigure().hasResolution() ?
+                     Integer.parseInt(mTest.getConfigure().getResolution().split("x")[1]) : 1080;
+        float frameRate = mTest.getConfigure().hasFramerate() ?
+                         mTest.getConfigure().getFramerate() : 30.0f;
+
+        String fullFilename = CliSettings.getWorkDir() + "/" + mFilename;
+        Log.d(TAG, String.format("***** Create MuxerWrapper: %s (internal=%b, HEVC=%b, Image=%b) *******",
+                fullFilename, useInternalMuxer, isHEVC, isImageOutput));
+
+        mMuxerWrapper = new MuxerWrapper(fullFilename, useInternalMuxer, width, height,
+                                        frameRate, isHEVC, isImageOutput);
+
+        mStats.setEncodedfile(mFilename);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && encoder != null) {
+            mStats.setEncoderIsHardwareAccelerated(encoder.getCodecInfo().isHardwareAccelerated());
+        }
+
+        return mMuxerWrapper;
+    }
+
+    protected void stopAllEncoders() {
+    }
+
+    /**
+     * Determine the correct file extension for image output based on codec type.
+     *
+     * @param encoder MediaCodec encoder instance
+     * @param format MediaFormat from the encoder
+     * @return File extension including the dot (e.g., ".heic", ".avif", ".avci")
+     */
+    private String getImageFileExtension(MediaCodec encoder, MediaFormat format) {
+        // Try to determine from encoder codec name first
+        if (encoder != null) {
+            String codecName = encoder.getCodecInfo().getName().toLowerCase(Locale.US);
+
+            if (codecName.contains("hevc") || codecName.contains("h265")) {
+                Log.d(TAG, "Detected HEVC codec, using .heic extension");
+                return ".heic";
+            } else if (codecName.contains("av1") || codecName.contains("av01")) {
+                Log.d(TAG, "Detected AV1 codec, using .avif extension");
+                return ".avif";
+            } else if (codecName.contains("avc") || codecName.contains("h264")) {
+                Log.d(TAG, "Detected AVC codec, using .avci extension");
+                return ".avci";
+            } else if (codecName.contains("vp9")) {
+                Log.d(TAG, "Detected VP9 codec, using .webp extension");
+                return ".webp";
+            }
+        }
+
+        // Try to determine from MediaFormat MIME type
+        if (format != null && format.containsKey(MediaFormat.KEY_MIME)) {
+            String mime = format.getString(MediaFormat.KEY_MIME);
+
+            if (mime.contains("hevc") || mime.contains("h265")) {
+                Log.d(TAG, "Detected HEVC from MIME, using .heic extension");
+                return ".heic";
+            } else if (mime.contains("av01") || mime.contains("av1")) {
+                Log.d(TAG, "Detected AV1 from MIME, using .avif extension");
+                return ".avif";
+            } else if (mime.contains("avc") || mime.contains("h264")) {
+                Log.d(TAG, "Detected AVC from MIME, using .avci extension");
+                return ".avci";
+            } else if (mime.contains("vp9")) {
+                Log.d(TAG, "Detected VP9 from MIME, using .webp extension");
+                return ".webp";
+            }
+        }
+
+        // Default to .heic if unable to determine
+        Log.w(TAG, "Unable to determine codec type, defaulting to .heic extension");
+        return ".heic";
     }
 
     public String getOutputFilename() {
@@ -342,7 +517,8 @@ public abstract class Encoder {
             byteBuffer.clear();
             read = fileReader.fillBuffer(byteBuffer, size);
         }
-        long ptsUsec = computePresentationTimeUsec(frameCount, mRefFrameTime);
+        Log.d(TAG, "Read: " + read);
+        long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
         mCurrentTimeSec =  ptsUsec / 1000000.0f;
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);
@@ -387,7 +563,6 @@ public abstract class Encoder {
             mDone = true;
         }
 
-
         @Override
         public void run() {
             MediaFormat currentOutputFormat = null;
@@ -400,16 +575,27 @@ public abstract class Encoder {
                         continue;
                     }
 
+                    if (mCodec == null || mStats == null) {
+                        Log.e(TAG, "Codec or Stats not initialized, skipping buffer");
+                        continue;
+                    }
+
                     if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         MediaFormat oformat = mCodec.getOutputFormat();
                         mStats.setEncoderMediaFormat(mCodec.getInputFormat());
-                        Log.d(TAG, "Start muxer: " + mMuxer +", write? " + mWriteFile);
-                        if (mWriteFile && mMuxer != null) {
+
+                        // Use MuxerWrapper if available, otherwise fall back to MediaMuxer
+                        if (mWriteFile && mMuxerWrapper != null) {
+                            Log.d(TAG, "Start MuxerWrapper");
+                            mVideoTrack = mMuxerWrapper.addTrack(oformat);
+                            mMuxerWrapper.start();
+                        } else if (mWriteFile && mMuxer != null) {
+                            Log.d(TAG, "Start MediaMuxer (legacy): " + mMuxer);
                             mVideoTrack = mMuxer.addTrack(oformat);
-                            Log.d(TAG, "Start muxer, track = " + mVideoTrack);
                             mMuxer.start();
                         }
-                        mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+
+                        mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                         if (currentOutputFormat == null) {
                            currentOutputFormat =  mCodec.getOutputFormat();
                         }
@@ -422,7 +608,7 @@ public abstract class Encoder {
                             long timestampUsec = mPts + (long) (frameBuffer.mInfo.presentationTimeUs - mFirstFrameTimestampUsec);
                             if (timestampUsec < 0) {
                                 Log.w(TAG, "Timestamp < 0");
-                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                                 continue;
                             }
                             try {
@@ -432,23 +618,29 @@ public abstract class Encoder {
                                 ++mOutFramesCount;
                                 if (Build.VERSION.SDK_INT >= 29) {
                                     MediaFormat oformat = mCodec.getOutputFormat();
-                                    latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
+                                latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
                                     currentOutputFormat = oformat;
                                     info.addInfo(latestFrameChanges);
                                 }
-                                if (mMuxer != null && mVideoTrack != -1) {
+
+                                // Write sample data using MuxerWrapper if available, otherwise MediaMuxer
+                                if (mVideoTrack != -1) {
                                     ByteBuffer data = mCodec.getOutputBuffer(frameBuffer.mBufferId);
-                                    mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
+
+                                    if (mMuxerWrapper != null) {
+                                        mMuxerWrapper.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
+                                    } else if (mMuxer != null) {
+                                        mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
+                                    }
                                 }
 
-                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                                mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                             } catch (Exception ise) {
-                                // Codec may be closed elsewhere...
                                 Log.e(TAG, "Writing failed: " + ise.getMessage());
                             }
                             mCurrentTimeSec = timestampUsec / 1000000.0;
                         } else {
-                            mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
+                            mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false);
                         }
                     }
                 }
@@ -473,21 +665,18 @@ public abstract class Encoder {
         }
     }
 
-    public class EncoderCallbackHandler extends MediaCodec.Callback {
+    protected abstract class BaseCallbackHandler extends MediaCodec.Callback {
+        protected final boolean mIsEncoder;
+        protected final String mHandlerName;
 
-        @Override
-        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            writeToBuffer(codec, index, true);
-        }
-
-        @Override
-        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-            mDataWriter.addBuffer(codec, index, info);
+        protected BaseCallbackHandler(boolean isEncoder, String handlerName) {
+            mIsEncoder = isEncoder;
+            mHandlerName = handlerName;
         }
 
         @Override
         public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.e(TAG, "onError: " + e.getMessage() + ", error code: " + e.getErrorCode());
+            Log.e(TAG, mHandlerName + ".onError: " + e.getDiagnosticInfo());
             if (e.isTransient()) {
                 Log.e(TAG, "Transient error. Try to continue");
             } else if (e.isRecoverable()) {
@@ -503,34 +692,35 @@ public abstract class Encoder {
         }
     }
 
-    public class DecoderCallbackHandler extends MediaCodec.Callback {
-        private static final String TAG = "encapp.decoder";
+    public class EncoderCallbackHandler extends BaseCallbackHandler {
+        public EncoderCallbackHandler() {
+            super(true, "EncoderCallbackHandler");
+        }
+
         @Override
         public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            //  Log.d(TAG, "DecoderCallbackHandler onInputBufferAvailable");
-            writeToBuffer(codec, index, false);
+            writeToBuffer(codec, index, mIsEncoder);
         }
 
         @Override
         public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
-            readFromBuffer(codec, index, false, info);
+            mDataWriter.addBuffer(codec, index, info);
+        }
+    }
+
+    public class DecoderCallbackHandler extends BaseCallbackHandler {
+        public DecoderCallbackHandler() {
+            super(false, "DecoderCallbackHandler");
         }
 
         @Override
-        public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
-            Log.e(TAG, "onError: " + e.getDiagnosticInfo());
-            if (e.isTransient()) {
-                Log.e(TAG, "Transient error. Try to continue");
-            } else if (e.isRecoverable()) {
-                Log.d(TAG, "Error should be recoverable. Try to continue");
-            } else {
-                Log.d(TAG, "Error is fatal. Shutdown.");
-                stopAllActivity();
-            }
+        public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+            writeToBuffer(codec, index, mIsEncoder);
         }
 
         @Override
-        public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+        public void onOutputBufferAvailable(@NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+            readFromBuffer(codec, index, mIsEncoder, info);
         }
     }
 }

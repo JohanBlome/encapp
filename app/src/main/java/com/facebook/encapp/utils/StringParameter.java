@@ -24,7 +24,7 @@ public class StringParameter {
             return Parameter.newBuilder().setType(DataValueType.longType).setKey(mKey).setValue(mValue).build();
         } else if (mType.equals(DataValueType.floatType.name())) {
             return Parameter.newBuilder().setType(DataValueType.floatType).setKey(mKey).setValue(mValue).build();
-        } else if (mType.equals(DataValueType.longType.name())) {
+        } else if (mType.equals(DataValueType.stringType.name())) {
             return Parameter.newBuilder().setType(DataValueType.stringType).setKey(mKey).setValue(mValue).build();
         }
 

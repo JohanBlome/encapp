@@ -90,10 +90,7 @@ class CustomEncoder extends Encoder {
             Log.e(TAG, "Failed to load library, " + name + ", " + targetPath + ": " + e.getMessage());
         }
     }
-
-    private long computePresentationTimeUs(int frameIndex) {
-        return frameIndex * 1000000 / 30;
-    }
+    
 
     public static byte[] readYUVFromFile(String filePath, int size, int framePosition) throws IOException {
         byte[] inputBuffer = new byte[size];
@@ -122,9 +119,9 @@ class CustomEncoder extends Encoder {
                     (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
 
                 int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
+                if (nalType == H264_NALU_TYPE_SPS && spsStart == -1) { // SPS NAL unit type is 7
                     spsStart = i;
-                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
+                } else if (nalType == H264_NALU_TYPE_PPS && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
                     spsEnd = i;
                     ppsStart = i;
                 }
@@ -153,7 +150,7 @@ class CustomEncoder extends Encoder {
                 nalUnitType = bitstream[i + (bitstream[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
 
                 // Check if the NAL unit type is 5 (IDR frame)
-                if (nalUnitType == 5) {
+                if (nalUnitType == H264_NALU_TYPE_IDR) {
                     return true;
                 }
             }
@@ -169,14 +166,14 @@ class CustomEncoder extends Encoder {
 
         for (Runtime.VideoBitrateParameter bitrate : mRuntimeParams.getVideoBitrateList()) {
             if (bitrate.getFramenum() == frame) {
-                params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
+                addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
                 break;
             }
         }
 
         for (Long sync : mRuntimeParams.getRequestSyncList()) {
-            if (sync == frame) {
-                params.add(Parameter.newBuilder().setKey("request-sync").setValue(String.valueOf("")).setType(DataValueType.stringType).build());
+            if (sync == frame) {                
+                addEncoderParameters(params, DataValueType.longType.name(), "request-sync", "");
                 break;
             }
         }
@@ -228,9 +225,9 @@ class CustomEncoder extends Encoder {
         Vector<Parameter> params = new Vector(mTest.getConfigure().getParameterList());
         // This one needs to be set as a native param.
         try {
-            params.add(Parameter.newBuilder().setKey("bitrate").setValue(String.valueOf(bitrate)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("bitrate_mode").setValue(String.valueOf(bitratemode)).setType(DataValueType.stringType).build());
-            params.add(Parameter.newBuilder().setKey("i_frame_interval").setValue(String.valueOf(iframeinterval)).setType(DataValueType.stringType).build());
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE, String.valueOf(bitrate));
+            addEncoderParameters(params, DataValueType.intType.name(), BITRATE_MODE, String.valueOf(bitratemode));
+            addEncoderParameters(params, DataValueType.floatType.name(), I_FRAME_INTERVAL, String.valueOf(iframeinterval));
         } catch (Exception ex) {
             Log.d(TAG, "Exception: " + ex);
         }
@@ -258,7 +255,7 @@ class CustomEncoder extends Encoder {
         }
         mStats.start();
 
-        mMuxer = createMuxer(null, mediaFormat);
+        mMuxerWrapper = createMuxerWrapper(null, mediaFormat);
         try {
             int currentFramePosition = 0;
             boolean input_done = false;
@@ -313,7 +310,7 @@ class CustomEncoder extends Encoder {
                             continue;
                         }
 
-                        long pts = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+                        long pts = computePresentationTimeUs(mPts, mFramesAdded, mRefFrameTime);
                         info = mStats.startEncodingFrame(pts, mFramesAdded);
                         // Let us read the setting in native and force key frame if set here.
                         // If (for some reason a key frame is not produced it will be updated in the native code
@@ -357,8 +354,8 @@ class CustomEncoder extends Encoder {
                         format.setByteBuffer("csd-1", pps);
 
                         bufferInfo = new MediaCodec.BufferInfo();
-                        videoTrackIndex = mMuxer.addTrack(format);
-                        mMuxer.start();
+                        videoTrackIndex = mMuxerWrapper.addTrack(format);
+                        mMuxerWrapper.start();
                         muxerStarted = true;
                     }
 
@@ -371,11 +368,11 @@ class CustomEncoder extends Encoder {
                     boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
 
-                    if(mMuxer != null) {
+                    if(mMuxerWrapper != null) {
                         buffer.position(bufferInfo.offset);
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 
-                        mMuxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                        mMuxerWrapper.writeSampleData(videoTrackIndex, buffer, bufferInfo);
                     }
                 } catch (MediaCodec.CodecException ex) {
                     Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
@@ -388,9 +385,9 @@ class CustomEncoder extends Encoder {
             Log.d(TAG, "Close encoder and streams");
             close();
 
-            if (mMuxer != null) {
+            if (mMuxerWrapper != null) {
                 try {
-                    mMuxer.release();
+                    mMuxerWrapper.release();
                 } catch (IllegalStateException ise) {
                     Log.e(TAG, "Illegal state exception when trying to release the muxer");
                 }
