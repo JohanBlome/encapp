@@ -145,3 +145,7 @@ func sleepUntilNextFrame(lastTimeMs: Int64, frameDurationMs: Double) -> Int64 {
     return updatedLastTime
 }
 
+enum EncappErrors: Error {
+    case x264NotAvailable
+}
+

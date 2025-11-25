@@ -8,6 +8,7 @@
 #ifndef X264WrapperBridge_h
 #define X264WrapperBridge_h
 #include <stdint.h>
+#ifdef X264
 #include "x264.h"
 
 
@@ -27,4 +28,5 @@ void    x264_encoder_intra_refresh( x264_t * );
 int     x264_encoder_invalidate_reference( x264_t *, int64_t pts );
 int     x264_encoder_delayed_frames( x264_t * );
 int     x264_encoder_maximum_delayed_frames( x264_t * );
+#endif
 #endif /* X264WrapperBridge_h */
