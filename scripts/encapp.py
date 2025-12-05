@@ -45,7 +45,7 @@ import tests_pb2 as tests_definitions  # noqa: E402
 RD_RESULT_FILE_NAME = "rd_results.json"
 
 DEBUG = False
-QUIET=False
+QUIET = False
 EXPAND_ALL = False
 
 QUALITY_PROCESSES = []
@@ -620,7 +620,9 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             test.common.id = replace_placeholders(test.common.id, test)
 
         if test.HasField("common") and test.common.HasField("description"):
-            test.common.description = replace_placeholders(test.common.description, test)
+            test.common.description = replace_placeholders(
+                test.common.description, test
+            )
 
     # 5. save the full protobuf text file(s)
     if options.split:
@@ -1002,6 +1004,7 @@ def lookup_message_by_name(message, submessage_name):
     else:
         return None
 
+
 def set_attribute(subparam, setting, item):
     while True:
         try:
@@ -1040,7 +1043,7 @@ def multiply_tests_with_items(test, parent, setting, expanded):
         submessage = lookup_message_by_name(ntest, parent)
         if submessage and not param:
             set_attribute(submessage, setting, item)
-            #setattr(submessage, setting, str(item))
+            # setattr(submessage, setting, str(item))
         elif submessage and param:
             for subparam in submessage.parameter:
                 if subparam.key == param.key:
@@ -1121,9 +1124,10 @@ def create_tests_from_definition_expansion(testsuite, options):
                                 except Exception as ex:
                                     print(f"Failed to convert {ex}")
                                     pass
-                            if parent == "configure"\
-                                and ((setting[0].name == "parameter" and EXPAND_ALL)\
-                                or setting[0].name == "proxy_val"):
+                            if parent == "configure" and (
+                                (setting[0].name == "parameter" and EXPAND_ALL)
+                                or setting[0].name == "proxy_val"
+                            ):
                                 for num, param in enumerate(item.parameter):
                                     for proxy in proxies:
                                         try:
@@ -1462,7 +1466,6 @@ def update_media(test, options):
         test.input.framerate = framerate
         test.input.pix_fmt = pix_fmt
     else:
-
         # Passed this point, always transcode to a raw file
         if debug:
             print("Transcode input")
@@ -3156,9 +3159,7 @@ def main(argv):
                 "device_workdir"
             ):
                 check_device_workdir = False
-            if test.HasField("test_setup") and test.test_setup.HasField(
-                "expand_all"
-            ):
+            if test.HasField("test_setup") and test.test_setup.HasField("expand_all"):
                 EXPAND_ALL = test.test_setup.expand_all
 
     if options.func == "run":
