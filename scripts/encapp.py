@@ -1487,7 +1487,11 @@ def update_media(test, options):
 
         test.input.resolution = d["resolution"]
         test.input.framerate = d["framerate"]
-        test.input.pix_fmt = d["pix_fmt"]  # ???? PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+        test.input.pix_fmt = (
+            PIX_FMT_TYPES_VALUES[d["pix_fmt"]]
+            if type(d["pix_fmt"]) is str
+            else d["pix_fmt"]
+        )
         test.input.filepath = d["filepath"]
         # Maybe not necessary but would just indicate that the input resolution was used.
         test.configure.resolution = d["resolution"]
