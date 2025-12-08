@@ -3,6 +3,7 @@ package com.facebook.encapp;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
+import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -20,13 +21,16 @@ import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
+import com.facebook.encapp.utils.YuvSplitter;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Dictionary;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 /**
@@ -74,6 +78,40 @@ class BufferEncoder extends Encoder {
         }
         Log.d(TAG, "isImageMime (from test config): " + isImageMime);
 
+        // Check for tile configuration BEFORE configuring codec
+        // When tiled encoding is enabled, we configure the codec for tile dimensions
+        boolean useTiledEncoding = false;
+        YuvSplitter yuvSplitter = null;
+        int tileWidth = 0;
+        int tileHeight = 0;
+
+        if (mTest.hasConfigure()) {
+            if (mTest.getConfigure().hasTileWidth()) {
+                tileWidth = mTest.getConfigure().getTileWidth();
+            }
+            if (mTest.getConfigure().hasTileHeight()) {
+                tileHeight = mTest.getConfigure().getTileHeight();
+            }
+            // If only one is set, use it for both (square tiles)
+            if (tileWidth > 0 || tileHeight > 0) {
+                useTiledEncoding = true;
+                if (tileWidth <= 0) tileWidth = tileHeight;
+                if (tileHeight <= 0) tileHeight = tileWidth;
+
+                yuvSplitter = new YuvSplitter(
+                        sourceResolution.getWidth(),
+                        sourceResolution.getHeight(),
+                        tileWidth,
+                        tileHeight,
+                        inputFmt);
+
+                Log.d(TAG, String.format("Tiled encoding enabled: tile=%dx%d, grid=%dx%d (%d tiles total)",
+                        yuvSplitter.getTileWidth(), yuvSplitter.getTileHeight(),
+                        yuvSplitter.getTileColumns(), yuvSplitter.getTileRows(),
+                        yuvSplitter.getTotalTiles()));
+            }
+        }
+
         try {
             // Unless we have a mime, do lookup
             if (mTest.getConfigure().getMime().length() == 0) {
@@ -93,12 +131,82 @@ class BufferEncoder extends Encoder {
             Log.d(TAG, "MediaFormat (mTest)");
             logMediaFormat(mediaFormat);
             setConfigureParams(mTest, mediaFormat);
+
+            // If tiled encoding, override the resolution to tile dimensions
+            if (useTiledEncoding && yuvSplitter != null) {
+                Log.d(TAG, String.format("Overriding codec resolution from %dx%d to tile size %dx%d",
+                        mediaFormat.getInteger(MediaFormat.KEY_WIDTH),
+                        mediaFormat.getInteger(MediaFormat.KEY_HEIGHT),
+                        yuvSplitter.getTileWidth(),
+                        yuvSplitter.getTileHeight()));
+                mediaFormat.setInteger(MediaFormat.KEY_WIDTH, yuvSplitter.getTileWidth());
+                mediaFormat.setInteger(MediaFormat.KEY_HEIGHT, yuvSplitter.getTileHeight());
+
+                // =========================================================================
+                // CRITICAL: For tiled image encoding, ALL frames MUST be I-frames (keyframes)
+                // =========================================================================
+                // Each tile must be independently decodable. If B-frames or P-frames are
+                // used, the encoder will reorder frames internally for better compression,
+                // which will SCRAMBLE THE TILE ORDER in the output HEIC file!
+                // It is not really prohitioned by the spec, but it is a very bad idea and most
+                // HEIC decoders will not be able to handle it.
+                // =========================================================================
+
+                // Check if user has set i_frame_interval to something other than 0
+                int configuredIFrameInterval = -1;
+                if (mTest.getConfigure().hasIFrameInterval()) {
+                    configuredIFrameInterval = (int) mTest.getConfigure().getIFrameInterval();
+                }
+
+                if (configuredIFrameInterval != 0) {
+                    Log.w(TAG, "========================================================================");
+                    Log.w(TAG, "WARNING: TILED HEIC ENCODING REQUIRES i_frame_interval = 0");
+                    Log.w(TAG, "========================================================================");
+                    Log.w(TAG, "Your configuration has i_frame_interval = " + configuredIFrameInterval);
+                    Log.w(TAG, "This WILL cause tiles to be scrambled in the output!");
+                    Log.w(TAG, "Forcing i_frame_interval = 0 for correct tile ordering.");
+                    Log.w(TAG, "========================================================================");
+                }
+
+                // Force all-intra mode regardless of user setting
+                mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 0);
+                Log.d(TAG, "Set KEY_I_FRAME_INTERVAL=0 for tiled encoding (all I-frames)");
+
+                // Disable B-frames explicitly if supported
+                try {
+                    mediaFormat.setInteger("max-bframes", 0);
+                    Log.d(TAG, "Disabled B-frames for tiled encoding (max-bframes=0)");
+                } catch (Exception e) {
+                    Log.d(TAG, "Could not set max-bframes, may not be supported");
+                }
+
+                // Set low latency mode to help ensure frame ordering
+                try {
+                    mediaFormat.setInteger(MediaFormat.KEY_LATENCY, 0);
+                    Log.d(TAG, "Set KEY_LATENCY=0 for tiled encoding");
+                } catch (Exception e) {
+                    Log.d(TAG, "Could not set KEY_LATENCY, may not be supported");
+                }
+            }
+
             Log.d(TAG, "MediaFormat (configure)");
             logMediaFormat(mediaFormat);
 
             // useImage flag determines whether to use Image input buffers
-            useImage = (mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT) == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-            Log.d(TAG, "useImage (for input buffers): " + useImage);
+            // For tiled encoding, we should prefer Image API as it handles format conversion properly
+            int colorFormat = mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT);
+            useImage = (colorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+
+            // For tiled encoding, force flexible color format to use Image API
+            // This avoids pixel format mismatches between input file format and encoder format
+            if (useTiledEncoding && !useImage) {
+                Log.d(TAG, "Tiled encoding: forcing COLOR_FormatYUV420Flexible for Image API support");
+                mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT,
+                        MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+                useImage = true;
+            }
+
+            Log.d(TAG, "useImage (for input buffers): " + useImage + ", colorFormat=" + colorFormat);
             Log.d(TAG, "Configure: " + mCodec.getName());
             mStats.pushTimestamp("encoder.configure");
             mCodec.configure(
@@ -149,6 +257,28 @@ class BufferEncoder extends Encoder {
         if (isVP) {
             mVideoTrack = mMuxerWrapper.addTrack(outputFormat);
             mMuxerWrapper.start();
+        }
+
+        // Configure muxer for tiled output if supported
+        if (useTiledEncoding && yuvSplitter != null && mMuxerWrapper != null) {
+            mMuxerWrapper.setTileMode(yuvSplitter.getTileColumns(), yuvSplitter.getTileRows());
+            // Set actual tile dimensions (512x512)
+            mMuxerWrapper.setTileDimensions(yuvSplitter.getTileWidth(), yuvSplitter.getTileHeight());
+            // Set the grid output dimensions to PADDED size (e.g., 1536x1536 for 3x3 grid of 512x512 tiles)
+            mMuxerWrapper.setGridOutputDimensions(yuvSplitter.getPaddedWidth(), yuvSplitter.getPaddedHeight());
+            // Set the clean aperture to the actual source dimensions (e.g., 1280x1280)
+            // This tells the decoder to crop the padded image back to original size
+            mMuxerWrapper.setCleanAperture(yuvSplitter.getSourceWidth(), yuvSplitter.getSourceHeight());
+            Log.d(TAG, String.format("Muxer configured: grid=%dx%d, tile=%dx%d, padded=%dx%d, clap=%dx%d",
+                    yuvSplitter.getTileColumns(), yuvSplitter.getTileRows(),
+                    yuvSplitter.getTileWidth(), yuvSplitter.getTileHeight(),
+                    yuvSplitter.getPaddedWidth(), yuvSplitter.getPaddedHeight(),
+                    yuvSplitter.getSourceWidth(), yuvSplitter.getSourceHeight()));
+        }
+
+        // Route to appropriate encoding method
+        if (useTiledEncoding && yuvSplitter != null) {
+            return encodeTiled(yuvSplitter, sourceResolution, inputFmt, useImage);
         }
 
         int current_loop = 1;
@@ -352,7 +482,211 @@ class BufferEncoder extends Encoder {
         return "";
     }
 
+    /**
+     * Encode a frame using tiled encoding.
+     * Reads full frames, splits them into tiles, and encodes each tile separately.
+     */
+    private String encodeTiled(YuvSplitter yuvSplitter, Size sourceResolution, PixFmt inputFmt, boolean useImage) {
+        Log.d(TAG, "Starting tiled encoding: " + yuvSplitter.getTotalTiles() + " tiles");
+
+        int frameSize = (int) (sourceResolution.getWidth() * sourceResolution.getHeight() * 1.5);
+        byte[] frameBuffer = new byte[frameSize];
+
+        synchronized (this) {
+            Log.d(TAG, "Wait for synchronized start (tiled)");
+            try {
+                mInitDone = true;
+                wait(WAIT_TIME_MS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        mStats.start();
+
+        boolean input_done = false;
+        boolean output_done = false;
+        int failures = 0;
+        int current_loop = 1;
+        int tilesEncodedCount = 0;
+
+        ConcurrentLinkedQueue<YuvSplitter.Tile> pendingTiles = new ConcurrentLinkedQueue<>();
+
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        MediaFormat currentOutputFormat = mCodec.getOutputFormat();
+        Dictionary<String, Object> latestFrameChanges = null;
+
+        while (!input_done || !output_done || !pendingTiles.isEmpty()) {
+            // Read and split a new frame if needed
+            if (!input_done && pendingTiles.isEmpty()) {
+                int read = readFullFrame(frameBuffer, frameSize);
+                if (read < 0) {
+                    current_loop++;
+                    if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, true)) {
+                        input_done = true;
+                        Log.d(TAG, "Input done: " + mInFramesCount + " frames, " + tilesEncodedCount + " tiles");
+                    } else {
+                        mYuvReader.closeFile();
+                        if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), inputFmt)) {
+                            return "Failed to reopen input file";
+                        }
+                        continue;
+                    }
+                } else {
+                    List<YuvSplitter.Tile> tiles = yuvSplitter.splitFrame(frameBuffer);
+                    pendingTiles.addAll(tiles);
+                    mInFramesCount++;
+
+                    if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
+                        input_done = true;
+                    }
+                }
+            }
+
+            // Process encoder input - queue tiles
+            if (!pendingTiles.isEmpty() || input_done) {
+                try {
+                    int index = mCodec.dequeueInputBuffer(VIDEO_CODEC_WAIT_TIME_US);
+                    if (index >= 0) {
+                        failures = 0;
+
+                        if (!pendingTiles.isEmpty()) {
+                            YuvSplitter.Tile tile = pendingTiles.poll();
+                            queueTileBuffer(index, tile, tilesEncodedCount, inputFmt, useImage);
+                            tilesEncodedCount++;
+                        } else if (input_done) {
+                            long pts = computePresentationTimeUs(mPts, tilesEncodedCount, mRefFrameTime);
+                            mCodec.queueInputBuffer(index, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            Log.d(TAG, "Queued EOS after " + tilesEncodedCount + " tiles");
+                            pendingTiles.clear();
+                        }
+                    } else if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                        failures++;
+                        if (failures >= VIDEO_CODEC_MAX_INPUT_SEC * 10 && !input_done) {
+                            return "dequeueInputBuffer(): Too many consecutive failures";
+                        }
+                    }
+                } catch (IllegalStateException ex) {
+                    Log.e(TAG, "dequeueInputBuffer error: " + ex.getMessage());
+                    return "dequeueInputBuffer error: " + ex.getMessage();
+                }
+            }
+
+            // Process encoder output
+            try {
+                int outIndex = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US);
+                if (outIndex >= 0) {
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        MediaFormat oformat = mCodec.getOutputFormat();
+                        if (mWriteFile && mMuxerWrapper != null && mVideoTrack == -1) {
+                            mVideoTrack = mMuxerWrapper.addTrack(oformat);
+                            mMuxerWrapper.start();
+                        }
+                        mCodec.releaseOutputBuffer(outIndex, false);
+                    } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        Log.d(TAG, "BUFFER_FLAG_END_OF_STREAM");
+                        output_done = true;
+                        mCodec.releaseOutputBuffer(outIndex, false);
+                    } else {
+                        FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                        ++mOutFramesCount;
+                        frameInfo.addInfo(latestFrameChanges);
+                        latestFrameChanges = null;
+
+                        if (mMuxerWrapper != null && mVideoTrack != -1) {
+                            ByteBuffer data = mCodec.getOutputBuffer(outIndex);
+                            mMuxerWrapper.writeSampleData(mVideoTrack, data, info);
+                        }
+                        mCodec.releaseOutputBuffer(outIndex, false);
+                    }
+                } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    if (input_done && pendingTiles.isEmpty()) {
+                        try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+                    }
+                } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    MediaFormat oformat = mCodec.getOutputFormat();
+                    if (mWriteFile && mMuxerWrapper != null && mVideoTrack == -1) {
+                        mVideoTrack = mMuxerWrapper.addTrack(oformat);
+                        mMuxerWrapper.start();
+                    }
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
+                        currentOutputFormat = oformat;
+                    }
+                }
+            } catch (IllegalStateException ex) {
+                Log.e(TAG, "dequeueOutputBuffer error: " + ex.getMessage());
+                return "dequeueOutputBuffer error: " + ex.getMessage();
+            }
+        }
+
+        mStats.stop();
+        Log.d(TAG, String.format("Tiled encoding complete: %d frames, %d tiles, %d output",
+                mInFramesCount, tilesEncodedCount, mOutFramesCount));
+
+        if (mCodec != null) {
+            mCodec.stop();
+            mCodec.release();
+        }
+        if (mMuxerWrapper != null) {
+            try {
+                mMuxerWrapper.release();
+            } catch (IllegalStateException ise) {
+                Log.e(TAG, "Error releasing muxer");
+            }
+        }
+
+        mYuvReader.closeFile();
+        return "";
+    }
+
+    /**
+     * Read a full frame from the YUV file.
+     */
+    private int readFullFrame(byte[] buffer, int size) {
+        if (mYuvReader.isClosed()) {
+            return -1;
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+        int read = mYuvReader.fillBuffer(byteBuffer, size);
+        return (read == size) ? read : -1;
+    }
+
     public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
+    }
+
+    /* *
+     * Queue a tile to the encoder.
+     *
+     * @param index Encoder input buffer index
+     * @param tile The tile to encode
+     * @param tileCount Total tiles encoded so far (for PTS calculation)
+     * @param inputFmt Pixel format
+     * @param useImage Whether to use Image API
+     */
+    private void queueTileBuffer(int index, YuvSplitter.Tile tile, int tileCount, PixFmt inputFmt, boolean useImage) {
+        long pts = computePresentationTimeUs(mPts, tileCount, mRefFrameTime);
+        mStats.startEncodingFrame(pts, tileCount);
+
+        if (useImage) {
+            Image image = mCodec.getInputImage(index);
+            if (image != null) {
+                tile.fillImage(image);
+            } else {
+                Log.e(TAG, "Failed to get input image for index " + index);
+            }
+        } else {
+            ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
+            if (byteBuffer != null) {
+                tile.writeToBuffer(byteBuffer, inputFmt);
+            } else {
+                Log.e(TAG, "Failed to get input buffer for index " + index);
+            }
+        }
+
+        mCodec.queueInputBuffer(index, 0, tile.getSizeInBytes(), pts, 0);
+        mFramesAdded++;
     }
 
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
