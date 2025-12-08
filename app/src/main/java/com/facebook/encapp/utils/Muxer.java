@@ -123,6 +123,15 @@ public class Muxer {
     }
 
     /**
+     * Check if tile mode is already enabled.
+     *
+     * @return true if tile mode has been explicitly set
+     */
+    public boolean isTileModeEnabled() {
+        return mTileMode;
+    }
+
+    /**
      * Set actual tile dimensions (from MediaFormat or encoder).
      * Call this after setTileMode() to override calculated tile dimensions.
      *
@@ -152,6 +161,24 @@ public class Muxer {
         mHasCleanAperture = (cleanWidth != mWidth || cleanHeight != mHeight);
         Log.d(TAG, String.format("Set clean aperture: %dx%d (display), encoded: %dx%d",
                 cleanWidth, cleanHeight, mWidth, mHeight));
+    }
+
+    /**
+     * Set the grid output dimensions (total encoded size after tiling).
+     * This should be the padded dimensions (tile_width * columns, tile_height * rows).
+     * Call this for tiled encoding when the padded size differs from the source size.
+     *
+     * @param paddedWidth Total padded width (tile_width * tile_columns)
+     * @param paddedHeight Total padded height (tile_height * tile_rows)
+     */
+    public void setGridOutputDimensions(int paddedWidth, int paddedHeight) {
+        if (mInitialized) {
+            Log.w(TAG, "Cannot set grid output dimensions after initialization");
+            return;
+        }
+        mWidth = paddedWidth;
+        mHeight = paddedHeight;
+        Log.d(TAG, String.format("Set grid output dimensions: %dx%d", paddedWidth, paddedHeight));
     }
 
     /**
@@ -255,12 +282,8 @@ public class Muxer {
         // For HEIC images in tile mode, accept tiles up to expected count
         if (mIsHEIC && mTileMode) {
             if (mSamples.size() >= mExpectedTileCount) {
-                Log.d(TAG, String.format("Tile mode: already have all %d tiles, ignoring additional frame",
-                    mExpectedTileCount));
                 return true; // Return success but don't add more tiles
             }
-            Log.d(TAG, String.format("Tile mode: accepting tile %d/%d",
-                mSamples.size() + 1, mExpectedTileCount));
         }
         // For HEIC images NOT in tile mode, only accept the first keyframe
         else if (mIsHEIC && !mSamples.isEmpty()) {
@@ -1174,8 +1197,8 @@ public class Muxer {
             writeInt16(mHeight);  // 16-bit output height
         }
 
-        Log.d(TAG, String.format("idat box written with ImageGrid data: %dx%d grid, output %dx%d",
-            mTileColumns, mTileRows, mWidth, mHeight));
+        Log.d(TAG, String.format("idat box: %dx%d grid, output %dx%d",
+            mTileRows, mTileColumns, mWidth, mHeight));
 
         endBox(position);
     }

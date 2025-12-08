@@ -111,24 +111,29 @@ public class MuxerWrapper {
             Log.d(TAG, "MediaFormat MIME type: " + mime);
 
             // Auto-detect tile grid from MediaFormat using standard Android keys (API 31+)
-            // Try standard keys first, then fall back to custom keys
+            // BUT ONLY if tile mode was not already explicitly set via setTileMode()
+            // This prevents the codec's 1x1 grid from overwriting our actual tile configuration
             boolean tileDetected = false;
 
-            // Check for standard Android tile keys (MediaFormat.KEY_GRID_COLUMNS, KEY_GRID_ROWS)
-            if (format.containsKey(MediaFormat.KEY_GRID_COLUMNS) && format.containsKey(MediaFormat.KEY_GRID_ROWS)) {
-                int gridCols = format.getInteger(MediaFormat.KEY_GRID_COLUMNS);
-                int gridRows = format.getInteger(MediaFormat.KEY_GRID_ROWS);
-                Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (standard keys): %dx%d", gridCols, gridRows));
-                mInternalMuxer.setTileMode(gridCols, gridRows);
-                tileDetected = true;
-            }
-            // Fall back to custom keys for older implementations
-            else if (format.containsKey("grid-cols") && format.containsKey("grid-rows")) {
-                int gridCols = format.getInteger("grid-cols");
-                int gridRows = format.getInteger("grid-rows");
-                Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (custom keys): %dx%d", gridCols, gridRows));
-                mInternalMuxer.setTileMode(gridCols, gridRows);
-                tileDetected = true;
+            if (!mInternalMuxer.isTileModeEnabled()) {
+                // Check for standard Android tile keys (MediaFormat.KEY_GRID_COLUMNS, KEY_GRID_ROWS)
+                if (format.containsKey(MediaFormat.KEY_GRID_COLUMNS) && format.containsKey(MediaFormat.KEY_GRID_ROWS)) {
+                    int gridCols = format.getInteger(MediaFormat.KEY_GRID_COLUMNS);
+                    int gridRows = format.getInteger(MediaFormat.KEY_GRID_ROWS);
+                    Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (standard keys): %dx%d", gridCols, gridRows));
+                    mInternalMuxer.setTileMode(gridCols, gridRows);
+                    tileDetected = true;
+                }
+                // Fall back to custom keys for older implementations
+                else if (format.containsKey("grid-cols") && format.containsKey("grid-rows")) {
+                    int gridCols = format.getInteger("grid-cols");
+                    int gridRows = format.getInteger("grid-rows");
+                    Log.d(TAG, String.format("Auto-detected tile grid from MediaFormat (custom keys): %dx%d", gridCols, gridRows));
+                    mInternalMuxer.setTileMode(gridCols, gridRows);
+                    tileDetected = true;
+                }
+            } else {
+                Log.d(TAG, "Tile mode already explicitly set, skipping auto-detection from MediaFormat");
             }
 
             // Auto-detect tile dimensions from MediaFormat
@@ -305,6 +310,23 @@ public class MuxerWrapper {
             Log.d(TAG, String.format("Tile dimensions set: %dx%d", tileWidth, tileHeight));
         } else {
             Log.w(TAG, "Tile dimensions only supported with internal muxer");
+        }
+    }
+
+    /**
+     * Set the grid output dimensions (total encoded size after tiling).
+     * This should be the padded dimensions (tile_width * columns, tile_height * rows).
+     * Call this for tiled encoding when the padded size differs from the source size.
+     *
+     * @param paddedWidth Total padded width (tile_width * tile_columns)
+     * @param paddedHeight Total padded height (tile_height * tile_rows)
+     */
+    public void setGridOutputDimensions(int paddedWidth, int paddedHeight) {
+        if (mUseInternalMuxer && mInternalMuxer != null) {
+            mInternalMuxer.setGridOutputDimensions(paddedWidth, paddedHeight);
+            Log.d(TAG, String.format("Grid output dimensions set: %dx%d", paddedWidth, paddedHeight));
+        } else {
+            Log.w(TAG, "Grid output dimensions only supported with internal muxer");
         }
     }
 

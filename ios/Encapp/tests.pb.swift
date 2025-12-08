@@ -222,7 +222,7 @@ struct TestSetup: Sendable {
   /// Clears the value of `internalDemuxer`. Subsequent reads from it will return its default value.
   mutating func clearInternalDemuxer() {self._internalDemuxer = nil}
 
-  /// For string values we have had an expansion available e.g. 1-3-1,5 
+  /// For string values we have had an expansion available e.g. 1-3-1,5
   /// 1. For non string value this has not been possible
   /// 2. The matrix expansion of parameters is not always desired. There are situation where some
   ///    values needs to have synchronized settings
@@ -730,6 +730,27 @@ struct Configure: @unchecked Sendable {
   var hasDecodeDump: Bool {return _storage._decodeDump != nil}
   /// Clears the value of `decodeDump`. Subsequent reads from it will return its default value.
   mutating func clearDecodeDump() {_uniqueStorage()._decodeDump = nil}
+
+  /// Tile configuration for image encoding (HEIF)
+  /// When set, input frames are split into tiles of the specified size
+  /// If only one dimension is set, tiles are square
+  var tileWidth: Int32 {
+    get {return _storage._tileWidth ?? 0}
+    set {_uniqueStorage()._tileWidth = newValue}
+  }
+  /// Returns true if `tileWidth` has been explicitly set.
+  var hasTileWidth: Bool {return _storage._tileWidth != nil}
+  /// Clears the value of `tileWidth`. Subsequent reads from it will return its default value.
+  mutating func clearTileWidth() {_uniqueStorage()._tileWidth = nil}
+
+  var tileHeight: Int32 {
+    get {return _storage._tileHeight ?? 0}
+    set {_uniqueStorage()._tileHeight = newValue}
+  }
+  /// Returns true if `tileHeight` has been explicitly set.
+  var hasTileHeight: Bool {return _storage._tileHeight != nil}
+  /// Clears the value of `tileHeight`. Subsequent reads from it will return its default value.
+  mutating func clearTileHeight() {_uniqueStorage()._tileHeight = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1376,7 +1397,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
 
 extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0")
 
   fileprivate class _StorageClass {
     var _parameter: [Parameter] = []
@@ -1402,6 +1423,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _quality: Int32? = nil
     var _complexity: Int32? = nil
     var _decodeDump: Bool? = nil
+    var _tileWidth: Int32? = nil
+    var _tileHeight: Int32? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1435,6 +1458,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _quality = source._quality
       _complexity = source._complexity
       _decodeDump = source._decodeDump
+      _tileWidth = source._tileWidth
+      _tileHeight = source._tileHeight
     }
   }
 
@@ -1476,6 +1501,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         case 21: try { try decoder.decodeSingularInt32Field(value: &_storage._quality) }()
         case 22: try { try decoder.decodeSingularInt32Field(value: &_storage._complexity) }()
         case 23: try { try decoder.decodeSingularBoolField(value: &_storage._decodeDump) }()
+        case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._tileWidth) }()
+        case 25: try { try decoder.decodeSingularInt32Field(value: &_storage._tileHeight) }()
         default: break
         }
       }
@@ -1557,6 +1584,12 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._decodeDump {
         try visitor.visitSingularBoolField(value: v, fieldNumber: 23)
       } }()
+      try { if let v = _storage._tileWidth {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 24)
+      } }()
+      try { if let v = _storage._tileHeight {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 25)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1589,6 +1622,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._quality != rhs_storage._quality {return false}
         if _storage._complexity != rhs_storage._complexity {return false}
         if _storage._decodeDump != rhs_storage._decodeDump {return false}
+        if _storage._tileWidth != rhs_storage._tileWidth {return false}
+        if _storage._tileHeight != rhs_storage._tileHeight {return false}
         return true
       }
       if !storagesAreEqual {return false}

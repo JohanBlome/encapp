@@ -963,7 +963,388 @@ ok: test id: "bitrate_buffer" run_id: akiyo_qcif.200kbps.6809-90 result: ok
 ```
 
 
-# 8. Quality Analysis with encapp_quality
+# 8. Image and Tiling Features
+
+Encapp supports encoding still images and tiled encoding for creating HEIC/HEIF image files with grid structures. This is particularly useful for high-resolution image encoding and creating HEIC images with tile-based layouts.
+
+## 8.1. Image Encoding Overview
+
+Image encoding in encapp allows you to encode a single frame video (or the first frame of a video) as a still image. This is useful for:
+
+* Creating HEIC/HEIF images from raw YUV data
+* Testing image codec quality
+* Creating tiled grid images for high-resolution content
+
+### Protobuf Updates for Image Encoding
+
+The protobuf schema has been extended with new fields in the `Configure` message to support image and tiling features:
+
+```protobuf
+message Configure {
+    // ... existing fields ...
+
+    // Image encoding settings
+    optional string mime = 5;            // MIME type (e.g., "image/heif", "video/hevc")
+    optional int32 tile_width = 24;      // Width of each tile in pixels
+    optional int32 tile_height = 25;     // Height of each tile in pixels
+}
+```
+
+**Field Descriptions:**
+
+* **`mime`** (string, optional): Specifies the MIME type for the encoder
+  - Use `"image/heif"` or `"image/heic"` for HEIC image encoding
+  - Use `"video/hevc"` for standard HEVC video encoding
+  - Default: Determined by the codec if not specified
+
+* **`tile_width`** (int32, optional): Width of each tile in pixels
+  - Used for creating tiled/grid images
+  - All tiles will have this width
+  - Image width must be divisible by tile_width, or padding will be added
+
+* **`tile_height`** (int32, optional): Height of each tile in pixels
+  - Used for creating tiled/grid images
+  - All tiles will have this height
+  - Image height must be divisible by tile_height, or padding will be added
+
+## 8.2. Basic Image Encoding
+
+To encode a single frame as an image:
+
+```protobuf
+test {
+    common {
+        id: "simple_heic_image"
+        description: "Encode single frame as HEIC image"
+    }
+    input {
+        filepath: "/tmp/test_image.yuv"
+        resolution: "1920x1080"
+        pix_fmt: yuv420p
+        framerate: 1          # Single frame
+        playout_frames: 1     # Encode only 1 frame
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"  # Or any HEVC encoder
+        mime: "image/heif"                # Specify HEIC/HEIF output
+        bitrate: "10M"                    # Quality setting
+        i_frame_interval: 0               # All intra (required for images)
+    }
+}
+```
+
+**Key Settings for Image Encoding:**
+
+* `framerate: 1` - Single frame per second
+* `playout_frames: 1` - Encode exactly one frame
+* `mime: "image/heif"` - Specify HEIC/HEIF format
+* `i_frame_interval: 0` - Force all frames to be I-frames (required for still images)
+
+## 8.3. Tiled Image Encoding (HEIC Grid)
+
+Tiled encoding creates a HEIC image with a grid structure, where the image is divided into tiles. This is useful for:
+
+* High-resolution images (enables parallel encoding of tiles)
+* Large images that exceed codec size limits
+* Creating mosaic-style images
+* Better compression efficiency for large images
+
+### Method 1: Specify Tile Dimensions
+
+Specify the width and height of each tile directly:
+
+```protobuf
+test {
+    common {
+        id: "tiled_heic_512"
+        description: "Encode 1280x1280 image with 512x512 tiles"
+    }
+    input {
+        filepath: "/tmp/large_image.yuv"
+        resolution: "1280x1280"
+        pix_fmt: yuv420p
+        framerate: 1
+        playout_frames: 1
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"
+        mime: "image/heif"
+        bitrate: "8M"
+        i_frame_interval: 0
+        tile_width: 512       # Each tile is 512 pixels wide
+        tile_height: 512      # Each tile is 512 pixels tall
+    }
+}
+```
+
+**Result:** This creates a 3x3 grid of tiles (1280/512 = 2.5, rounded up to 3):
+```
+┌───────┬───────┬───────┐
+│ Tile  │ Tile  │ Tile  │
+│ 0,0   │ 0,1   │ 0,2   │
+├───────┼───────┼───────┤
+│ Tile  │ Tile  │ Tile  │
+│ 1,0   │ 1,1   │ 1,2   │
+├───────┼───────┼───────┤
+│ Tile  │ Tile  │ Tile  │
+│ 2,0   │ 2,1   │ 2,2   │
+└───────┴───────┴───────┘
+```
+
+**Padding:** If the image dimensions are not evenly divisible by tile dimensions, the image will be padded with black pixels to fit the grid.
+
+### Method 2: Automatic Tiling (Encoder-Dependent)
+
+Some encoders support automatic tiling internally and do not require explicit tile configuration. These encoders will automatically divide the image into tiles based on their internal logic and capabilities.
+
+**When to use automatic tiling:**
+- The encoder natively supports HEIF/HEIC image encoding with built-in tiling
+- You want the encoder to choose optimal tile dimensions
+- The encoder documentation indicates automatic tiling support
+
+**Configuration:**
+
+```protobuf
+test {
+    common {
+        id: "auto_tiled_heic"
+        description: "Let encoder handle tiling automatically"
+    }
+    input {
+        filepath: "/tmp/large_image.yuv"
+        resolution: "3840x2160"
+        pix_fmt: yuv420p
+        framerate: 1
+        playout_frames: 1
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"
+        mime: "image/heif"
+        bitrate: "20M"
+        i_frame_interval: 0
+        # DO NOT specify tile_width, tile_height
+        # Let the encoder handle tiling automatically
+    }
+}
+```
+
+**Important Notes:**
+
+* **Do NOT specify tiling parameters** when using automatic tiling:
+  - Omit `tile_width` and `tile_height`
+  - The encoder will determine optimal tiling internally
+
+* **Encoder Capabilities:** Not all encoders support automatic tiling. Check encoder capabilities with:
+  ```bash
+  ./scripts/encapp.py list -c hevc -l -1
+  ```
+
+* **Verification:** To check if an encoder supports automatic tiling:
+  - Look for HEIF/HEIC MIME type support in codec capabilities
+  - Test with a simple image encoding (as shown above)
+  - Check encoder documentation or vendor specifications
+
+* **Precedence:** If you specify both automatic tiling (by setting `mime: "image/heif"`) AND manual tiling parameters (`tile_width`, etc.), the manual parameters take precedence and the encoder will use your specified tile dimensions instead of automatic tiling.
+
+**Example: Testing Automatic vs. Manual Tiling**
+
+```bash
+# Test automatic tiling
+./scripts/encapp.py run auto_tile_test.pbtxt -e configure.mime "image/heif"
+
+# Compare with manual tiling
+./scripts/encapp.py run auto_tile_test.pbtxt \
+  -e configure.mime "image/heif" \
+  -e configure.tile_width 512 \
+  -e configure.tile_height 512
+```
+
+## 8.4. Practical Examples
+
+### Example 1: High-Resolution Photo
+
+Encode a 4K image as a tiled HEIC file:
+
+```bash
+./scripts/encapp.py run high_res_photo.pbtxt
+```
+
+**high_res_photo.pbtxt:**
+```protobuf
+test {
+    common {
+        id: "4k_photo_tiled"
+        description: "4K photo with 512x512 tiles"
+    }
+    input {
+        filepath: "/tmp/photo_4k.yuv"
+        resolution: "3840x2160"
+        pix_fmt: yuv420p
+        framerate: 1
+        playout_frames: 1
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"
+        mime: "image/heif"
+        bitrate: "20M"
+        i_frame_interval: 0
+        tile_width: 512
+        tile_height: 512
+    }
+}
+```
+
+### Example 2: Testing Different Tile Sizes
+
+Test encoding with multiple tile sizes:
+
+```bash
+# Create test config
+cat > tile_comparison.pbtxt << 'EOF'
+test {
+    common {
+        id: "tile_256"
+        description: "256x256 tiles"
+    }
+    input {
+        filepath: "/tmp/test_image.yuv"
+        resolution: "1280x1280"
+        pix_fmt: yuv420p
+        framerate: 1
+        playout_frames: 1
+    }
+    configure {
+        codec: "c2.exynos.hevc.encoder"
+        mime: "image/heif"
+        bitrate: "8M"
+        i_frame_interval: 0
+        tile_width: 256
+        tile_height: 256
+    }
+}
+
+test {
+    common {
+        id: "tile_512"
+        description: "512x512 tiles"
+    }
+    configure {
+        tile_width: 512
+        tile_height: 512
+    }
+}
+
+test {
+    common {
+        id: "tile_1024"
+        description: "1024x1024 tiles"
+    }
+    configure {
+        tile_width: 1024
+        tile_height: 1024
+    }
+}
+EOF
+
+# Run all tests
+./scripts/encapp.py run tile_comparison.pbtxt --local-workdir /tmp/tile_tests
+```
+
+## 8.5. Tile Size Considerations
+
+**Choosing Tile Dimensions:**
+
+* **Codec Limits:** Some codecs have maximum resolution limits. Tiling allows encoding images larger than these limits.
+* **Performance:** Smaller tiles = more tiles = more overhead. Larger tiles = better compression but less parallelism.
+* **Recommended Sizes:** 256, 512, or 1024 pixels are common choices.
+* **Divisibility:** For best results, choose tile sizes that evenly divide your image dimensions.
+
+**Example Tile Calculations:**
+
+| Image Size | Tile Size | Grid Size | Total Tiles | Padding |
+|------------|-----------|-----------|-------------|---------|
+| 1280x720   | 512x512   | 3x2       | 6 tiles     | 256x72  |
+| 1920x1080  | 512x512   | 4x3       | 12 tiles    | 128x456 |
+| 3840x2160  | 512x512   | 8x5       | 40 tiles    | 128x400 |
+| 2048x2048  | 512x512   | 4x4       | 16 tiles    | None    |
+
+## 8.6. Output Format
+
+**HEIC File Structure:**
+
+When tiling is enabled with `mime: "image/heif"`, the output will be a HEIC file containing:
+
+* A primary image entry (the full tiled grid)
+* Individual tile images as auxiliary items
+* Grid metadata describing the tile layout
+* HEIF/HEIC container structure
+
+**Viewing Tiled Images:**
+
+* Modern image viewers automatically decode and display the full tiled image
+* Individual tiles are typically not exposed to the user
+* The grid structure is transparent during viewing
+
+## 8.7. Command-Line Overrides
+
+You can override image and tiling settings from the command line:
+
+```bash
+# Override MIME type
+./scripts/encapp.py run test.pbtxt -e configure.mime "image/heif"
+
+# Override tile dimensions
+./scripts/encapp.py run test.pbtxt \
+  -e configure.tile_width 512 \
+  -e configure.tile_height 512
+
+# Change to single frame encoding
+./scripts/encapp.py run test.pbtxt \
+  -e input.playout_frames 1 \
+  -e configure.i_frame_interval 0
+```
+
+## 8.8. Troubleshooting
+
+**Common Issues:**
+
+1. **"Codec doesn't support tiling"**
+   - Not all HEVC encoders support tile encoding
+   - Try a different encoder (hardware encoders often support tiling)
+   - Check codec capabilities with: `./scripts/encapp.py list -c hevc -l -1`
+
+2. **"Invalid tile dimensions"**
+   - Tile dimensions must be multiples of codec alignment requirements (usually 16)
+   - Try dimensions like 256, 512, 1024
+   - Some codecs have minimum/maximum tile size limits
+
+3. **"Output file is not HEIC format"**
+   - Ensure `mime: "image/heif"` is set in configure section
+   - Verify the encoder supports HEIF container format
+   - Check that `i_frame_interval: 0` is set
+
+4. **"Image appears corrupted or wrong size"**
+   - Check that `resolution` matches your input file
+   - Verify `pix_fmt` is correct (yuv420p, nv12, etc.)
+   - Ensure padding is accounted for in dimensions
+
+## 8.9. Testing Image Encoding
+
+Use the provided system test to verify tiled HEIC encoding:
+
+```bash
+# Run the tiled HEIC system test
+ANDROID_SERIAL=<device_serial> python3 -m pytest \
+  scripts/tests/system/test_tiled_heic.py -v
+```
+
+This test:
+1. Generates a test pattern with numbered tiles
+2. Encodes it as a tiled HEIC image
+3. Verifies the output file exists
+4. Tests various tile grid configurations
+
+# 9. Quality Analysis with encapp_quality
 
 The `encapp_quality.py` script is used to calculate video quality metrics (VMAF, PSNR, SSIM) by comparing encoded video outputs against their source files. This is essential for evaluating encoder performance and generating rate-distortion (RD) curves.
 
