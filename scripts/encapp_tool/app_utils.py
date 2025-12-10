@@ -15,7 +15,10 @@ RELEASE_APK_DIR = os.path.abspath(
     os.path.join(SCRIPT_DIR, os.pardir, "app", "releases")
 )
 APK_NAME_MAIN = f"{APPNAME_MAIN}-v{encapp_tool._version.__version__}-debug.apk"
-APK_MAIN = os.path.join(RELEASE_APK_DIR, APK_NAME_MAIN)
+APK_MAIN_DEFAULT = os.path.join(RELEASE_APK_DIR, APK_NAME_MAIN)
+
+# Allow overriding the APK path via environment variable (useful for testing with non-release builds)
+APK_MAIN = os.environ.get("ENCAPP_APK_PATH", APK_MAIN_DEFAULT)
 
 
 def install_app(serial, debug=0):
