@@ -435,7 +435,8 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
         basename = os.path.basename(test.configure.codec)
         test.configure.codec = f"{device_workdir}/{basename}"
     # camera tests do not need any input file paths
-    if test.input.filepath == "camera":
+    # fake_input tests do not need any input file paths
+    if test.input.filepath == "camera" or test.input.filepath == "fake_input":
         return
     # update main test
     basename = os.path.basename(test.input.filepath)
@@ -447,12 +448,15 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
 
 def get_media_files(test, all_files):
     # TODO: remove?
-    if test.input.filepath != "camera":
+    if test.input.filepath != "camera" and test.input.filepath != "fake_input":
         name = os.path.basename(test.input.filepath)
         if name not in all_files:
             all_files.add(name)
     for subtest in test.parallel.test:
-        if subtest.input.filepath != "camera":
+        if (
+            subtest.input.filepath != "camera"
+            and subtest.input.filepath != "fake_input"
+        ):
             get_media_files(subtest, all_files)
     return
 
@@ -463,21 +467,27 @@ def add_files_to_push(test, files_to_push):
         full_path = os.path.expanduser(test.configure.codec)
         if full_path not in files_to_push:
             files_to_push.add(full_path)
-    if test.input.filepath != "camera":
+    if test.input.filepath != "camera" and test.input.filepath != "fake_input":
         full_path = os.path.expanduser(test.input.filepath)
         if full_path not in files_to_push:
             files_to_push.add(full_path)
     for subtest in test.parallel.test:
-        if subtest.input.filepath != "camera":
+        if (
+            subtest.input.filepath != "camera"
+            and subtest.input.filepath != "fake_input"
+        ):
             add_files_to_push(subtest, files_to_push)
     return
 
 
 def update_media_files(test, options):
-    if test.input.filepath != "camera":
+    if test.input.filepath != "camera" and test.input.filepath != "fake_input":
         update_media(test, options)
     for subtest in test.parallel.test:
-        if subtest.input.filepath != "camera":
+        if (
+            subtest.input.filepath != "camera"
+            and subtest.input.filepath != "fake_input"
+        ):
             update_media_files(subtest, options)
     return
 
@@ -2809,7 +2819,8 @@ def process_options(options):
         options.replace = {}
     if options.replace.get("input", {}).get("filepath", ""):
         videofile = options.replace.get("input", {}).get("filepath", "")
-        if videofile != "[generate]":
+        # Skip file validation for special inputs (generate, camera, and fake_input)
+        if videofile != "[generate]" and videofile != "camera" and videofile != "fake_input":
             assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
                 f"file {videofile} does not exist"
                 if os.path.exists(videofile)

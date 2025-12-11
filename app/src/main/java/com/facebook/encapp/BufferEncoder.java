@@ -15,6 +15,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.FakeInputReader;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
@@ -60,10 +61,20 @@ class BufferEncoder extends Encoder {
         Size sourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         PixFmt inputFmt = mTest.getInput().getPixFmt();
         mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
-        mYuvReader = new FileReader();
 
-        if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
-            return "Could not open file";
+        if (mTest.getInput().getFilepath().equals("fake_input")) {
+            mIsFakeInput = true;
+            Log.d(TAG, "Using fake input for performance testing");
+            mFakeInputReader = new FakeInputReader();
+            if (!mFakeInputReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt(),
+                    sourceResolution.getWidth(), sourceResolution.getHeight())) {
+                return "Could not initialize fake input";
+            }
+        } else {
+            mYuvReader = new FileReader();
+            if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
+                return "Could not open file";
+            }
         }
 
         MediaFormat mediaFormat;
@@ -363,7 +374,12 @@ class BufferEncoder extends Encoder {
 
                             if (!input_done) {
                                 Log.d(TAG, " *********** OPEN FILE AGAIN *******");
-                                mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
+                                if (mIsFakeInput) {
+                                    mFakeInputReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt(),
+                                            sourceResolution.getWidth(), sourceResolution.getHeight());
+                                } else {
+                                    mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt());
+                                }
                                 Log.d(TAG, "*** Loop ended start " + current_loop + "***");
                             }
                         }
@@ -478,7 +494,11 @@ class BufferEncoder extends Encoder {
             }
         }
 
-        mYuvReader.closeFile();
+        if (mIsFakeInput && mFakeInputReader != null) {
+            mFakeInputReader.closeFile();
+        } else if (mYuvReader != null) {
+            mYuvReader.closeFile();
+        }
         return "";
     }
 
