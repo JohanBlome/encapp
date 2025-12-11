@@ -262,3 +262,7 @@ cython_debug/
 *.o.d
 *.yuv
 *.ivf
+
+# Protoc binaries (downloaded by proto/Makefile)
+proto/protoc-*/
+proto/*.zip
