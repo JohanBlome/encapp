@@ -51,6 +51,7 @@ android {
         main {
             proto {
                 srcDir '../proto/'
+                exclude 'protoc-3.20.3/**'
             }
         }
 
