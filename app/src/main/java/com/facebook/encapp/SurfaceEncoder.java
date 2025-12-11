@@ -21,6 +21,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
+import com.facebook.encapp.utils.FakeInputReader;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameswapControl;
@@ -51,6 +52,8 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     SurfaceTexture mSurfaceTexture;
     boolean mIsRgbaSource = false;
     boolean mIsCameraSource = false;
+    boolean mIsFakeInput = false;
+    FakeInputReader mFakeInputReader;
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
     Bundle mKeyFrameBundle;
@@ -109,6 +112,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         if (mTest.getInput().getPixFmt().getNumber() == PixFmt.rgba_VALUE) {
             mIsRgbaSource = true;
             mRefFramesizeInBytes = width * height * 4;
+        } else if (mTest.getInput().getFilepath().equals("fake_input")) {
+            mIsFakeInput = true;
+            Log.d(TAG, "Using fake input for performance testing");
         } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
             //TODO: handle other fps (i.e. try to set lower or higher fps)
@@ -124,7 +130,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         }
 
 
-        if (!mIsRgbaSource && !mIsCameraSource) {
+        if (!mIsRgbaSource && !mIsCameraSource && !mIsFakeInput) {
             // if we are getting a YUV source, we need to convert it to RGBA
             // This conversion routine assumes nv21. Let's make sure that
             // is the input pix_fmt.
@@ -148,9 +154,16 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         if (!mIsCameraSource) {
             mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
-            mYuvReader = new FileReader();
-            if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
-                return "Could not open file";
+            if (mIsFakeInput) {
+                mFakeInputReader = new FakeInputReader();
+                if (!mFakeInputReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt(), width, height)) {
+                    return "Could not initialize fake input";
+                }
+            } else {
+                mYuvReader = new FileReader();
+                if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
+                    return "Could not open file";
+                }
             }
 
         }
@@ -496,7 +509,12 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     private int queueInputBufferEncoder(
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
         byteBuffer.clear();
-        int read = fileReader.fillBuffer(byteBuffer, size);
+        int read = 0;
+        if (mIsFakeInput) {
+            read = mFakeInputReader.fillBuffer(byteBuffer, size);
+        } else {
+            read = fileReader.fillBuffer(byteBuffer, size);
+        }
         long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
         setRuntimeParameters(mInFramesCount);
         mDropNext = dropFrame(mInFramesCount);

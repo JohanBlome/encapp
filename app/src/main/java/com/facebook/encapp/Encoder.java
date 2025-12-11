@@ -20,6 +20,7 @@ import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.FakeInputReader;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameBuffer;
@@ -66,6 +67,8 @@ public abstract class Encoder {
     protected boolean mDropNext;
     protected Runtime mRuntimeParams;
     protected FileReader mYuvReader;
+    protected FakeInputReader mFakeInputReader;
+    protected boolean mIsFakeInput = false;
     protected int mVideoTrack = -1;
     long mPts = 132;
     boolean mRealtime = false;
@@ -510,12 +513,20 @@ public abstract class Encoder {
             // copy a frame to the Image
             Image image = mCodec.getInputImage(index);
             //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying data to Image.ByteBuffer");
-            read = fileReader.fillImage(image);
+            if (mIsFakeInput) {
+                read = mFakeInputReader.fillImage(image);
+            } else {
+                read = fileReader.fillImage(image);
+            }
         } else {
             // copy a frame to the ByteBuffer
             //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying " + size + " bytes to the ByteBuffer");
             byteBuffer.clear();
-            read = fileReader.fillBuffer(byteBuffer, size);
+            if (mIsFakeInput) {
+                read = mFakeInputReader.fillBuffer(byteBuffer, size);
+            } else {
+                read = fileReader.fillBuffer(byteBuffer, size);
+            }
         }
         Log.d(TAG, "Read: " + read);
         long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
