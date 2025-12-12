@@ -177,8 +177,9 @@ def plotLatency(data, options):
         data = data.loc[data["rel_start"] > (options.skip_head_sec * 1e9)]
     data = data.loc[(data["proctime"] > 0) & (data["starttime"] > 0)]
 
-    # filter outliers
-    data = data[np.abs(stats.zscore(data["proctime"])) < 3]
+    # filter outliers (unless disabled)
+    if not options.no_filter_outliers:
+        data = data[np.abs(stats.zscore(data["proctime"])) < 3]
     data["rel_start_quant"] = (
         (data["rel_start"] / (options.quantization * 1e6)).astype(int)
     ) * options.quantization
@@ -196,8 +197,9 @@ def plotLatency(data, options):
             )
         proctime = "proctime_rolling"
 
-    # drop na
-    data = data.dropna(subset=["proctime"])
+    # drop na from the column that will be plotted
+    data = data.dropna(subset=[proctime])
+    print(f"{data['proctime'][:3]=}, {data['source'][:3]}")
     average_lat_msec = round(data["proctime"].mean() / 1e6, 2)
     p50_msec = int(round(data["proctime"].quantile(0.5) / 1e6, 0))
     p95_msec = int(round(data["proctime"].quantile(0.95) / 1e6, 0))
@@ -520,29 +522,38 @@ def plot_named_timestamps(data, enc_dec_data, options):
     output["time ms"] = output["diff"] / 1000000
 
     extra = []
+    original_media = "n/a"
+    print(f"{enc_dec_data.columns}")
     for source in data["source"].unique():
-        print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
-        print(
-            f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}"
-        )
-        proctime = enc_dec_data.loc[(enc_dec_data["source"] == source)][
-            "proctime"
-        ].values[0]
-        original_media = enc_dec_data.loc[enc_dec_data["source"] == source][
-            "original_media"
-        ].values[0]
-        print(f"{proctime=} {original_media=}")
-        output.loc[output["source"] == source, "original_media"] = original_media
+        print(f"{source=}")
+        try:
+            print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
+            print(
+                f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}"
+            )
+            proctime = enc_dec_data.loc[(enc_dec_data["source"] == source)][
+                "proctime"
+            ].values[0]
+            if "original_media" in enc_dec_data.columns:
+                original_media = enc_dec_data.loc[enc_dec_data["source"] == source][
+                    "original_media"
+                ].values[0]
+            print(f"{proctime=} *{original_media=}*")
+            if not original_media:
+                original_media = "n/a"
+            output.loc[output["source"] == source, "original_media"] = original_media
 
-        extra.append(
-            {
-                "source": source,
-                "original_media": original_media,
-                "named_timestamp": "first.frame.transcode",
-                "diff": proctime,
-                "time ms": proctime / 1000000.0,
-            }
-        )
+            extra.append(
+                {
+                    "source": source,
+                    "original_media": original_media,
+                    "named_timestamp": "first.frame.transcode",
+                    "diff": proctime,
+                    "time ms": proctime / 1000000.0,
+                }
+            )
+        except Exception as ex:
+            print(f"{ex=}")
 
         complete_sum = output.loc[output["source"] == source]["diff"].sum() + proctime
         extra.append(
@@ -659,6 +670,13 @@ def parse_args():
     parser.add_argument("--keep_na_codec", action="store_true")
     parser.add_argument("--skip_tail_sec", default=0, type=float)
     parser.add_argument("--skip_head_sec", default=0, type=float)
+    parser.add_argument(
+        "--no-filter-outliers",
+        dest="no_filter_outliers",
+        action="store_true",
+        help="Disable outlier filtering (z-score > 3) for latency plots. "
+        "Useful to see initial frame spikes.",
+    )
     options = parser.parse_args()
 
     return options
