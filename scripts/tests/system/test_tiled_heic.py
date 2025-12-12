@@ -200,7 +200,7 @@ def test_tiled_heic_encoding(setup_encapp, temp_dir, test_pattern):
         result = subprocess.run(
             [
                 f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
-                f"--serial {ANDROID_SERIAL} list --codec '.*hevc.*' --output {output_path}/"
+                f"--serial {ANDROID_SERIAL} list --codec hevc --output {output_path}/"
             ],
             shell=True,
             check=True,
@@ -208,7 +208,8 @@ def test_tiled_heic_encoding(setup_encapp, temp_dir, test_pattern):
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
         )
-        codec = result.stdout.strip()
+        # Just run the first one
+        codec = result.stdout.strip().split("\n")[0]
         if not codec or "hevc" not in codec.lower():
             pytest.skip("No HEVC encoder found on device")
     except subprocess.CalledProcessError as err:
@@ -231,7 +232,7 @@ def test_tiled_heic_encoding(setup_encapp, temp_dir, test_pattern):
                     description: 'System test for tiled HEIC encoding'
                 }}
                 input {{
-                    filepath: \"{test_pattern}\"
+                    filepath: '{test_pattern}'
                     resolution: '1280x1280'
                     pix_fmt: yuv420p
                     framerate: 1
