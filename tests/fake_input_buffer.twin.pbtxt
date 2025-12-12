@@ -1,0 +1,50 @@
+test {
+# Fake input test for buffer encoder
+# This test uses synthetic data generation for performance testing
+# without filesystem or camera overhead
+
+    common: {
+      id: "fake_input_buffer_test_parallell.1"
+      description: "Buffer encoder with fake input for max throughput testing"
+    }
+
+    input: {
+      filepath: "fake_input"
+      resolution: "1280x720"
+      framerate: 30
+      pix_fmt: nv12
+      playout_frames: 300
+    }
+
+    configure: {
+      codec: "c2.android.avc.encoder"
+      mime: "video/avc"
+      bitrate: "5000000"
+      framerate: 30
+      i_frame_interval: 1
+    }
+    parallel {
+        test {
+            common: {
+              id: "fake_input_buffer_test_parallell.2"
+              description: "Buffer encoder with fake input for max throughput testing"
+            }
+
+            input: {
+              filepath: "fake_input"
+              resolution: "1280x720"
+              framerate: 30
+              pix_fmt: nv12
+              playout_frames: 300
+            }
+
+            configure: {
+              codec: "c2.android.avc.encoder"
+              mime: "video/avc"
+              bitrate: "5000000"
+              framerate: 30
+              i_frame_interval: 1
+            }
+        }
+    }
+}

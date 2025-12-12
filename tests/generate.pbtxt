@@ -1,0 +1,19 @@
+test {
+  common {
+    id: "generate_test"
+    description: "Test using generated synthetic input"
+  }
+  input {
+    filepath: "[generate]"
+    resolution: "1280x720"
+    framerate: 30.0
+    pix_fmt: nv12
+    stoptime_sec: 5
+  }
+  configure {
+    codec: "c2.android.avc.encoder"
+    bitrate: "2M"
+    framerate: 30.0
+  }
+}
+
