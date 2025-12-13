@@ -17,6 +17,64 @@ import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+/**
+ * Buffer objects for queuing render work to renderer thread
+ */
+abstract class RenderBufferObject {
+    long mTimestampUs;
+    int mFrameCount;
+    Statistics mStats;  // For encoding measurement
+    
+    RenderBufferObject(long timestampUs, int frameCount, Statistics stats) {
+        mTimestampUs = timestampUs;
+        mFrameCount = frameCount;
+        mStats = stats;
+    }
+    
+    long getTimestampUs() {
+        return mTimestampUs;
+    }
+    
+    int getFrameCount() {
+        return mFrameCount;
+    }
+    
+    Statistics getStats() {
+        return mStats;
+    }
+}
+
+class RenderFrameBuffer extends RenderBufferObject {
+    MediaCodec mCodec;
+    int mBufferId;
+    MediaCodec.BufferInfo mInfo;
+    
+    RenderFrameBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info, int frameCount, Statistics stats) {
+        super(info.presentationTimeUs, frameCount, stats);
+        mCodec = codec;
+        mBufferId = id;
+        mInfo = info;
+    }
+}
+
+class RenderBitmapBuffer extends RenderBufferObject {
+    Bitmap mBitmap;
+    
+    RenderBitmapBuffer(Bitmap bitmap, long timestampUs, int frameCount, Statistics stats) {
+        super(timestampUs, frameCount, stats);
+        mBitmap = bitmap;
+    }
+}
+
+class RenderGLPatternBuffer extends RenderBufferObject {
+    FakeGLRenderer mGLRenderer;
+    
+    RenderGLPatternBuffer(FakeGLRenderer glRenderer, long timestampUs, int frameCount, Statistics stats) {
+        super(timestampUs, frameCount, stats);
+        mGLRenderer = glRenderer;
+    }
+}
+
 public class OutputMultiplier {
     final static int WAIT_TIME_SHORT_MS = 3000;  // 3 sec
     private static final String TAG = "encapp.mult";
@@ -30,8 +88,10 @@ public class OutputMultiplier {
     private EglCore mEglCore;
     private SurfaceTexture mInputTexture;
     private FullFrameRect mFullFrameBlit;
+    private FullFrameRect mBitmapBlit;  // Separate blit for 2D textures (bitmaps)
     private Surface mInputSurface;
     private int mTextureId;
+    private int mBitmapTextureId = -1;  // Separate 2D texture for bitmap input
     private FrameswapControl mMasterSurface = null;
     private String mName = "OutputMultiplier";
     private int mWidth = -1;
@@ -118,8 +178,16 @@ public class OutputMultiplier {
     }
 
 
-    public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
-        mRenderer.newBitmapAvailable(bitmap, timestampUsec);
+    public void newBitmapAvailable(Bitmap bitmap, long timestampUsec, int frameCount, Statistics stats) {
+        mRenderer.newBitmapAvailable(bitmap, timestampUsec, frameCount, stats);
+    }
+    
+    /**
+     * Signal that a new GL-rendered frame is available (for fake input).
+     * This is used when rendering synthetic patterns directly with GL.
+     */
+    public void newGLPatternFrame(FakeGLRenderer glRenderer, long timestampUsec, int frameCount, Statistics stats) {
+        mRenderer.newGLPatternFrame(glRenderer, timestampUsec, frameCount, stats);
     }
 
     public void newFrameAvailable() {
@@ -152,9 +220,9 @@ public class OutputMultiplier {
         Log.d(TAG, "Done stop and release");
     }
 
-    public void newFrameAvailableInBuffer(MediaCodec codec, int bufferId, MediaCodec.BufferInfo info) {
+    public void newFrameAvailableInBuffer(MediaCodec codec, int bufferId, MediaCodec.BufferInfo info, int frameCount, Statistics stats) {
         if (mRenderer != null) { // it will be null if no surface is connected
-            mRenderer.newFrameAvailableInBuffer(codec, bufferId, info);
+            mRenderer.newFrameAvailableInBuffer(codec, bufferId, info, frameCount, stats);
         } else {
             try {
                 codec.releaseOutputBuffer(bufferId, false);
@@ -176,7 +244,7 @@ public class OutputMultiplier {
         private final Object mVSynchLock = new Object();
         private final Object mSizeLock = new Object();
         boolean mDone = false;
-        ConcurrentLinkedQueue<BufferObject> mFrameBuffers = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<RenderBufferObject> mFrameBuffers = new ConcurrentLinkedQueue<>();
         private long mLatestTimestampNsec = 0;
         private long mTimestamp0Ns = -1;
         private long mCurrentVsyncNs = 0;
@@ -207,10 +275,16 @@ public class OutputMultiplier {
             mSurfaceObject = null; // we do not need it anymore
             mOutputSurfaces.add(mMasterSurface);
             mMasterSurface.makeCurrent();
+            
+            // Create shader program for camera input (external OES texture)
             mFullFrameBlit = new FullFrameRect(
                     new Texture2dProgram(mProgramType));
             mTextureId = mFullFrameBlit.createTextureObject();
             mInputTexture = new SurfaceTexture(mTextureId);
+            
+            // Create shader program for bitmap input (2D texture)
+            mBitmapBlit = new FullFrameRect(
+                    new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_2D));
 
             // We need to know how big the texture should be
             synchronized (mSizeLock) {
@@ -323,7 +397,7 @@ public class OutputMultiplier {
             }
             try {
                 synchronized (mVSynchLock) {
-                    BufferObject buffer = mFrameBuffers.poll();
+                    RenderBufferObject buffer = mFrameBuffers.poll();
                     if (buffer == null) {
                         return;
                     }
@@ -340,7 +414,7 @@ public class OutputMultiplier {
 
                         // Drop frame if we have frame in the buffert and we are more than one frame late
                         if((diff - (mCurrentVsyncNs - mVsync0) < -2L * LATE_LIMIT_NS) && mFrameBuffers.size() > 0) {
-                            FrameBuffer fb = (FrameBuffer)buffer;
+                            RenderFrameBuffer fb = (RenderFrameBuffer)buffer;
                             Log.d(TAG, "Drop late frame " + (diff - (mCurrentVsyncNs - mVsync0)/1000000) + " ms ");
                             fb.mCodec.releaseOutputBuffer(fb.mBufferId, false);
                             synchronized (mFrameDrawnLock) {
@@ -358,43 +432,84 @@ public class OutputMultiplier {
                             }
                         }
                     }
+                    
+                    boolean isGLPattern = false;
                     try {
                         mLatestTimestampNsec = timeNs;
-                        if (buffer instanceof FrameBuffer) {
-                            // Draw texture
-                            FrameBuffer fb = (FrameBuffer)buffer;
+                        if (buffer instanceof RenderFrameBuffer) {
+                            // Draw texture from MediaCodec
+                            RenderFrameBuffer fb = (RenderFrameBuffer)buffer;
                             fb.mCodec.releaseOutputBuffer(fb.mBufferId, true);
                             mMasterSurface.makeCurrent();
                             mInputTexture.updateTexImage();
                             mInputTexture.getTransformMatrix(mTmpMatrix);
+                        } else if (buffer instanceof RenderGLPatternBuffer) {
+                            // Render GL pattern directly - FAST PATH!
+                            // This renders directly to surfaces, no texture blit needed
+                            RenderGLPatternBuffer glBuffer = (RenderGLPatternBuffer)buffer;
+                            renderGLPattern(glBuffer.mGLRenderer, glBuffer.mTimestampUs);
+                            isGLPattern = true;
                         } else {
                             // Draw bitmap
-                            drawBitmap(((BitmapBuffer)buffer).mBitmap);
+                            drawBitmap(((RenderBitmapBuffer)buffer).mBitmap);
                         }
                     } catch (IllegalStateException ise) {
                         // not important
                     }
 
-                }
-                mMasterSurface.setPresentationTime(mLatestTimestampNsec);
+                    
+                    // For GL patterns, we've already rendered directly to surfaces
+                    // For texture/bitmap, we need to blit to all surfaces
+                    if (!isGLPattern) {
+                    mMasterSurface.setPresentationTime(mLatestTimestampNsec);
 
-                synchronized (mLock) {
-                    for (FrameswapControl surface : mOutputSurfaces) {
-                        if (surface.keepFrame()) {
-                            surface.makeCurrent();
-                            int width = surface.getWidth();
-                            int height = surface.getHeight();
-                            GLES20.glViewport(0, 0, width, height);
-                            mFullFrameBlit.drawFrame(mTextureId, mTmpMatrix);
-                            surface.setPresentationTime(mLatestTimestampNsec);
-                            surface.swapBuffers();
+                    synchronized (mLock) {
+                        // Use the appropriate blitter and texture based on input type
+                        FullFrameRect blitter = (mBitmapTextureId != -1) ? mBitmapBlit : mFullFrameBlit;
+                        int textureToUse = (mBitmapTextureId != -1) ? mBitmapTextureId : mTextureId;
+                        
+                        for (FrameswapControl surface : mOutputSurfaces) {
+                            if (surface.keepFrame()) {
+                                surface.makeCurrent();
+                                int width = surface.getWidth();
+                                int height = surface.getHeight();
+                                GLES20.glViewport(0, 0, width, height);
+                                blitter.drawFrame(textureToUse, mTmpMatrix);
+                                surface.setPresentationTime(mLatestTimestampNsec);
+                                surface.swapBuffers();
+                            }
+                        }
+                        
+                        // NOW start encoding measurement - frame has been submitted to encoder!
+                        // Called ONCE per frame after all surfaces are swapped, not once per surface.
+                        // This measures only encoder time, not preparation/rendering time.
+                        if (buffer.getStats() != null) {
+                            buffer.getStats().startEncodingFrame(buffer.getTimestampUs(), buffer.getFrameCount());
+                        }
+                    }
+                } else {
+                    // GL pattern already rendered, just set timestamps and swap
+                    synchronized (mLock) {
+                        for (FrameswapControl surface : mOutputSurfaces) {
+                            if (surface.keepFrame()) {
+                                surface.setPresentationTime(mLatestTimestampNsec);
+                                surface.swapBuffers();
+                            }
+                        }
+                        
+                        // NOW start encoding measurement - frame has been submitted to encoder!
+                        // Called ONCE per frame after all surfaces are swapped, not once per surface.
+                        // This measures only encoder time, not GL rendering or queuing time.
+                        if (buffer.getStats() != null) {
+                            buffer.getStats().startEncodingFrame(buffer.getTimestampUs(), buffer.getFrameCount());
                         }
                     }
                 }
 
-                synchronized (mFrameDrawnLock) {
-                    frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
-                    mFrameDrawnLock.notifyAll();
+                    synchronized (mFrameDrawnLock) {
+                        frameAvailable = (frameAvailable > 0) ? frameAvailable - 1 : 0;
+                        mFrameDrawnLock.notifyAll();
+                    }
                 }
             } catch (Exception ex) {
                 Log.e(TAG, "Exception: " + ex.getMessage());
@@ -446,19 +561,72 @@ public class OutputMultiplier {
                     Log.d(TAG, "Skipping drawFrame after shutdown");
                     return;
                 }
+                if (mMasterSurface == null) {
+                    Log.e(TAG, "Master surface is null, cannot draw bitmap!");
+                    return;
+                }
                 mMasterSurface.makeCurrent();
-                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureId);
-                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
-                        GLES20.GL_LINEAR);
-                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER,
-                        GLES20.GL_LINEAR);
-                GlUtil.checkGlError("loadImageTexture");
+                
+                // Create a separate 2D texture for bitmap input (only once)
+                if (mBitmapTextureId == -1) {
+                    int[] textures = new int[1];
+                    GLES20.glGenTextures(1, textures, 0);
+                    mBitmapTextureId = textures[0];
+                    Log.d(TAG, "Created 2D texture for bitmap input: " + mBitmapTextureId);
+                    
+                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mBitmapTextureId);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+                    GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+                    GlUtil.checkGlError("create 2D texture");
+                } else {
+                    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mBitmapTextureId);
+                }
+                
+                // Load bitmap into the 2D texture
                 GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
-                GlUtil.checkGlError("loadImageTexture");
-                mInputTexture.getTransformMatrix(mTmpMatrix);
+                GlUtil.checkGlError("GLUtils.texImage2D");
+                
+                // Set up transform matrix for bitmap (no transform from SurfaceTexture)
+                Matrix.setIdentityM(mTmpMatrix, 0);
                 Matrix.rotateM(mTmpMatrix, 0, 180, 1f, 0, 0);
             } catch (Exception ex) {
-                Log.e(TAG, "Exception: " + ex.getMessage());
+                Log.e(TAG, "Exception in drawBitmap: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        }
+        
+        /**
+         * Render GL pattern directly to all surfaces - FAST PATH!
+         * No bitmap, no texture upload, just pure GL rendering.
+         */
+        public void renderGLPattern(FakeGLRenderer glRenderer, long timestampUs) {
+            try {
+                if (mEglCore == null) {
+                    Log.d(TAG, "Skipping GL render after shutdown");
+                    return;
+                }
+                
+                // Render pattern to all surfaces
+                synchronized (mLock) {
+                    for (FrameswapControl surface : mOutputSurfaces) {
+                        if (surface.keepFrame()) {
+                            surface.makeCurrent();
+                            int width = surface.getWidth();
+                            int height = surface.getHeight();
+                            GLES20.glViewport(0, 0, width, height);
+                            
+                            // Render GL pattern directly - ZERO CPU overhead!
+                            glRenderer.renderFrame(timestampUs);
+                            
+                            // No need to set transform matrix - pattern fills viewport
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "Exception in renderGLPattern: " + ex.getMessage());
+                ex.printStackTrace();
             }
         }
 
@@ -470,9 +638,9 @@ public class OutputMultiplier {
             }
         }
 
-        public void newFrameAvailableInBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
+        public void newFrameAvailableInBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info, int frameCount, Statistics stats) {
             synchronized (mInputFrameLock) {
-                mFrameBuffers.offer(new FrameBuffer(codec, id, info));
+                mFrameBuffers.offer(new RenderFrameBuffer(codec, id, info, frameCount, stats));
                 frameAvailable += 1;
                 mInputFrameLock.notifyAll();
             }
@@ -485,9 +653,9 @@ public class OutputMultiplier {
             }
         }
 
-        public void newBitmapAvailable(Bitmap bitmap, long timestampUsec) {
+        public void newBitmapAvailable(Bitmap bitmap, long timestampUsec, int frameCount, Statistics stats) {
             synchronized (mInputFrameLock) {
-                mFrameBuffers.offer(new BitmapBuffer(bitmap.copy(bitmap.getConfig(), true), timestampUsec));
+                mFrameBuffers.offer(new RenderBitmapBuffer(bitmap.copy(bitmap.getConfig(), true), timestampUsec, frameCount, stats));
                 frameAvailable += 1;
                 mInputFrameLock.notifyAll();
             }
@@ -500,6 +668,26 @@ public class OutputMultiplier {
                     }
                 }
             }
+        }
+        
+        /**
+         * Render a GL pattern frame - queues the work to be done on GL thread.
+         * This is the fast path for fake input - no bitmap overhead!
+         * OPTIMIZED: No blocking wait - just queue and return immediately.
+         */
+        public void newGLPatternFrame(FakeGLRenderer glRenderer, long timestampUsec, int frameCount, Statistics stats) {
+            synchronized (mInputFrameLock) {
+                // Queue a GL render request (will be processed on GL thread in main loop)
+                mFrameBuffers.offer(new RenderGLPatternBuffer(glRenderer, timestampUsec, frameCount, stats));
+                frameAvailable += 1;
+                mInputFrameLock.notifyAll();
+            }
+            
+            // REMOVED BLOCKING WAIT - GL rendering is async, no need to wait for frame drawn
+            // The bitmap path needs to wait because it copies memory, but GL just queues work
+            
+            // NOTE: startEncodingFrame will be called AFTER swapBuffers() in drawBufferSwap()
+            // to measure only the encoding time, not the GL rendering + queuing time.
         }
 
         public void quit() {

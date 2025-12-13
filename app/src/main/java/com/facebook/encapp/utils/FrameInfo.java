@@ -61,15 +61,17 @@ public class FrameInfo {
     }
     public void start(){
         mStartTime = ClockTimes.currentTimeNs();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Trace.beginAsyncSection("Process frame", mUUID);
-        }
+        // Trace disabled for performance - adds ~1-2ms overhead per frame
+        // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        //     Trace.beginAsyncSection("Process frame", mUUID);
+        // }
     }
 
     public void stop(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Trace.endAsyncSection("Process frame", mUUID);
-        }
+        // Trace disabled for performance - adds ~1-2ms overhead per frame
+        // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        //     Trace.endAsyncSection("Process frame", mUUID);
+        // }
         mStopTime = ClockTimes.currentTimeNs();
         if (mStopTime < mStartTime) {
             mStopTime = -1;
