@@ -17,8 +17,10 @@ public class CliSettings {
     public static final String WORKDIR = "workdir";
     // Either /sdcard/ or /data/data/com.facebook.encapp
     public static final String CHECK_WORKDIR = "check_workdir";
+    public static final String ENABLE_TRACING = "enable_tracing";
 
     private static String mWorkDir = "/sdcard/";
+    private static boolean mEnableTracing = false;
 
     public static void setWorkDir(Context context, Bundle mExtraData) {
         if (mExtraData != null && mExtraData.containsKey(CliSettings.WORKDIR)) {
@@ -39,5 +41,14 @@ public class CliSettings {
 
     public static String getWorkDir() {
         return mWorkDir;
+    }
+    
+    public static void setEnableTracing(boolean enable) {
+        mEnableTracing = enable;
+        Log.d(TAG, "Performance tracing: " + (enable ? "enabled" : "disabled"));
+    }
+    
+    public static boolean isTracingEnabled() {
+        return mEnableTracing;
     }
 }

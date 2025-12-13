@@ -173,6 +173,12 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         // need to check permission strategy
         getTestSettings();
         CliSettings.setWorkDir(this, mExtraData);
+        
+        // Check if performance tracing is enabled
+        if (mExtraData != null && mExtraData.containsKey(CliSettings.ENABLE_TRACING)) {
+            CliSettings.setEnableTracing(mExtraData.getBoolean(CliSettings.ENABLE_TRACING, false));
+        }
+        
         boolean useNewMethod = true;
         if (mExtraData != null && mExtraData.size() > 0) {
             useNewMethod = !mExtraData.getBoolean(CliSettings.OLD_AUTH_METHOD, false);
