@@ -469,9 +469,10 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                         mDropNext = false;
                         codec.releaseOutputBuffer(index, false);
                     } else {
-                        mStats.startEncodingFrame(ptsUsec, mInFramesCount);
+                        // NOTE: startEncodingFrame is NOT called here. It will be called AFTER swapBuffers()
+                        // in OutputMultiplier to measure only the encoder time.
                         mFramesAdded++;
-                        mOutputMult.newFrameAvailableInBuffer(codec, index, info);
+                        mOutputMult.newFrameAvailableInBuffer(codec, index, info, mInFramesCount, mStats);
                     }
                 } else {
                     mCurrentTimeSec = diffUsec/1000000.0f;
@@ -493,7 +494,8 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                     if (mDropNext) {
                         codec.releaseOutputBuffer(index, false);
                     } else {
-                        mOutputMult.newFrameAvailableInBuffer(codec, index, info);
+                        // Decode-only mode: no encoder, so pass 0 for frameCount and null for stats
+                        mOutputMult.newFrameAvailableInBuffer(codec, index, info, 0, null);
                     }
                 }
             } else {

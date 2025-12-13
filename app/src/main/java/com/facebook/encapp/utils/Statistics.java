@@ -221,7 +221,12 @@ public class Statistics {
         for (int i = mEncodingFrames.size() - 1; i  >= 0; i--) {
             FrameInfo info = mEncodingFrames.get(i);
             if (info == null) {
-                Log.e(TAG, "Failed to lookip object at " + i);
+                Log.e(TAG, "Failed to lookup object at " + i);
+                continue;
+            }
+            // Skip frames that have already been stopped
+            if (info.getStopTime() != 0) {
+                continue;
             }
             long dist = Math.abs(pts - info.getPts());
             if (dist <= minDist) {
