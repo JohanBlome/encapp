@@ -200,10 +200,33 @@ def plotLatency(data, options):
     # drop na from the column that will be plotted
     data = data.dropna(subset=[proctime])
     print(f"{data['proctime'][:3]=}, {data['source'][:3]}")
-    average_lat_msec = round(data["proctime"].mean() / 1e6, 2)
-    p50_msec = int(round(data["proctime"].quantile(0.5) / 1e6, 0))
-    p95_msec = int(round(data["proctime"].quantile(0.95) / 1e6, 0))
-    p99_msec = int(round(data["proctime"].quantile(0.99) / 1e6, 0))
+
+    # Get the number of unique datasets
+    unique_datasets = data[hue].unique()
+    num_datasets = len(unique_datasets)
+
+    # Calculate statistics - either combined or per-dataset
+    if num_datasets <= 3:
+        # Show per-dataset statistics
+        title_lines = [f"{options.label}"]
+        for item in unique_datasets:
+            itemdata = data.loc[data[hue] == item]
+            average_lat_msec = round(itemdata["proctime"].mean() / 1e6, 2)
+            p50_msec = int(round(itemdata["proctime"].quantile(0.5) / 1e6, 0))
+            p95_msec = int(round(itemdata["proctime"].quantile(0.95) / 1e6, 0))
+            p99_msec = int(round(itemdata["proctime"].quantile(0.99) / 1e6, 0))
+            title_lines.append(
+                f"{item}: mean: {average_lat_msec}, p50,p95,p99: {p50_msec}, {p95_msec}, {p99_msec}"
+            )
+        title_text = "\n".join(title_lines)
+    else:
+        # Show combined statistics for more than 3 datasets
+        average_lat_msec = round(data["proctime"].mean() / 1e6, 2)
+        p50_msec = int(round(data["proctime"].quantile(0.5) / 1e6, 0))
+        p95_msec = int(round(data["proctime"].quantile(0.95) / 1e6, 0))
+        p99_msec = int(round(data["proctime"].quantile(0.99) / 1e6, 0))
+        title_text = f"{options.label}\nLatency, mean: {average_lat_msec} msec, p50,p95,p99: {p50_msec}, {p95_msec}, {p99_msec}"
+
     p = sns.lineplot(  # noqa: F841
         x=data["rel_start_quant"] / 1e3,
         y=data[proctime] / 1e6,
@@ -213,9 +236,34 @@ def plotLatency(data, options):
     )
     axs = p.axes
     # p.set_ylim(0, 90)
-    axs.set_title(
-        f"{options.label}\nLatency, mean: {average_lat_msec} msec, p50,p95,p99: {p50_msec}, {p95_msec}, {p99_msec}"
-    )
+    axs.set_title(title_text)
+
+    # Add horizontal lines for max latency per dataset
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for idx, item in enumerate(unique_datasets):
+        itemdata = data.loc[data[hue] == item]
+        max_lat_msec = round(itemdata["proctime"].max() / 1e6, 1)
+        color = colors[idx % len(colors)]
+
+        # Draw horizontal line
+        axs.axhline(y=max_lat_msec, color=color, linestyle="--", linewidth=1, alpha=0.7)
+
+        # Add text label inside the graph area
+        xlim = axs.get_xlim()
+        x_pos = xlim[0] + (xlim[1] - xlim[0]) * 0.02
+        axs.text(
+            x_pos,
+            max_lat_msec,
+            f" {max_lat_msec}",
+            color=color,
+            va="bottom",
+            ha="left",
+            fontsize=8,
+            bbox=dict(
+                boxstyle="round,pad=0.3", facecolor="white", alpha=0.7, edgecolor=color
+            ),
+        )
+
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.set(xlabel="Time (sec)", ylabel="Latency (msec)")
@@ -231,21 +279,45 @@ def plotLatency(data, options):
     for item in data[hue].unique():
         itemdata = data.loc[data[hue] == item]
         average_lat_msec = round(itemdata["proctime"].mean() / 1e6, 2)
-        p50_msec = round(itemdata["proctime"].quantile(0.5) / 1e6, 1)
-        p95_msec = round(itemdata["proctime"].quantile(0.95) / 1e6, 1)
-        p99_msec = round(itemdata["proctime"].quantile(0.99) / 1e6, 1)
+        p50_msec = round(itemdata["proctime"].quantile(0.5) / 1e6, 2)
+        p95_msec = round(itemdata["proctime"].quantile(0.95) / 1e6, 2)
+        p99_msec = round(itemdata["proctime"].quantile(0.99) / 1e6, 2)
         tmp.append([item, average_lat_msec, p50_msec, p95_msec, p99_msec])
     meandata = pd.DataFrame(tmp, columns=[hue, "average", "p50", "p90", "p99"])
     meandata.sort_values(["p50"], inplace=True)
     meandata["index"] = np.arange(1, len(meandata) + 1)
     meanmelt = pd.melt(meandata, ["index", hue])
-    p = sns.lineplot(x="variable", y="value", hue=hue, data=meanmelt)
+    p = sns.lineplot(x="variable", y="value", hue=hue, data=meanmelt, marker="o")
     ymax = meanmelt["value"].max()
     xmax = meanmelt["index"].max()
     for num in meanmelt["index"].unique():
         item = meanmelt.loc[meanmelt["index"] == num].iloc[0][hue]
         text += f"{num}: {item}\n"
     axs = p.axes
+
+    # Add value labels at each point in the graph
+    stat_types = ["average", "p50", "p90", "p99"]
+    for idx, dataset_name in enumerate(meandata[hue]):
+        row = meandata[meandata[hue] == dataset_name].iloc[0]
+        for stat_idx, stat_type in enumerate(stat_types):
+            value = row[stat_type]
+            # Add text annotation slightly above each point
+            axs.text(
+                stat_idx,
+                value,
+                f"{value:.2f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                bbox=dict(
+                    boxstyle="round,pad=0.2",
+                    facecolor="white",
+                    alpha=0.7,
+                    edgecolor="gray",
+                    linewidth=0.5,
+                ),
+            )
+
     axs.set_title("Averaged values")
 
     axs.set(ylabel="Latency (msec)")
@@ -529,7 +601,7 @@ def plot_named_timestamps(data, enc_dec_data, options):
         try:
             print(f"{enc_dec_data.loc[enc_dec_data['frame'] == 0]}")
             print(
-                f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source) ]['proctime']}"
+                f"frame 0: {enc_dec_data.loc[(enc_dec_data['source'] == source)]['proctime']}"
             )
             proctime = enc_dec_data.loc[(enc_dec_data["source"] == source)][
                 "proctime"
@@ -576,6 +648,16 @@ def plot_named_timestamps(data, enc_dec_data, options):
     plt.xticks(rotation=70)
     plt.suptitle(f"{options.label} - Timestamp times in ms")
     axs = p.axes
+
+    # Add value labels on top of each bar
+    for container in axs.containers:
+        # Add labels with rounded integer values (no decimals)
+        labels = [
+            f"{int(round(v.get_height()))}" if v.get_height() > 0 else ""
+            for v in container
+        ]
+        axs.bar_label(container, labels=labels, fontsize=8, padding=3)
+
     axs.legend(loc="best", fancybox=True, framealpha=0.5)
     axs.get_yaxis().set_minor_locator(mlp.ticker.AutoMinorLocator())
     axs.grid(visible=True, which="both")
