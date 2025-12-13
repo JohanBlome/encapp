@@ -294,7 +294,9 @@ def collect_results(
         if test.common and test.common.output_filename:
             filename = test.common.output_filename
             output_files += re.findall(f"{filename}.*", stdout, re.MULTILINE)
-
+            for subtest in test.parallel.test:
+                filename = subtest.common.output_filename
+                output_files += re.findall(f"{filename}.*", stdout, re.MULTILINE)
     output_files += re.findall(
         encapp_tool.adb_cmds.ENCAPP_OUTPUT_FILE_NAME_RE, stdout, re.MULTILINE
     )
