@@ -21,7 +21,9 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.FakeInputReader;
+import com.facebook.encapp.utils.CliSettings;
+import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.FakeGLRenderer;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
 import com.facebook.encapp.utils.FrameswapControl;
@@ -38,6 +40,7 @@ import java.io.IOException;
 import java.lang.NullPointerException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 
 
 /**
@@ -53,7 +56,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     boolean mIsRgbaSource = false;
     boolean mIsCameraSource = false;
     boolean mIsFakeInput = false;
-    FakeInputReader mFakeInputReader;
+    FakeGLRenderer mFakeGLRenderer;  // GL-based fake input (fast!)
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
     Bundle mKeyFrameBundle;
@@ -114,7 +117,8 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             mRefFramesizeInBytes = width * height * 4;
         } else if (mTest.getInput().getFilepath().equals("fake_input")) {
             mIsFakeInput = true;
-            Log.d(TAG, "Using fake input for performance testing");
+            // Use GL rendering for fake input - ZERO CPU overhead!
+            Log.d(TAG, "Using fake input with GL rendering for performance testing");
         } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
             //TODO: handle other fps (i.e. try to set lower or higher fps)
@@ -152,26 +156,35 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         }
 
         if (!mIsCameraSource) {
-            mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            if (!mIsFakeInput) {
+                // Only create bitmap for non-GL paths
+                mBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            }
 
             if (mIsFakeInput) {
-                mFakeInputReader = new FakeInputReader();
-                if (!mFakeInputReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt(), width, height)) {
-                    return "Could not initialize fake input";
-                }
+                // Initialize FakeGLRenderer (will be set up later on GL thread)
+                mFakeGLRenderer = new FakeGLRenderer();
+                mFakeGLRenderer.setPatternType(FakeGLRenderer.PatternType.TEXTURE);
+                Log.d(TAG, "Created FakeGLRenderer for GL-based fake input");
+                // Initialize on GL thread after OutputMultiplier is ready
             } else {
                 mYuvReader = new FileReader();
                 if (!mYuvReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt())) {
                     return "Could not open file";
                 }
             }
-
         }
 
 
         MediaFormat format;
 
         try {
+            // Surface encoding requires OutputMultiplier - create one if not provided
+            if (mOutputMult == null) {
+                Log.d(TAG, "Creating OutputMultiplier for surface encoding (no display output)");
+                mOutputMult = new OutputMultiplier(mVsyncHandler);
+            }
+
             // Unless we have a mime, do lookup
             if (mTest.getConfigure().getMime().length() == 0) {
                 Log.d(TAG, "codec id: " + mTest.getConfigure().getCodec());
@@ -254,6 +267,17 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         int current_loop = 1;
         ByteBuffer byteBuffer = ByteBuffer.allocate(mRefFramesizeInBytes);
         boolean done = false;
+
+        // For file input, we're immediately stable (no warmup needed)
+        // For fake input with GL, initialization will happen on first frame render
+        if (!mIsCameraSource && mYuvReader != null) {
+            mStable = true;
+        } else if (mIsFakeInput && mFakeGLRenderer != null) {
+            // GL renderer will be initialized on first frame (on GL thread)
+            mStable = true;
+            Log.i(TAG, "FakeGLRenderer ready (will init on GL thread)");
+        }
+
         synchronized (this) {
             Log.d(TAG, "Wait for synchronized start");
             try {
@@ -264,6 +288,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             }
         }
         mStats.start();
+
         int errorCounter = 0;
         while (!done) {
             if (mFramesAdded % 100 == 0 && MainActivity.isStable()) {
@@ -320,7 +345,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                             } else {
                                 mFrameSwapSurface.dropNext(false);
                                 long ptsUsec = 0;
-                                if (mUseCameraTimestamp) {
+                                if (mUseCameraTimestamp && mIsCameraSource) {
                                     // Use the camera provided timestamp
                                     ptsUsec = mPts + (long) (timestampUsec - mFirstFrameTimestampUsec);
                                 } else {
@@ -344,10 +369,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
 
                 } else {
                     if (MainActivity.isStable()) {
-
                         while (size < 0 && !done) {
                             try {
-                                if (mYuvReader != null) {
+                                if (mYuvReader != null || mIsFakeInput) {
                                     size = queueInputBufferEncoder(
                                             mYuvReader,
                                             mCodec,
@@ -456,6 +480,10 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         if (mYuvReader != null)
             mYuvReader.closeFile();
 
+        if (mFakeGLRenderer != null) {
+            mFakeGLRenderer.release();
+        }
+
         if (mSurfaceTexture != null) {
             mSurfaceTexture.detachFromGLContext();
             mSurfaceTexture.releaseTexImage();
@@ -476,6 +504,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 mRealtime = true;
             }
         }
+        
+        // Fake GL input doesn't need realtime throttling - it's synthetic data
+        // Let it run as fast as the encoder can handle
+        if (mIsFakeInput) {
+            Log.d(TAG, "Fake GL input detected - disabling realtime throttling for max performance");
+            mRealtime = false;
+        }
+        
         if (!mRealtime) {
             if (mOutputMult != null) {
                 Log.d(TAG, "Outputmultiplier will work in non realtime mode");
@@ -497,54 +533,156 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                     Log.d(TAG, "Outputmultiplier will work in non realtime mode");
                     mOutputMult.setRealtime(false);
                 }
+            } else if (mIsFakeInput && !mTest.getInput().hasShow()) {
+                // Fake input without UI display doesn't need vsync synchronization
+                Log.d(TAG, "Fake input without display - disabling vsync synchronization");
+                mOutputMult.setRealtime(false);
             }
         }
     }
 
     /**
-     * Fills input buffer for encoder from YUV buffers.
+     * Fills input buffer for encoder from YUV file or fake GL input.
+     * OPTIMIZED: GL path has ZERO Java/CPU overhead.
      *
      * @return size of enqueued data.
      */
     private int queueInputBufferEncoder(
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
-        byteBuffer.clear();
-        int read = 0;
-        if (mIsFakeInput) {
-            read = mFakeInputReader.fillBuffer(byteBuffer, size);
-        } else {
-            read = fileReader.fillBuffer(byteBuffer, size);
-        }
-        long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
-        setRuntimeParameters(mInFramesCount);
-        mDropNext = dropFrame(mInFramesCount);
-        mDropNext |= dropFromDynamicFramerate(mInFramesCount);
-        updateDynamicFramerate(mInFramesCount);
-        if (mDropNext) {
-            mSkipped++;
-            mDropNext = false;
-            read = -2;
-        } else if (read == size) {
-            mFramesAdded++;
-            if (!mIsRgbaSource) {
-                mYuvIn.copyFrom(byteBuffer.array());
-                yuvToRgbIntrinsic.setInput(mYuvIn);
-                yuvToRgbIntrinsic.forEach(mYuvOut);
-
-                mYuvOut.copyTo(mBitmap);
+        
+        int read;
+        if (mIsFakeInput && mFakeGLRenderer != null) {
+            // GL rendering path - ZERO CPU overhead!
+            long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
+            setRuntimeParameters(mInFramesCount);
+            mDropNext = dropFrame(mInFramesCount);
+            mDropNext |= dropFromDynamicFramerate(mInFramesCount);
+            updateDynamicFramerate(mInFramesCount);
+            
+            if (mDropNext) {
+                mSkipped++;
+                mDropNext = false;
+                read = -2;
             } else {
-                mBitmap.copyPixelsFromBuffer(byteBuffer);
+                mFramesAdded++;
+                if (mFirstFrameTimestampUsec == -1) {
+                    mFirstFrameTimestampUsec = ptsUsec;
+                }
+                
+                // Direct GL rendering - no bitmap, no copying!
+                mOutputMult.newGLPatternFrame(mFakeGLRenderer, ptsUsec, frameCount, mStats);
+                
+                // NOTE: startEncodingFrame is NOT called here. It will be called AFTER swapBuffers()
+                // in OutputMultiplier to measure only the encoder time, not GL rendering time.
+                read = size; // Success
+                
+                // Apply realtime throttling if enabled
+                if (mRealtime) {
+                    sleepUntilNextFrame();
+                }
+            }
+        } else {
+            // Original bitmap path for YUV from disk
+            long t0 = 0, t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, t10 = 0, t11 = 0, t12 = 0;
+            
+            if (CliSettings.isTracingEnabled()) {
+                t0 = ClockTimes.currentTimeMs();
+            }
+            byteBuffer.clear();
+            
+            if (CliSettings.isTracingEnabled()) {
+                t1 = ClockTimes.currentTimeMs();
+            }
+            // Regular file input needs manual YUV->RGBA conversion
+            read = fileReader.fillBuffer(byteBuffer, size);
+            if (CliSettings.isTracingEnabled()) {
+                t2 = ClockTimes.currentTimeMs();
+            }
+            if (read == size) {
+                if (!mIsRgbaSource) {
+                    if (CliSettings.isTracingEnabled()) {
+                        t3 = ClockTimes.currentTimeMs();
+                    }
+                    mYuvIn.copyFrom(byteBuffer.array());
+                    if (CliSettings.isTracingEnabled()) {
+                        t4 = ClockTimes.currentTimeMs();
+                    }
+                    yuvToRgbIntrinsic.setInput(mYuvIn);
+                    if (CliSettings.isTracingEnabled()) {
+                        t5 = ClockTimes.currentTimeMs();
+                    }
+                    yuvToRgbIntrinsic.forEach(mYuvOut);
+                    if (CliSettings.isTracingEnabled()) {
+                        t6 = ClockTimes.currentTimeMs();
+                    }
+                    mYuvOut.copyTo(mBitmap);
+                    if (CliSettings.isTracingEnabled()) {
+                        t7 = ClockTimes.currentTimeMs();
+                        if (frameCount < 10) {
+                            Log.d(TAG, "Frame " + frameCount + " [YUV] fileRead: " + (t2-t1) + "ms, copyFrom: " + (t4-t3) + "ms, setInput: " + (t5-t4) + "ms, forEach: " + (t6-t5) + "ms, copyTo: " + (t7-t6) + "ms, TOTAL: " + (t7-t1) + "ms");
+                        }
+                    }
+                } else {
+                    mBitmap.copyPixelsFromBuffer(byteBuffer);
+                    if (CliSettings.isTracingEnabled()) {
+                        t3 = ClockTimes.currentTimeMs();
+                        if (frameCount < 10) {
+                            Log.d(TAG, "Frame " + frameCount + " [RGBA] fileRead: " + (t2-t1) + "ms, copyPixels: " + (t3-t2) + "ms");
+                        }
+                    }
+                }
             }
 
-            if (mFirstFrameTimestampUsec == -1) {
-                mFirstFrameTimestampUsec = ptsUsec;
+            if (CliSettings.isTracingEnabled()) {
+                t8 = ClockTimes.currentTimeMs();
             }
-            mOutputMult.newBitmapAvailable(mBitmap, ptsUsec);
-            mStats.startEncodingFrame(ptsUsec, frameCount);
-        } else {
-            Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
-            return -1;
+            long ptsUsec = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
+            setRuntimeParameters(mInFramesCount);
+            mDropNext = dropFrame(mInFramesCount);
+            mDropNext |= dropFromDynamicFramerate(mInFramesCount);
+            updateDynamicFramerate(mInFramesCount);
+            if (CliSettings.isTracingEnabled()) {
+                t9 = ClockTimes.currentTimeMs();
+            }
+            
+            if (mDropNext) {
+                mSkipped++;
+                mDropNext = false;
+                read = -2;
+            } else if (read == size) {
+                mFramesAdded++;
+
+                if (mFirstFrameTimestampUsec == -1) {
+                    mFirstFrameTimestampUsec = ptsUsec;
+                }
+                
+                if (CliSettings.isTracingEnabled()) {
+                    t10 = ClockTimes.currentTimeMs();
+                }
+                mOutputMult.newBitmapAvailable(mBitmap, ptsUsec, frameCount, mStats);
+                if (CliSettings.isTracingEnabled()) {
+                    t11 = ClockTimes.currentTimeMs();
+                }
+                
+                // NOTE: startEncodingFrame is NOT called here. It will be called AFTER swapBuffers()
+                // in OutputMultiplier to measure only the encoder time, not YUV processing time.
+                if (CliSettings.isTracingEnabled()) {
+                    t12 = ClockTimes.currentTimeMs();
+                    if (frameCount < 10) {
+                        Log.d(TAG, "Frame " + frameCount + " paramCalc: " + (t9-t8) + "ms, newBitmapAvailable: " + (t11-t10) + "ms, TOTAL_QUEUE: " + (t12-t0) + "ms");
+                    }
+                }
+                
+                // Apply realtime throttling if enabled - AFTER all processing is done
+                if (mRealtime) {
+                    sleepUntilNextFrame();
+                }
+            } else {
+                Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
+                return -1;
+            }
         }
+        
         mInFramesCount++;
         return read;
     }
@@ -559,6 +697,10 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
 
     public void release() {
         mOutputMult.stopAndRelease();
+    }
+
+    public OutputMultiplier getOutputMultiplier() {
+        return mOutputMult;
     }
 
     @Override
