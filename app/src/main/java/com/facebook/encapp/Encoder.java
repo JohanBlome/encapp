@@ -286,10 +286,23 @@ public abstract class Encoder {
         }
 
         // Get video dimensions and framerate
-        int width = mTest.getConfigure().hasResolution() ?
-                    Integer.parseInt(mTest.getConfigure().getResolution().split("x")[0]) : 1920;
-        int height = mTest.getConfigure().hasResolution() ?
-                     Integer.parseInt(mTest.getConfigure().getResolution().split("x")[1]) : 1080;
+        // Prefer crop_area if specified (for handling hardware downsampling/cropping)
+        int width = 1920;  // Default
+        int height = 1080; // Default
+
+        if (mTest.getConfigure().hasCropArea()) {
+            // User explicitly specified crop_area dimensions (for downsampling/cropping cases)
+            String[] dims = mTest.getConfigure().getCropArea().split("x");
+            width = Integer.parseInt(dims[0]);
+            height = Integer.parseInt(dims[1]);
+            Log.d(TAG, String.format("Using explicit crop_area dimensions: %dx%d", width, height));
+        } else if (mTest.getConfigure().hasResolution()) {
+            // Use configured resolution (normal case)
+            String[] dims = mTest.getConfigure().getResolution().split("x");
+            width = Integer.parseInt(dims[0]);
+            height = Integer.parseInt(dims[1]);
+        }
+
         float frameRate = mTest.getConfigure().hasFramerate() ?
                          mTest.getConfigure().getFramerate() : 30.0f;
 
@@ -700,6 +713,13 @@ public abstract class Encoder {
 
         @Override
         public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+            Log.d(TAG, mHandlerName + ".onOutputFormatChanged: " + MediaCodecInfoHelper.mediaFormatToString(format));
+            if (format.containsKey(MediaFormat.KEY_WIDTH) && format.containsKey(MediaFormat.KEY_HEIGHT)) {
+                int reportedWidth = format.getInteger(MediaFormat.KEY_WIDTH);
+                int reportedHeight = format.getInteger(MediaFormat.KEY_HEIGHT);
+                Log.d(TAG, "Codec reports dimensions: " + reportedWidth + "x" + reportedHeight +
+                          " (may be incorrect if downsampling - actual dims extracted from bitstream)");
+            }
         }
     }
 

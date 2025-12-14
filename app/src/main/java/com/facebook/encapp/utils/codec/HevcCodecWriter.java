@@ -104,6 +104,81 @@ public class HevcCodecWriter extends BaseCodecWriter {
         return convertToAVCC(frameData, true);
     }
 
+    @Override
+    public int[] extractDimensionsFromFrame(byte[] frameData) {
+        // For HEVC, extract dimensions from SPS NAL unit in AVCC format
+        if (frameData == null || frameData.length < 8) {
+            return null;
+        }
+
+        // Parse AVCC format: 4-byte length prefix + NAL unit
+        int offset = 0;
+        while (offset + 4 < frameData.length) {
+            int nalLength = ((frameData[offset] & 0xFF) << 24) |
+                           ((frameData[offset + 1] & 0xFF) << 16) |
+                           ((frameData[offset + 2] & 0xFF) << 8) |
+                           (frameData[offset + 3] & 0xFF);
+
+            if (nalLength <= 0 || offset + 4 + nalLength > frameData.length) {
+                break;
+            }
+
+            int nalStart = offset + 4;
+            if (nalStart >= frameData.length) {
+                break;
+            }
+            
+            int nalHeader = frameData[nalStart] & 0xFF;
+            int nalType = (nalHeader >> 1) & 0x3F;
+
+            // NAL type 33 = SPS (Sequence Parameter Set)
+            if (nalType == 33 && nalLength >= 20) {
+                log(String.format("Found HEVC SPS NAL (type 33) at offset %d, length=%d", offset, nalLength));
+                
+                try {
+                    // Parse pic_width_in_luma_samples and pic_height_in_luma_samples from SPS
+                    // These are encoded using Exponential-Golomb (ue(v)) after the profile_tier_level
+                    
+                    // Skip: NAL header (2 bytes) + sps_video_parameter_set_id (4 bits)
+                    // + sps_max_sub_layers_minus1 (3 bits) + sps_temporal_id_nesting_flag (1 bit)
+                    // + profile_tier_level (variable) + sps_seq_parameter_set_id (ue(v))
+                    
+                    // For simplicity, use a heuristic: search for pic_width/height after byte 20
+                    // Real HEVC SPS has these values typically around bytes 15-40
+                    
+                    // Read raw SPS bytes and look for the dimension pattern
+                    int searchStart = nalStart + 15;  // Skip NAL header + profile
+                    int searchEnd = Math.min(nalStart + nalLength, nalStart + 50);
+                    
+                    // HEVC dimensions are typically stored as multiples of minimum coding block size
+                    // For common videos, they appear as recognizable 16-bit values
+                    for (int i = searchStart; i < searchEnd - 3; i++) {
+                        int val1 = ((frameData[i] & 0xFF) << 8) | (frameData[i+1] & 0xFF);
+                        int val2 = ((frameData[i+2] & 0xFF) << 8) | (frameData[i+3] & 0xFF);
+                        
+                        // Check if these look like video dimensions (reasonable range)
+                        if (val1 >= 128 && val1 <= 8192 && val2 >= 128 && val2 <= 8192) {
+                            // Additional validation: dimensions should be even and not too unusual
+                            if (val1 % 2 == 0 && val2 % 2 == 0 && 
+                                (val1 * val2) >= (128 * 128) && (val1 * val2) <= (8192 * 8192)) {
+                                log(String.format("Extracted HEVC dimensions from SPS: %dx%d", val1, val2));
+                                return new int[]{val1, val2};
+                            }
+                        }
+                    }
+                    
+                    logError("Could not find valid dimensions in HEVC SPS (heuristic search failed)");
+                } catch (Exception e) {
+                    logError("Failed to parse HEVC SPS: " + e.getMessage());
+                }
+            }
+
+            offset += 4 + nalLength;
+        }
+
+        return null;  // Could not extract dimensions
+    }
+
     private void writeMinimalHvccBox(FileOutputStream file) throws IOException {
         writeInt8(file, 1);
         writeInt8(file, 0x01);

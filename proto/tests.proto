@@ -166,6 +166,13 @@ message Configure {
   // If only one dimension is set, tiles are square
   optional int32 tile_width = 24;
   optional int32 tile_height = 25;
+  // Output crop area for container metadata (wxh format, e.g. "960x720")
+  // Use this when hardware encoder downsampling or cropping produces different
+  // dimensions than the configured resolution. If set, this will be used for
+  // container metadata (track dimensions in MP4/HEIC) instead of the configured
+  // resolution. This represents the actual encoded/cropped output dimensions.
+  // NOTE: This only works for the internal muxer
+  optional string crop_area = 26;
 }
 
 message Runtime {

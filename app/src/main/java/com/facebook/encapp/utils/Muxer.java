@@ -182,6 +182,37 @@ public class Muxer {
     }
 
     /**
+     * Update dimensions after initialization.
+     * This allows correcting dimensions when downsampling occurs in the encoder.
+     * Should be called from onOutputFormatChanged callback with actual codec dimensions.
+     *
+     * @param width Actual encoded width
+     * @param height Actual encoded height
+     */
+    public void updateDimensions(int width, int height) {
+        if (!mInitialized) {
+            Log.w(TAG, "Cannot update dimensions before initialization - use constructor instead");
+            return;
+        }
+        if (mFinalized) {
+            Log.w(TAG, "Cannot update dimensions after finalization");
+            return;
+        }
+        
+        Log.d(TAG, String.format("Updating dimensions from %dx%d to %dx%d", 
+                                mWidth, mHeight, width, height));
+        mWidth = width;
+        mHeight = height;
+        
+        // Also update clean aperture to match if not explicitly set
+        if (!mHasCleanAperture) {
+            mCleanApertureWidth = width;
+            mCleanApertureHeight = height;
+            Log.d(TAG, "Updated clean aperture to match: " + width + "x" + height);
+        }
+    }
+
+    /**
      * Initialize the muxer with codec configuration data (SPS/PPS for H.264, VPS/SPS/PPS for H.265).
      *
      * @param codecData Codec-specific data (can be Annex-B or AVCC format)

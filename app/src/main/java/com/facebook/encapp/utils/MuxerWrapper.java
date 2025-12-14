@@ -336,4 +336,21 @@ public class MuxerWrapper {
     public boolean isUsingInternalMuxer() {
         return mUseInternalMuxer;
     }
+
+    /**
+     * Update dimensions in the internal muxer.
+     * This allows correcting the dimensions after the muxer was created,
+     * for example when downsampling happens and we get actual dimensions from the codec.
+     *
+     * @param width Actual encoded width
+     * @param height Actual encoded height
+     */
+    public void updateDimensions(int width, int height) {
+        if (mUseInternalMuxer && mInternalMuxer != null) {
+            mInternalMuxer.updateDimensions(width, height);
+            Log.d(TAG, String.format("Updated muxer dimensions to: %dx%d", width, height));
+        } else {
+            Log.w(TAG, "updateDimensions only supported with internal muxer");
+        }
+    }
 }

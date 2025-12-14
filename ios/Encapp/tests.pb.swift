@@ -752,6 +752,21 @@ struct Configure: @unchecked Sendable {
   /// Clears the value of `tileHeight`. Subsequent reads from it will return its default value.
   mutating func clearTileHeight() {_uniqueStorage()._tileHeight = nil}
 
+  /// Output crop area for container metadata (wxh format, e.g. "960x720")
+  /// Use this when hardware encoder downsampling or cropping produces different
+  /// dimensions than the configured resolution. If set, this will be used for
+  /// container metadata (track dimensions in MP4/HEIC) instead of the configured
+  /// resolution. This represents the actual encoded/cropped output dimensions.
+  /// NOTE: This only works for the internal muxer
+  var cropArea: String {
+    get {return _storage._cropArea ?? String()}
+    set {_uniqueStorage()._cropArea = newValue}
+  }
+  /// Returns true if `cropArea` has been explicitly set.
+  var hasCropArea: Bool {return _storage._cropArea != nil}
+  /// Clears the value of `cropArea`. Subsequent reads from it will return its default value.
+  mutating func clearCropArea() {_uniqueStorage()._cropArea = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum BitrateMode: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -1397,7 +1412,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
 
 extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0")
 
   fileprivate class _StorageClass {
     var _parameter: [Parameter] = []
@@ -1425,6 +1440,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _decodeDump: Bool? = nil
     var _tileWidth: Int32? = nil
     var _tileHeight: Int32? = nil
+    var _cropArea: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1460,6 +1476,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _decodeDump = source._decodeDump
       _tileWidth = source._tileWidth
       _tileHeight = source._tileHeight
+      _cropArea = source._cropArea
     }
   }
 
@@ -1503,6 +1520,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         case 23: try { try decoder.decodeSingularBoolField(value: &_storage._decodeDump) }()
         case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._tileWidth) }()
         case 25: try { try decoder.decodeSingularInt32Field(value: &_storage._tileHeight) }()
+        case 26: try { try decoder.decodeSingularStringField(value: &_storage._cropArea) }()
         default: break
         }
       }
@@ -1590,6 +1608,9 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._tileHeight {
         try visitor.visitSingularInt32Field(value: v, fieldNumber: 25)
       } }()
+      try { if let v = _storage._cropArea {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 26)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1624,6 +1645,7 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._decodeDump != rhs_storage._decodeDump {return false}
         if _storage._tileWidth != rhs_storage._tileWidth {return false}
         if _storage._tileHeight != rhs_storage._tileHeight {return false}
+        if _storage._cropArea != rhs_storage._cropArea {return false}
         return true
       }
       if !storagesAreEqual {return false}
