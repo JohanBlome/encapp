@@ -21,7 +21,7 @@ func logVTSessionProperties(statistics: Statistics, compSession: VTSession) {
                 if d?["PropertyType"]! as? String == "Number"{
                     var propval: CFNumber!
                     status = VTSessionCopyProperty(compSession, key: key as! CFString, allocator: nil, valueOut: &propval)
-                    if status == noErr{
+                    if status == noErr && propval != nil {
                         log.debug("---val: \(propval.debugDescription)")
                         statistics.addProp(name: key as! String, val: "\(propval!)")
                     }
