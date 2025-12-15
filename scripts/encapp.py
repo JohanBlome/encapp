@@ -517,6 +517,13 @@ def get_parameter_value(params: tests_definitions.Parameter, name: str) -> str:
     return ""
 
 
+def replace_placeholders_in_common(obj):
+    if obj.HasField("common"):
+        for field in ["id", "description"]:
+            if obj.common.HasField(field):
+                setattr(obj.common, field, replace_placeholders(getattr(obj.common, field), obj))
+
+
 def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
     reg = r"\[[\w.\-]*\]"
     while True:
@@ -581,6 +588,7 @@ def update_fileoutput_names(test):
         test.common.output_filename = filename
 
 
+
 def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
@@ -628,13 +636,11 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     # 4.b Update outputfile name and id (if present)
     for test in test_suite.test:
         update_fileoutput_names(test)
-        if test.HasField("common") and test.common.HasField("id"):
-            test.common.id = replace_placeholders(test.common.id, test)
+        replace_placeholders_in_common(test)
 
-        if test.HasField("common") and test.common.HasField("description"):
-            test.common.description = replace_placeholders(
-                test.common.description, test
-            )
+        for subtest in test.parallel.test:
+            update_fileoutput_names(subtest)
+            replace_placeholders_in_common(subtest)
 
     # 5. save the full protobuf text file(s)
     if options.split:
