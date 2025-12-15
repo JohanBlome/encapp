@@ -146,8 +146,13 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        Log.d(TAG, "Screen will stay on during encoding to prevent system freezing");
+        // Keep screen on, unlocked, and turn it on if off - required for camera access
+        getWindow().addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        Log.d(TAG, "Screen will stay on and unlocked during encoding for camera access");
 
         mVsyncHandler = new VsyncHandler();
         mVsyncHandler.start();
@@ -173,12 +178,12 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         // need to check permission strategy
         getTestSettings();
         CliSettings.setWorkDir(this, mExtraData);
-        
+
         // Check if performance tracing is enabled
         if (mExtraData != null && mExtraData.containsKey(CliSettings.ENABLE_TRACING)) {
             CliSettings.setEnableTracing(mExtraData.getBoolean(CliSettings.ENABLE_TRACING, false));
         }
-        
+
         boolean useNewMethod = true;
         if (mExtraData != null && mExtraData.size() > 0) {
             useNewMethod = !mExtraData.getBoolean(CliSettings.OLD_AUTH_METHOD, false);
@@ -795,7 +800,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 Log.d(TAG, "0. Custom encoder");
                 coder = new CustomEncoder(test, this.getFilesDir().getPath());
             } else if (test.getConfigure().getCodec().startsWith("lcevc")) {
-                
+
                 Log.d(TAG, "1. LCEVC encoder");
                 coder = LcevcFactory.createEncoderOrNull(test);
                 if (coder == null) {
