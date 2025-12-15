@@ -504,14 +504,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 mRealtime = true;
             }
         }
-        
+
         // Fake GL input doesn't need realtime throttling - it's synthetic data
         // Let it run as fast as the encoder can handle
         if (mIsFakeInput) {
             Log.d(TAG, "Fake GL input detected - disabling realtime throttling for max performance");
             mRealtime = false;
         }
-        
+
         if (!mRealtime) {
             if (mOutputMult != null) {
                 Log.d(TAG, "Outputmultiplier will work in non realtime mode");
@@ -549,7 +549,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
      */
     private int queueInputBufferEncoder(
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int frameCount, int flags, int size) {
-        
+
         int read;
         if (mIsFakeInput && mFakeGLRenderer != null) {
             // GL rendering path - ZERO CPU overhead!
@@ -558,7 +558,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             mDropNext = dropFrame(mInFramesCount);
             mDropNext |= dropFromDynamicFramerate(mInFramesCount);
             updateDynamicFramerate(mInFramesCount);
-            
+
             if (mDropNext) {
                 mSkipped++;
                 mDropNext = false;
@@ -568,14 +568,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 if (mFirstFrameTimestampUsec == -1) {
                     mFirstFrameTimestampUsec = ptsUsec;
                 }
-                
+
                 // Direct GL rendering - no bitmap, no copying!
                 mOutputMult.newGLPatternFrame(mFakeGLRenderer, ptsUsec, frameCount, mStats);
-                
+
                 // NOTE: startEncodingFrame is NOT called here. It will be called AFTER swapBuffers()
                 // in OutputMultiplier to measure only the encoder time, not GL rendering time.
                 read = size; // Success
-                
+
                 // Apply realtime throttling if enabled
                 if (mRealtime) {
                     sleepUntilNextFrame();
@@ -584,12 +584,12 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         } else {
             // Original bitmap path for YUV from disk
             long t0 = 0, t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, t10 = 0, t11 = 0, t12 = 0;
-            
+
             if (CliSettings.isTracingEnabled()) {
                 t0 = ClockTimes.currentTimeMs();
             }
             byteBuffer.clear();
-            
+
             if (CliSettings.isTracingEnabled()) {
                 t1 = ClockTimes.currentTimeMs();
             }
@@ -644,7 +644,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             if (CliSettings.isTracingEnabled()) {
                 t9 = ClockTimes.currentTimeMs();
             }
-            
+
             if (mDropNext) {
                 mSkipped++;
                 mDropNext = false;
@@ -655,7 +655,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 if (mFirstFrameTimestampUsec == -1) {
                     mFirstFrameTimestampUsec = ptsUsec;
                 }
-                
+
                 if (CliSettings.isTracingEnabled()) {
                     t10 = ClockTimes.currentTimeMs();
                 }
@@ -663,7 +663,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 if (CliSettings.isTracingEnabled()) {
                     t11 = ClockTimes.currentTimeMs();
                 }
-                
+
                 // NOTE: startEncodingFrame is NOT called here. It will be called AFTER swapBuffers()
                 // in OutputMultiplier to measure only the encoder time, not YUV processing time.
                 if (CliSettings.isTracingEnabled()) {
@@ -672,7 +672,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                         Log.d(TAG, "Frame " + frameCount + " paramCalc: " + (t9-t8) + "ms, newBitmapAvailable: " + (t11-t10) + "ms, TOTAL_QUEUE: " + (t12-t0) + "ms");
                     }
                 }
-                
+
                 // Apply realtime throttling if enabled - AFTER all processing is done
                 if (mRealtime) {
                     sleepUntilNextFrame();
@@ -682,7 +682,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                 return -1;
             }
         }
-        
+
         mInFramesCount++;
         return read;
     }
@@ -696,7 +696,11 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     public void stopAllActivity(){}
 
     public void release() {
-        mOutputMult.stopAndRelease();
+        // Don't release the multiplier if it's a shared camera source -
+        // MainActivity will release mCameraSourceMultiplier after all tests complete
+        if (!mIsCameraSource) {
+            mOutputMult.stopAndRelease();
+        }
     }
 
     public OutputMultiplier getOutputMultiplier() {

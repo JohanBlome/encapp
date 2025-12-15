@@ -605,6 +605,10 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 for (Encoder coder: mEncoderList) {
                     coder.release();
                 }
+                // Release the shared camera source multiplier after all encoders are done
+                if (mCameraSourceMultiplier != null) {
+                    mCameraSourceMultiplier.stopAndRelease();
+                }
                 if (mCameraSource != null) {
                     mCameraSource.closeCamera();
                 }
@@ -745,6 +749,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     Log.d(TAG, "[" + test.getCommon().getId() + "] getting texture");
                     ot = getFirstFreeTextureView();
                 }
+                // For camera input, setup camera first to ensure mCameraSourceMultiplier is created
+                if (filePath.toLowerCase(Locale.US).equals("camera")) {
+                    setupCamera(ot);  // setupCamera handles null ot
+                }
+
                 if (filePath.toLowerCase(Locale.US).contains(".raw") ||
                         filePath.toLowerCase(Locale.US).contains(".yuv") ||
                         filePath.toLowerCase(Locale.US).contains(".rgba")) {
@@ -759,11 +768,6 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     ot.mMult = mult;
                 }
                 surface = true;
-                if (ot != null) {
-                    if (filePath.toLowerCase(Locale.US).equals("camera")) {
-                        setupCamera(ot);
-                    }
-                }
             }
             String extension = getFilenameExtension(filePath);
             // Check decode
