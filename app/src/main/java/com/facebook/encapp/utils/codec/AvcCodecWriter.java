@@ -369,9 +369,6 @@ public class AvcCodecWriter extends BaseCodecWriter {
             return null;
         }
 
-        log(String.format("Converted Annex-B to AVCC: %d NAL units, %d bytes total",
-            nalCount, avccBuffer.length));
-
         return avccBuffer;
     }
 }
