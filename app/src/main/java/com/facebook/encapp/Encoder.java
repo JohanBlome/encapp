@@ -541,7 +541,6 @@ public abstract class Encoder {
                 read = fileReader.fillBuffer(byteBuffer, size);
             }
         }
-        Log.d(TAG, "Read: " + read);
         long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
         mCurrentTimeSec =  ptsUsec / 1000000.0f;
         // set any runtime parameters for this frame
