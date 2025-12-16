@@ -1,0 +1,20 @@
+# System test for fake input buffer encoding
+# Uses synthetic data generation instead of file input
+test {
+    input {
+        filepath: "fake_input"
+        resolution: "640x480"
+        framerate: 30
+        pix_fmt: nv12
+        playout_frames: 100
+    }
+    common {
+        id: "system_test_fake_input"
+        description: "Verify fake input buffer encoding"
+    }
+    configure {
+        bitrate: "500 kbps"
+        framerate: 30
+        i_frame_interval: 1
+    }
+}

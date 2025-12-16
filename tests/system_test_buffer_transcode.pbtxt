@@ -1,0 +1,17 @@
+# System test for buffer transcoding
+# Decodes video file and re-encodes using buffer mode
+test {
+    input {
+        filepath: "/tmp/akiyo_qcif.mp4"
+        device_decode: true
+    }
+    common {
+        id: "system_test_buffer_transcode"
+        description: "Verify buffer transcoding (decode + encode)"
+    }
+    configure {
+        bitrate: "200 kbps"
+        framerate: 30
+        i_frame_interval: 1
+    }
+}

@@ -208,3 +208,44 @@ def test_buffer_encoding(tmp_path, setup_data):
         )
     except subprocess.CalledProcessError as err:
         pytest.fail(err.stdout)
+
+
+def test_buffer_transcoding(tmp_path, setup_data):
+    """Verify buffer transcoding (decode + re-encode) works on test device"""
+    try:
+        # Get codec list and lookup a sw h264 codec
+        result = subprocess.run(
+            [
+                f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+                f"--serial {ANDROID_SERIAL} list --codec '.*h264.*' --sw --encoder"
+            ],
+            shell=True,
+            check=True,
+            text=True,
+            stderr=subprocess.STDOUT,
+            stdout=subprocess.PIPE,
+        )
+        codec = result.stdout.strip()
+        assert len(codec) > 0, "No h264 encoder found"
+
+        output_path = f"{tmp_path}/encapp_buffer_transcode_test/"
+        subprocess.run(
+            [
+                f"{PYTHON_ENV} {ENCAPP_SCRIPT_PATH} "
+                f"--serial {ANDROID_SERIAL} run "
+                f"{TEST_SCRIPTS_DIR}/system_test_buffer_transcode.pbtxt "
+                f"--codec {codec} --local-workdir {output_path}"
+            ],
+            shell=True,
+            check=True,
+            text=True,
+            stderr=subprocess.STDOUT,
+            stdout=subprocess.PIPE,
+        )
+        # Verify output file was created
+        output_files = os.listdir(output_path) if os.path.exists(output_path) else []
+        mp4_files = [f for f in output_files if f.endswith('.mp4')]
+        assert len(mp4_files) > 0, f"No output MP4 files found in {output_path}"
+
+    except subprocess.CalledProcessError as err:
+        pytest.fail(f"Buffer transcoding failed: {err.stdout}")
