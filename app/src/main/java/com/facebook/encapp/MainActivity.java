@@ -814,7 +814,15 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
             } else if (!surface && !deviceDecode && deviceEncode) {
 
                 Log.d(TAG, "3. Simple buffer encode");
-                coder = new BufferEncoder(test);
+                // Use BufferEncoder for tiled encoding (HEIC), otherwise use AsyncBufferEncoder
+                boolean useTiledEncoding = test.getConfigure().hasTileWidth() || test.getConfigure().hasTileHeight();
+                if (useTiledEncoding) {
+                    Log.d(TAG, "3a. Using BufferEncoder for tiled encoding");
+                    coder = new BufferEncoder(test);
+                } else {
+                    Log.d(TAG, "3b. Using AsyncBufferEncoder for better throughput");
+                    coder = new AsyncBufferEncoder(test);
+                }
             } else if (!surface && deviceDecode && deviceEncode) {
                 Log.d(TAG, "4. Buffer transcode");
                 coder = new BufferTranscoder(test);
