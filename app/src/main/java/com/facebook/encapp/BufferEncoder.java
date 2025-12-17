@@ -326,9 +326,6 @@ class BufferEncoder extends Encoder {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     input_done = true;
                 }
-                if (mRealtime) {
-                    sleepUntilNextFrame();
-                }
                 if (index >= 0) {
                     failures = 0;
                     int size = -1;
