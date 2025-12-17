@@ -9,13 +9,15 @@ import Foundation
 
 class TestRunner: Thread {
     var filename: String
+    var overrideInput: String? = nil
     var testsRunning = Array<Thread>()
     var isRunning = true
     var completion: ()->()?
-
-    init(filename: String, completion: @escaping ()->()) {
+    
+    init(filename: String, input: String, completion: @escaping ()->()) {
         self.filename = filename
         self.completion = completion
+        self.overrideInput = input
     }
 
     override func main() { // Thread's starting point
@@ -27,21 +29,25 @@ class TestRunner: Thread {
         log.info("Starting threaded test")
         let io = FileIO()
         let testsuite = io.readTestDefinition(inputfile: filename)
-        log.info("Test definition: \(testsuite)")
+        
         if testsuite.test.count == 0 {
             log.error("No test, probably faulty path or definition")
             return
         }
-
+        
         var counter = 1
         for test in testsuite.test {
             let descr = "** Running \(counter)/\(testsuite.test.count), test: \(test.common.id)"
             log.info(descr)
             overview.updateTestsLog(text: descr)
+            var test_ = test
+            if overrideInput!.count > 0 {
+                test_.input.filepath = overrideInput!
+            }
             counter += 1
             //TODO: add start sync
-            if test.hasParallel {
-                for parallel in test.parallel.test {
+            if test_.hasParallel {
+                for parallel in test_.parallel.test {
                     let task = RunSingleTest(test: parallel, completion: completion)
 
                     testsRunning.append(task)
@@ -49,7 +55,7 @@ class TestRunner: Thread {
                     task.start()
                 }
             }
-            let task = RunSingleTest(test: test, completion: completion)
+            let task = RunSingleTest(test: test_, completion: completion)
             log.info("** start blocking")
             testsRunning.append(task)
             task.start()
@@ -100,18 +106,29 @@ class TestRunner: Thread {
                 } else {
                     //TODO: fix later, for now simple things
                     log.info("Start encoding test: \(test.common.id)")
-                    let encoder = Encoder(test: test)
+                    // Check the encoder if x264 choose the x264 encoder (duh)
+                    let encoder: Encoder
+                    if test.configure.codec.contains("x264") {
+                        #if X264
+                        encoder = X264Encoder(test: test)
+                        #else
+                        log.error("X264 build is not included in this build")
+                        throw EncappErrors.x264NotAvailable
+                        #endif
+                    } else {
+                        encoder = Encoder(test: test)
+                    }
                     let result = try encoder.Encode()
                     statistics = encoder.statistics
                     log.info("\(result)")
                     log.info("Done testing: ")
                 }
-
+                done = true
+                self.completion(self)
             }  catch {
                 log.error("Error running single test")
             }
-            done = true
-            self.completion(self)
+
             sem.signal()
         }
 
