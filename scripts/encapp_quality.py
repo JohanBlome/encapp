@@ -24,6 +24,7 @@ from google.protobuf.json_format import MessageToDict
 import multiprocessing as mp
 import tempfile
 import traceback
+
 # Define color codes
 
 RED = "\033[91m"
@@ -62,6 +63,7 @@ KEEP_QUALITY_FILES_ENV = os.environ.get("ENCAPP_KEEP_QUALITY_FILES", False) in [
 CVVDP_AVAILABLE = True
 QPEXTRACT_AVAILABLE = True
 QUIET = False
+
 
 def calc_stats(pdata, options, label, print_text=False):
     if pdata.empty:
@@ -564,7 +566,9 @@ def run_quality(test_file, options, debug):
             return failed
 
         if results.get("sourcefile") is None:
-            print(f"{RED} ERROR, bad source, {test_file}, probably not an Encapp file {END}")
+            print(
+                f"{RED} ERROR, bad source, {test_file}, probably not an Encapp file {END}"
+            )
             failed["error"] = "Not an encapp file"
             return failed
 
@@ -833,11 +837,13 @@ def run_quality(test_file, options, debug):
             _tmp = encodedfile
             # create them
             if is_image:
-                _tmp = '.'.join(encodedfile.split('.')[:-1]) + ".y4m"
+                _tmp = ".".join(encodedfile.split(".")[:-1]) + ".y4m"
                 shell_cmd = f"heif-dec {encodedfile} -s {_tmp}"
                 ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
                 if not ret or not os.path.exists(_tmp):
-                    print(f"ERROR: failed to run heif-dec: {shell_cmd=}, is it on path?")
+                    print(
+                        f"ERROR: failed to run heif-dec: {shell_cmd=}, is it on path?"
+                    )
                     # TODO: Return?
             shell_cmd = f"{FFMPEG_SILENT} -i {_tmp} -f rawvideo -pix_fmt {pix_fmt} -s {output_resolution} {duration_s} {tmp_dist} -y"
             ret, std, err = encapp_tool.adb_cmds.run_cmd(shell_cmd, debug)
@@ -951,7 +957,7 @@ def run_quality(test_file, options, debug):
             for loop in range(0, loopnum):
                 vmaf_file_ = vmaf_file
                 if loopmode:
-                    timefilter = fr"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
+                    timefilter = rf"[0:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[{diststream}];[1:v]select=e='eq(mod(n\, {loopnum})\, {loop})'[source];[{diststream}][source]"
                     vmaf_file_ = f"{vmaf_file[:-4]}_{loop}.json"
                 elif len(filter_cmd) > 0:
                     filter_cmd = f"{filter_cmd};[{diststream}][source]"
@@ -1512,7 +1518,10 @@ def get_options(argv):
         default=-1,
     )
     parser.add_argument(
-        "--no-header", help="omit header from output", action="store_true", default=False
+        "--no-header",
+        help="omit header from output",
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--csv",

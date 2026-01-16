@@ -46,13 +46,14 @@ DEFAULT_TESTS = [
 ]
 
 # TODO: sort parameters for difference vendors
-# Add tests with spcific vendor extensions. 
+# Add tests with spcific vendor extensions.
 # Currently hardcoded for Qualcomm
 VENDOR_TESTS = [
     "ltr-2ref.pbtxt",
 ]
 
 TESTS_DIR = "tests"
+
 
 class TestResult:
     name = None
@@ -920,22 +921,22 @@ def get_options(argv):
         "--vendor",
         default=None,
     )
-    parser.add_argument(
-        "--device-workdir",
-        dest="device_workdir",
-        default=None
-    )
+    parser.add_argument("--device-workdir", dest="device_workdir", default=None)
 
     options = parser.parse_args(argv[1:])
     return options
 
+
 def _wrapper(queue, func, *args, **kwargs):
     queue.put(func(*args, **kwargs))
+
 
 # Allow 5 minutes before throwing in the towel.
 def call_with_timeout(func, args=(), kwarg={}, timeout=300):
     queue = multiprocessing.Queue()
-    process = multiprocessing.Process(target=_wrapper, args=(queue, func, *args), kwargs=kwarg)
+    process = multiprocessing.Process(
+        target=_wrapper, args=(queue, func, *args), kwargs=kwarg
+    )
     process.start()
     process.join(timeout)
     if process.is_alive():
@@ -945,9 +946,10 @@ def call_with_timeout(func, args=(), kwarg={}, timeout=300):
         serial = args(2)
         debug = args(1)["debug"]
         encapp_tool.app_utils.force_stop(serial, debug)
-        return False,{}
+        return False, {}
     else:
         return queue.get()
+
 
 def main(argv):
     options = get_options(argv)
@@ -956,9 +958,7 @@ def main(argv):
     serial = None
 
     # get model and serial number
-    model, serial = encapp_tool.adb_cmds.get_device_info(
-        options.serial, options.debug
-    )
+    model, serial = encapp_tool.adb_cmds.get_device_info(options.serial, options.debug)
     if options.serial is None and "ANDROID_SERIAL" in os.environ:
         # read serial number from ANDROID_SERIAL env variable
         options.serial = os.environ["ANDROID_SERIAL"]
@@ -1034,7 +1034,9 @@ def main(argv):
             settings.local_workdir = local_workdir
             settings = encapp.process_options(settings)
             # Set a timeout
-            result_ok, result = call_with_timeout(encapp.codec_test, args=(settings, model, serial, settings.debug))
+            result_ok, result = call_with_timeout(
+                encapp.codec_test, args=(settings, model, serial, settings.debug)
+            )
             bitrate_string += check_mean_bitrate_deviation(result)
             idr_string += check_idr_placement(result)
             temporal_string += check_temporal_layer(result)

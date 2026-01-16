@@ -521,7 +521,11 @@ def replace_placeholders_in_common(obj):
     if obj.HasField("common"):
         for field in ["id", "description"]:
             if obj.common.HasField(field):
-                setattr(obj.common, field, replace_placeholders(getattr(obj.common, field), obj))
+                setattr(
+                    obj.common,
+                    field,
+                    replace_placeholders(getattr(obj.common, field), obj),
+                )
 
 
 def replace_placeholders(source: str, test: tests_definitions.TestSuite) -> str:
@@ -586,7 +590,6 @@ def update_fileoutput_names(test):
 
     if len(filename) > 0:
         test.common.output_filename = filename
-
 
 
 def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
@@ -1292,9 +1295,9 @@ def parse_resolution_field(resolution):
     # parse ranges
     if "-" in resolution:
         resolution_spec = resolution.split("-")
-        assert len(resolution_spec) == 3, (
-            f'error: invalid resolution spec: "{resolution}"'
-        )
+        assert (
+            len(resolution_spec) == 3
+        ), f'error: invalid resolution spec: "{resolution}"'
         start, stop, step = resolution_spec
         return list(
             range(start, stop + 1, step)
@@ -2828,7 +2831,11 @@ def process_options(options):
     if options.replace.get("input", {}).get("filepath", ""):
         videofile = options.replace.get("input", {}).get("filepath", "")
         # Skip file validation for special inputs (generate, camera, and fake_input)
-        if videofile != "[generate]" and videofile != "camera" and videofile != "fake_input":
+        if (
+            videofile != "[generate]"
+            and videofile != "camera"
+            and videofile != "fake_input"
+        ):
             assert os.path.exists(videofile) and os.access(videofile, os.R_OK), (
                 f"file {videofile} does not exist"
                 if os.path.exists(videofile)
@@ -2981,9 +2988,9 @@ def process_input_path(input_filepath, replace, test_input, mediastore, debug=0)
 
 def check_protobuf_test_setup(options):
     # ensure there is an input configuration
-    assert options.configfile is not None, (
-        "error: need a valid input configuration file"
-    )
+    assert (
+        options.configfile is not None
+    ), "error: need a valid input configuration file"
     test_suite = tests_definitions.TestSuite()
 
     for file in options.configfile:
@@ -3339,9 +3346,9 @@ def main(argv):
         encapp_tool.adb_cmds.SPLIT_SIZE_BYTES = parse_magnitude(options.file_split_size)
 
         # ensure there is an input configuration
-        assert options.configfile is not None, (
-            "error: need a valid input configuration file"
-        )
+        assert (
+            options.configfile is not None
+        ), "error: need a valid input configuration file"
 
         if not options.dry_run:
             # first clear out old result
