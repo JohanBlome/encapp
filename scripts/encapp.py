@@ -3296,7 +3296,7 @@ def main(argv):
             options.serial,
             "encapp_.*",
             options.device_workdir,
-            options.workdir,
+            ".",
             options.debug,
         )
         return
