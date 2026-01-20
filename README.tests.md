@@ -417,6 +417,18 @@ Any key that can be set in the `MediaFormat` dictionary can be passed here (all 
   * Default: `false`
   * Useful for debugging decoder output
 
+* **"nullEncode"** (bool)
+    * optional
+    * Disables the encoding stage and runs the pipeline in read-only mode
+    * Default: `false`
+    * Useful for collecting decoder, input, or pipeline statistics without performing actual encoding
+
+* **"battery-test"** (bool)
+    * optional
+    * Enables battery drain test mode, optimized for long-running power measurements
+    * Default: `false`
+    * Useful for collecting battery and power-consumption statistics during sustained workloads
+
 ### Codec-Proprietary Parameters
 
 Any codec-proprietary value can also be passed here. Some examples:

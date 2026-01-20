@@ -72,7 +72,7 @@ public abstract class Encoder {
     protected int mVideoTrack = -1;
     long mPts = 132;
     boolean mRealtime = false;
-
+    boolean mNullEncode = false;
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
     boolean mInitDone = false;
@@ -522,6 +522,8 @@ public abstract class Encoder {
     protected int queueInputBufferEncoder(
             FileReader fileReader, MediaCodec codec, ByteBuffer byteBuffer, int index, int frameCount, int flags, int size, boolean useImage) {
         int read = 0;
+        long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
+        FrameInfo frame = new FrameInfo(ptsUsec, frameCount);
         if (useImage) {
             // copy a frame to the Image
             Image image = mCodec.getInputImage(index);
@@ -534,14 +536,17 @@ public abstract class Encoder {
         } else {
             // copy a frame to the ByteBuffer
             //Log.i(TAG, "-----> [" + index + " / " + frameCount + "] copying " + size + " bytes to the ByteBuffer");
+            if(mNullEncode)
+                frame.start();
             byteBuffer.clear();
             if (mIsFakeInput) {
                 read = mFakeInputReader.fillBuffer(byteBuffer, size);
             } else {
                 read = fileReader.fillBuffer(byteBuffer, size);
             }
+            if(mNullEncode)
+                frame.stop();
         }
-        long ptsUsec = computePresentationTimeUs(mPts, frameCount, mRefFrameTime);
         mCurrentTimeSec =  ptsUsec / 1000000.0f;
         // set any runtime parameters for this frame
         setRuntimeParameters(mInFramesCount);
@@ -561,10 +566,18 @@ public abstract class Encoder {
             if (mRealtime) {
                 sleepUntilNextFrame();
             }
-            mStats.startEncodingFrame(ptsUsec, frameCount);
-            codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+            if(!mNullEncode) {
+                mStats.startEncodingFrame(ptsUsec, frameCount);
+                codec.queueInputBuffer(index, 0 /* offset */, read, ptsUsec /* timeUs */, flags);
+            }
+            else {
+                mStats.startNullEncodingFrame(ptsUsec, frameCount, frame);
+            }
+
         } else if ((flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-            codec.queueInputBuffer(index, 0 /* offset */, 0, ptsUsec /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            if(!mNullEncode) {
+                codec.queueInputBuffer(index, 0 /* offset */, 0, ptsUsec /* timeUs */, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            }
         } else {
             read = -1;
         }

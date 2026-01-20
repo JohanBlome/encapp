@@ -2,6 +2,12 @@ package com.facebook.encapp.utils;
 import android.os.Build;
 import android.os.Trace;
 import android.util.Log;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
+
+import com.facebook.encapp.MainActivity;
 
 import java.util.Dictionary;
 
@@ -15,7 +21,12 @@ public class FrameInfo {
     boolean mIsIframe;
     int mFlags;
     int mOriginalFrame;
-    int mOutputOrder = -1;  // DTS order - the order this frame came out of the encoder
+    int mBatteryVoltage = -1;
+    int mAverageCurrent = -1;
+    int mBatteryCapacity = -1;
+    int mBatteryChargeCounter = -1;
+    int mBatteryCurrentNow = -1;
+    long mBatteryEnergyCounter = -1;
     int mUUID = -1;
     static Integer mIdCounter = 0;
     Dictionary<String, Object> mInfo;
@@ -96,5 +107,73 @@ public class FrameInfo {
     public void addInfo(Dictionary<String, Object> info) {
         mInfo = info;
     }
+
+    public void setAverageCurrent() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mAverageCurrent = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mAverageCurrent = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
+                : -1;
+    }
+
+    public void setBatteryVoltage() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryVoltage = -1; return; }
+
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent status = ctx.registerReceiver(null, filter);
+        mBatteryVoltage = (status != null)
+                ? status.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+                : -1;
+    }
+
+    public void setBatteryCapacity() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryCapacity = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryCapacity = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                : -1;
+    }
+
+    public void setBatteryChargeCounter() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryChargeCounter = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryChargeCounter = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+                : -1;
+    }
+
+    public void setBatteryCurrentNow() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryCurrentNow = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryCurrentNow = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                : -1;
+    }
+
+    public void setBatteryEnergyCounter() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryEnergyCounter = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryEnergyCounter = (bm != null)
+                ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_ENERGY_COUNTER)
+                : -1;
+    }
+
+    public int getBatteryVoltage() { return mBatteryVoltage; }
+    public int getAverageCurrent() { return mAverageCurrent; }
+    public int getBatteryCapacity() { return mBatteryCapacity; }
+    public int getBatteryChargeCounter() { return mBatteryChargeCounter; }
+    public int getBatteryCurrentNow() { return mBatteryCurrentNow; }
+    public long getBatteryEnergyCounter() { return mBatteryEnergyCounter; }
 
 }
