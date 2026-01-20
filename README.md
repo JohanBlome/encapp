@@ -16,6 +16,7 @@ encapp also has support for dynamically changing framerate, bitrate, and ltr.
 This document describes how to use the tool.
 * for tool development, check [README.dev.md](README.dev.md).
 * for details on test configuration, check [README.tests.md](README.tests.md).
+* for details on battery test setup, check [README.battery.md](README.battery.md).
 
 
 # 1. Prerequisites

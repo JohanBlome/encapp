@@ -2,6 +2,7 @@ package com.facebook.encapp;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Matrix;
@@ -64,6 +65,7 @@ import java.util.Stack;
 import java.util.Vector;
 
 public class MainActivity extends AppCompatActivity implements BatteryStatusListener {
+    private static MainActivity instance;
     private final static String TAG = "encapp.main";
     private static boolean mStable = false;
     private final Object mTestLockObject = new Object();
@@ -88,6 +90,23 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     private int mInstancesRunning = 0;
     VsyncHandler mVsyncHandler;
     final static int WAIT_TIME_MS = 5000;
+    static int voltage = -1;
+    long startbattery;
+    int startvoltage;
+    int startavgcurrent;
+    long endbattery;
+    int endvoltage;
+    int endavgcurrent;
+    long endbatteryalter;
+    int startbatterycapacity;
+    int endbatterycapacity;
+    int startchargecounter;
+    int endchargecounter;
+    int startcurrentnow;
+    int endcurrentnow;
+    long startenergycounter;
+    long endenergycounter;
+    int brightness;
     final static long CHARGE_WAIT_TIME_MS = 1 * 60 * 1000;// X minutes
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
     private boolean  mPowerLow = false;
@@ -95,6 +114,14 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
     public static boolean isStable() {
         return mStable;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // Call the methods to check and request permissions
+        checkAndRequestWriteSettingsPermission();
     }
 
     public static String getFilenameExtension(String filename) {
@@ -142,10 +169,46 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return currentVersion;
     }
 
+    private void checkAndRequestWriteSettingsPermission() {
+        if (!Settings.System.canWrite(this)) {
+            // Request Write Settings permission
+            Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "Write Settings permission already granted", Toast.LENGTH_SHORT).show();
+        }
+    }
+    private void setScreenBrightness(int brightnessLevel) {
+        try {
+            // Ensure the brightness level is within the valid range
+            if (brightnessLevel < 0) brightnessLevel = 0;
+            if (brightnessLevel > 255) brightnessLevel = 255;
+
+            Settings.System.putInt(
+                    getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            );
+
+            // Update the system brightness setting
+            Settings.System.putInt(
+                    getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS,
+                    brightnessLevel
+            );
+            Toast.makeText(this, "Brightness set to " + brightnessLevel, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.w(TAG,"Failed to change brightness");
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        instance = this;
         // Keep screen on, unlocked, and turn it on if off - required for camera access
         getWindow().addFlags(
                 android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
@@ -218,6 +281,111 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
             listCodecsJson();
         }
 
+    }
+
+    public static Context getAppContext() { return instance.getApplicationContext(); }
+
+    private double getBatteryCapacity(Context context) {
+        Object powerProfile;
+        double batteryCapacity = 0;
+        try {
+            powerProfile = Class.forName("com.android.internal.os.PowerProfile")
+                    .getConstructor(Context.class)
+                    .newInstance(context);
+            batteryCapacity = (double) Class.forName("com.android.internal.os.PowerProfile")
+                    .getMethod("getBatteryCapacity")
+                    .invoke(powerProfile);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return batteryCapacity; // Returns in mAh
+    }
+
+    private int getChargeCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if (batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        }
+        return -1;
+    }
+
+    private int getAvgCurrent() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE);
+        }
+        return -1;
+    }
+
+    private int getBatteryVoltage() {
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, ifilter);
+
+        if (batteryStatus != null) {
+            return batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1); // in mV
+        }
+        return -1;
+    }
+
+    private int getBatteryPropertyCapacity() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+        }
+        return -1;
+    }
+    private int getBatteryChargeCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        }
+        return -1;
+    }
+    private int getBatteryCurrentNow() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
+        }
+        return -1;
+    }
+    private long getBatteryEnergyCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_ENERGY_COUNTER);
+        }
+        return -1;
+    }
+
+    private long getChargeCountAlternative() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            int Battery_percentage = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            double batteryCapacity = getBatteryCapacity(this);
+            if(Battery_percentage == Integer.MIN_VALUE) {
+                IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+                Intent batteryStatus = registerReceiver(null, filter);
+
+                if(batteryStatus != null) {
+                    int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+                    if (level >= 0 && scale > 0) {  // Ensure valid values
+                        float batteryPct = (level / (float) scale) * 100;
+                        Battery_percentage = (int)batteryPct;
+                    } else {
+                        Log.e("BatteryTest", "Failed to retrieve battery percentage.");
+                        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+                    }
+                } else {
+                    Log.e("BatteryTest", "Battery Intent is null.");
+                    return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+                }
+            }
+
+            long estimatedCharge = (long) ((batteryCapacity * Battery_percentage / 100) * 1000);
+            return estimatedCharge;
+        }
+        return -1;
     }
 
 
@@ -411,6 +579,31 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     TestSetup setup = test0.getTestSetup();
                     if (setup.hasUiholdSec()) {
                         mUIHoldtimeSec = setup.getUiholdSec();
+                    }
+                }
+
+                try {
+                    brightness = Settings.System.getInt(
+                            getContentResolver(),
+                            Settings.System.SCREEN_BRIGHTNESS
+                    );
+                } catch (Settings.SettingNotFoundException e) {
+                    e.printStackTrace();
+                }
+                setScreenBrightness(1);
+
+                if (test0.getConfigure().hasBatteryTest()){
+                    if (test0.getConfigure().getBatteryTest()) {
+                        try {
+                            runOnUiThread(() -> {
+                                Log.d(TAG, "Prepare battery text");
+                                setContentView(R.layout.battery_test);
+                                mLogText = findViewById(R.id.logText);
+                            });
+                            Thread.sleep(30_000); // 30 seconds
+                        } catch (InterruptedException e) {
+                            Log.w("NullEncode", "Start delay interrupted", e);
+                        }
                     }
                 }
 
@@ -875,6 +1068,15 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     final Statistics stats = coder_.getStatistics();
                     if (stats != null) {
                         stats.setAppVersion(getCurrentAppVersion());
+                        endbattery = getChargeCounter();
+                        endvoltage = getBatteryVoltage();
+                        endavgcurrent = getAvgCurrent();
+                        endbatterycapacity = getBatteryPropertyCapacity();
+                        endchargecounter = getBatteryChargeCounter();
+                        endcurrentnow = getBatteryCurrentNow();
+                        endenergycounter = getBatteryEnergyCounter();
+                        endbatteryalter = getChargeCountAlternative();
+                        stats.BatteryTest(startbattery,endbattery,voltage,startvoltage,endvoltage,startavgcurrent,endavgcurrent,startbatterycapacity,endbatterycapacity,startchargecounter,endchargecounter,startcurrentnow,endcurrentnow,startenergycounter,endenergycounter);
                         try {
                             String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
                             Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
@@ -892,7 +1094,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     log("\nDone test: " + test.getCommon().getId());
                     if (stats != null) {
                         Log.d(TAG, "Done test: " + test.getCommon().getId() + " with stats: " + stats.getId() + ", to go: " + mInstancesRunning);
-
+                        setScreenBrightness(brightness);
                     } else {
                         Log.d(TAG, "Done test, stats failed, to go: " + mInstancesRunning);
                     }

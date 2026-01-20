@@ -55,6 +55,23 @@ public class Statistics {
     private int START_STOP_EXTRA = 0;
     private PowerSnapshot mStartPower;
     private PowerSnapshot mEndPower;
+    long mstartbattery;
+    long mendbattery;
+    double mVoltage;
+    double mstartvoltage;
+    double mendvoltage;
+    int mstartavgcurrent;
+    int mendavgcurrent;
+    int startbatterycapacity;
+    int endbatterycapacity;
+    int startchargecounter;
+    int endchargecounter;
+    int startcurrentnow;
+    int endcurrentnow;
+    long startenergycounter;
+    long endenergycounter;
+    long mbatteryDifference;
+    double mtotalEnergyConsumption;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -196,10 +213,27 @@ public class Statistics {
 
     public FrameInfo startEncodingFrame(long pts, int originalFrame) {
         FrameInfo frame = new FrameInfo(pts, originalFrame);
+        frame.setAverageCurrent();
+        frame.setBatteryVoltage();
+        frame.setBatteryCapacity();
+        frame.setBatteryChargeCounter();
+        frame.setBatteryCurrentNow();
+        frame.setBatteryEnergyCounter();
         frame.start();
         mEncodingFrames.add(frame);
         mEncodingProcessingFrames += 1;
         return frame;
+    }
+
+    public void startNullEncodingFrame(long pts, int originalFrame, FrameInfo frame) {
+        frame.setAverageCurrent();
+        frame.setBatteryVoltage();
+        frame.setBatteryCapacity();
+        frame.setBatteryChargeCounter();
+        frame.setBatteryCurrentNow();
+        frame.setBatteryEnergyCounter();
+        mEncodingFrames.add(frame);
+        mEncodingProcessingFrames += 1;
     }
 
     public FrameInfo stopEncodingFrame(long pts, long size, boolean isIFrame) {
@@ -246,6 +280,12 @@ public class Statistics {
         FrameInfo frame = new FrameInfo(pts, getDecodedFrameCount());
         frame.setSize(size);
         frame.setFlags(flags);
+        frame.setAverageCurrent();
+        frame.setBatteryVoltage();
+        frame.setBatteryCapacity();
+        frame.setBatteryChargeCounter();
+        frame.setBatteryCurrentNow();
+        frame.setBatteryEnergyCounter();
         frame.start();
         mDecodingFrames.put(Long.valueOf(pts), frame);
     }
@@ -302,6 +342,41 @@ public class Statistics {
 
     public void setEncodedfile(String filename) {
         mEncodedfile = filename;
+    }
+
+    public void BatteryTest(long startbattery,long endbattery,double Voltage, double StartVoltage, double EndVoltage, int startAvgCurrent, int endAvgCurrent, int startBatteryCapacity, int endBatteryCapacity, int startChargeCounter, int endChargeCounter, int startCurrentNow, int endCurrentNow, long startEnergyCounter, long endEnergyCounter) {
+        mstartbattery = startbattery;
+        mendbattery = endbattery;
+        mstartavgcurrent = startAvgCurrent;
+        mendavgcurrent = endAvgCurrent;
+        startbatterycapacity = startBatteryCapacity;
+        endbatterycapacity = endBatteryCapacity;
+        startchargecounter = startChargeCounter;
+        endchargecounter = endChargeCounter;
+        startcurrentnow = startCurrentNow;
+        endcurrentnow = endCurrentNow;
+        startenergycounter = startEnergyCounter;
+        endenergycounter = endEnergyCounter;
+        if(Voltage > 10) {
+            mVoltage = Voltage/1000;
+        }
+        else {
+            mVoltage = Voltage;
+        }
+        if(StartVoltage > 10) {
+            mstartvoltage = StartVoltage/1000;
+        }
+        else {
+            mstartvoltage = StartVoltage;
+        }
+        if(EndVoltage > 10) {
+            mendvoltage = EndVoltage/1000;
+        }
+        else {
+            mendvoltage = EndVoltage;
+        }
+        mbatteryDifference = startbattery - endbattery;
+        mtotalEnergyConsumption = mbatteryDifference * mVoltage;
     }
 
     public void setEncoderMediaFormat(MediaFormat format) {
@@ -422,6 +497,26 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
+            //Battery info
+            JSONObject batteryData = new JSONObject();
+            batteryData.put("Start Battery (In MicroAmps)", mstartbattery);
+            batteryData.put("End Battery (In MicroAmps)",mendbattery);
+            batteryData.put("StartVoltage", mstartvoltage);
+            batteryData.put("EndVoltage:",mendvoltage);
+            batteryData.put("StartAvgCurrent:",mstartavgcurrent);
+            batteryData.put("EndAvgCurrent:",mendavgcurrent);
+            batteryData.put("StartBatteryCapacity:",startbatterycapacity);
+            batteryData.put("EndBatteryCapacity:",endbatterycapacity);
+            batteryData.put("StartChargeCounter:",startchargecounter);
+            batteryData.put("EndChargeCounter:",endchargecounter);
+            batteryData.put("StartCurrentNow:",startcurrentnow);
+            batteryData.put("EndCurrentNow:",endcurrentnow);
+            batteryData.put("StartEnergyCounter:",startenergycounter);
+            batteryData.put("EndEnergyCounter:",endenergycounter);
+            batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
+            batteryData.put("Voltage (In Volts)",mVoltage);
+            batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
+            json.put("battery_data", batteryData);
             // convert the test configuration to json
             String jsonStr = JsonFormat.printer().includingDefaultValueFields().print(mTest);
             json.put("test", new JSONObject(jsonStr));
@@ -489,6 +584,12 @@ public class Statistics {
                 }
                 obj.put("starttime", info.getStartTime());
                 obj.put("stoptime", info.getStopTime());
+                obj.put("avgcurrent", info.getAverageCurrent());
+                obj.put("currentvoltage", info.getBatteryVoltage());
+                obj.put("BatteryCapacity", info.getBatteryCapacity());
+                obj.put("BatteryChargeCounter", info.getBatteryChargeCounter());
+                obj.put("BatteryCurrentNow", info.getBatteryCurrentNow());
+                obj.put("BatteryEnergyCounter", info.getBatteryEnergyCounter());
                 Dictionary<String, Object> dict = info.getInfo();
                 if (dict != null) {
                     Enumeration<String> keys = dict.keys();
@@ -523,6 +624,12 @@ public class Statistics {
                         obj.put("proctime", info.getProcessingTime());
                         obj.put("starttime", info.getStartTime());
                         obj.put("stoptime", info.getStopTime());
+                        obj.put("avgcurrent", info.getAverageCurrent());
+                        obj.put("currentvoltage", info.getBatteryVoltage());
+                        obj.put("BatteryCapacity", info.getBatteryCapacity());
+                        obj.put("BatteryChargeCounter", info.getBatteryChargeCounter());
+                        obj.put("BatteryCurrentNow", info.getBatteryCurrentNow());
+                        obj.put("BatteryEnergyCounter", info.getBatteryEnergyCounter());
                         Dictionary<String, Object> dict = info.getInfo();
                         if (dict != null) {
                             Enumeration<String> keys = dict.keys();

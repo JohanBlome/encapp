@@ -173,6 +173,8 @@ message Configure {
   // resolution. This represents the actual encoded/cropped output dimensions.
   // NOTE: This only works for the internal muxer
   optional string crop_area = 26;
+  optional bool nullEncode = 27;
+  optional bool battery_test = 28;
 }
 
 message Runtime {

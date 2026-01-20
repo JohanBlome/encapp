@@ -53,6 +53,8 @@ class BufferEncoder extends Encoder {
             mRuntimeParams = mTest.getRuntime();
         if (mTest.getInput().hasRealtime())
             mRealtime = mTest.getInput().getRealtime();
+        if (mTest.getConfigure().hasNullEncode())
+            mNullEncode = mTest.getConfigure().getNullEncode();
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
@@ -308,7 +310,8 @@ class BufferEncoder extends Encoder {
         int failures = 0;
         MediaFormat currentOutputFormat = mCodec.getOutputFormat();
         Dictionary<String, Object> latestFrameChanges = null;
-        while (!input_done || !output_done) {
+        ByteBuffer byteBuffer = ByteBuffer.allocate(mRefFramesizeInBytes);
+        while (!input_done || (!mNullEncode && !output_done)) {
             int index;
             if (mFramesAdded % 100 == 0) {
                 Log.d(TAG, mTest.getCommon().getId() + " - BufferEncoder: frames: " + mFramesAdded +
@@ -326,7 +329,7 @@ class BufferEncoder extends Encoder {
                     flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                     input_done = true;
                 }
-                if (index >= 0) {
+                if (index >= 0 || mNullEncode) {
                     failures = 0;
                     if (input_done) {
                         long pts = computePresentationTimeUs(mPts, mInFramesCount, mRefFrameTime);
@@ -343,7 +346,7 @@ class BufferEncoder extends Encoder {
                                     mYuvReader,
                                     mCodec,
                                     byteBuffer,
-                                    index,
+                                    mNullEncode ? -1 : index,
                                     mInFramesCount,
                                     flags,
                                     mRefFramesizeInBytes,
@@ -368,7 +371,7 @@ class BufferEncoder extends Encoder {
                                      mYuvReader,
                                      mCodec,
                                      byteBuffer,
-                                     index,
+                                     mNullEncode ? -1 : index,
                                      mInFramesCount,
                                      flags,
                                      mRefFramesizeInBytes,
@@ -407,78 +410,80 @@ class BufferEncoder extends Encoder {
             }
 
             // 2. process the encoder output
-            while (!output_done) {
-                try {
-                    int outIndex = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US);
-                    if (outIndex >= 0) {
-                        if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-                            MediaFormat oformat = mCodec.getOutputFormat();
-                            Log.d(TAG, "Output format from codec config: " + oformat);
+            if(!mNullEncode) {
+                while (!output_done) {
+                    try {
+                        int outIndex = mCodec.dequeueOutputBuffer(info, VIDEO_CODEC_WAIT_TIME_US);
+                        if (outIndex >= 0) {
+                            if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                                MediaFormat oformat = mCodec.getOutputFormat();
+                                Log.d(TAG, "Output format from codec config: " + oformat);
 
-                            // Only start muxer if not already started
+                                // Only start muxer if not already started
+                                if (mWriteFile && mMuxerWrapper != null && mVideoTrack == -1) {
+                                    Log.d(TAG, "Starting muxer on codec config buffer");
+                                    mVideoTrack = mMuxerWrapper.addTrack(oformat);
+                                    mMuxerWrapper.start();
+                                    Log.d(TAG, "Muxer started, videoTrack=" + mVideoTrack);
+                                } else {
+                                    Log.d(TAG, "Muxer already started, skipping codec config initialization");
+                                }
+                                mCodec.releaseOutputBuffer(outIndex, false);
+                            } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                                Log.d(TAG, "BUFFER_FLAG_END_OF_STREAM");
+                                output_done = true;
+                                mCodec.releaseOutputBuffer(outIndex, false);
+                            } else {
+                                // Regular frame
+                                FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
+                                        (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+                                ++mOutFramesCount;
+                                frameInfo.addInfo(latestFrameChanges);
+                                latestFrameChanges = null;
+
+                                if (mMuxerWrapper != null && mVideoTrack != -1) {
+                                    ByteBuffer data = mCodec.getOutputBuffer(outIndex);
+                                    mMuxerWrapper.writeSampleData(mVideoTrack, data, info);
+                                }
+                                mCodec.releaseOutputBuffer(outIndex, false);
+                            }
+                        } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                            // No output available yet - go back to input processing
+                            if (input_done) {
+                                // If input is done and no output, we're truly done
+                                output_done = true;
+                            }
+                            break; // Exit output loop, go back to input processing
+                        } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                            MediaFormat oformat = mCodec.getOutputFormat();
+                            Log.d(TAG, "Output format: " + oformat);
+
+                            // Start muxer if not already started
+                            // Some codecs (like AV1) don't send BUFFER_FLAG_CODEC_CONFIG, only format change
                             if (mWriteFile && mMuxerWrapper != null && mVideoTrack == -1) {
-                                Log.d(TAG, "Starting muxer on codec config buffer");
+                                Log.d(TAG, "Starting muxer on format change (no codec config buffer)");
                                 mVideoTrack = mMuxerWrapper.addTrack(oformat);
                                 mMuxerWrapper.start();
                                 Log.d(TAG, "Muxer started, videoTrack=" + mVideoTrack);
                             } else {
-                                Log.d(TAG, "Muxer already started, skipping codec config initialization");
+                                Log.d(TAG, String.format("Not starting muxer: mWriteFile=%b, mMuxerWrapper=%s, mVideoTrack=%d",
+                                        mWriteFile, (mMuxerWrapper != null ? "not null" : "null"), mVideoTrack));
                             }
-                            mCodec.releaseOutputBuffer(outIndex, false);
-                        } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                            Log.d(TAG, "BUFFER_FLAG_END_OF_STREAM");
-                            output_done = true;
-                            mCodec.releaseOutputBuffer(outIndex, false);
-                        } else {
-                            // Regular frame
-                            FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
-                                    (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                            ++mOutFramesCount;
-                            frameInfo.addInfo(latestFrameChanges);
-                            latestFrameChanges = null;
 
-                            if (mMuxerWrapper != null && mVideoTrack != -1) {
-                                ByteBuffer data = mCodec.getOutputBuffer(outIndex);
-                                mMuxerWrapper.writeSampleData(mVideoTrack, data, info);
+                            if (Build.VERSION.SDK_INT >= 29) {
+                                latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
+                                currentOutputFormat = oformat;
                             }
-                            mCodec.releaseOutputBuffer(outIndex, false);
                         }
-                    } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                        // No output available yet - go back to input processing
-                        if (input_done) {
-                            // If input is done and no output, we're truly done
-                            output_done = true;
-                        }
-                        break; // Exit output loop, go back to input processing
-                    } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        MediaFormat oformat = mCodec.getOutputFormat();
-                        Log.d(TAG, "Output format: " + oformat);
-
-                        // Start muxer if not already started
-                        // Some codecs (like AV1) don't send BUFFER_FLAG_CODEC_CONFIG, only format change
-                        if (mWriteFile && mMuxerWrapper != null && mVideoTrack == -1) {
-                            Log.d(TAG, "Starting muxer on format change (no codec config buffer)");
-                            mVideoTrack = mMuxerWrapper.addTrack(oformat);
-                            mMuxerWrapper.start();
-                            Log.d(TAG, "Muxer started, videoTrack=" + mVideoTrack);
-                        } else {
-                            Log.d(TAG, String.format("Not starting muxer: mWriteFile=%b, mMuxerWrapper=%s, mVideoTrack=%d",
-                                mWriteFile, (mMuxerWrapper != null ? "not null" : "null"), mVideoTrack));
-                        }
-
-                        if (Build.VERSION.SDK_INT >= 29) {
-                            latestFrameChanges = mediaFormatComparison(currentOutputFormat, oformat);
-                            currentOutputFormat = oformat;
-                        }
+                    } catch (MediaCodec.CodecException ex) {
+                        Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
+                        ex.printStackTrace();
+                        return "dequeueOutputBuffer: MediaCodec.CodecException error";
+                    } catch (IllegalStateException ex) {
+                        Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
+                        ex.printStackTrace();
+                        return "dequeueOutputBuffer: IllegalStateException error";
                     }
-                } catch (MediaCodec.CodecException ex) {
-                    Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
-                    ex.printStackTrace();
-                    return "dequeueOutputBuffer: MediaCodec.CodecException error";
-                } catch (IllegalStateException ex) {
-                    Log.e(TAG, "dequeueOutputBuffer: IllegalStateException error");
-                    ex.printStackTrace();
-                    return "dequeueOutputBuffer: IllegalStateException error";
                 }
             }
         }
