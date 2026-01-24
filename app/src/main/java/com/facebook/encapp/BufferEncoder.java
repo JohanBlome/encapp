@@ -331,6 +331,8 @@ class BufferEncoder extends Encoder {
                     int size = -1;
                     // get the ByteBuffer where we will write the image to encode
                     ByteBuffer byteBuffer = mCodec.getInputBuffer(index);
+                    Log.d(TAG, "Set runtime");
+                    setRuntimeParameters(mInFramesCount);
                     while (size < 0 && !input_done) {
                         try {
                             size = queueInputBufferEncoder(
