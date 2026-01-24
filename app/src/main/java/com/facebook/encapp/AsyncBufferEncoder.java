@@ -348,18 +348,26 @@ public class AsyncBufferEncoder extends Encoder {
                 return; // Already sent EOS
             }
             
-            // Get a buffer for EOS
-            Integer bufferIndex = mAvailableInputBuffers.poll();
-            if (bufferIndex == null) {
-                // Wait for a buffer
-                while (!mStopRequested && bufferIndex == null) {
-                    bufferIndex = mAvailableInputBuffers.poll();
-                    if (bufferIndex == null) {
-                        try {
-                            Thread.sleep(1);
-                        } catch (InterruptedException e) {
-                            return;
+            // Wait for a buffer to send EOS - with timeout
+            Integer bufferIndex = null;
+            long startTime = System.currentTimeMillis();
+            final long EOS_TIMEOUT_MS = 5000;
+            
+            while (!mStopRequested && bufferIndex == null) {
+                bufferIndex = mAvailableInputBuffers.poll();
+                if (bufferIndex == null) {
+                    if (System.currentTimeMillis() - startTime > EOS_TIMEOUT_MS) {
+                        Log.e(TAG, "Timeout waiting for input buffer to send EOS - forcing completion");
+                        mOutputDone.set(true);
+                        synchronized (mCompletionLock) {
+                            mCompletionLock.notifyAll();
                         }
+                        return;
+                    }
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        return;
                     }
                 }
             }
@@ -371,6 +379,10 @@ public class AsyncBufferEncoder extends Encoder {
                     Log.d(TAG, "Queued EOS at frame " + mInFramesCount);
                 } catch (IllegalStateException e) {
                     Log.e(TAG, "Error queueing EOS: " + e.getMessage());
+                    mOutputDone.set(true);
+                    synchronized (mCompletionLock) {
+                        mCompletionLock.notifyAll();
+                    }
                 }
             }
         }
@@ -460,10 +472,9 @@ public class AsyncBufferEncoder extends Encoder {
 
         @Override
         public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
-            // Add buffer to available queue - InputFeeder will use it
-            if (!mInputDone.get()) {
-                mAvailableInputBuffers.add(index);
-            }
+            // Always add buffers to the queue - InputFeeder needs them for EOS signaling
+            // even after we stop adding frames
+            mAvailableInputBuffers.add(index);
         }
 
         @Override
