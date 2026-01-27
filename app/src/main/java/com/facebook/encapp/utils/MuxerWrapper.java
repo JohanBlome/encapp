@@ -89,12 +89,35 @@ public class MuxerWrapper {
 
         if (mUseInternalMuxer && mInternalMuxer != null) {
             // Get codec-specific data from MediaFormat
-            ByteBuffer csdBuffer = format.getByteBuffer("csd-0");
+            // For AVC: csd-0 contains SPS, csd-1 contains PPS (both with Annex-B start codes)
+            // For HEVC: csd-0 contains VPS+SPS+PPS combined
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            Log.d(TAG, "MediaFormat MIME type: " + mime);
+
             byte[] codecData = null;
-            if (csdBuffer != null) {
-                codecData = new byte[csdBuffer.remaining()];
-                csdBuffer.get(codecData);
-                Log.d(TAG, "Got codec config data from MediaFormat: " + codecData.length + " bytes");
+            ByteBuffer csd0Buffer = format.getByteBuffer("csd-0");
+            ByteBuffer csd1Buffer = format.getByteBuffer("csd-1");
+
+            if (csd0Buffer != null) {
+                byte[] csd0Data = new byte[csd0Buffer.remaining()];
+                csd0Buffer.get(csd0Data);
+                csd0Buffer.rewind(); // Reset position for potential re-read
+
+                if (csd1Buffer != null && "video/avc".equals(mime)) {
+                    // AVC: Combine csd-0 (SPS) and csd-1 (PPS)
+                    byte[] csd1Data = new byte[csd1Buffer.remaining()];
+                    csd1Buffer.get(csd1Data);
+                    csd1Buffer.rewind();
+
+                    codecData = new byte[csd0Data.length + csd1Data.length];
+                    System.arraycopy(csd0Data, 0, codecData, 0, csd0Data.length);
+                    System.arraycopy(csd1Data, 0, codecData, csd0Data.length, csd1Data.length);
+                    Log.d(TAG, "Combined AVC codec config: csd-0 (" + csd0Data.length + " bytes) + csd-1 (" + csd1Data.length + " bytes) = " + codecData.length + " bytes");
+                } else {
+                    // HEVC or other codecs: csd-0 contains everything
+                    codecData = csd0Data;
+                    Log.d(TAG, "Got codec config data from MediaFormat: " + codecData.length + " bytes");
+                }
 
                 // Log first few bytes
                 if (codecData.length > 0) {
@@ -102,13 +125,11 @@ public class MuxerWrapper {
                     for (int i = 0; i < Math.min(16, codecData.length); i++) {
                         hex.append(String.format("%02x ", codecData[i] & 0xFF));
                     }
+                    Log.d(TAG, "Codec config first bytes: " + hex.toString());
                 }
             } else {
                 Log.w(TAG, "No csd-0 buffer in MediaFormat");
             }
-
-            String mime = format.getString(MediaFormat.KEY_MIME);
-            Log.d(TAG, "MediaFormat MIME type: " + mime);
 
             // Auto-detect tile grid from MediaFormat using standard Android keys (API 31+)
             // BUT ONLY if tile mode was not already explicitly set via setTileMode()

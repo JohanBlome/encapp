@@ -11,6 +11,11 @@ import java.util.List;
  */
 public class AvcCodecWriter extends BaseCodecWriter {
 
+    // Storage for SPS/PPS NAL units extracted from frame data.
+    // Used as fallback when codec config data is not provided in initialize().
+    private byte[] mExtractedSps = null;
+    private byte[] mExtractedPps = null;
+
     public AvcCodecWriter() {
         super(CodecType.AVC);
     }
@@ -34,20 +39,27 @@ public class AvcCodecWriter extends BaseCodecWriter {
             throws IOException {
         long position = startBox(file, "avcC");
 
-        if (codecData != null && codecData.length > 0) {
-            log(String.format("Writing avcC box with %d bytes of codec config data", codecData.length));
-            log(String.format("First bytes: %02x %02x %02x %02x",
-                codecData[0] & 0xFF,
-                codecData.length > 1 ? codecData[1] & 0xFF : 0,
-                codecData.length > 2 ? codecData[2] & 0xFF : 0,
-                codecData.length > 3 ? codecData[3] & 0xFF : 0));
+        // If no codec config data provided, try using extracted SPS/PPS from frames
+        byte[] dataToUse = codecData;
+        if ((dataToUse == null || dataToUse.length == 0) && hasExtractedCodecConfig()) {
+            dataToUse = getExtractedCodecConfig();
+            log("Using SPS/PPS extracted from frame data (no codec config provided)");
+        }
 
-            if (codecData.length >= 7 && codecData[0] == 0x01) {
+        if (dataToUse != null && dataToUse.length > 0) {
+            log(String.format("Writing avcC box with %d bytes of codec config data", dataToUse.length));
+            log(String.format("First bytes: %02x %02x %02x %02x",
+                dataToUse[0] & 0xFF,
+                dataToUse.length > 1 ? dataToUse[1] & 0xFF : 0,
+                dataToUse.length > 2 ? dataToUse[2] & 0xFF : 0,
+                dataToUse.length > 3 ? dataToUse[3] & 0xFF : 0));
+
+            if (dataToUse.length >= 7 && dataToUse[0] == 0x01) {
                 log("Codec data appears to be in AVCC format, writing directly");
-                writeBytes(file, codecData);
+                writeBytes(file, dataToUse);
             } else {
                 log("Codec data appears to be in Annex-B format, parsing...");
-                writeAvccFromAnnexB(file, codecData);
+                writeAvccFromAnnexB(file, dataToUse);
             }
         } else {
             log("No codec config data available, writing minimal avcC box");
@@ -103,7 +115,169 @@ public class AvcCodecWriter extends BaseCodecWriter {
 
     @Override
     public byte[] convertFrameData(byte[] frameData) {
+        // Extract and store SPS/PPS from frame data for use as fallback codec config
+        extractAndStoreSpsPs(frameData);
         return convertToAVCC(frameData, false);
+    }
+
+    /**
+     * Get the extracted codec configuration data (SPS/PPS) in Annex-B format.
+     * This is used as fallback when codec config data was not provided during initialization.
+     *
+     * @return SPS/PPS in Annex-B format, or null if not available
+     */
+    public byte[] getExtractedCodecConfig() {
+        if (mExtractedSps == null || mExtractedPps == null) {
+            return null;
+        }
+
+        // Build Annex-B format: 00 00 00 01 SPS 00 00 00 01 PPS
+        int totalSize = 4 + mExtractedSps.length + 4 + mExtractedPps.length;
+        byte[] annexB = new byte[totalSize];
+        int offset = 0;
+
+        // Start code for SPS
+        annexB[offset++] = 0;
+        annexB[offset++] = 0;
+        annexB[offset++] = 0;
+        annexB[offset++] = 1;
+        System.arraycopy(mExtractedSps, 0, annexB, offset, mExtractedSps.length);
+        offset += mExtractedSps.length;
+
+        // Start code for PPS
+        annexB[offset++] = 0;
+        annexB[offset++] = 0;
+        annexB[offset++] = 0;
+        annexB[offset++] = 1;
+        System.arraycopy(mExtractedPps, 0, annexB, offset, mExtractedPps.length);
+
+        return annexB;
+    }
+
+    /**
+     * Check if SPS/PPS have been extracted from frame data.
+     */
+    public boolean hasExtractedCodecConfig() {
+        return mExtractedSps != null && mExtractedPps != null;
+    }
+
+    /**
+     * Extract and store SPS/PPS NAL units from frame data.
+     * This handles both Annex-B and AVCC format input.
+     */
+    private void extractAndStoreSpsPs(byte[] buffer) {
+        if (buffer == null || buffer.length == 0) {
+            return;
+        }
+
+        // Already have SPS and PPS, no need to extract again
+        if (mExtractedSps != null && mExtractedPps != null) {
+            return;
+        }
+
+        // Check if data is in AVCC format (4-byte length prefix)
+        boolean isAvcc = false;
+        if (buffer.length >= 8) {
+            int firstNalLength = ((buffer[0] & 0xFF) << 24) |
+                                ((buffer[1] & 0xFF) << 16) |
+                                ((buffer[2] & 0xFF) << 8) |
+                                (buffer[3] & 0xFF);
+            if (firstNalLength > 0 && firstNalLength <= buffer.length - 4 &&
+                !(buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 0 && buffer[3] == 1)) {
+                isAvcc = true;
+            }
+        }
+
+        if (isAvcc) {
+            extractFromAvcc(buffer);
+        } else {
+            extractFromAnnexB(buffer);
+        }
+    }
+
+    private void extractFromAvcc(byte[] buffer) {
+        int offset = 0;
+        while (offset + 4 < buffer.length) {
+            int nalLength = ((buffer[offset] & 0xFF) << 24) |
+                           ((buffer[offset + 1] & 0xFF) << 16) |
+                           ((buffer[offset + 2] & 0xFF) << 8) |
+                           (buffer[offset + 3] & 0xFF);
+
+            if (nalLength <= 0 || offset + 4 + nalLength > buffer.length) {
+                break;
+            }
+
+            int nalStart = offset + 4;
+            int nalType = buffer[nalStart] & 0x1F;
+
+            if (nalType == 7 && mExtractedSps == null) {
+                // SPS
+                mExtractedSps = new byte[nalLength];
+                System.arraycopy(buffer, nalStart, mExtractedSps, 0, nalLength);
+                log(String.format("Extracted SPS from frame (AVCC): %d bytes", nalLength));
+            } else if (nalType == 8 && mExtractedPps == null) {
+                // PPS
+                mExtractedPps = new byte[nalLength];
+                System.arraycopy(buffer, nalStart, mExtractedPps, 0, nalLength);
+                log(String.format("Extracted PPS from frame (AVCC): %d bytes", nalLength));
+            }
+
+            offset += 4 + nalLength;
+        }
+    }
+
+    private void extractFromAnnexB(byte[] buffer) {
+        int offset = 0;
+        while (offset < buffer.length) {
+            int startCodeLen = 0;
+            if (offset + 3 < buffer.length &&
+                buffer[offset] == 0 && buffer[offset + 1] == 0) {
+                if (buffer[offset + 2] == 1) {
+                    startCodeLen = 3;
+                } else if (offset + 4 < buffer.length &&
+                          buffer[offset + 2] == 0 && buffer[offset + 3] == 1) {
+                    startCodeLen = 4;
+                }
+            }
+
+            if (startCodeLen == 0) {
+                offset++;
+                continue;
+            }
+
+            int nalStart = offset + startCodeLen;
+            if (nalStart >= buffer.length) {
+                break;
+            }
+
+            int nalType = buffer[nalStart] & 0x1F;
+
+            // Find end of NAL unit
+            int nalEnd = buffer.length;
+            for (int i = nalStart + 1; i + 2 < buffer.length; i++) {
+                if (buffer[i] == 0 && buffer[i + 1] == 0 &&
+                    (buffer[i + 2] == 1 ||
+                     (i + 3 < buffer.length && buffer[i + 2] == 0 && buffer[i + 3] == 1))) {
+                    nalEnd = i;
+                    break;
+                }
+            }
+
+            int nalLength = nalEnd - nalStart;
+            if (nalType == 7 && mExtractedSps == null) {
+                // SPS
+                mExtractedSps = new byte[nalLength];
+                System.arraycopy(buffer, nalStart, mExtractedSps, 0, nalLength);
+                log(String.format("Extracted SPS from frame (Annex-B): %d bytes", nalLength));
+            } else if (nalType == 8 && mExtractedPps == null) {
+                // PPS
+                mExtractedPps = new byte[nalLength];
+                System.arraycopy(buffer, nalStart, mExtractedPps, 0, nalLength);
+                log(String.format("Extracted PPS from frame (Annex-B): %d bytes", nalLength));
+            }
+
+            offset = nalEnd;
+        }
     }
 
     private void writeMinimalAvccBox(FileOutputStream file) throws IOException {
@@ -204,6 +378,16 @@ public class AvcCodecWriter extends BaseCodecWriter {
         }
 
         log(String.format("Found %d SPS and %d PPS NAL units", spsNals.size(), ppsNals.size()));
+
+        // If we couldn't find SPS/PPS in the codec config data, try using extracted ones from frames
+        if (spsNals.isEmpty() && mExtractedSps != null) {
+            spsNals.add(mExtractedSps);
+            log("Using SPS extracted from frame data as fallback");
+        }
+        if (ppsNals.isEmpty() && mExtractedPps != null) {
+            ppsNals.add(mExtractedPps);
+            log("Using PPS extracted from frame data as fallback");
+        }
 
         if (!spsNals.isEmpty() && !ppsNals.isEmpty()) {
             byte[] sps = spsNals.get(0);

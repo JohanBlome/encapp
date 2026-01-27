@@ -198,12 +198,12 @@ public class Muxer {
             Log.w(TAG, "Cannot update dimensions after finalization");
             return;
         }
-        
-        Log.d(TAG, String.format("Updating dimensions from %dx%d to %dx%d", 
+
+        Log.d(TAG, String.format("Updating dimensions from %dx%d to %dx%d",
                                 mWidth, mHeight, width, height));
         mWidth = width;
         mHeight = height;
-        
+
         // Also update clean aperture to match if not explicitly set
         if (!mHasCleanAperture) {
             mCleanApertureWidth = width;
@@ -824,7 +824,18 @@ public class Muxer {
         writeInt32(1); // Entry count
 
         if (mCodecWriter != null) {
-            mCodecWriter.writeSampleEntryBox(mFile, mCodecConfigData, mWidth, mHeight,
+            // Use mCodecConfigData if available, otherwise try to get extracted config from AVC writer
+            byte[] codecConfigToUse = mCodecConfigData;
+            if ((codecConfigToUse == null || codecConfigToUse.length == 0) &&
+                mCodecWriter instanceof com.facebook.encapp.utils.codec.AvcCodecWriter) {
+                com.facebook.encapp.utils.codec.AvcCodecWriter avcWriter =
+                    (com.facebook.encapp.utils.codec.AvcCodecWriter) mCodecWriter;
+                if (avcWriter.hasExtractedCodecConfig()) {
+                    codecConfigToUse = avcWriter.getExtractedCodecConfig();
+                    Log.i(TAG, "Using SPS/PPS extracted from frame data as codec config fallback");
+                }
+            }
+            mCodecWriter.writeSampleEntryBox(mFile, codecConfigToUse, mWidth, mHeight,
                 mHasCleanAperture, mCleanApertureWidth, mCleanApertureHeight);
         } else {
             Log.w(TAG, "No codec writer available for sample entry");
