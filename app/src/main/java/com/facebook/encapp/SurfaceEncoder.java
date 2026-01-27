@@ -57,6 +57,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     boolean mIsCameraSource = false;
     boolean mIsFakeInput = false;
     FakeGLRenderer mFakeGLRenderer;  // GL-based fake input (fast!)
+    FakeGLRenderer.PatternType mFakeInputPatternType = FakeGLRenderer.PatternType.TEXTURE;  // Default pattern
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
     Bundle mKeyFrameBundle;
@@ -115,10 +116,12 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         if (mTest.getInput().getPixFmt().getNumber() == PixFmt.rgba_VALUE) {
             mIsRgbaSource = true;
             mRefFramesizeInBytes = width * height * 4;
-        } else if (mTest.getInput().getFilepath().equals("fake_input")) {
+        } else if (mTest.getInput().getFilepath().startsWith("fake_input")) {
             mIsFakeInput = true;
+            // Parse pattern type from "fake_input.type" notation
+            mFakeInputPatternType = parseFakeInputPatternType(mTest.getInput().getFilepath());
             // Use GL rendering for fake input - ZERO CPU overhead!
-            Log.d(TAG, "Using fake input with GL rendering for performance testing");
+            Log.d(TAG, "Using fake input with GL rendering, pattern: " + mFakeInputPatternType);
         } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
             //TODO: handle other fps (i.e. try to set lower or higher fps)
@@ -164,8 +167,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             if (mIsFakeInput) {
                 // Initialize FakeGLRenderer (will be set up later on GL thread)
                 mFakeGLRenderer = new FakeGLRenderer();
-                mFakeGLRenderer.setPatternType(FakeGLRenderer.PatternType.TEXTURE);
-                Log.d(TAG, "Created FakeGLRenderer for GL-based fake input");
+                mFakeGLRenderer.setPatternType(mFakeInputPatternType);
+                mFakeGLRenderer.setDimensions(width, height);
+                Log.d(TAG, "Created FakeGLRenderer for GL-based fake input with pattern: " + mFakeInputPatternType);
                 // Initialize on GL thread after OutputMultiplier is ready
             } else {
                 mYuvReader = new FileReader();
@@ -713,5 +717,44 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             mVsyncTimeNs = frameTimeNs;
             mSyncLock.notifyAll();
         }
+    }
+
+    /**
+     * Parse pattern type from fake_input filepath notation.
+     * Supports: "fake_input", "fake_input.clock", "fake_input.texture", "fake_input.gradient", "fake_input.solid"
+     *
+     * @param filepath The input filepath (e.g., "fake_input.clock")
+     * @return The parsed PatternType, defaults to TEXTURE if not specified or unknown
+     */
+    private FakeGLRenderer.PatternType parseFakeInputPatternType(String filepath) {
+        if (filepath == null || !filepath.startsWith("fake_input")) {
+            return FakeGLRenderer.PatternType.TEXTURE;
+        }
+
+        // Check for ".type" suffix
+        if (filepath.contains(".")) {
+            String suffix = filepath.substring(filepath.lastIndexOf('.') + 1).toLowerCase();
+            switch (suffix) {
+                case "clock":
+                    Log.d(TAG, "Parsed fake_input pattern type: CLOCK");
+                    return FakeGLRenderer.PatternType.CLOCK;
+                case "texture":
+                    Log.d(TAG, "Parsed fake_input pattern type: TEXTURE");
+                    return FakeGLRenderer.PatternType.TEXTURE;
+                case "gradient":
+                    Log.d(TAG, "Parsed fake_input pattern type: GRADIENT");
+                    return FakeGLRenderer.PatternType.GRADIENT;
+                case "solid":
+                    Log.d(TAG, "Parsed fake_input pattern type: SOLID");
+                    return FakeGLRenderer.PatternType.SOLID;
+                default:
+                    Log.w(TAG, "Unknown fake_input pattern type: " + suffix + ", using TEXTURE");
+                    return FakeGLRenderer.PatternType.TEXTURE;
+            }
+        }
+
+        // No suffix, use default
+        Log.d(TAG, "No pattern type specified, using default: TEXTURE");
+        return FakeGLRenderer.PatternType.TEXTURE;
     }
 }

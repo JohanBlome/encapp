@@ -492,6 +492,8 @@ public class OutputMultiplier {
                     synchronized (mLock) {
                         for (FrameswapControl surface : mOutputSurfaces) {
                             if (surface.keepFrame()) {
+                                // Must make surface current before swap on some EGL implementations
+                                surface.makeCurrent();
                                 surface.setPresentationTime(mLatestTimestampNsec);
                                 surface.swapBuffers();
                             }

@@ -62,7 +62,7 @@ class BufferEncoder extends Encoder {
         PixFmt inputFmt = mTest.getInput().getPixFmt();
         mRefFramesizeInBytes = MediaCodecInfoHelper.frameSizeInBytes(inputFmt, sourceResolution.getWidth(), sourceResolution.getHeight());
 
-        if (mTest.getInput().getFilepath().equals("fake_input")) {
+        if (mTest.getInput().getFilepath().startsWith("fake_input")) {
             mIsFakeInput = true;
             Log.d(TAG, "Using fake input for performance testing");
             mFakeInputReader = new FakeInputReader();
