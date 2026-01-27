@@ -24,21 +24,21 @@ abstract class RenderBufferObject {
     long mTimestampUs;
     int mFrameCount;
     Statistics mStats;  // For encoding measurement
-    
+
     RenderBufferObject(long timestampUs, int frameCount, Statistics stats) {
         mTimestampUs = timestampUs;
         mFrameCount = frameCount;
         mStats = stats;
     }
-    
+
     long getTimestampUs() {
         return mTimestampUs;
     }
-    
+
     int getFrameCount() {
         return mFrameCount;
     }
-    
+
     Statistics getStats() {
         return mStats;
     }
@@ -48,7 +48,7 @@ class RenderFrameBuffer extends RenderBufferObject {
     MediaCodec mCodec;
     int mBufferId;
     MediaCodec.BufferInfo mInfo;
-    
+
     RenderFrameBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info, int frameCount, Statistics stats) {
         super(info.presentationTimeUs, frameCount, stats);
         mCodec = codec;
@@ -59,7 +59,7 @@ class RenderFrameBuffer extends RenderBufferObject {
 
 class RenderBitmapBuffer extends RenderBufferObject {
     Bitmap mBitmap;
-    
+
     RenderBitmapBuffer(Bitmap bitmap, long timestampUs, int frameCount, Statistics stats) {
         super(timestampUs, frameCount, stats);
         mBitmap = bitmap;
@@ -68,7 +68,7 @@ class RenderBitmapBuffer extends RenderBufferObject {
 
 class RenderGLPatternBuffer extends RenderBufferObject {
     FakeGLRenderer mGLRenderer;
-    
+
     RenderGLPatternBuffer(FakeGLRenderer glRenderer, long timestampUs, int frameCount, Statistics stats) {
         super(timestampUs, frameCount, stats);
         mGLRenderer = glRenderer;
@@ -181,7 +181,7 @@ public class OutputMultiplier {
     public void newBitmapAvailable(Bitmap bitmap, long timestampUsec, int frameCount, Statistics stats) {
         mRenderer.newBitmapAvailable(bitmap, timestampUsec, frameCount, stats);
     }
-    
+
     /**
      * Signal that a new GL-rendered frame is available (for fake input).
      * This is used when rendering synthetic patterns directly with GL.
@@ -275,13 +275,13 @@ public class OutputMultiplier {
             mSurfaceObject = null; // we do not need it anymore
             mOutputSurfaces.add(mMasterSurface);
             mMasterSurface.makeCurrent();
-            
+
             // Create shader program for camera input (external OES texture)
             mFullFrameBlit = new FullFrameRect(
                     new Texture2dProgram(mProgramType));
             mTextureId = mFullFrameBlit.createTextureObject();
             mInputTexture = new SurfaceTexture(mTextureId);
-            
+
             // Create shader program for bitmap input (2D texture)
             mBitmapBlit = new FullFrameRect(
                     new Texture2dProgram(Texture2dProgram.ProgramType.TEXTURE_2D));
@@ -432,7 +432,7 @@ public class OutputMultiplier {
                             }
                         }
                     }
-                    
+
                     boolean isGLPattern = false;
                     try {
                         mLatestTimestampNsec = timeNs;
@@ -457,7 +457,7 @@ public class OutputMultiplier {
                         // not important
                     }
 
-                    
+
                     // For GL patterns, we've already rendered directly to surfaces
                     // For texture/bitmap, we need to blit to all surfaces
                     if (!isGLPattern) {
@@ -467,7 +467,7 @@ public class OutputMultiplier {
                         // Use the appropriate blitter and texture based on input type
                         FullFrameRect blitter = (mBitmapTextureId != -1) ? mBitmapBlit : mFullFrameBlit;
                         int textureToUse = (mBitmapTextureId != -1) ? mBitmapTextureId : mTextureId;
-                        
+
                         for (FrameswapControl surface : mOutputSurfaces) {
                             if (surface.keepFrame()) {
                                 surface.makeCurrent();
@@ -479,7 +479,7 @@ public class OutputMultiplier {
                                 surface.swapBuffers();
                             }
                         }
-                        
+
                         // NOW start encoding measurement - frame has been submitted to encoder!
                         // Called ONCE per frame after all surfaces are swapped, not once per surface.
                         // This measures only encoder time, not preparation/rendering time.
@@ -498,7 +498,7 @@ public class OutputMultiplier {
                                 surface.swapBuffers();
                             }
                         }
-                        
+
                         // NOW start encoding measurement - frame has been submitted to encoder!
                         // Called ONCE per frame after all surfaces are swapped, not once per surface.
                         // This measures only encoder time, not GL rendering or queuing time.
@@ -568,14 +568,14 @@ public class OutputMultiplier {
                     return;
                 }
                 mMasterSurface.makeCurrent();
-                
+
                 // Create a separate 2D texture for bitmap input (only once)
                 if (mBitmapTextureId == -1) {
                     int[] textures = new int[1];
                     GLES20.glGenTextures(1, textures, 0);
                     mBitmapTextureId = textures[0];
                     Log.d(TAG, "Created 2D texture for bitmap input: " + mBitmapTextureId);
-                    
+
                     GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mBitmapTextureId);
                     GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
                     GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
@@ -585,11 +585,11 @@ public class OutputMultiplier {
                 } else {
                     GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mBitmapTextureId);
                 }
-                
+
                 // Load bitmap into the 2D texture
                 GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
                 GlUtil.checkGlError("GLUtils.texImage2D");
-                
+
                 // Set up transform matrix for bitmap (no transform from SurfaceTexture)
                 Matrix.setIdentityM(mTmpMatrix, 0);
                 Matrix.rotateM(mTmpMatrix, 0, 180, 1f, 0, 0);
@@ -598,7 +598,7 @@ public class OutputMultiplier {
                 ex.printStackTrace();
             }
         }
-        
+
         /**
          * Render GL pattern directly to all surfaces - FAST PATH!
          * No bitmap, no texture upload, just pure GL rendering.
@@ -609,7 +609,7 @@ public class OutputMultiplier {
                     Log.d(TAG, "Skipping GL render after shutdown");
                     return;
                 }
-                
+
                 // Render pattern to all surfaces
                 synchronized (mLock) {
                     for (FrameswapControl surface : mOutputSurfaces) {
@@ -618,10 +618,10 @@ public class OutputMultiplier {
                             int width = surface.getWidth();
                             int height = surface.getHeight();
                             GLES20.glViewport(0, 0, width, height);
-                            
+
                             // Render GL pattern directly - ZERO CPU overhead!
                             glRenderer.renderFrame(timestampUs);
-                            
+
                             // No need to set transform matrix - pattern fills viewport
                         }
                     }
@@ -671,7 +671,7 @@ public class OutputMultiplier {
                 }
             }
         }
-        
+
         /**
          * Render a GL pattern frame - queues the work to be done on GL thread.
          * This is the fast path for fake input - no bitmap overhead!
@@ -684,10 +684,10 @@ public class OutputMultiplier {
                 frameAvailable += 1;
                 mInputFrameLock.notifyAll();
             }
-            
+
             // REMOVED BLOCKING WAIT - GL rendering is async, no need to wait for frame drawn
             // The bitmap path needs to wait because it copies memory, but GL just queues work
-            
+
             // NOTE: startEncodingFrame will be called AFTER swapBuffers() in drawBufferSwap()
             // to measure only the encoding time, not the GL rendering + queuing time.
         }
