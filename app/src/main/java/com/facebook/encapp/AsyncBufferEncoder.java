@@ -87,7 +87,7 @@ public class AsyncBufferEncoder extends Encoder {
 
         // Initialize input reader
         String filepath = mTest.getInput().getFilepath();
-        if (filepath.equals("fake_input")) {
+        if (filepath.startsWith("fake_input")) {
             mFakeInputReader = new FakeInputReader();
             if (!mFakeInputReader.openFile(filepath, inputFmt, width, height)) {
                 return "Could not initialize fake input";
