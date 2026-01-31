@@ -32,8 +32,6 @@ using namespace std;
 extern "C" {
 
 x264_t *encoder = NULL;
-x264_nal_t *nal;
-int nnal;
 int _width = -1;
 int _height = -1;
 int _colorformat = -1;
@@ -190,14 +188,16 @@ jint init_encoder(JNIEnv *env, jobject thiz, jobjectArray params, jint width,
 
   x264Params.i_width = _width;
   x264Params.i_height = _height;
-  // TODO: remove this, currenlty the encoder is broken without it
-  x264Params.i_threads = 1;
   x264Params.i_csp = _colorformat;
   x264Params.i_bitdepth = _bitdepth;
   x264Params.i_fps_num = 30;
   x264Params.i_fps_den = 1;
   x264Params.i_timebase_num = 1;
-  x264Params.i_timebase_den = 1000000; // Nanosecs
+  x264Params.i_timebase_den = 1000000; // Microsecs
+  // Output NALs in Annex B format (start codes) - MediaMuxer handles conversion
+  x264Params.b_annexb = 1;
+  // Disable repeat headers - we handle SPS/PPS separately
+  x264Params.b_repeat_headers = 0;
   LOGD("Open x264 encoder");
   encoder = x264_encoder_open(&x264Params);
   if (!encoder) {
@@ -219,6 +219,8 @@ jbyteArray get_header(JNIEnv *env, jobject thiz, jbyteArray headerArray) {
     return NULL;
   }
 
+  x264_nal_t *nal;
+  int nnal;
   int size_of_headers = x264_encoder_headers(encoder, &nal, &nnal);
   jbyte *buf = new jbyte[size_of_headers];
   memset(buf, 0, size_of_headers);
@@ -246,6 +248,45 @@ jbyteArray get_header(JNIEnv *env, jobject thiz, jbyteArray headerArray) {
   return ret;
 }
 
+static int copy_nal_to_output(x264_nal_t *nal, int nnal, jbyte *output_data,
+                              int output_size) {
+  // Start with 2-byte offset - required for MediaMuxer compatibility
+  int offset = 2;
+  output_data[0] = 0;
+  output_data[1] = 0;
+
+  for (int i = 0; i < nnal; i++) {
+    // Skip header NALs - they're handled separately via get_header()
+    if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS ||
+        nal[i].i_type == NAL_SEI || nal[i].i_type == NAL_AUD ||
+        nal[i].i_type == NAL_FILLER) {
+      continue;
+    }
+    if (offset + nal[i].i_payload <= output_size) {
+      memcpy(output_data + offset, nal[i].p_payload, nal[i].i_payload);
+      offset += nal[i].i_payload;
+    } else {
+      LOGE("Output buffer too small for NAL unit");
+    }
+  }
+  return offset;
+}
+
+static void update_frame_info(JNIEnv *env, jobject frameInfo,
+                              x264_picture_t *pic_out, int frame_size) {
+  jclass infoClass = env->FindClass("com/facebook/encapp/utils/FrameInfo");
+  jfieldID isIframeId = env->GetFieldID(infoClass, "mIsIframe", "Z");
+  jfieldID ptsId = env->GetFieldID(infoClass, "mPts", "J");
+  jfieldID dtsId = env->GetFieldID(infoClass, "mDts", "J");
+  jfieldID sizeId = env->GetFieldID(infoClass, "mSize", "J");
+
+  env->SetLongField(frameInfo, sizeId, frame_size);
+  env->SetLongField(frameInfo, ptsId, pic_out->i_pts);
+  env->SetLongField(frameInfo, dtsId, pic_out->i_dts);
+  env->SetBooleanField(frameInfo, isIframeId, pic_out->b_keyframe);
+}
+
+// Returns frame size, 0 if buffered (B-frames), -1 on error
 jint encode(JNIEnv *env, jobject thiz, jbyteArray input, jbyteArray output,
             jobject frameInfo) {
   LOGD("Encoding frame");
@@ -255,32 +296,33 @@ jint encode(JNIEnv *env, jobject thiz, jbyteArray input, jbyteArray output,
   }
 
   jclass infoClass = env->FindClass("com/facebook/encapp/utils/FrameInfo");
-  jfieldID isIframeId = env->GetFieldID(infoClass, "mIsIframe", "Z");
   jfieldID ptsId = env->GetFieldID(infoClass, "mPts", "J");
-  jfieldID dtsId = env->GetFieldID(infoClass, "mDts", "J");
-  jfieldID sizeId = env->GetFieldID(infoClass, "mSize", "J");
 
-  // All interaction must be done before locking java...
+  x264_nal_t *nal;
+  int nnal;
+
   x264_picture_t pic_in = {0};
   x264_picture_t pic_out = {0};
 
-  // TODO: We are assuming yuv420p, add check...
-  int ySize = _width * _height; // Stride?
+  int ySize = _width * _height;
   int uvSize = (int)(ySize / 4.0f);
+  int inputSize = ySize + uvSize * 2;
 
   x264_picture_init(&pic_in);
   pic_in.img.i_csp = _colorformat;
-  // TODO: hard code, really?
   pic_in.img.i_plane = 3;
 
   long pts = env->GetLongField(frameInfo, ptsId);
   LOGD("Set pts: %ld", pts);
-  pic_in.i_pts = pts; // Convert to milliseconds
+  pic_in.i_pts = pts;
 
-  // Now we are locking java
-  jbyte *input_data = (jbyte *)env->GetPrimitiveArrayCritical(input, 0);
-  jbyte *output_data = (jbyte *)env->GetPrimitiveArrayCritical(output, 0);
+  jsize input_array_size = env->GetArrayLength(input);
+  jsize output_array_size = env->GetArrayLength(output);
 
+  // Use local buffers instead of GetPrimitiveArrayCritical to allow GC
+  jbyte *input_data = new jbyte[inputSize];
+  jbyte *output_data = new jbyte[output_array_size];
+  env->GetByteArrayRegion(input, 0, inputSize, input_data);
   pic_in.img.plane[0] = (uint8_t *)input_data;
   pic_in.img.plane[1] = (uint8_t *)(input_data + ySize);
   pic_in.img.plane[2] = (uint8_t *)(input_data + ySize + uvSize);
@@ -290,41 +332,68 @@ jint encode(JNIEnv *env, jobject thiz, jbyteArray input, jbyteArray output,
   pic_in.img.i_stride[2] = _width / 2;
 
   int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
-  if (frame_size >= 0) {
-    // TODO: Added total_size = 2 for debugging purpose
-    int total_size = 2;
-    for (int i = 0; i < nnal; i++) {
-      total_size += nal[i].i_payload;
-    }
-    int offset = 2;
-    for (int i = 0; i < nnal; i++) {
-      if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS ||
-          nal[i].i_type == NAL_SEI || nal[i].i_type == NAL_AUD ||
-          nal[i].i_type == NAL_FILLER) {
-        continue;
-      }
-      memcpy(output_data + offset, nal[i].p_payload, nal[i].i_payload);
-      offset += nal[i].i_payload;
-    }
-    frame_size = total_size;
+
+  int total_size = 0;
+  if (frame_size > 0) {
+    total_size = copy_nal_to_output(nal, nnal, output_data, output_array_size);
+    env->SetByteArrayRegion(output, 0, total_size, output_data);
+    update_frame_info(env, frameInfo, &pic_out, total_size);
+  } else if (frame_size == 0) {
+    // Frame buffered (B-frame reordering)
+    LOGD("Frame buffered, no output yet (encoder delay)");
+    update_frame_info(env, frameInfo, &pic_out, 0);
+  } else {
+    LOGE("x264_encoder_encode failed with error: %d", frame_size);
+  }
+  delete[] input_data;
+  delete[] output_data;
+
+  return total_size;
+}
+
+// Flush buffered frames. Call until returns 0.
+jint flush_encoder(JNIEnv *env, jobject thiz, jbyteArray output,
+                   jobject frameInfo) {
+  LOGD("Flushing encoder");
+  if (!encoder) {
+    LOGI("Encoder is not initialized for flushing");
+    return -1;
   }
 
-  env->ReleasePrimitiveArrayCritical(input, input_data, 0);
-  env->ReleasePrimitiveArrayCritical(output, output_data, 0);
+  x264_nal_t *nal;
+  int nnal;
+  x264_picture_t pic_out = {0};
 
-  // Set data from the encoding process
-  env->SetLongField(frameInfo, sizeId, frame_size);
-  env->SetLongField(frameInfo, ptsId, pic_out.i_pts);
-  env->SetLongField(frameInfo, dtsId, pic_out.i_dts);
-  env->SetBooleanField(frameInfo, isIframeId, pic_out.b_keyframe);
-  // Do we need additional info?
-  // LOGD("Not saved: Pic type: %d", pic_out.i_type);
-  // TODO: we also have a complete list of params. Maybe with a debug flag we
-  // could push this to java?
+  jsize output_array_size = env->GetArrayLength(output);
+  jbyte *output_data = new jbyte[output_array_size];
 
-  // x264_image_properties_t holds psnr and ssim as well (potentially, if
-  // enabled)
-  return frame_size;
+  // NULL input flushes buffered frames
+  int frame_size =
+      x264_encoder_encode(encoder, &nal, &nnal, NULL, &pic_out);
+
+  int total_size = 0;
+  if (frame_size > 0) {
+    total_size = copy_nal_to_output(nal, nnal, output_data, output_array_size);
+    env->SetByteArrayRegion(output, 0, total_size, output_data);
+    update_frame_info(env, frameInfo, &pic_out, total_size);
+    LOGD("Flushed frame: pts=%ld, dts=%ld, size=%d", (long)pic_out.i_pts,
+         (long)pic_out.i_dts, total_size);
+  } else if (frame_size == 0) {
+    LOGD("Encoder flush complete, no more buffered frames");
+    update_frame_info(env, frameInfo, &pic_out, 0);
+  } else {
+    LOGE("x264_encoder_encode (flush) failed with error: %d", frame_size);
+  }
+
+  delete[] output_data;
+  return total_size;
+}
+
+jint get_delayed_frames(JNIEnv *env, jobject thiz) {
+  if (!encoder) {
+    return 0;
+  }
+  return x264_encoder_delayed_frames(encoder);
 }
 
 void update_settings(JNIEnv *env, jobject thiz, jobjectArray params) {
@@ -470,6 +539,25 @@ jobjectArray get_all_settings(JNIEnv *env, jobject thiz) {
       parameterClass, paramConstructor, env->NewStringUTF("i_timebase_den"),
       env->NewStringUTF("intType"), env->NewStringUTF(buffer)));
 
+  snprintf(buffer, len, "%d", info.i_threads);
+  params.push_back(env->NewObject(
+      parameterClass, paramConstructor, env->NewStringUTF("i_threads"),
+      env->NewStringUTF("intType"), env->NewStringUTF(buffer)));
+  snprintf(buffer, len, "%d", info.i_lookahead_threads);
+  params.push_back(env->NewObject(
+      parameterClass, paramConstructor,
+      env->NewStringUTF("i_lookahead_threads"), env->NewStringUTF("intType"),
+      env->NewStringUTF(buffer)));
+  snprintf(buffer, len, "%d", info.b_sliced_threads);
+  params.push_back(env->NewObject(
+      parameterClass, paramConstructor, env->NewStringUTF("b_sliced_threads"),
+      env->NewStringUTF("intType"), env->NewStringUTF(buffer)));
+
+  snprintf(buffer, len, "%d", info.i_bframe);
+  params.push_back(env->NewObject(
+      parameterClass, paramConstructor, env->NewStringUTF("i_bframe"),
+      env->NewStringUTF("intType"), env->NewStringUTF(buffer)));
+
   jobjectArray ret = env->NewObjectArray(params.size(), parameterClass, NULL);
   int index = 0;
   for (auto element : params) {
@@ -492,6 +580,9 @@ static JNINativeMethod methods[] = {
      (void *)&init_encoder},
     {"getHeader", "()[B", (void *)&get_header},
     {"encode", "([B[BLcom/facebook/encapp/utils/FrameInfo;)I", (void *)&encode},
+    {"flushEncoder", "([BLcom/facebook/encapp/utils/FrameInfo;)I",
+     (void *)&flush_encoder},
+    {"getDelayedFrames", "()I", (void *)&get_delayed_frames},
     {"close", "()V", (void *)&close},
     {"getAllEncoderSettings", "()[Lcom/facebook/encapp/utils/StringParameter;",
      (void *)&get_all_settings},

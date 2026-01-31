@@ -12,6 +12,11 @@ test {
         bitrate_mode: cbr
         i_frame_interval: 10
         parameter {
+            key: "i_threads"
+            type: intType
+            value: "1"
+        }
+        parameter {
             key: "tune"
             type: stringType
             value: "zerolatency"

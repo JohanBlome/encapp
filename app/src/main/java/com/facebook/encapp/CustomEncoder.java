@@ -47,6 +47,10 @@ class CustomEncoder extends Encoder {
     public static native byte[] getHeader();
     // TODO: can the size, color and bitdepth change runtime?
     public static native int encode(byte[] input, byte[] output, FrameInfo info);
+    // Flush buffered frames. Call until returns 0.
+    public static native int flushEncoder(byte[] output, FrameInfo info);
+    // Get number of frames currently buffered in encoder
+    public static native int getDelayedFrames();
 
     public static native StringParameter[] getAllEncoderSettings();
 
@@ -90,7 +94,7 @@ class CustomEncoder extends Encoder {
             Log.e(TAG, "Failed to load library, " + name + ", " + targetPath + ": " + e.getMessage());
         }
     }
-    
+
 
     public static byte[] readYUVFromFile(String filePath, int size, int framePosition) throws IOException {
         byte[] inputBuffer = new byte[size];
@@ -172,7 +176,7 @@ class CustomEncoder extends Encoder {
         }
 
         for (Long sync : mRuntimeParams.getRequestSyncList()) {
-            if (sync == frame) {                
+            if (sync == frame) {
                 addEncoderParameters(params, DataValueType.longType.name(), "request-sync", "");
                 break;
             }
@@ -318,11 +322,13 @@ class CustomEncoder extends Encoder {
                         outputBufferSize = encode(yuvData, outputBuffer, info);
                         // Look at nal type as well, not just key frame?
                         // To ms?
-                        mStats.stopEncodingFrame(info.getPts() , info.getSize(), info.isIFrame());
-                        if (outputBufferSize == 0) {
-                            return "Failed to encode frame";
-                        } else if (outputBufferSize == -1) {
-                            return "Encoder not started";
+                        if (outputBufferSize < 0) {
+                            return "Encoder not started or error occurred";
+                        }
+                        // outputBufferSize == 0 means frame was buffered (B-frame reordering)
+                        // This is normal when B-frames are enabled, we'll get output later
+                        if (outputBufferSize > 0) {
+                            mStats.stopEncodingFrame(info.getPts() , info.getSize(), info.isIFrame());
                         }
                         currentFramePosition += frameSize;
                         mFramesAdded++;
@@ -359,16 +365,17 @@ class CustomEncoder extends Encoder {
                         muxerStarted = true;
                     }
 
-                    ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
-                    bufferInfo.offset = 0;
-                    bufferInfo.size = outputBufferSize;
-                    bufferInfo.presentationTimeUs = info.getPts();
+                    // Only write to muxer if we have actual output
+                    if (outputBufferSize > 0 && mMuxerWrapper != null) {
+                        ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
+                        bufferInfo.offset = 0;
+                        bufferInfo.size = outputBufferSize;
+                        bufferInfo.presentationTimeUs = info.getPts();
 
-                    //TODO: we get this from FrameInfo instead
-                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
-                    if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                        boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                        if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                        else bufferInfo.flags = 0;
 
-                    if(mMuxerWrapper != null) {
                         buffer.position(bufferInfo.offset);
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 
@@ -381,6 +388,35 @@ class CustomEncoder extends Encoder {
                 }
             }
             mStats.stop();
+
+            // Flush any remaining buffered frames (important for B-frames/multi-threading)
+            int delayedFrames = getDelayedFrames();
+            Log.d(TAG, "Flushing " + delayedFrames + " delayed frames from encoder");
+            while (delayedFrames > 0) {
+                info = new FrameInfo(0);
+                outputBufferSize = flushEncoder(outputBuffer, info);
+                if (outputBufferSize <= 0) {
+                    break;  // No more frames or error
+                }
+                Log.d(TAG, "Flushed frame: pts=" + info.getPts() + ", size=" + outputBufferSize);
+
+                // Write flushed frame to muxer
+                if (mMuxerWrapper != null && muxerStarted) {
+                    ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
+                    bufferInfo.offset = 0;
+                    bufferInfo.size = outputBufferSize;
+                    bufferInfo.presentationTimeUs = info.getPts();
+
+                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                    bufferInfo.flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
+
+                    buffer.position(bufferInfo.offset);
+                    buffer.limit(bufferInfo.offset + bufferInfo.size);
+                    mMuxerWrapper.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                }
+                delayedFrames = getDelayedFrames();
+            }
+            Log.d(TAG, "Encoder flush complete");
 
             Log.d(TAG, "Close encoder and streams");
             close();
