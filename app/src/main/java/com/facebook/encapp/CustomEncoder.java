@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
 
-
 /**
  * Created by jobl on 2018-02-27.
  */
@@ -56,7 +55,6 @@ class CustomEncoder extends Encoder {
 
     public static native void updateSettings(Parameter[] parameters);
     public static native void close();
-
 
     public CustomEncoder(Test test, String filesDir) {
         super(test);
@@ -224,8 +222,7 @@ class CustomEncoder extends Encoder {
         Log.d(TAG, width + "x" + height + ",  pixelformat: " + pixelformat + ", bitdepth:" + bitdepth + ", bitrate_mode:" + bitratemode + ", bitrate: " + bitrate + ", iframeinterval: "+ iframeinterval);
         // Create params for this
 
-
-        // Caching vital values and see if they can be set runtime.
+        // Caching vital values
         Vector<Parameter> params = new Vector(mTest.getConfigure().getParameterList());
         // This one needs to be set as a native param.
         try {
@@ -274,7 +271,6 @@ class CustomEncoder extends Encoder {
             byte[] headerArray = new byte[estimatedSize];
             int outputBufferSize;
 
-
             Parameter[] param_buffer = new Parameter[params.size()];
             params.toArray(param_buffer);
             int status = initEncoder(param_buffer, width, height, pixelformat, bitdepth);
@@ -294,7 +290,7 @@ class CustomEncoder extends Encoder {
                 return "";
             }
             headerArray = getHeader();
-            FrameInfo info;
+            FrameInfo encodeInfo = null;
             while (!input_done || !output_done) {
                 try {
                     long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
@@ -315,20 +311,21 @@ class CustomEncoder extends Encoder {
                         }
 
                         long pts = computePresentationTimeUs(mPts, mFramesAdded, mRefFrameTime);
-                        info = mStats.startEncodingFrame(pts, mFramesAdded);
-                        // Let us read the setting in native and force key frame if set here.
-                        // If (for some reason a key frame is not produced it will be updated in the native code
-                        //info.isIFrame(true);
-                        outputBufferSize = encode(yuvData, outputBuffer, info);
-                        // Look at nal type as well, not just key frame?
-                        // To ms?
+                        mStats.startEncodingFrame(pts, mFramesAdded);
+
+                        // Create a separate FrameInfo for the encode call to avoid modifying the stored one
+                        encodeInfo = new FrameInfo(pts);
+                        outputBufferSize = encode(yuvData, outputBuffer, encodeInfo);
+
                         if (outputBufferSize < 0) {
                             return "Encoder not started or error occurred";
                         }
                         // outputBufferSize == 0 means frame was buffered (B-frame reordering)
-                        // This is normal when B-frames are enabled, we'll get output later
+                        // When output is produced, use the OUTPUT PTS to find the matching input frame
                         if (outputBufferSize > 0) {
-                            mStats.stopEncodingFrame(info.getPts() , info.getSize(), info.isIFrame());
+                            // encodeInfo.getPts() now contains the OUTPUT pts (set by native code)
+                            // This matches the original input frame that produced this output
+                            mStats.stopEncodingFrame(encodeInfo.getPts(), encodeInfo.getSize(), encodeInfo.isIFrame());
                         }
                         currentFramePosition += frameSize;
                         mFramesAdded++;
@@ -370,7 +367,7 @@ class CustomEncoder extends Encoder {
                         ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                         bufferInfo.offset = 0;
                         bufferInfo.size = outputBufferSize;
-                        bufferInfo.presentationTimeUs = info.getPts();
+                        bufferInfo.presentationTimeUs = encodeInfo.getPts();
 
                         boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                         if (isKeyFrame) bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
@@ -393,19 +390,22 @@ class CustomEncoder extends Encoder {
             int delayedFrames = getDelayedFrames();
             Log.d(TAG, "Flushing " + delayedFrames + " delayed frames from encoder");
             while (delayedFrames > 0) {
-                info = new FrameInfo(0);
-                outputBufferSize = flushEncoder(outputBuffer, info);
+                FrameInfo flushInfo = new FrameInfo(0);
+                outputBufferSize = flushEncoder(outputBuffer, flushInfo);
                 if (outputBufferSize <= 0) {
                     break;  // No more frames or error
                 }
-                Log.d(TAG, "Flushed frame: pts=" + info.getPts() + ", size=" + outputBufferSize);
+                Log.d(TAG, "Flushed frame: pts=" + flushInfo.getPts() + ", size=" + outputBufferSize);
+
+                // Stop the encoding frame using the output PTS to find the matching input frame
+                mStats.stopEncodingFrame(flushInfo.getPts(), flushInfo.getSize(), flushInfo.isIFrame());
 
                 // Write flushed frame to muxer
                 if (mMuxerWrapper != null && muxerStarted) {
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     bufferInfo.offset = 0;
                     bufferInfo.size = outputBufferSize;
-                    bufferInfo.presentationTimeUs = info.getPts();
+                    bufferInfo.presentationTimeUs = flushInfo.getPts();
 
                     boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     bufferInfo.flags = isKeyFrame ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0;
