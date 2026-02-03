@@ -9,6 +9,7 @@ set -e  # Exit on error
 
 # Global flags
 DRY_RUN=false
+NO_CLEAN=false
 SCRIPT_ARGS=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +24,33 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Check Java version compatibility
+check_java_version() {
+    local java_version=$(java -version 2>&1 | head -n 1 | sed -E 's/.*version "([0-9]+).*/\1/')
+
+    if [ -n "$java_version" ] && [ "$java_version" -ge 25 ] 2>/dev/null; then
+        echo ""
+        print_error "═══════════════════════════════════════════════════════════"
+        print_error "  INCOMPATIBLE JAVA VERSION DETECTED: Java $java_version"
+        print_error "═══════════════════════════════════════════════════════════"
+        echo ""
+        print_warning "Gradle 8.x does not support Java 25 or later."
+        print_warning "Please switch to Java 17-21 before running this script."
+        echo ""
+        echo "Your current JAVA_HOME: ${JAVA_HOME:-<not set>}"
+        echo ""
+        echo "To switch Java versions:"
+        echo "  macOS:   export JAVA_HOME=\$(/usr/libexec/java_home -v 21)"
+        echo "  Linux:   update-alternatives --config java"
+        echo ""
+        exit 1
+    fi
+
+    if [ -n "$java_version" ]; then
+        print_success "Java version: $java_version (compatible)"
+    fi
+}
 
 # Helper functions
 print_header() {
@@ -86,6 +114,9 @@ show_help() {
     echo -e "    ${YELLOW}# Perform a release (will prompt for version)${NC}"
     echo "    ./scripts/release.sh"
     echo ""
+    echo -e "    ${YELLOW}# Release without clean build (faster, uses cached build)${NC}"
+    echo "    ./scripts/release.sh --no-clean 1.29"
+    echo ""
     echo -e "${GREEN}MODES:${NC}"
     echo -e "    ${BLUE}Release Mode (default):${NC}"
     echo "        - Checks for documentation updates"
@@ -108,6 +139,7 @@ show_help() {
     echo "    - Android SDK with adb in PATH"
     echo "    - Gradle wrapper in project root"
     echo "    - Python 3 with pytest for system tests"
+    echo "    - Java 17-21 (Gradle 8.x does not support Java 25+)"
     echo "    - For release mode: an emulator must be available"
     echo "    - For dry-run mode: any device connected via adb"
     echo ""
@@ -555,14 +587,21 @@ build_apk() {
 
     cd "$PROJECT_ROOT"
 
-    # Clean build
-    print_warning "Running clean build..."
-
-    # Always use assembleDefaultDebug (Lcevc flavor requires additional dependencies)
-    ./gradlew clean assembleDefaultDebug || {
-        print_error "Build failed"
-        exit 1
-    }
+    # Build (with optional clean)
+    if [ "$NO_CLEAN" = true ]; then
+        print_warning "Running incremental build (--no-clean)..."
+        ./gradlew assembleDefaultDebug || {
+            print_error "Build failed"
+            exit 1
+        }
+    else
+        print_warning "Running clean build..."
+        # Always use assembleDefaultDebug (Lcevc flavor requires additional dependencies)
+        ./gradlew clean assembleDefaultDebug || {
+            print_error "Build failed"
+            exit 1
+        }
+    fi
 
     print_success "Build completed successfully"
 }
@@ -735,6 +774,9 @@ git_commit() {
 
 # Main script
 main() {
+    # Check Java version compatibility first
+    check_java_version
+
     if [ "$DRY_RUN" = true ]; then
         # Dry-run mode: test only, no release operations
         print_header "Encapp Test Script (Dry-Run Mode)"
@@ -819,6 +861,9 @@ for arg in "$@"; do
             ;;
         --dry-run)
             DRY_RUN=true
+            ;;
+        --no-clean)
+            NO_CLEAN=true
             ;;
         *)
             SCRIPT_ARGS+=("$arg")
