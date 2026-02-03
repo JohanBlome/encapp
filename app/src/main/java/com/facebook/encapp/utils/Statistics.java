@@ -36,6 +36,7 @@ public class Statistics {
     private final ArrayList<Pair> mNamedTimestamps;
 
     int mEncodingProcessingFrames = 0;
+    int mOutputFrameCount = 0;  // Counter for tracking DTS/output order
     Test mTest;
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
@@ -207,6 +208,7 @@ public class Statistics {
             frame.stop();
             frame.setSize(size);
             frame.isIFrame(isIFrame);
+            frame.setOutputOrder(mOutputFrameCount++);  // Track DTS/output order
         } else {
             Log.e(TAG, "No matching pts! Error in time handling. Pts = " + pts);
         }
@@ -461,8 +463,10 @@ public class Statistics {
                 }
             }
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
-            Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
-            Collections.sort(allFrames, compareByPts);
+            // Sort by output order (DTS/decode order) to preserve the order frames came out of encoder
+            Comparator<FrameInfo> compareByOutputOrder = (FrameInfo o1, FrameInfo o2) -> 
+                Integer.valueOf(o1.getOutputOrder()).compareTo(Integer.valueOf(o2.getOutputOrder()));
+            Collections.sort(allFrames, compareByOutputOrder);
             int counter = 0;
             JSONArray jsonArray = new JSONArray();
 
@@ -470,7 +474,9 @@ public class Statistics {
             ArrayList<FrameInfo> frameCopy = (ArrayList<FrameInfo>) allFrames.clone();
             for (FrameInfo info : frameCopy) {
                 obj = new JSONObject();
-                obj.put("frame", counter++);
+                // frame = DTS/decode order (order frames came out of encoder)
+                obj.put("frame", info.getOutputOrder());
+                // original_frame = PTS/presentation order (order frames were input)
                 obj.put("original_frame", info.getOriginalFrame());
                 obj.put("iframe", (info.isIFrame()) ? 1 : 0);
                 obj.put("size", info.getSize());
@@ -492,11 +498,13 @@ public class Statistics {
                     }
                 }
                 jsonArray.put(obj);
+                counter++;
             }
             json.put("frames", jsonArray);
 
             if (mDecodingFrames.size() > 0) {
-
+                Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> 
+                    Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
                 allFrames = new ArrayList<>(mDecodingFrames.values());
                 Collections.sort(allFrames, compareByPts);
                 counter = 1;

@@ -15,6 +15,7 @@ public class FrameInfo {
     boolean mIsIframe;
     int mFlags;
     int mOriginalFrame;
+    int mOutputOrder = -1;  // DTS order - the order this frame came out of the encoder
     int mUUID = -1;
     static Integer mIdCounter = 0;
     Dictionary<String, Object> mInfo;
@@ -85,6 +86,9 @@ public class FrameInfo {
 
     public long getStartTime() { return mStartTime;}
     public long getStopTime() { return mStopTime;}
+
+    public void setOutputOrder(int order) { mOutputOrder = order; }
+    public int getOutputOrder() { return mOutputOrder; }
 
     public Dictionary getInfo() {
         return mInfo;
