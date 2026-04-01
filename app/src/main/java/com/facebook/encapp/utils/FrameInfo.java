@@ -27,6 +27,7 @@ public class FrameInfo {
     int mBatteryChargeCounter = -1;
     int mBatteryCurrentNow = -1;
     long mBatteryEnergyCounter = -1;
+    int mOutputOrder = -1;
     int mUUID = -1;
     static Integer mIdCounter = 0;
     Dictionary<String, Object> mInfo;

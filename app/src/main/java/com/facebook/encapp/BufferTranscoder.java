@@ -83,6 +83,8 @@ public class BufferTranscoder extends Encoder  {
             mRuntimeParams = mTest.getRuntime();
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
+        if (mTest.getInput().hasRealtime())
+            mRealtime = mTest.getInput().getRealtime();
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = true; // No point in being here unless we write...
@@ -346,7 +348,12 @@ public class BufferTranscoder extends Encoder  {
         mSourceReader.start();
         mStats.start();
         try {
-            mSourceReader.join(WAIT_TIME_MS);
+            long joinTimeoutMs = WAIT_TIME_MS;
+            if (mTest.getInput().hasStoptimeSec() && mTest.getInput().getStoptimeSec() > 0) {
+                // Allow enough time for the full test duration plus a margin
+                joinTimeoutMs = (long)(mTest.getInput().getStoptimeSec() * 1000) + WAIT_TIME_MS;
+            }
+            mSourceReader.join(joinTimeoutMs);
             if (mSourceReader.isAlive()) {
                 Log.e(TAG, "SourceReader did not finish within timeout");
             }
@@ -541,9 +548,16 @@ public class BufferTranscoder extends Encoder  {
                         size = mExtractor.readSampleData(buffer, 0);
                         flags = mExtractor.getSampleFlags();
                         ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
+                        mCurrentTimeSec = ptsUsec / 1000000.0;
                     }
 
-                    if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec /* runtime*/, false)) {
+                    // Use wall clock elapsed time for stoptime check to avoid PTS drift across loops
+                    double runtime = mCurrentTimeSec;
+                    if (mFirstFrameSystemTimeUsec > 0) {
+                        runtime = (ClockTimes.currentTimeUs() - mFirstFrameSystemTimeUsec) / 1000000.0;
+                    }
+
+                    if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, false)) {
                         flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mDone = true;
                     }
@@ -603,7 +617,11 @@ public class BufferTranscoder extends Encoder  {
 
                         mLoopTime = mPtsOffset /1000000.0;
                         Log.d(TAG, "*** Loop ended starting " + mCurrentLoop + " - currentTime " + mCurrentTimeSec + " ***");
-                        if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec /*runtime*/, true)) {
+                        double loopRuntime = mCurrentTimeSec;
+                        if (mFirstFrameSystemTimeUsec > 0) {
+                            loopRuntime = (ClockTimes.currentTimeUs() - mFirstFrameSystemTimeUsec) / 1000000.0;
+                        }
+                        if (doneReading(mTest, mYuvReader, mInFramesCount, loopRuntime, true)) {
                             mDone = true;
                         }
                     }
