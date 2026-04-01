@@ -80,6 +80,8 @@ public class SurfaceTranscoder extends SurfaceEncoder {
             mRuntimeParams = mTest.getRuntime();
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
+        if (mTest.getInput().hasRealtime())
+            mRealtime = mTest.getInput().getRealtime();
         if (mTest.hasTestSetup()) {
             // Default is that we should throttle from the start. Setting this to false means that
             // we are waiting for the first frame to arrive before throttling.
@@ -351,7 +353,12 @@ public class SurfaceTranscoder extends SurfaceEncoder {
         mSourceReader.start();
         mStats.start();
         try {
-            mSourceReader.join(WAIT_TIME_MS);
+            long joinTimeoutMs = WAIT_TIME_MS;
+            if (mTest.getInput().hasStoptimeSec() && mTest.getInput().getStoptimeSec() > 0) {
+                // Allow enough time for the full test duration plus a margin
+                joinTimeoutMs = (long)(mTest.getInput().getStoptimeSec() * 1000) + WAIT_TIME_MS;
+            }
+            mSourceReader.join(joinTimeoutMs);
             if (mSourceReader.isAlive()) {
                 Log.e(TAG, "SourceReader did not finish within timeout");
             }
