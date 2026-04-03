@@ -202,6 +202,13 @@ public class AsyncBufferEncoder extends Encoder {
         mInputFeeder.start();
 
         // Wait for encoding to complete (with global timeout to avoid infinite hang)
+        long encodingTimeoutMs = WAIT_TIME_MS;
+        if (mTest.getInput().hasStoptimeSec() && mTest.getInput().getStoptimeSec() > 0) {
+            encodingTimeoutMs = (long)(mTest.getInput().getStoptimeSec() * 1000) + WAIT_TIME_MS;
+        } else if (mTest.getInput().hasPlayoutFrames() && mTest.getInput().getPlayoutFrames() > 0) {
+            encodingTimeoutMs = (long)(mTest.getInput().getPlayoutFrames() / mFrameRate * 1000) + WAIT_TIME_MS;
+        }
+
         long waitStart = System.currentTimeMillis();
         synchronized (mCompletionLock) {
             while (!mOutputDone.get()) {
@@ -216,8 +223,8 @@ public class AsyncBufferEncoder extends Encoder {
                                 " current_time: " + mCurrentTimeSec);
                     }
 
-                    if (System.currentTimeMillis() - waitStart > WAIT_TIME_MS) {
-                        Log.e(TAG, "Global encoding timeout after " + WAIT_TIME_MS + "ms" +
+                    if (System.currentTimeMillis() - waitStart > encodingTimeoutMs) {
+                        Log.e(TAG, "Global encoding timeout after " + encodingTimeoutMs + "ms" +
                                 " \u2014 inputDone=" + mInputDone.get() +
                                 ", frames=" + mFramesAdded +
                                 ", outframes=" + mOutFramesCount);
