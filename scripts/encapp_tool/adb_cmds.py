@@ -798,7 +798,31 @@ def pull_files_from_device(
         for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
             adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
-            run_cmd(adb_cmd, debug=debug)
+            # Retry to absorb transient adb-pull failures (USB hiccups,
+            # device-locked-screen restrictions on some OEMs, etc.). A pull
+            # is considered successful when adb returns 0 AND the file lands
+            # in destination — adb sometimes returns 0 even when nothing was
+            # transferred, so we verify both.
+            local_path = os.path.join(destination, os.path.basename(file))
+            ok = False
+            last_err = ""
+            for attempt in range(1, 4):
+                ret, _, stderr = run_cmd(adb_cmd, debug=debug)
+                if ret and os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                    ok = True
+                    break
+                last_err = stderr.strip()
+                if attempt < 3:
+                    print(
+                        f"\nWARN: pull of {file} failed (attempt {attempt}/3): "
+                        f"{last_err or 'file missing/empty after pull'} — retrying"
+                    )
+                    time.sleep(1)
+            if not ok:
+                print(
+                    f"\nERROR: failed to pull {file} after 3 attempts: "
+                    f"{last_err or 'file missing/empty after pull'}"
+                )
 
 
 def set_idb_mode(mode):

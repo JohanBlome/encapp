@@ -1,5 +1,7 @@
 package com.facebook.encapp;
 
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -107,6 +109,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     long startenergycounter;
     long endenergycounter;
     int brightness;
+    volatile boolean mScreenLockedForTest = false;
+    // Held while the panel is forced off via lockScreenNow() so the SoC cannot
+    // enter deep sleep mid-test and stall the encoder threads / MediaCodec
+    // callbacks. Released in wakeScreenUp().
+    private android.os.PowerManager.WakeLock mTestCpuWakeLock = null;
     final static long CHARGE_WAIT_TIME_MS = 1 * 60 * 1000;// X minutes
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
     private boolean  mPowerLow = false;
@@ -179,6 +186,132 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
             Toast.makeText(this, "Write Settings permission already granted", Toast.LENGTH_SHORT).show();
         }
     }
+    /**
+     * Returns the {@link ComponentName} for our DeviceAdminReceiver — used by
+     * {@link DevicePolicyManager} calls.
+     */
+    private ComponentName getDeviceAdminComponent() {
+        return new ComponentName(this, EncappDeviceAdminReceiver.class);
+    }
+
+    /**
+     * Checks whether our app is enabled as a Device Admin. If not, fires the
+     * system "add device admin" prompt so the user can approve it once. Returns
+     * true if (and only if) the admin was already enabled at call time.
+     */
+    private boolean ensureDeviceAdminEnabled() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName admin = getDeviceAdminComponent();
+        if (dpm != null && dpm.isAdminActive(admin)) {
+            return true;
+        }
+        Log.w(TAG, "Device Admin not active — launching system prompt to enable it");
+        try {
+            Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+            intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin);
+            intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                    "encapp needs Device Admin to turn the screen off during battery tests " +
+                    "(test_setup.screen_off). Only the 'force lock' policy is used.");
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch Device Admin enable intent", e);
+        }
+        return false;
+    }
+
+    /**
+     * Turns the display panel off via {@link DevicePolicyManager#lockNow()}.
+     * Requires the app to be an enabled Device Admin (see
+     * {@link #ensureDeviceAdminEnabled()}). No-op + logs if not enabled.
+     */
+    private void lockScreenNow() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName admin = getDeviceAdminComponent();
+        if (dpm == null || !dpm.isAdminActive(admin)) {
+            Log.w(TAG, "screen_off: cannot lockNow() — Device Admin not enabled");
+            return;
+        }
+        // Acquire BEFORE lockNow() so there is no window in which the SoC is
+        // free to suspend. Without this, encoder feeder threads' Thread.sleep()
+        // and MediaCodec callbacks stall when the kernel decides to enter deep
+        // sleep, producing wildly inconsistent frame counts across runs.
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && mTestCpuWakeLock == null) {
+                mTestCpuWakeLock = pm.newWakeLock(
+                        android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                        "encapp:BatteryTestCpu");
+                mTestCpuWakeLock.setReferenceCounted(false);
+                // Bounded acquire as a safety belt so the lock cannot leak past
+                // the test if wakeScreenUp() is somehow not called.
+                mTestCpuWakeLock.acquire(60L * 60L * 1000L); // 1 hour
+                Log.d(TAG, "screen_off: acquired PARTIAL_WAKE_LOCK for test CPU");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "screen_off: failed to acquire CPU wake lock", e);
+        }
+        try {
+            Log.d(TAG, "screen_off: calling DevicePolicyManager.lockNow() to blank display");
+            dpm.lockNow();
+            mScreenLockedForTest = true;
+        } catch (SecurityException e) {
+            Log.e(TAG, "screen_off: lockNow() denied", e);
+        }
+    }
+
+    /**
+     * Wakes the display back up after a {@link #lockScreenNow()} — used at test
+     * completion so the device is visible again when the user reconnects USB.
+     * Combines a short SCREEN_BRIGHT wake lock with re-adding the keep-screen-on /
+     * turn-screen-on / show-when-locked window flags. Note: a secure keyguard
+     * (PIN/pattern/fingerprint) will still need the user to unlock; the panel
+     * itself will be on.
+     */
+    private void wakeScreenUp() {
+        if (!mScreenLockedForTest) {
+            return;
+        }
+        Log.d(TAG, "screen_off: waking display back up at end of test");
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                @SuppressWarnings("deprecation")
+                android.os.PowerManager.WakeLock wl = pm.newWakeLock(
+                        android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                                | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP
+                                | android.os.PowerManager.ON_AFTER_RELEASE,
+                        "encapp:WakeAfterScreenOffTest");
+                // Hold briefly — release is implicit via timeout, so the device
+                // returns to its normal sleep policy afterwards.
+                wl.acquire(3_000L);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "screen_off: wake lock acquire failed", e);
+        }
+        runOnUiThread(() -> {
+            getWindow().addFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                            | android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                            | android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                            | android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        });
+        // Release the partial wake lock so the device can resume normal sleep
+        // policy after the test.
+        if (mTestCpuWakeLock != null) {
+            try {
+                if (mTestCpuWakeLock.isHeld()) {
+                    mTestCpuWakeLock.release();
+                }
+                Log.d(TAG, "screen_off: released PARTIAL_WAKE_LOCK");
+            } catch (Exception e) {
+                Log.w(TAG, "screen_off: failed to release CPU wake lock", e);
+            }
+            mTestCpuWakeLock = null;
+        }
+        mScreenLockedForTest = false;
+    }
+
     private void setScreenBrightness(int brightnessLevel) {
         try {
             // Ensure the brightness level is within the valid range
@@ -582,6 +715,8 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     }
                 }
 
+                final boolean screenOff = test0.hasTestSetup() && test0.getTestSetup().getScreenOff();
+
                 try {
                     brightness = Settings.System.getInt(
                             getContentResolver(),
@@ -590,7 +725,26 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 } catch (Settings.SettingNotFoundException e) {
                     e.printStackTrace();
                 }
-                setScreenBrightness(1);
+                if (!screenOff) {
+                    setScreenBrightness(1);
+                }
+
+                if (screenOff) {
+                    // Clear the keep-screen-on flag so the panel stays off after we
+                    // request lockNow() and so the system's normal timeout can blank
+                    // it on its own.
+                    Log.d(TAG, "screen_off requested: cleared FLAG_KEEP_SCREEN_ON, will lockNow() before encoding");
+                    runOnUiThread(() -> {
+                        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    });
+                    // Ensure Device Admin is enabled so we can actually turn the
+                    // panel off via DevicePolicyManager.lockNow(). If not enabled,
+                    // prompt the user — they only need to do this once.
+                    if (!ensureDeviceAdminEnabled()) {
+                        Log.w(TAG, "screen_off: Device Admin not enabled — screen will not be turned off this run. " +
+                                "Approve the Device Admin prompt and re-run.");
+                    }
+                }
 
                 if (test0.getConfigure().hasBatteryTest()){
                     if (test0.getConfigure().getBatteryTest()) {
@@ -605,6 +759,14 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                             Log.w("NullEncode", "Start delay interrupted", e);
                         }
                     }
+                }
+
+                // After the battery prompt is shown (and after the 30s read-window
+                // for battery_test), if screen_off was requested actually lock the
+                // device — this turns the display panel off via the system,
+                // identical to pressing the hardware power key.
+                if (screenOff) {
+                    lockScreenNow();
                 }
 
                 int nbrViews = 0;
@@ -1095,8 +1257,10 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     if (stats != null) {
                         Log.d(TAG, "Done test: " + test.getCommon().getId() + " with stats: " + stats.getId() + ", to go: " + mInstancesRunning);
                         setScreenBrightness(brightness);
+                        wakeScreenUp();
                     } else {
                         Log.d(TAG, "Done test, stats failed, to go: " + mInstancesRunning);
+                        wakeScreenUp();
                     }
                 }
             }

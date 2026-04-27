@@ -56,6 +56,12 @@ message TestSetup {
   // This is not default since we may end up in a situatin were settings may clash
   // with some other intent
   optional bool expand_all = 15;
+  // If true, the app turns the display panel off for the duration of the test
+  // (clears FLAG_KEEP_SCREEN_ON and sets window brightness to BRIGHTNESS_OVERRIDE_OFF).
+  // Useful for battery / power measurements where the display would otherwise
+  // dominate consumption. The app process stays in the foreground so the encoder
+  // continues to run.
+  optional bool screen_off = 16;
 }
 
 message Common {
