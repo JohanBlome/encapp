@@ -87,140 +87,140 @@ struct ProxyVal: Sendable {
   fileprivate var _value: String? = nil
 }
 
-struct TestSetup: Sendable {
+struct TestSetup: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Instead of setting device workdir on the cli it can be defined here
   var deviceWorkdir: String {
-    get {return _deviceWorkdir ?? String()}
-    set {_deviceWorkdir = newValue}
+    get {return _storage._deviceWorkdir ?? String()}
+    set {_uniqueStorage()._deviceWorkdir = newValue}
   }
   /// Returns true if `deviceWorkdir` has been explicitly set.
-  var hasDeviceWorkdir: Bool {return self._deviceWorkdir != nil}
+  var hasDeviceWorkdir: Bool {return _storage._deviceWorkdir != nil}
   /// Clears the value of `deviceWorkdir`. Subsequent reads from it will return its default value.
-  mutating func clearDeviceWorkdir() {self._deviceWorkdir = nil}
+  mutating func clearDeviceWorkdir() {_uniqueStorage()._deviceWorkdir = nil}
 
   var localWorkdir: String {
-    get {return _localWorkdir ?? String()}
-    set {_localWorkdir = newValue}
+    get {return _storage._localWorkdir ?? String()}
+    set {_uniqueStorage()._localWorkdir = newValue}
   }
   /// Returns true if `localWorkdir` has been explicitly set.
-  var hasLocalWorkdir: Bool {return self._localWorkdir != nil}
+  var hasLocalWorkdir: Bool {return _storage._localWorkdir != nil}
   /// Clears the value of `localWorkdir`. Subsequent reads from it will return its default value.
-  mutating func clearLocalWorkdir() {self._localWorkdir = nil}
+  mutating func clearLocalWorkdir() {_uniqueStorage()._localWorkdir = nil}
 
   var serial: String {
-    get {return _serial ?? String()}
-    set {_serial = newValue}
+    get {return _storage._serial ?? String()}
+    set {_uniqueStorage()._serial = newValue}
   }
   /// Returns true if `serial` has been explicitly set.
-  var hasSerial: Bool {return self._serial != nil}
+  var hasSerial: Bool {return _storage._serial != nil}
   /// Clears the value of `serial`. Subsequent reads from it will return its default value.
-  mutating func clearSerial() {self._serial = nil}
+  mutating func clearSerial() {_uniqueStorage()._serial = nil}
 
   /// Default is adb, set it to idb for Apple
   var deviceCmd: String {
-    get {return _deviceCmd ?? String()}
-    set {_deviceCmd = newValue}
+    get {return _storage._deviceCmd ?? String()}
+    set {_uniqueStorage()._deviceCmd = newValue}
   }
   /// Returns true if `deviceCmd` has been explicitly set.
-  var hasDeviceCmd: Bool {return self._deviceCmd != nil}
+  var hasDeviceCmd: Bool {return _storage._deviceCmd != nil}
   /// Clears the value of `deviceCmd`. Subsequent reads from it will return its default value.
-  mutating func clearDeviceCmd() {self._deviceCmd = nil}
+  mutating func clearDeviceCmd() {_uniqueStorage()._deviceCmd = nil}
 
   /// If a different command is needed to start the device app it can be defined here
   /// e.g. "appXYZ -r " + "DEF.pbtxt"
   /// "Needs to be self contained, i.e. paths etc, defined in the protobuf
   var runCmd: String {
-    get {return _runCmd ?? String()}
-    set {_runCmd = newValue}
+    get {return _storage._runCmd ?? String()}
+    set {_uniqueStorage()._runCmd = newValue}
   }
   /// Returns true if `runCmd` has been explicitly set.
-  var hasRunCmd: Bool {return self._runCmd != nil}
+  var hasRunCmd: Bool {return _storage._runCmd != nil}
   /// Clears the value of `runCmd`. Subsequent reads from it will return its default value.
-  mutating func clearRunCmd() {self._runCmd = nil}
+  mutating func clearRunCmd() {_uniqueStorage()._runCmd = nil}
 
   var separateSources: Bool {
-    get {return _separateSources ?? false}
-    set {_separateSources = newValue}
+    get {return _storage._separateSources ?? false}
+    set {_uniqueStorage()._separateSources = newValue}
   }
   /// Returns true if `separateSources` has been explicitly set.
-  var hasSeparateSources: Bool {return self._separateSources != nil}
+  var hasSeparateSources: Bool {return _storage._separateSources != nil}
   /// Clears the value of `separateSources`. Subsequent reads from it will return its default value.
-  mutating func clearSeparateSources() {self._separateSources = nil}
+  mutating func clearSeparateSources() {_uniqueStorage()._separateSources = nil}
 
   /// Place to store temporary files
   var mediastore: String {
-    get {return _mediastore ?? String()}
-    set {_mediastore = newValue}
+    get {return _storage._mediastore ?? String()}
+    set {_uniqueStorage()._mediastore = newValue}
   }
   /// Returns true if `mediastore` has been explicitly set.
-  var hasMediastore: Bool {return self._mediastore != nil}
+  var hasMediastore: Bool {return _storage._mediastore != nil}
   /// Clears the value of `mediastore`. Subsequent reads from it will return its default value.
-  mutating func clearMediastore() {self._mediastore = nil}
+  mutating func clearMediastore() {_uniqueStorage()._mediastore = nil}
 
   /// Root directory for sources.
   /// If not set the input.filepath wll be absolute or relative from the current
   var sourceDir: String {
-    get {return _sourceDir ?? String()}
-    set {_sourceDir = newValue}
+    get {return _storage._sourceDir ?? String()}
+    set {_uniqueStorage()._sourceDir = newValue}
   }
   /// Returns true if `sourceDir` has been explicitly set.
-  var hasSourceDir: Bool {return self._sourceDir != nil}
+  var hasSourceDir: Bool {return _storage._sourceDir != nil}
   /// Clears the value of `sourceDir`. Subsequent reads from it will return its default value.
-  mutating func clearSourceDir() {self._sourceDir = nil}
+  mutating func clearSourceDir() {_uniqueStorage()._sourceDir = nil}
 
   var firstFrameFastRead: Bool {
-    get {return _firstFrameFastRead ?? false}
-    set {_firstFrameFastRead = newValue}
+    get {return _storage._firstFrameFastRead ?? false}
+    set {_uniqueStorage()._firstFrameFastRead = newValue}
   }
   /// Returns true if `firstFrameFastRead` has been explicitly set.
-  var hasFirstFrameFastRead: Bool {return self._firstFrameFastRead != nil}
+  var hasFirstFrameFastRead: Bool {return _storage._firstFrameFastRead != nil}
   /// Clears the value of `firstFrameFastRead`. Subsequent reads from it will return its default value.
-  mutating func clearFirstFrameFastRead() {self._firstFrameFastRead = nil}
+  mutating func clearFirstFrameFastRead() {_uniqueStorage()._firstFrameFastRead = nil}
 
   /// If set the 20%-80% power lvel rules will be ignored and the test will run until power is out.
   /// Useful for devices with problem in the power reporting.
   var ignorePowerStatus: Bool {
-    get {return _ignorePowerStatus ?? false}
-    set {_ignorePowerStatus = newValue}
+    get {return _storage._ignorePowerStatus ?? false}
+    set {_uniqueStorage()._ignorePowerStatus = newValue}
   }
   /// Returns true if `ignorePowerStatus` has been explicitly set.
-  var hasIgnorePowerStatus: Bool {return self._ignorePowerStatus != nil}
+  var hasIgnorePowerStatus: Bool {return _storage._ignorePowerStatus != nil}
   /// Clears the value of `ignorePowerStatus`. Subsequent reads from it will return its default value.
-  mutating func clearIgnorePowerStatus() {self._ignorePowerStatus = nil}
+  mutating func clearIgnorePowerStatus() {_uniqueStorage()._ignorePowerStatus = nil}
 
   /// Add a delay before exiting the app. Can be usefull for identifying back to back runs.
   var uiholdSec: Int32 {
-    get {return _uiholdSec ?? 0}
-    set {_uiholdSec = newValue}
+    get {return _storage._uiholdSec ?? 0}
+    set {_uniqueStorage()._uiholdSec = newValue}
   }
   /// Returns true if `uiholdSec` has been explicitly set.
-  var hasUiholdSec: Bool {return self._uiholdSec != nil}
+  var hasUiholdSec: Bool {return _storage._uiholdSec != nil}
   /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
-  mutating func clearUiholdSec() {self._uiholdSec = nil}
+  mutating func clearUiholdSec() {_uniqueStorage()._uiholdSec = nil}
 
   /// Use internal Java muxer instead of Android MediaMuxer
   /// Note: HEIC output always uses internal muxer (MediaMuxer doesn't support HEIC)
   var internalMuxer: Bool {
-    get {return _internalMuxer ?? false}
-    set {_internalMuxer = newValue}
+    get {return _storage._internalMuxer ?? false}
+    set {_uniqueStorage()._internalMuxer = newValue}
   }
   /// Returns true if `internalMuxer` has been explicitly set.
-  var hasInternalMuxer: Bool {return self._internalMuxer != nil}
+  var hasInternalMuxer: Bool {return _storage._internalMuxer != nil}
   /// Clears the value of `internalMuxer`. Subsequent reads from it will return its default value.
-  mutating func clearInternalMuxer() {self._internalMuxer = nil}
+  mutating func clearInternalMuxer() {_uniqueStorage()._internalMuxer = nil}
 
   var internalDemuxer: Bool {
-    get {return _internalDemuxer ?? false}
-    set {_internalDemuxer = newValue}
+    get {return _storage._internalDemuxer ?? false}
+    set {_uniqueStorage()._internalDemuxer = newValue}
   }
   /// Returns true if `internalDemuxer` has been explicitly set.
-  var hasInternalDemuxer: Bool {return self._internalDemuxer != nil}
+  var hasInternalDemuxer: Bool {return _storage._internalDemuxer != nil}
   /// Clears the value of `internalDemuxer`. Subsequent reads from it will return its default value.
-  mutating func clearInternalDemuxer() {self._internalDemuxer = nil}
+  mutating func clearInternalDemuxer() {_uniqueStorage()._internalDemuxer = nil}
 
   /// For string values we have had an expansion available e.g. 1-3-1,5
   /// 1. For non string value this has not been possible
@@ -236,38 +236,54 @@ struct TestSetup: Sendable {
   ///
   ///config.quality: "-100"
   /// The id can be anything and if matching the value will be expanded.
-  var proxyVal: [ProxyVal] = []
+  var proxyVal: [ProxyVal] {
+    get {return _storage._proxyVal}
+    set {_uniqueStorage()._proxyVal = newValue}
+  }
 
   /// Same as the cli option to expand all fields in parameters
   /// This is not default since we may end up in a situatin were settings may clash
   /// with some other intent
   var expandAll: Bool {
-    get {return _expandAll ?? false}
-    set {_expandAll = newValue}
+    get {return _storage._expandAll ?? false}
+    set {_uniqueStorage()._expandAll = newValue}
   }
   /// Returns true if `expandAll` has been explicitly set.
-  var hasExpandAll: Bool {return self._expandAll != nil}
+  var hasExpandAll: Bool {return _storage._expandAll != nil}
   /// Clears the value of `expandAll`. Subsequent reads from it will return its default value.
-  mutating func clearExpandAll() {self._expandAll = nil}
+  mutating func clearExpandAll() {_uniqueStorage()._expandAll = nil}
+
+  /// If true, the app turns the display panel off for the duration of the test
+  /// (clears FLAG_KEEP_SCREEN_ON and sets window brightness to BRIGHTNESS_OVERRIDE_OFF).
+  /// Useful for battery / power measurements where the display would otherwise
+  /// dominate consumption. The app process stays in the foreground so the encoder
+  /// continues to run.
+  var screenOff: Bool {
+    get {return _storage._screenOff ?? false}
+    set {_uniqueStorage()._screenOff = newValue}
+  }
+  /// Returns true if `screenOff` has been explicitly set.
+  var hasScreenOff: Bool {return _storage._screenOff != nil}
+  /// Clears the value of `screenOff`. Subsequent reads from it will return its default value.
+  mutating func clearScreenOff() {_uniqueStorage()._screenOff = nil}
+
+  /// Hard timeout for this test, in seconds. If the test does not complete
+  /// within this window, the CLI force-stops the app and marks the test
+  /// status as "timeout". If unset, CLI uses a heuristic default.
+  var timeoutSec: Int32 {
+    get {return _storage._timeoutSec ?? 0}
+    set {_uniqueStorage()._timeoutSec = newValue}
+  }
+  /// Returns true if `timeoutSec` has been explicitly set.
+  var hasTimeoutSec: Bool {return _storage._timeoutSec != nil}
+  /// Clears the value of `timeoutSec`. Subsequent reads from it will return its default value.
+  mutating func clearTimeoutSec() {_uniqueStorage()._timeoutSec = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _deviceWorkdir: String? = nil
-  fileprivate var _localWorkdir: String? = nil
-  fileprivate var _serial: String? = nil
-  fileprivate var _deviceCmd: String? = nil
-  fileprivate var _runCmd: String? = nil
-  fileprivate var _separateSources: Bool? = nil
-  fileprivate var _mediastore: String? = nil
-  fileprivate var _sourceDir: String? = nil
-  fileprivate var _firstFrameFastRead: Bool? = nil
-  fileprivate var _ignorePowerStatus: Bool? = nil
-  fileprivate var _uiholdSec: Int32? = nil
-  fileprivate var _internalMuxer: Bool? = nil
-  fileprivate var _internalDemuxer: Bool? = nil
-  fileprivate var _expandAll: Bool? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct Common: Sendable {
@@ -767,6 +783,24 @@ struct Configure: @unchecked Sendable {
   /// Clears the value of `cropArea`. Subsequent reads from it will return its default value.
   mutating func clearCropArea() {_uniqueStorage()._cropArea = nil}
 
+  var nullEncode: Bool {
+    get {return _storage._nullEncode ?? false}
+    set {_uniqueStorage()._nullEncode = newValue}
+  }
+  /// Returns true if `nullEncode` has been explicitly set.
+  var hasNullEncode: Bool {return _storage._nullEncode != nil}
+  /// Clears the value of `nullEncode`. Subsequent reads from it will return its default value.
+  mutating func clearNullEncode() {_uniqueStorage()._nullEncode = nil}
+
+  var batteryTest: Bool {
+    get {return _storage._batteryTest ?? false}
+    set {_uniqueStorage()._batteryTest = newValue}
+  }
+  /// Returns true if `batteryTest` has been explicitly set.
+  var hasBatteryTest: Bool {return _storage._batteryTest != nil}
+  /// Clears the value of `batteryTest`. Subsequent reads from it will return its default value.
+  mutating func clearBatteryTest() {_uniqueStorage()._batteryTest = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum BitrateMode: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -1116,103 +1150,181 @@ extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
 
 extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSetup"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0\u{3}screen_off\0\u{3}timeout_sec\0")
+
+  fileprivate class _StorageClass {
+    var _deviceWorkdir: String? = nil
+    var _localWorkdir: String? = nil
+    var _serial: String? = nil
+    var _deviceCmd: String? = nil
+    var _runCmd: String? = nil
+    var _separateSources: Bool? = nil
+    var _mediastore: String? = nil
+    var _sourceDir: String? = nil
+    var _firstFrameFastRead: Bool? = nil
+    var _ignorePowerStatus: Bool? = nil
+    var _uiholdSec: Int32? = nil
+    var _internalMuxer: Bool? = nil
+    var _internalDemuxer: Bool? = nil
+    var _proxyVal: [ProxyVal] = []
+    var _expandAll: Bool? = nil
+    var _screenOff: Bool? = nil
+    var _timeoutSec: Int32? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _deviceWorkdir = source._deviceWorkdir
+      _localWorkdir = source._localWorkdir
+      _serial = source._serial
+      _deviceCmd = source._deviceCmd
+      _runCmd = source._runCmd
+      _separateSources = source._separateSources
+      _mediastore = source._mediastore
+      _sourceDir = source._sourceDir
+      _firstFrameFastRead = source._firstFrameFastRead
+      _ignorePowerStatus = source._ignorePowerStatus
+      _uiholdSec = source._uiholdSec
+      _internalMuxer = source._internalMuxer
+      _internalDemuxer = source._internalDemuxer
+      _proxyVal = source._proxyVal
+      _expandAll = source._expandAll
+      _screenOff = source._screenOff
+      _timeoutSec = source._timeoutSec
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._deviceWorkdir) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._localWorkdir) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._serial) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._deviceCmd) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._runCmd) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self._separateSources) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._mediastore) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._sourceDir) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self._firstFrameFastRead) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self._ignorePowerStatus) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self._uiholdSec) }()
-      case 12: try { try decoder.decodeSingularBoolField(value: &self._internalDemuxer) }()
-      case 13: try { try decoder.decodeRepeatedMessageField(value: &self.proxyVal) }()
-      case 14: try { try decoder.decodeSingularBoolField(value: &self._internalMuxer) }()
-      case 15: try { try decoder.decodeSingularBoolField(value: &self._expandAll) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._deviceWorkdir) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._localWorkdir) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._serial) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._deviceCmd) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._runCmd) }()
+        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._separateSources) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._mediastore) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._sourceDir) }()
+        case 9: try { try decoder.decodeSingularBoolField(value: &_storage._firstFrameFastRead) }()
+        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._ignorePowerStatus) }()
+        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._uiholdSec) }()
+        case 12: try { try decoder.decodeSingularBoolField(value: &_storage._internalDemuxer) }()
+        case 13: try { try decoder.decodeRepeatedMessageField(value: &_storage._proxyVal) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._internalMuxer) }()
+        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._expandAll) }()
+        case 16: try { try decoder.decodeSingularBoolField(value: &_storage._screenOff) }()
+        case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._timeoutSec) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._deviceWorkdir {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._localWorkdir {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._serial {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._deviceCmd {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._runCmd {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._separateSources {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._mediastore {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._sourceDir {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._firstFrameFastRead {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._ignorePowerStatus {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
-    } }()
-    try { if let v = self._uiholdSec {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 11)
-    } }()
-    try { if let v = self._internalDemuxer {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
-    } }()
-    if !self.proxyVal.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.proxyVal, fieldNumber: 13)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._deviceWorkdir {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._localWorkdir {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._serial {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._deviceCmd {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._runCmd {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._separateSources {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._mediastore {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._sourceDir {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._firstFrameFastRead {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._ignorePowerStatus {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._uiholdSec {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._internalDemuxer {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
+      } }()
+      if !_storage._proxyVal.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._proxyVal, fieldNumber: 13)
+      }
+      try { if let v = _storage._internalMuxer {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._expandAll {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._screenOff {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._timeoutSec {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 17)
+      } }()
     }
-    try { if let v = self._internalMuxer {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
-    } }()
-    try { if let v = self._expandAll {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: TestSetup, rhs: TestSetup) -> Bool {
-    if lhs._deviceWorkdir != rhs._deviceWorkdir {return false}
-    if lhs._localWorkdir != rhs._localWorkdir {return false}
-    if lhs._serial != rhs._serial {return false}
-    if lhs._deviceCmd != rhs._deviceCmd {return false}
-    if lhs._runCmd != rhs._runCmd {return false}
-    if lhs._separateSources != rhs._separateSources {return false}
-    if lhs._mediastore != rhs._mediastore {return false}
-    if lhs._sourceDir != rhs._sourceDir {return false}
-    if lhs._firstFrameFastRead != rhs._firstFrameFastRead {return false}
-    if lhs._ignorePowerStatus != rhs._ignorePowerStatus {return false}
-    if lhs._uiholdSec != rhs._uiholdSec {return false}
-    if lhs._internalMuxer != rhs._internalMuxer {return false}
-    if lhs._internalDemuxer != rhs._internalDemuxer {return false}
-    if lhs.proxyVal != rhs.proxyVal {return false}
-    if lhs._expandAll != rhs._expandAll {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._deviceWorkdir != rhs_storage._deviceWorkdir {return false}
+        if _storage._localWorkdir != rhs_storage._localWorkdir {return false}
+        if _storage._serial != rhs_storage._serial {return false}
+        if _storage._deviceCmd != rhs_storage._deviceCmd {return false}
+        if _storage._runCmd != rhs_storage._runCmd {return false}
+        if _storage._separateSources != rhs_storage._separateSources {return false}
+        if _storage._mediastore != rhs_storage._mediastore {return false}
+        if _storage._sourceDir != rhs_storage._sourceDir {return false}
+        if _storage._firstFrameFastRead != rhs_storage._firstFrameFastRead {return false}
+        if _storage._ignorePowerStatus != rhs_storage._ignorePowerStatus {return false}
+        if _storage._uiholdSec != rhs_storage._uiholdSec {return false}
+        if _storage._internalMuxer != rhs_storage._internalMuxer {return false}
+        if _storage._internalDemuxer != rhs_storage._internalDemuxer {return false}
+        if _storage._proxyVal != rhs_storage._proxyVal {return false}
+        if _storage._expandAll != rhs_storage._expandAll {return false}
+        if _storage._screenOff != rhs_storage._screenOff {return false}
+        if _storage._timeoutSec != rhs_storage._timeoutSec {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1412,7 +1524,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
 
 extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0\u{1}nullEncode\0\u{3}battery_test\0")
 
   fileprivate class _StorageClass {
     var _parameter: [Parameter] = []
@@ -1441,6 +1553,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _tileWidth: Int32? = nil
     var _tileHeight: Int32? = nil
     var _cropArea: String? = nil
+    var _nullEncode: Bool? = nil
+    var _batteryTest: Bool? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1477,6 +1591,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _tileWidth = source._tileWidth
       _tileHeight = source._tileHeight
       _cropArea = source._cropArea
+      _nullEncode = source._nullEncode
+      _batteryTest = source._batteryTest
     }
   }
 
@@ -1521,6 +1637,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._tileWidth) }()
         case 25: try { try decoder.decodeSingularInt32Field(value: &_storage._tileHeight) }()
         case 26: try { try decoder.decodeSingularStringField(value: &_storage._cropArea) }()
+        case 27: try { try decoder.decodeSingularBoolField(value: &_storage._nullEncode) }()
+        case 28: try { try decoder.decodeSingularBoolField(value: &_storage._batteryTest) }()
         default: break
         }
       }
@@ -1611,6 +1729,12 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._cropArea {
         try visitor.visitSingularStringField(value: v, fieldNumber: 26)
       } }()
+      try { if let v = _storage._nullEncode {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 27)
+      } }()
+      try { if let v = _storage._batteryTest {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 28)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1646,6 +1770,8 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._tileWidth != rhs_storage._tileWidth {return false}
         if _storage._tileHeight != rhs_storage._tileHeight {return false}
         if _storage._cropArea != rhs_storage._cropArea {return false}
+        if _storage._nullEncode != rhs_storage._nullEncode {return false}
+        if _storage._batteryTest != rhs_storage._batteryTest {return false}
         return true
       }
       if !storagesAreEqual {return false}

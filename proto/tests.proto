@@ -62,6 +62,10 @@ message TestSetup {
   // dominate consumption. The app process stays in the foreground so the encoder
   // continues to run.
   optional bool screen_off = 16;
+  // Hard timeout for this test, in seconds. If the test does not complete
+  // within this window, the CLI force-stops the app and marks the test
+  // status as "timeout". If unset, CLI uses a heuristic default.
+  optional int32 timeout_sec = 17;
 }
 
 message Common {
