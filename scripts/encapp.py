@@ -171,6 +171,49 @@ video_extensions = [
 ]
 
 
+def _slug(s):
+    return re.sub(r"^_+|_+$", "", re.sub(r"[^A-Za-z0-9]+", "_", s))
+
+
+def _derive_id(test):
+    parts = []
+    if test.common.description:
+        parts.append(_slug(test.common.description))
+    else:
+        parts.append("encapp")
+    if test.configure.codec:
+        parts.append(_slug(test.configure.codec))
+    if test.configure.bitrate:
+        parts.append(_slug(test.configure.bitrate))
+    if test.configure.resolution:
+        parts.append(_slug(test.configure.resolution))
+    return "_".join(parts)
+
+
+def fill_ids(suite):
+    """Assigns common.id to every Test (and parallel sibling) that doesn't have one.
+
+    Matches the algorithm in Statistics.resolveId() / deriveId() on the app
+    side so a manual `am start` against the same pbtxt produces identical
+    file names. Disambiguates duplicates within a single suite with a
+    numeric suffix.
+    """
+    seen = {}
+
+    def _assign(test):
+        if test.common.id:
+            return
+        base = _derive_id(test)
+        idx = seen.get(base, 0)
+        seen[base] = idx + 1
+        test.common.id = base if idx == 0 else f"{base}_{idx:03d}"
+
+    for test in suite.test:
+        _assign(test)
+        for sub in test.parallel.test:
+            _assign(sub)
+
+
 def is_video_extension(filename):
     ending = f".{filename.rsplit('.')[-1]}"
     if ending is not None and ending in video_extensions:
@@ -597,6 +640,11 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         os.mkdir(local_workdir)
 
     test_suite = configfile_read(protobuf_txt_filepath)
+
+    # Seed common.id on any test that doesn't have one, BEFORE the
+    # codec/bitrate/resolution suffix mutations in update_codec_testsuite
+    # so the suffixes land on a deterministic, human-readable base.
+    fill_ids(test_suite)
 
     updated_test_suite = tests_definitions.TestSuite()
     update_codec_testsuite(
