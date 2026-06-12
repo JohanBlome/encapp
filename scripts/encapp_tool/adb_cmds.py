@@ -4,12 +4,15 @@ import re
 import os
 import glob
 import hashlib
+import logging
 import subprocess
 import tempfile
 import time
 import typing
 import sys
 import json
+
+log = logging.getLogger("encapp.adb")
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
@@ -42,11 +45,11 @@ def run_cmd(
     # We may have a -s NONE if running adb, we cannot have that. Instead of patching all places
     # check here.
     if "-s None" in cmd:
-        print("ERROR: serial is None, adb cannot run")
+        log.error("serial is None, adb cannot run")
         return False, "", ""
     try:
         if debug > 0:
-            print(cmd, sep=" ")
+            log.debug("cmd: %s", cmd)
         with subprocess.Popen(
             cmd,
             shell=True,
@@ -57,7 +60,7 @@ def run_cmd(
             stdout, stderr = process.communicate()
             ret = bool(process.returncode == 0)
     except subprocess.SubprocessError:
-        print(f"Failed to run command: {cmd}")
+        log.exception("failed to run command: %s", cmd)
         return False, "", ""
 
     stdstr = ""
