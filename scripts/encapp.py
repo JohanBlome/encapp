@@ -2167,6 +2167,31 @@ def _oracle_via_manifest(
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
 
+    # Dump the encapp logcat slice for this session. The app's log lines
+    # were emitted between run_encapp_test's logcat reset (at am-start time)
+    # and now, so this captures every encapp line for the session in one
+    # go. Per-test slicing by timestamp is a follow-up.
+    #
+    # adb logcat -s tag:level matches a literal tag, but every file in the
+    # app uses a sub-tag like 'encapp.statistics' / 'encapp.main'. Filter
+    # device-side with grep -E '^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ +[A-Z] +encapp'
+    # so the file contains only encapp lines but with their original
+    # sub-tags preserved.
+    logcat_path = os.path.join(local_workdir, f"{session_id}.android_logcat.txt")
+    try:
+        ret, stdout, _ = encapp_tool.adb_cmds.run_cmd(
+            f"adb -s {serial} shell \"logcat -d | grep -E ' encapp(\\.|:)' || true\"",
+            ignore_errors=True,
+            debug=0,
+        )
+        if ret and stdout:
+            with open(logcat_path, "w") as f:
+                f.write(stdout)
+            log.debug("wrote session logcat to %s (%d bytes)",
+                      logcat_path, len(stdout))
+    except Exception as e:
+        log.warning("logcat dump failed: %s", e)
+
     _print_manifest_summary(verdicts, session_id)
 
     # Shape: collect_results returns a (bool, list) tuple; collected_results
