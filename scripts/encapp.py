@@ -337,7 +337,14 @@ def run_encapp_test(
                 debug,
             )
             assert ret, f"ERROR: {stderr}"
-        wait_for_exit(serial)
+        if session_id and not encapp_tool.adb_cmds.USE_IDB:
+            # session_id is set: the manifest poll in run_codec_tests is
+            # the authoritative waiter (and the only one that honors
+            # test_setup.timeout_sec). wait_for_exit here would just
+            # block until the app exits naturally, defeating the timeout.
+            pass
+        else:
+            wait_for_exit(serial)
 
 
 def collect_results(
@@ -2074,12 +2081,169 @@ def run_codec_tests(
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
             return None, None
-        collected_results.extend(
-            collect_results(
-                local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+        # Legacy oracle path (logcat parse + regex-ls + verify). Skipped
+        # when session_id is set — the manifest path below is authoritative
+        # AND replaces the wait_for_exit/race-condition issues the legacy
+        # collect_results has (it relies on naming patterns + ls timing).
+        if not (session_id and not encapp_tool.adb_cmds.USE_IDB):
+            collected_results.extend(
+                collect_results(
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                )
             )
+
+    # New oracle path: poll the on-device session manifest, classify each
+    # test, pull declared artifacts. Replaces the legacy block above when
+    # active. Skipped on iOS — the iOS app doesn't write the manifest yet.
+    if session_id and not encapp_tool.adb_cmds.USE_IDB:
+        synth = _oracle_via_manifest(
+            test_suite, serial, device_workdir, local_workdir, session_id, debug
         )
+        # Synthesize the legacy collect_results shape so downstream
+        # verify_test_result is satisfied. Phase 5 cleanup will retire
+        # verify_test_result entirely.
+        if synth is not None:
+            collected_results.extend(synth)
+
     return collected_results
+
+
+def _oracle_via_manifest(
+    test_suite, serial, device_workdir, local_workdir, session_id, debug
+):
+    """Pull and classify the session manifest, pull declared artifacts,
+    print a per-test verdict summary. Returns a list of (ok, json_paths)
+    tuples shaped like collect_results() so downstream legacy verifiers
+    keep working."""
+    from encapp_tool import session_manifest
+
+    expected_ids = []
+    for t in test_suite.test:
+        if t.common.id:
+            expected_ids.append(t.common.id)
+        for sub in t.parallel.test:
+            if sub.common.id:
+                expected_ids.append(sub.common.id)
+
+    def _pull(remote_path, local_dir):
+        encapp_tool.adb_cmds.run_cmd(
+            f"adb -s {serial} pull {remote_path} {local_dir}/",
+            ignore_errors=True,
+            debug=debug,
+        )
+        return os.path.exists(
+            os.path.join(local_dir, f"{session_id}.session.jsonl")
+        )
+
+    def _force_stop():
+        encapp_tool.adb_cmds.run_cmd(
+            f"adb -s {serial} shell am force-stop com.facebook.encapp",
+            ignore_errors=True,
+            debug=debug,
+        )
+
+    def _is_alive():
+        # pidof returns the pid (exit 0) when alive, exits 1 when not.
+        ret, _stdout, _ = encapp_tool.adb_cmds.run_cmd(
+            f"adb -s {serial} shell pidof com.facebook.encapp",
+            ignore_errors=True,
+            debug=0,
+        )
+        return ret is True and _stdout.strip() != ""
+
+    timeout_sec = _suite_timeout_sec(test_suite)
+
+    verdicts = session_manifest.wait_for_session(
+        pull_fn=_pull,
+        device_workdir=device_workdir,
+        local_workdir=local_workdir,
+        session_id=session_id,
+        expected_test_ids=expected_ids,
+        timeout_sec=timeout_sec,
+        on_timeout=_force_stop,
+        is_alive_fn=_is_alive,
+    )
+
+    # Pull every artifact the manifest declared. Duplicates with the
+    # legacy regex pull are absorbed by adb_pull (same file → overwritten
+    # in place).
+    json_paths = []
+    all_pass = True
+    for v in verdicts.tests.values():
+        if v.status != session_manifest.Status.PASS:
+            all_pass = False
+        for art in v.artifacts:
+            path = art.get("path")
+            if not path:
+                continue
+            encapp_tool.adb_cmds.run_cmd(
+                f"adb -s {serial} pull {device_workdir.rstrip('/')}/{path} {local_workdir}/",
+                ignore_errors=True,
+                debug=debug,
+            )
+            if art.get("kind") == "stats":
+                json_paths.append(os.path.join(local_workdir, path))
+
+    _print_manifest_summary(verdicts, session_id)
+
+    # Shape: collect_results returns a (bool, list) tuple; collected_results
+    # then `extend`s it into a flat [bool, list, ...] sequence that
+    # verify_test_result indexes with results[0] / results[1].
+    return (all_pass, json_paths)
+
+
+def _suite_timeout_sec(test_suite):
+    """Per-suite timeout: sum of per-test budgets.
+
+    Per-test: an explicit test_setup.timeout_sec wins outright (no
+    floor). Without an explicit value, use a heuristic: 3x expected
+    duration + 30s safety, clamped to [60s, 600s].
+
+    Suite floor of 30s prevents misconfigured zero-frame edge cases
+    from yielding a 0s deadline that fires before the app even
+    launches.
+    """
+    total = 0
+    any_explicit = False
+    for t in test_suite.test:
+        ts_field = t.test_setup.timeout_sec if t.HasField("test_setup") else 0
+        if ts_field > 0:
+            total += ts_field
+            any_explicit = True
+            continue
+        fps = t.input.framerate or 30
+        frames = t.input.playout_frames or 300
+        expected = frames / max(fps, 1)
+        total += max(60, min(600, int(expected * 3 + 30)))
+    # Suite floor applies only when every test was on the heuristic; an
+    # explicit per-test timeout_sec is trusted as-written (down to 1s).
+    return max(1 if any_explicit else 30, total)
+
+
+def _print_manifest_summary(verdicts, session_id):
+    from encapp_tool import session_manifest
+
+    tests = verdicts.tests
+    n_pass = sum(1 for v in tests.values() if v.status == session_manifest.Status.PASS)
+    n_total = len(tests)
+    print()
+    print(f"=== session {session_id}: {n_pass}/{n_total} tests passed ===")
+    # Only flag missing session_end when it's actually a problem (some
+    # test wasn't terminal). A clean run that early-exited on the last
+    # test_end before session_end was written is not an error — the
+    # final 2s mUIHoldtimeSec is post-test housekeeping the CLI doesn't
+    # need to wait for.
+    terminal = {session_manifest.Status.PASS, session_manifest.Status.FAIL,
+                session_manifest.Status.SKIPPED, session_manifest.Status.TIMEOUT,
+                session_manifest.Status.CRASH}
+    not_terminal = [tid for tid, v in tests.items() if v.status not in terminal]
+    if not_terminal and not verdicts.session_completed:
+        print(f"WARNING: session did not end cleanly "
+              f"(session_end_status={verdicts.session_end_status!r}); "
+              f"incomplete tests: {not_terminal}")
+    for v in tests.values():
+        if v.status != session_manifest.Status.PASS:
+            print(session_manifest.format_test_failure(v))
 
 
 def list_codecs(
