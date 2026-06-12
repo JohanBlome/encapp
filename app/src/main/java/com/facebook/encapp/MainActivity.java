@@ -1345,17 +1345,32 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 String status = null;
                 Throwable thrown = null;
                 final String testId = test.getCommon().getId();
+                com.facebook.encapp.utils.TestLogWriter testLog = null;
+                try {
+                    testLog = new com.facebook.encapp.utils.TestLogWriter(
+                            testId, CliSettings.getWorkDir());
+                    testLog.info("test_start",
+                            "pid=" + android.os.Process.myPid()
+                            + " codec=" + test.getConfigure().getCodec()
+                            + " bitrate=" + test.getConfigure().getBitrate());
+                } catch (IOException e) {
+                    Log.e(TAG, "TestLogWriter open failed for " + testId, e);
+                    testLog = null;
+                }
                 if (mSessionManifest != null) {
                     mSessionManifest.testStart(testId, android.os.Process.myPid());
                 }
                 try {
                     Log.d(TAG, "Start test id: \"" + testId + "\"");
+                    if (testLog != null) testLog.info("encoder_start", "");
                     status = coder_.start();
                     if (status.length() == 0) {
                         // test was ok
                         report_result(coder_.mTest.getCommon().getId(), coder_.getStatistics().getId(), "ok", "");
+                        if (testLog != null) testLog.info("encoder_ok", "");
                     } else if (status.length() > 0) {
                         report_result(coder_.mTest.getCommon().getId(), coder_.getStatistics().getId(), "error", status);
+                        if (testLog != null) testLog.error("encoder_error", status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
                         Log.d(TAG, "Pursuit over");
                         mPursuitOver = true;
@@ -1366,6 +1381,10 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     Log.d(TAG, "Instances running: " + mInstancesRunning);
                 } catch (Throwable th) {
                     thrown = th;
+                    if (testLog != null) {
+                        testLog.error("exception",
+                                (th.getMessage() == null ? th.getClass().getName() : th.getMessage()));
+                    }
                     throw th;
                 } finally {
                     // dump statistics
@@ -1395,6 +1414,18 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                         }
                     } else {
                         Log.d(TAG, "No stats available");
+                    }
+                    String logFilename = null;
+                    if (testLog != null) {
+                        testLog.info("test_end",
+                                "status=" + (thrown != null ? "exception"
+                                        : (status == null || status.isEmpty() ? "ok" : "error")));
+                        logFilename = com.facebook.encapp.utils.TestLogWriter.filename(testId);
+                        long logBytes = testLog.size();
+                        testLog.close();
+                        if (mSessionManifest != null && logBytes > 0) {
+                            mSessionManifest.artifact(testId, "log", logFilename, logBytes);
+                        }
                     }
                     if (mSessionManifest != null) {
                         recordTestArtifactsAndEnd(testId, stats,
