@@ -10,6 +10,7 @@ import copy
 import datetime
 import itertools
 import json
+import logging
 import multiprocessing
 import os
 import pprint
@@ -19,6 +20,8 @@ import shutil
 import sys
 import tempfile
 import time
+
+log = logging.getLogger("encapp.run")
 
 import encapp_quality
 
@@ -1919,9 +1922,8 @@ def run_codec_tests(
     # boundary and output artifact. CLI threads session_id into every
     # run_encapp_test() call site.
     session_id = make_session_id()
-    print(
-        f"session_id: {session_id}  manifest: {device_workdir}/{session_id}.session.jsonl"
-    )
+    log.info("session_id: %s  manifest: %s/%s.session.jsonl",
+             session_id, device_workdir, session_id)
 
     collected_results = []
     # run the test(s)
@@ -2226,8 +2228,8 @@ def _print_manifest_summary(verdicts, session_id):
     tests = verdicts.tests
     n_pass = sum(1 for v in tests.values() if v.status == session_manifest.Status.PASS)
     n_total = len(tests)
-    print()
-    print(f"=== session {session_id}: {n_pass}/{n_total} tests passed ===")
+    log.info("")
+    log.info("=== session %s: %d/%d tests passed ===", session_id, n_pass, n_total)
     # Only flag missing session_end when it's actually a problem (some
     # test wasn't terminal). A clean run that early-exited on the last
     # test_end before session_end was written is not an error — the
@@ -2238,12 +2240,12 @@ def _print_manifest_summary(verdicts, session_id):
                 session_manifest.Status.CRASH}
     not_terminal = [tid for tid, v in tests.items() if v.status not in terminal]
     if not_terminal and not verdicts.session_completed:
-        print(f"WARNING: session did not end cleanly "
-              f"(session_end_status={verdicts.session_end_status!r}); "
-              f"incomplete tests: {not_terminal}")
+        log.warning("session did not end cleanly (session_end_status=%r); "
+                    "incomplete tests: %s",
+                    verdicts.session_end_status, not_terminal)
     for v in tests.values():
         if v.status != session_manifest.Status.PASS:
-            print(session_manifest.format_test_failure(v))
+            log.warning(session_manifest.format_test_failure(v))
 
 
 def list_codecs(
@@ -2803,6 +2805,45 @@ input_args = {
         "args": {
             "action": "store_true",
             "help": "Zero verbosity",
+        },
+    },
+    "log_level": {
+        "func": FUNC_CHOICES,
+        "long": "--log-level",
+        "args": {
+            "type": str,
+            "default": None,
+            "choices": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            "help": (
+                "Stdlib-logging level for the 'encapp' root logger. "
+                "Defaults to INFO (or WARNING with --quiet, DEBUG with -d)."
+            ),
+        },
+    },
+    "log_file": {
+        "func": FUNC_CHOICES,
+        "long": "--log-file",
+        "args": {
+            "type": str,
+            "default": None,
+            "metavar": "PATH",
+            "help": (
+                "Tee log output to PATH (in addition to stderr). Overwritten "
+                "each run — encapp logs are runtime diagnostics, not archives."
+            ),
+        },
+    },
+    "log_modules": {
+        "func": FUNC_CHOICES,
+        "long": "--log-modules",
+        "args": {
+            "type": str,
+            "default": None,
+            "metavar": "MOD=LEVEL[,MOD=LEVEL]...",
+            "help": (
+                "Per-module log-level overrides, e.g. "
+                "'encapp.adb=DEBUG,encapp.manifest=WARNING'."
+            ),
         },
     },
     "serial": {
@@ -3413,6 +3454,27 @@ def get_workdir(serial, debug=0):
 
 def main(argv):
     options = get_options(argv)
+
+    # Initialize structured logging as early as possible. --log-level wins;
+    # otherwise -q maps to WARNING and -d maps to DEBUG (count >=2 keeps DEBUG
+    # too — it's the most verbose level there is). Defaults to INFO.
+    from encapp_tool.log_setup import setup_logging, level_from_debug_kwarg
+    if options.log_level:
+        _resolved_level = options.log_level
+    elif getattr(options, "quiet", False):
+        _resolved_level = "WARNING"
+    else:
+        _resolved_level = level_from_debug_kwarg(getattr(options, "debug", 0))
+        if _resolved_level == "WARNING":
+            _resolved_level = "INFO"
+    setup_logging(
+        level=_resolved_level,
+        log_file=options.log_file,
+        module_overrides=(
+            options.log_modules.split(",") if options.log_modules else None
+        ),
+    )
+
     # check if this is a test run and if these params are defined in the test
 
     proto_options = None
