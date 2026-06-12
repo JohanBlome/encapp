@@ -942,16 +942,25 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
-                # Verify the number fo tests and files (if applicable)
-                if debug:
-                    print(f"*** VERIFY RESULT ***")
-                check = verify_test_result(results, test_suite, protobuf_txt_filepath)
-                if len(check) > 0:
-                    print("ERROR! some tests failed")
-                    df = pd.DataFrame(check)
-                    df.to_csv(
-                        "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
-                    )
+                # Legacy fail-detection (counts ls output vs suite size, regex-
+                # matches output_filename naming). Now redundant on Android:
+                # the manifest oracle in run_codec_tests already classified
+                # every test and the synth tuple's bool (results[0]) carries
+                # the verdict. Also retires the hardcoded
+                # "bitrate_surface_transcoder_show.pbtxt.failed.csv" write in
+                # CWD that fired on every failure regardless of which pbtxt
+                # was actually run. Kept for iOS until the iOS app gets
+                # manifest support.
+                if encapp_tool.adb_cmds.USE_IDB:
+                    if debug:
+                        print(f"*** VERIFY RESULT ***")
+                    check = verify_test_result(results, test_suite, protobuf_txt_filepath)
+                    if len(check) > 0:
+                        print("ERROR! some tests failed")
+                        df = pd.DataFrame(check)
+                        df.to_csv(
+                            "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
+                        )
 
                 # Run quality
                 success = True
