@@ -27,6 +27,20 @@ public class CliSettings {
     // this manifest as the success oracle. If absent, the app runs in
     // legacy mode (no manifest written).
     public static final String SESSION_ID = "session_id";
+    // Probe mode. When set to "true", the app picks a writable workdir,
+    // writes its absolute path to PROBE_MARKER_PATH, then exits without
+    // running any tests. The CLI reads the marker back via
+    // `adb shell cat` to learn where the app will actually write
+    // artifacts (important when /sdcard is not writable and the app
+    // falls back to internal storage).
+    public static final String PROBE = "probe";
+    // Well-known location for the probe marker file. Must be readable
+    // by adb shell — /sdcard is the only path that satisfies both
+    // (app-writable + adb-shell-readable) on every Android version
+    // encapp supports. If the app cannot write here, probe fails
+    // visibly — that's the right signal that the device is mis-set-up
+    // for testing.
+    public static final String PROBE_MARKER_PATH = "/sdcard/encapp_workdir.txt";
 
     private static String mWorkDir = "/sdcard/";
     private static boolean mEnableTracing = false;

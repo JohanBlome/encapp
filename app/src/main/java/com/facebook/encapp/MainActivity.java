@@ -378,6 +378,28 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         getTestSettings();
         CliSettings.setWorkDir(this, mExtraData);
 
+        // Probe mode: write the chosen workdir to a well-known marker
+        // file and exit. The CLI uses this to discover where the app
+        // will actually write artifacts on this device (the WORKDIR
+        // extra is a hint; the app may fall back to internal storage
+        // if /sdcard isn't writable, and the CLI needs to know).
+        if (mExtraData != null
+                && "true".equalsIgnoreCase(mExtraData.getString(CliSettings.PROBE, ""))) {
+            String wd = CliSettings.getWorkDir();
+            File marker = new File(CliSettings.PROBE_MARKER_PATH);
+            try (FileOutputStream fos = new FileOutputStream(marker)) {
+                fos.write(wd.getBytes(StandardCharsets.UTF_8));
+                fos.getFD().sync();
+                Log.i(TAG, "probe: wrote " + marker.getAbsolutePath()
+                        + " containing " + wd);
+            } catch (IOException e) {
+                Log.e(TAG, "probe: failed to write marker at "
+                        + marker.getAbsolutePath(), e);
+            }
+            finish();
+            return;
+        }
+
         // Check if performance tracing is enabled
         if (mExtraData != null && mExtraData.containsKey(CliSettings.ENABLE_TRACING)) {
             CliSettings.setEnableTracing(mExtraData.getBoolean(CliSettings.ENABLE_TRACING, false));
