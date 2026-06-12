@@ -344,6 +344,24 @@ public class Statistics {
         mEncodedfile = filename;
     }
 
+    public String getEncodedfile() {
+        return mEncodedfile;
+    }
+
+    public int getEncodingProcessingFrames() {
+        return mEncodingProcessingFrames;
+    }
+
+    /**
+     * Total number of frames the encoder started processing (whether or
+     * not they completed). Distinct from {@link #getEncodingProcessingFrames()}
+     * which is the live in-flight counter (start incs, stop decs) and
+     * reads ~0 by the time a test's finally block runs.
+     */
+    public int getEncodingFrameCount() {
+        return mEncodingFrames.size();
+    }
+
     public void BatteryTest(long startbattery,long endbattery,double Voltage, double StartVoltage, double EndVoltage, int startAvgCurrent, int endAvgCurrent, int startBatteryCapacity, int endBatteryCapacity, int startChargeCounter, int endChargeCounter, int startCurrentNow, int endCurrentNow, long startEnergyCounter, long endEnergyCounter) {
         mstartbattery = startbattery;
         mendbattery = endbattery;
