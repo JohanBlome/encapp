@@ -35,10 +35,22 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Explicit so BuildConfig.DEBUG=true on default-debug builds.
+            // AGP 8 doesn't auto-generate BuildConfig unless asked.
+            debuggable true
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+
+    buildFeatures {
+        // Required on AGP >= 8 to regenerate the BuildConfig.java class
+        // that exposes BuildConfig.DEBUG (used by utils/Constants.java
+        // to gate Log.d calls at runtime).
+        buildConfig true
     }
 
     lintOptions {
