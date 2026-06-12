@@ -6,7 +6,7 @@ import android.util.Log;
 import java.util.Vector;
 
 public class FpsMeasure extends Thread {
-    private final String TAG = "encapp.fps";
+    private static final String TAG = "encapp.fps";
     double mFps = 0;
     long[] mLatestPts;
     boolean mStable = false;
