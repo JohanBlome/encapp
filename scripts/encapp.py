@@ -665,11 +665,23 @@ def update_fileoutput_names(test):
         test.common.output_filename = filename
 
 
-def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
+def read_and_update_proto(protobuf_txt_filepath, local_workdir, options,
+                          test_suite=None):
+    """Apply CLI overrides + suite expansion to a pbtxt; return the
+    updated TestSuite, the set of files to push to the device, and a
+    sentinel for the split/combined branch taken.
+
+    test_suite=None (default): read from protobuf_txt_filepath.
+    test_suite=<TestSuite>:    use it directly, skip the disk read.
+        Use this when the caller already has a (possibly in-memory
+        expanded) TestSuite to avoid the write+read roundtrip that
+        create_tests_from_definition_expansionPath used to do.
+    """
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
 
-    test_suite = configfile_read(protobuf_txt_filepath)
+    if test_suite is None:
+        test_suite = configfile_read(protobuf_txt_filepath)
 
     # Seed common.id on any test that doesn't have one, BEFORE the
     # codec/bitrate/resolution suffix mutations in update_codec_testsuite
@@ -752,13 +764,20 @@ def valid_path(text):
 def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
-    protobuf_txt_filepath = create_tests_from_definition_expansionPath(
-        protobuf_txt_filepath, local_workdir, options
-    )
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
+    # In-memory expansion: read the input pbtxt → apply expansion (proxy
+    # vals, range expansion, etc.) → hand the resulting TestSuite to
+    # read_and_update_proto. Was a write+read disk roundtrip via
+    # create_tests_from_definition_expansionPath; now zero disk writes
+    # before read_and_update_proto runs.
+    if not os.path.exists(local_workdir):
+        os.mkdir(local_workdir)
+    expanded_suite = create_tests_from_definition_expansion(
+        configfile_read(protobuf_txt_filepath), options
+    )
     test_suite, files_to_push, protobuf_txt_filepath = read_and_update_proto(
-        protobuf_txt_filepath, local_workdir, options
+        protobuf_txt_filepath, local_workdir, options, test_suite=expanded_suite
     )
 
     # multiply tests per request
@@ -1081,27 +1100,6 @@ def abort_test(local_workdir, message):
     print(message)
     # shutil.rmtree(local_workdir)
     sys.exit(-1)
-
-
-def create_tests_from_definition_expansionPath(
-    protobuf_txt_filepath, local_workdir, options
-):
-    if not os.path.exists(local_workdir):
-        os.mkdir(local_workdir)
-
-    test_suite = configfile_read(protobuf_txt_filepath)
-
-    test_suite_ = create_tests_from_definition_expansion(test_suite, options)
-    # check if they are the same, if so do nothing
-    # if (test_suite_.equals(test_suite)):
-    #    return protobuf_txt_filepath
-
-    # write in the workdir
-    basename = os.path.basename(protobuf_txt_filepath)
-    filepath = f"{local_workdir}/expanded_{basename}"
-    configfile_write(test_suite_, filepath)
-
-    return filepath
 
 
 def lookup_message_by_name(message, submessage_name):
