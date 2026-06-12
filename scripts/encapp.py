@@ -735,10 +735,12 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             configfile_write(test, filename)
             files_to_push |= {filename}
     else:
-        # (b) one pbtxt for all tests
-        protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
-        configfile_write(test_suite, protobuf_txt_filepath)
-        files_to_push |= {protobuf_txt_filepath}
+        # (b) one pbtxt for all tests. The canonical write happens later
+        # in run_codec_tests (writes <local_workdir>/encapp_test.pbtxt
+        # and pushes it). Returning the "combined" sentinel mirrors the
+        # "split" sentinel above and signals which branch was taken
+        # without leaving a dead local file on disk.
+        protobuf_txt_filepath = "combined"
     return test_suite, files_to_push, protobuf_txt_filepath
 
 
@@ -911,15 +913,11 @@ def run_codec_tests_file(
             return success, result_files
 
         else:
-            # If we are using the id - we need to replace characters that are problematic in
-            # a filepath (i.e. space)
-            protobuf_txt_filepath = (
-                f"{local_workdir}/{get_valid_test_name(test)}_aggr.pbtxt"
-            )
-            configfile_write(test_suite, protobuf_txt_filepath)
-            if debug > 0:
-                print(f"add {protobuf_txt_filepath}")
-            files_to_push |= {protobuf_txt_filepath}
+            # The canonical pbtxt write happens in run_codec_tests
+            # (writes <local_workdir>/encapp_test.pbtxt). The
+            # <test>_aggr.pbtxt write that used to live here was a dead
+            # local artifact — added to files_to_push, but the push loop
+            # explicitly skips .pbtxt entries.
             if options.dry_run:
                 # Do nothing here
                 if debug:
