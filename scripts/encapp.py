@@ -2194,6 +2194,21 @@ def _oracle_via_manifest(
 
     _print_manifest_summary(verdicts, session_id)
 
+    # Write run_summary.json — machine-readable rollup of every test's
+    # verdict + artifact paths. Stable schema (versioned) for downstream
+    # tooling (CI dashboards, bisect scripts, ...).
+    from encapp_tool import run_summary
+    summary = run_summary.build_summary(
+        session_id=session_id,
+        verdicts=verdicts,
+        device={
+            "serial": serial,
+            "app_version": encapp_tool.__version__,
+        },
+    )
+    summary_path = run_summary.write_run_summary(local_workdir, summary)
+    log.info(run_summary.format_summary_line(summary, report_path=summary_path))
+
     # Shape: collect_results returns a (bool, list) tuple; collected_results
     # then `extend`s it into a flat [bool, list, ...] sequence that
     # verify_test_result indexes with results[0] / results[1].
