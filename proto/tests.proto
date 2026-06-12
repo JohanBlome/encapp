@@ -4,6 +4,14 @@ option java_multiple_files = true;
 option java_package = "com.facebook.encapp.proto";
 option java_outer_classname = "TestDefinition";
 
+// Naming note: do NOT add a `Serial` message here. The CLI flag
+// `--serial <SERIAL>` selects which adb device to target; a proto
+// type with the same stem invites confusion ("is this the device
+// thing?"). Test ordering is already covered: TestSuite's repeated
+// `test` field defaults to serial execution, and the `Parallel`
+// message wraps tests that run concurrently. Multi-device parallelism
+// is shell-level today — one CLI process per device via `&`.
+
 message ProxyVal {
     optional string id = 1;
     optional DataValueType type = 2;
@@ -215,10 +223,6 @@ message DecoderRuntime {
 }
 
 message Parallel {
-  repeated Test test = 1;
-}
-
-message Serial {
   repeated Test test = 1;
 }
 
