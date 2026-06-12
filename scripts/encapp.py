@@ -264,7 +264,7 @@ def remove_encapp_gen_files(
     )
 
 
-def wait_for_exit(serial, debug=0):
+def wait_for_exit(serial):
     log.debug("wait_for_exit: polling pidof")
     time.sleep(2)
     if encapp_tool.adb_cmds.USE_IDB:
@@ -279,7 +279,7 @@ def wait_for_exit(serial, debug=0):
         current = 1
         while current != -1:
             current = encapp_tool.adb_cmds.get_app_pid(
-                serial, encapp_tool.app_utils.APPNAME_MAIN, debug
+                serial, encapp_tool.app_utils.APPNAME_MAIN, 0
             )
             if current > 0:
                 pid = current
@@ -349,7 +349,7 @@ def run_encapp_test(
 
 
 def collect_results(
-    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+    local_workdir, protobuf_txt_filepath, serial, device_workdir
 ):
     log.debug("collecting result: %s", protobuf_txt_filepath)
     stdout = ""
@@ -357,7 +357,7 @@ def collect_results(
         # There seems to be somethign fishy here which causes files to show up late
         # Not a problem if running a single file but multiple is a problem. Sleep...
         time.sleep(2)
-    stdout = encapp_tool.adb_cmds.list_files(serial, device_workdir, debug=debug)
+    stdout = encapp_tool.adb_cmds.list_files(serial, device_workdir, debug=0)
     # If we have a output_filename template in the test we need to check the begining
     local_path = local_workdir + "/" + os.path.basename(protobuf_txt_filepath)
     test_suite = configfile_read(local_path)
@@ -379,7 +379,7 @@ def collect_results(
         cmd = (
             f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
         )
-        encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+        encapp_tool.adb_cmds.run_cmd(cmd, debug=0)
     log.debug("outputfiles: %d", len(output_files))
     # prepare the local working directory to pull the files in
     if not os.path.exists(local_workdir):
@@ -395,34 +395,34 @@ def collect_results(
             continue
         # pull the output file
         encapp_tool.adb_cmds.pull_files_from_device(
-            serial, file, device_workdir, local_workdir, debug=debug
+            serial, file, device_workdir, local_workdir, debug=0
         )
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
-            encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
+            encapp_tool.adb_cmds.run_cmd(cmd, debug=0)
         # append results file (json files) to final results
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
     # remove/process the test file
-    encapp_tool.adb_cmds.remove_file(serial, protobuf_txt_filepath, debug)
+    encapp_tool.adb_cmds.remove_file(serial, protobuf_txt_filepath, 0)
     log.debug("results collect: %s", result_json)
     # dump device information
-    dump_device_info(serial, local_workdir, debug)
+    dump_device_info(serial, local_workdir, 0)
     # get logcat
     result_ok = False
     if encapp_tool.adb_cmds.USE_IDB:
         encapp_tool.adb_cmds.pull_files_from_device(
-            serial, "encapp.log", device_workdir, local_workdir, debug
+            serial, "encapp.log", device_workdir, local_workdir, 0
         )
         # Release the app
         encapp_tool.app_utils.force_stop(serial)
         # Remove test output files
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
             f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
-            debug,
+            0,
         )
         # TODO: checks on ios
         result_ok = True
@@ -1990,7 +1990,6 @@ def run_codec_tests(
                     protobuf_txt_filepath,
                     serial,
                     device_workdir,
-                    debug=debug,
                 )
             )
 
@@ -2072,7 +2071,7 @@ def run_codec_tests(
         if not (session_id and not encapp_tool.adb_cmds.USE_IDB):
             collected_results.extend(
                 collect_results(
-                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir
                 )
             )
 
