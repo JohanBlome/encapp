@@ -21,6 +21,12 @@ public class CliSettings {
     // Either /sdcard/ or /data/data/com.facebook.encapp
     public static final String CHECK_WORKDIR = "check_workdir";
     public static final String ENABLE_TRACING = "enable_tracing";
+    // CLI-generated session identifier. When set, the app writes an
+    // append-only JSONL manifest at <workdir>/<session_id>.session.jsonl
+    // declaring every test boundary and output artifact. The CLI uses
+    // this manifest as the success oracle. If absent, the app runs in
+    // legacy mode (no manifest written).
+    public static final String SESSION_ID = "session_id";
 
     private static String mWorkDir = "/sdcard/";
     private static boolean mEnableTracing = false;

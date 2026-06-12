@@ -90,6 +90,9 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     int mCameraCount = 0;
     private Bundle mExtraData;
     private int mInstancesRunning = 0;
+    // CLI<->app contract: session manifest. Null when no session_id extra
+    // was passed (legacy invocation). All call sites must null-check.
+    private com.facebook.encapp.utils.SessionManifest mSessionManifest;
     VsyncHandler mVsyncHandler;
     final static int WAIT_TIME_MS = 5000;
     static int voltage = -1;
@@ -675,6 +678,23 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
             }
         }
 
+        // Open the session manifest if the CLI passed a session_id. When
+        // absent (legacy invocation) mSessionManifest stays null and every
+        // call site below null-checks. Failure to open degrades silently
+        // to legacy mode — losing the manifest is preferable to failing
+        // the run.
+        String sessionId = mExtraData.getString(CliSettings.SESSION_ID);
+        if (sessionId != null && !sessionId.isEmpty()) {
+            try {
+                mSessionManifest = new com.facebook.encapp.utils.SessionManifest(
+                        sessionId, CliSettings.getWorkDir());
+                mSessionManifest.sessionStart(getCurrentAppVersion(), CliSettings.getWorkDir());
+                Log.d(TAG, "Opened session manifest: " + mSessionManifest.getPath());
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to open session manifest for " + sessionId, e);
+                mSessionManifest = null;
+            }
+        }
 
         TestSuite test_suite = null;
         try {
@@ -962,6 +982,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
                 } while (mInstancesRunning > 0);
                 Log.d(TAG, "Done with tests, instances: " + mInstancesRunning);
+                if (mSessionManifest != null) {
+                    mSessionManifest.sessionEnd("complete");
+                    mSessionManifest.close();
+                    mSessionManifest = null;
+                }
                 for (Encoder coder: mEncoderList) {
                     coder.release();
                 }
@@ -983,6 +1008,19 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
 
         } catch (IOException iox) {
             report_result("unknown", "unknown", "error", iox.getMessage());
+            if (mSessionManifest != null) {
+                org.json.JSONObject err = new org.json.JSONObject();
+                try {
+                    err.put("code", "io_exception");
+                    err.put("message", iox.getMessage() == null
+                            ? iox.getClass().getName() : iox.getMessage());
+                    err.put("stack", Log.getStackTraceString(iox));
+                } catch (org.json.JSONException ignored) {}
+                mSessionManifest.testEnd("unknown", "error", err, null);
+                mSessionManifest.sessionEnd("aborted");
+                mSessionManifest.close();
+                mSessionManifest = null;
+            }
         }
     }
 
@@ -1011,6 +1049,79 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return false;
     }
 
+
+    /**
+     * Emit artifact events for every output file the test produced, then
+     * a single test_end event with the verdict. Called from the per-test
+     * thread's finally block. mSessionManifest must be non-null.
+     *
+     * @param testId        common.id of the test
+     * @param stats         the test's Statistics object (may be null on
+     *                      early failure)
+     * @param statsFilename basename of the stats JSON if it was written,
+     *                      else null
+     * @param status        return value from Encoder.start(): "" = ok,
+     *                      non-empty = error message, null = exception
+     *                      thrown before completion
+     * @param thrown        non-null if an exception bubbled out of the
+     *                      try block
+     */
+    private void recordTestArtifactsAndEnd(String testId, Statistics stats,
+                                           String statsFilename, String status,
+                                           Throwable thrown) {
+        // Artifact events for every file we know was written.
+        if (statsFilename != null) {
+            File f = new File(CliSettings.getWorkDir(), statsFilename);
+            mSessionManifest.artifact(testId, "stats", statsFilename,
+                    f.exists() ? f.length() : -1L);
+        }
+        if (stats != null) {
+            String encoded = stats.getEncodedfile();
+            if (encoded != null && !encoded.isEmpty()) {
+                File enc = new File(encoded);
+                String basename = enc.isAbsolute() ? enc.getName() : encoded;
+                File abs = enc.isAbsolute() ? enc : new File(CliSettings.getWorkDir(), encoded);
+                mSessionManifest.artifact(testId, "video", basename,
+                        abs.exists() ? abs.length() : -1L);
+            }
+        }
+
+        // Verdict + error block.
+        String verdict;
+        org.json.JSONObject err = null;
+        if (thrown != null) {
+            verdict = "error";
+            err = new org.json.JSONObject();
+            try {
+                err.put("code", "exception");
+                err.put("message", thrown.getMessage() == null
+                        ? thrown.getClass().getName() : thrown.getMessage());
+                err.put("stack", Log.getStackTraceString(thrown));
+            } catch (org.json.JSONException ignored) {}
+        } else if (status == null || status.isEmpty()) {
+            verdict = "ok";
+        } else {
+            verdict = "error";
+            err = new org.json.JSONObject();
+            try {
+                err.put("code", "encoder_error");
+                err.put("message", status);
+                err.put("stack", "");
+            } catch (org.json.JSONException ignored) {}
+        }
+
+        org.json.JSONObject extras = new org.json.JSONObject();
+        if (stats != null) {
+            try {
+                extras.put("frames_encoded", stats.getEncodingFrameCount());
+                String encoded = stats.getEncodedfile();
+                if (encoded != null && !encoded.isEmpty()) {
+                    extras.put("encoded_file", encoded);
+                }
+            } catch (org.json.JSONException ignored) {}
+        }
+        mSessionManifest.testEnd(testId, verdict, err, extras);
+    }
 
     /**
      * Traverse list of test cases below this and starts them keeping
@@ -1209,9 +1320,15 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         t = new Thread(new Runnable() {
             @Override
             public void run() {
+                String status = null;
+                Throwable thrown = null;
+                final String testId = test.getCommon().getId();
+                if (mSessionManifest != null) {
+                    mSessionManifest.testStart(testId, android.os.Process.myPid());
+                }
                 try {
-                    Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
-                    final String status = coder_.start();
+                    Log.d(TAG, "Start test id: \"" + testId + "\"");
+                    status = coder_.start();
                     if (status.length() == 0) {
                         // test was ok
                         report_result(coder_.mTest.getCommon().getId(), coder_.getStatistics().getId(), "ok", "");
@@ -1225,9 +1342,13 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                         //   }
                     }
                     Log.d(TAG, "Instances running: " + mInstancesRunning);
+                } catch (Throwable th) {
+                    thrown = th;
+                    throw th;
                 } finally {
                     // dump statistics
                     final Statistics stats = coder_.getStatistics();
+                    String statsFilename = null;
                     if (stats != null) {
                         stats.setAppVersion(getCurrentAppVersion());
                         endbattery = getChargeCounter();
@@ -1245,12 +1366,17 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                             FileWriter fw = new FileWriter(fullFilename, false);
                             stats.writeJSON(fw);
                             fw.close();
+                            statsFilename = stats.getId() + ".json";
                         } catch (IOException e) {
                             Log.e(TAG, test.getCommon().getId() + " - Error when writing stats");
                             e.printStackTrace();
                         }
                     } else {
                         Log.d(TAG, "No stats available");
+                    }
+                    if (mSessionManifest != null) {
+                        recordTestArtifactsAndEnd(testId, stats,
+                                statsFilename, status, thrown);
                     }
                     decreaseTestsInflight();
                     log("\nDone test: " + test.getCommon().getId());
