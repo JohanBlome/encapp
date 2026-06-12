@@ -171,6 +171,21 @@ video_extensions = [
 ]
 
 
+def make_session_id():
+    """CLI-generated identifier for a single `encapp run` invocation.
+
+    Threaded through to the app via the `session_id` am start extra.
+    The app writes <session_id>.session.jsonl into its workdir; the CLI
+    polls that file as the success oracle. Shape:
+        R<unix_seconds>_<6-hex>
+    Unix-seconds gives debugability ('which run was this?'); the
+    6-hex suffix avoids same-second collisions across parallel CLI
+    invocations.
+    """
+    import secrets
+    return f"R{int(time.time())}_{secrets.token_hex(3)}"
+
+
 def _slug(s):
     return re.sub(r"^_+|_+$", "", re.sub(r"[^A-Za-z0-9]+", "_", s))
 
@@ -279,10 +294,12 @@ def valid_path(text):
     return ret
 
 
-def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", debug=0):
+def run_encapp_test(
+    protobuf_txt_filepath, serial, device_workdir, run_cmd="", session_id=None, debug=0
+):
     if debug > 0:
         print(
-            f"running test: {protobuf_txt_filepath}, {serial=}, {device_workdir=}, {run_cmd=}"
+            f"running test: {protobuf_txt_filepath}, {serial=}, {device_workdir=}, {run_cmd=}, {session_id=}"
         )
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
@@ -298,18 +315,24 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, run_cmd="", d
             encapp_tool.adb_cmds.remove_files_using_regex(
                 serial, "encapp.log", device_workdir, debug
             )
+            # session_id passes through to the iOS app via the same extras
+            # mechanism; the iOS-side manifest writer is a future task,
+            # but the extra is harmless if the app ignores it.
+            session_extra = f" session_id {session_id}" if session_id else ""
             ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
                 f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} "
-                f" test {protobuf_txt_filepath}",
+                f" test {protobuf_txt_filepath}{session_extra}",
                 debug=debug,
             )
         else:
             # clean the logcat first
             encapp_tool.adb_cmds.reset_logcat(serial)
+            session_extra = f"-e session_id {session_id} " if session_id else ""
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
                 f"adb -s {serial} shell am start "
                 f"-e workdir {device_workdir} "
                 f"-e test {protobuf_txt_filepath} "
+                f"{session_extra}"
                 f"{encapp_tool.app_utils.ACTIVITY}",
                 debug,
             )
@@ -1873,6 +1896,15 @@ def run_codec_tests(
 
     os.makedirs(local_workdir, exist_ok=True)
 
+    # Session manifest: CLI generates a session_id, the app writes
+    # <session_id>.session.jsonl into its workdir declaring every test
+    # boundary and output artifact. CLI threads session_id into every
+    # run_encapp_test() call site.
+    session_id = make_session_id()
+    print(
+        f"session_id: {session_id}  manifest: {device_workdir}/{session_id}.session.jsonl"
+    )
+
     collected_results = []
     # run the test(s)
     if split:
@@ -1927,6 +1959,7 @@ def run_codec_tests(
                 serial,
                 device_workdir,
                 run_cmd=run_cmd,
+                session_id=session_id,
                 debug=debug,
             )
             with open(tests_run, "a") as passed:
@@ -2013,7 +2046,12 @@ def run_codec_tests(
         if test.test_setup and test.test_setup.run_cmd:
             run_cmd = test.test_setup.run_cmd
         run_encapp_test(
-            protobuf_txt_filepath, serial, device_workdir, run_cmd=run_cmd, debug=debug
+            protobuf_txt_filepath,
+            serial,
+            device_workdir,
+            run_cmd=run_cmd,
+            session_id=session_id,
+            debug=debug,
         )
 
         # collect the test results
