@@ -90,6 +90,10 @@ dependencies {
     implementation 'com.google.protobuf:protobuf-java-util:3.24.0'
     implementation 'com.google.code.gson:gson:2.8.0'
 
+    // Unit tests (JVM, no Android runtime). Run with:
+    //   ./gradlew :app:testDefaultDebugUnitTest
+    testImplementation 'junit:junit:4.13.2'
+
     lcevcImplementation 'com.vnova.lcevc:eil:3.14.7'
     lcevcImplementation 'com.vnova.lcevc.eilp:mediacodec:3.14.7'
     lcevcImplementation 'com.vnova.lcevc.eilp:x264:3.14.7'
