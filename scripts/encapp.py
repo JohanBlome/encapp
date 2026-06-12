@@ -3493,7 +3493,31 @@ def main(argv):
         if "dry_run" in options and not options.dry_run and check_device_workdir:
             # default, check if it works
             if not encapp_tool.adb_cmds.USE_IDB:
-                options.device_workdir = get_workdir(serial)
+                # Probe: launch the app with probe=true, read back the
+                # workdir the app actually picked (it may have fallen
+                # back to internal storage if /sdcard isn't writable
+                # for it). Cache per-(serial, app_version) so the
+                # round-trip happens once per device per app upgrade.
+                # Fall back to the legacy get_workdir() if the probe
+                # itself fails (e.g. app not installed yet).
+                from encapp_tool import workdir_probe
+                cache_dir = os.path.join(
+                    os.environ.get("XDG_CACHE_HOME",
+                                   os.path.expanduser("~/.cache")),
+                    "encapp",
+                )
+                try:
+                    options.device_workdir = workdir_probe.get_or_probe_workdir(
+                        serial=serial,
+                        activity=encapp_tool.app_utils.ACTIVITY,
+                        app_version=encapp_tool.__version__,
+                        cache_dir=cache_dir,
+                        run_cmd_fn=encapp_tool.adb_cmds.run_cmd,
+                    )
+                except workdir_probe.ProbeFailed as e:
+                    print(f"WARNING: workdir probe failed ({e}); "
+                          f"falling back to legacy auto-detect")
+                    options.device_workdir = get_workdir(serial)
 
         if proto_options is not None and proto_options.device_workdir:
             options.device_workdir = proto_options.device_workdir
