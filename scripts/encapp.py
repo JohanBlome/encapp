@@ -265,8 +265,7 @@ def remove_encapp_gen_files(
 
 
 def wait_for_exit(serial, debug=0):
-    if debug > 0:
-        print("\n\n*** Wait for exit **\n\n")
+    log.debug("wait_for_exit: polling pidof")
     time.sleep(2)
     if encapp_tool.adb_cmds.USE_IDB:
         state = "Running"
@@ -285,11 +284,10 @@ def wait_for_exit(serial, debug=0):
             if current > 0:
                 pid = current
             time.sleep(1)
-        if pid != -1 and debug > 0:
-            print(f"exit from {pid}")
+        if pid != -1:
+            log.debug("wait_for_exit: app exited (last pid=%d)", pid)
 
-    if debug > 0:
-        print("\n\n*** Done waiting **\n\n")
+    log.debug("wait_for_exit: done")
 
 
 def valid_path(text):
@@ -300,10 +298,10 @@ def valid_path(text):
 def run_encapp_test(
     protobuf_txt_filepath, serial, device_workdir, run_cmd="", session_id=None, debug=0
 ):
-    if debug > 0:
-        print(
-            f"running test: {protobuf_txt_filepath}, {serial=}, {device_workdir=}, {run_cmd=}, {session_id=}"
-        )
+    log.debug(
+        "running test: %s serial=%s device_workdir=%s run_cmd=%r session_id=%s",
+        protobuf_txt_filepath, serial, device_workdir, run_cmd, session_id,
+    )
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
         # TODO: can we assume adb?
@@ -353,8 +351,7 @@ def run_encapp_test(
 def collect_results(
     local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
 ):
-    if debug > 0:
-        print(f"collecting result: {protobuf_txt_filepath}")
+    log.debug("collecting result: %s", protobuf_txt_filepath)
     stdout = ""
     if encapp_tool.adb_cmds.USE_IDB:
         # There seems to be somethign fishy here which causes files to show up late
@@ -383,8 +380,7 @@ def collect_results(
             f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
         )
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
-    if debug > 0:
-        print(f"outputfiles: {len(output_files)}")
+    log.debug("outputfiles: %d", len(output_files))
     # prepare the local working directory to pull the files in
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
@@ -393,10 +389,9 @@ def collect_results(
     total_number = len(output_files)
     counter = 1
     for counter, file in enumerate(output_files):
-        if debug > 0:
-            print(f"*** Pull file {counter}/{total_number}, {file} **")
+        log.debug("pull file %d/%d: %s", counter, total_number, file)
         if file == "":
-            print("No file found")
+            log.warning("empty filename in output_files; skipping")
             continue
         # pull the output file
         encapp_tool.adb_cmds.pull_files_from_device(
@@ -413,8 +408,7 @@ def collect_results(
             result_json.append(os.path.join(local_workdir, tmpname))
     # remove/process the test file
     encapp_tool.adb_cmds.remove_file(serial, protobuf_txt_filepath, debug)
-    if debug > 0:
-        print(f"results collect: {result_json}")
+    log.debug("results collect: %s", result_json)
     # dump device information
     dump_device_info(serial, local_workdir, debug)
     # get logcat
@@ -438,7 +432,7 @@ def collect_results(
             logcat_contents = encapp_tool.adb_cmds.logcat_dump(serial, debug=0)
             result_ok = parse_logcat(logcat_contents, local_workdir)
         except Exception as ex:
-            print(f"Failed to parse logcat: {ex}")
+            log.warning("failed to parse logcat: %s", ex)
         return result_ok, result_json
 
 
@@ -467,25 +461,24 @@ def parse_logcat(logcat_contents, local_workdir):
         if line_match:
             if line_match.group("result").lower() == "ok":
                 # experiment went well
-                if not QUIET:
-                    print(
-                        f'ok: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")}'
-                    )
+                log.info('ok: test id: "%s" run_id: %s result: %s',
+                         line_match.group("id"), line_match.group("run_id"),
+                         line_match.group("result"))
                 result_ok = True
             elif line_match.group("result") == "error":
                 if "error:" not in line_match.group("rem"):
-                    print(f'error: invalid error line match: "{line}"')
+                    log.warning('invalid error line match: %r', line)
                 error_re = re.compile(r".*error: \"(?P<error_code>.+)\"")
                 error_match = error_re.search(line_match.group("rem"))
                 error_code = "not specified"
                 if error_match:
                     error_code = error_match.group("error_code")
-                print(
-                    f'error: test id: "{line_match.group("id")}" run_id: {line_match.group("run_id")} result: {line_match.group("result")} error_code: "{error_code}"'
-                )
+                log.error('test id: "%s" run_id: %s result: %s error_code: "%s"',
+                          line_match.group("id"), line_match.group("run_id"),
+                          line_match.group("result"), error_code)
                 result_ok = False
     if not result_ok:
-        print(f'logcat has been saved to "{logcat_filepath}"')
+        log.info('logcat has been saved to "%s"', logcat_filepath)
     return result_ok
 
 
@@ -768,7 +761,7 @@ def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     if debug > 0:
-        print(f"reading test: {protobuf_txt_filepath}")
+        log.debug("reading test: %s", protobuf_txt_filepath)
     # In-memory expansion: read the input pbtxt → apply expansion (proxy
     # vals, range expansion, etc.) → hand the resulting TestSuite to
     # read_and_update_proto. Was a write+read disk roundtrip via
@@ -821,16 +814,14 @@ def run_codec_tests_file(
     # Save the complete test if updated
     if updated:
         # remove any older pbtxt in existence
-        if debug > 0:
-            print("Remove other pbtxt files")
+        log.debug("remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
 
         result_files = []
         if options.separate_sources:
             # create test(s) for each source
             # dictionary with source as key
-            if debug > 0:
-                print("Run separate sources")
+            log.debug("run separate sources")
             test_collection = {}
             for test in test_suite.test:
                 source = test.input.filepath
@@ -842,8 +833,7 @@ def run_codec_tests_file(
                 tests.append(test)
 
             counter = 0
-            if debug > 0:
-                print("Clear target and remove known encapp files")
+            log.debug("clear target and remove known encapp files")
             if not options.dry_run:
                 # Clear target and run test, collect result and iterate
                 encapp_tool.adb_cmds.remove_files_using_regex(
@@ -878,8 +868,7 @@ def run_codec_tests_file(
                     f"{local_workdir}/{get_valid_test_name(test)}_{counter}.pbtxt"
                 )
                 configfile_write(test_suite, protobuf_txt_filepath)
-                if debug > 0:
-                    print(f"add {protobuf_txt_filepath}")
+                log.debug("add %s", protobuf_txt_filepath)
                 files.append(protobuf_txt_filepath)
 
                 if options.dry_run:
@@ -909,7 +898,7 @@ def run_codec_tests_file(
                 # Verify the number fo tests and files (if applicable)
                 # TODO:
                 if not results:
-                    print("Error: no result")
+                    log.error("no result")
                     return False, []
                 if results[0]:
                     success = False
@@ -929,8 +918,7 @@ def run_codec_tests_file(
                     )
                     QUALITY_PROCESSES.append([proc, output])
                     proc.start()
-                    if debug:
-                        print("\n*** Quality proc is started!!!\n***\n")
+                    log.debug("quality proc started")
 
             return success, result_files
 
@@ -941,13 +929,10 @@ def run_codec_tests_file(
             # local artifact — added to files_to_push, but the push loop
             # explicitly skips .pbtxt entries.
             if options.dry_run:
-                # Do nothing here
-                if debug:
-                    print("Dry run - do nothing")
+                log.info("dry run — nothing to execute")
                 return None, None
             else:
-                if debug > 0:
-                    print(f"RUN THIS! {text_format.MessageToString(test_suite)}")
+                log.debug("RUN: %s", text_format.MessageToString(test_suite))
 
                 results = run_codec_tests(
                     test_suite,
@@ -972,14 +957,14 @@ def run_codec_tests_file(
                 # was actually run. Kept for iOS until the iOS app gets
                 # manifest support.
                 if encapp_tool.adb_cmds.USE_IDB:
-                    if debug:
-                        print(f"*** VERIFY RESULT ***")
+                    log.debug("verify result")
                     check = verify_test_result(results, test_suite, protobuf_txt_filepath)
                     if len(check) > 0:
-                        print("ERROR! some tests failed")
+                        log.error("some tests failed")
                         df = pd.DataFrame(check)
                         df.to_csv(
-                            "bitrate_surface_transcoder_show.pbtxt.failed.csv", index=False
+                            "bitrate_surface_transcoder_show.pbtxt.failed.csv",
+                            index=False,
                         )
 
                 # Run quality
@@ -1002,12 +987,11 @@ def run_codec_tests_file(
                     )
                     QUALITY_PROCESSES.append([proc, output])
                     proc.start()
-                    if debug:
-                        print("\n*** Quality proc is started!!!\n***\n")
+                    log.debug("quality proc started")
                 return success, result_files
     else:
-        print(
-            f"Apparently something is not quite right, check the test definition: {test_suite=}"
+        log.error(
+            "test definition looks broken, check pbtxt: %s", test_suite
         )
 
 
@@ -1029,7 +1013,7 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
     fail = []
     if not (results and results[0]):
         # TODO: report in some other way?
-        print("Error! test case failed")
+        log.error("test case failed")
         fail.append({"test_id": "", "stats": "", "error": "Test failed"})
         return fail
 
@@ -1045,9 +1029,8 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
     folder = os.path.dirname(protobuf_txt_filepath)
     # TODO:  Currently it will fail when there are parallel tests
     if test_count > result_count:
-        print(
-            f"ERROR! \nTest count = {test_count}, nTest results = {result_count}\nMissing: {test_count - result_count}"
-        )
+        log.error("test count = %d, nTest results = %d, missing: %d",
+                  test_count, result_count, test_count - result_count)
         # In case of named output files we can find them
         for test in test_suite.test:
             if test.common.output_filename:
@@ -1098,9 +1081,8 @@ def verify_test_result(results, test_suite, protobuf_txt_filepath):
 
 
 def abort_test(local_workdir, message):
-    print("\n*** Test failed ***")
-    print(f"Remove {local_workdir}")
-    print(message)
+    log.error("test failed: %s", message)
+    log.error("local workdir: %s", local_workdir)
     # shutil.rmtree(local_workdir)
     sys.exit(-1)
 
