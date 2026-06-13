@@ -161,17 +161,59 @@ show_help() {
     echo ""
 }
 
-# Get current version from build.gradle
+# Get current versionName from build.gradle
 get_current_version() {
     grep 'versionName "' "$BUILD_GRADLE" | head -n 1 | sed 's/.*"\(.*\)".*/\1/'
 }
 
-# Update version in build.gradle
+# Get current versionCode from build.gradle
+get_current_version_code() {
+    grep 'versionCode ' "$BUILD_GRADLE" | head -n 1 | sed -E 's/.*versionCode +([0-9]+).*/\1/'
+}
+
+# Derive a monotonic versionCode from a dotted versionName.
+# "1.32" -> 132, "1.32.1" -> 13201, "2.0" -> 200.
+# Each dotted segment occupies two decimal digits in the result, so
+# "1.0" < "1.1" < "1.10" < "2.0" as integers.
+version_name_to_code() {
+    local v="$1"
+    local code=0
+    local IFS='.'
+    for p in $v; do
+        # 10# prefix forces base-10 (avoids "08" -> octal-parse error).
+        code=$((code * 100 + 10#$p))
+    done
+    echo "$code"
+}
+
+# Update versionName + versionCode in build.gradle in lockstep.
+# Refuses to release without bumping the integer versionCode — Android's
+# Package Installer needs a monotonic versionCode to treat an install
+# as a real update; a versionName-only bump leaves users staring at an
+# "install anyway?" prompt because the package manager can't tell the
+# new APK from the old.
 update_version() {
     local new_version=$1
+    local new_code
+    new_code=$(version_name_to_code "$new_version")
+    local current_code
+    current_code=$(get_current_version_code)
+
+    if [ -z "$new_code" ] || ! [[ "$new_code" =~ ^[0-9]+$ ]]; then
+        print_error "Could not derive versionCode from versionName '$new_version'"
+        print_error "Expected dotted-integer form, e.g. 1.32 or 1.32.1"
+        exit 1
+    fi
+    if [ -n "$current_code" ] && [ "$new_code" -le "$current_code" ] 2>/dev/null; then
+        print_error "Derived versionCode ($new_code) is not greater than current ($current_code)"
+        print_error "Refusing to ship — the device's Package Installer would block this install."
+        exit 1
+    fi
+
     # macOS/BSD sed requires different syntax than GNU sed
-    sed -i '' 's/versionName ".*"/versionName "'$new_version'"/' "$BUILD_GRADLE"
-    print_success "Updated version to $new_version in build.gradle"
+    sed -i '' 's/versionName ".*"/versionName "'"$new_version"'"/' "$BUILD_GRADLE"
+    sed -i '' 's/versionCode [0-9]\{1,\}/versionCode '"$new_code"'/' "$BUILD_GRADLE"
+    print_success "Updated versionName=$new_version, versionCode=$new_code in build.gradle"
 }
 
 # Check for documentation updates
