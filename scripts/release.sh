@@ -27,7 +27,19 @@ NC='\033[0m' # No Color
 
 # Check Java version compatibility
 check_java_version() {
-    local java_version=$(java -version 2>&1 | head -n 1 | sed -E 's/.*version "([0-9]+).*/\1/')
+    # Prefer $JAVA_HOME/bin/java over a bare PATH lookup. JAVA_HOME is
+    # what users actually configure, and what gradle's toolchain
+    # resolution respects; checking `java` from PATH would pick whatever
+    # came first there (often a newer Homebrew install) and reject a
+    # perfectly fine JAVA_HOME. Also prepend it to PATH so subsequent
+    # `java` invocations in this script (and gradle's own) agree.
+    if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+        local java_bin="$JAVA_HOME/bin/java"
+        export PATH="$JAVA_HOME/bin:$PATH"
+    else
+        local java_bin="java"
+    fi
+    local java_version=$("$java_bin" -version 2>&1 | head -n 1 | sed -E 's/.*version "([0-9]+).*/\1/')
 
     if [ -n "$java_version" ] && [ "$java_version" -ge 25 ] 2>/dev/null; then
         echo ""
@@ -38,7 +50,8 @@ check_java_version() {
         print_warning "Gradle 8.x does not support Java 25 or later."
         print_warning "Please switch to Java 17-21 before running this script."
         echo ""
-        echo "Your current JAVA_HOME: ${JAVA_HOME:-<not set>}"
+        echo "Resolved java binary: $java_bin"
+        echo "JAVA_HOME:            ${JAVA_HOME:-<not set>}"
         echo ""
         echo "To switch Java versions:"
         echo "  macOS:   export JAVA_HOME=\$(/usr/libexec/java_home -v 21)"
@@ -48,7 +61,7 @@ check_java_version() {
     fi
 
     if [ -n "$java_version" ]; then
-        print_success "Java version: $java_version (compatible)"
+        print_success "Java version: $java_version (compatible, from $java_bin)"
     fi
 }
 
