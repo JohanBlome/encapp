@@ -32,8 +32,8 @@ import java.util.Locale;
  * to the test, and survives reboot.
  *
  * What this is NOT: it does NOT intercept {@link Log#d}/{@link Log#w}
- * calls globally. The CLI also pulls a session-scoped logcat slice
- * (see Phase 8.2) for that.
+ * calls globally. The CLI separately pulls a session-scoped logcat
+ * slice for that.
  */
 public class TestLogWriter implements Closeable {
     private static final String TAG = "encapp.testlog";

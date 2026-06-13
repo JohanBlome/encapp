@@ -689,11 +689,10 @@ run_single_test() {
     adb_cmd logcat -c 2>/dev/null || true
 
     # Generate a session_id so the app writes the JSONL manifest at
-    # <DEVICE_WORKDIR>/<SESSION_ID>.session.jsonl. The CLI uses that
-    # as the success oracle, replacing the silent-pass-on-logcat-
-    # rollover bug the legacy grep had. Older apps (pre-Phase-2) ignore
-    # the extra and run as before; collect_test_results falls back to
-    # the legacy logcat oracle if no manifest appears.
+    # <DEVICE_WORKDIR>/<SESSION_ID>.session.jsonl. The CLI uses that as
+    # the success oracle. Older apps that don't recognize the extra run
+    # as before; collect_test_results falls back to the logcat grep
+    # oracle if no manifest appears.
     SESSION_ID="R$(date +%s)_$(
         openssl rand -hex 3 2>/dev/null \
         || head -c3 /dev/urandom 2>/dev/null | xxd -p 2>/dev/null \
@@ -819,7 +818,8 @@ collect_test_results() {
             error_msg="NEVER_STARTED: no test_start in manifest"
         fi
     elif [ -f "$logcat_file" ]; then
-        # Legacy logcat oracle (unchanged from pre-Phase-2 behavior).
+        # Fallback: logcat-grep oracle for app builds that don't write
+        # the session manifest.
         local result_lines
         result_lines=$(grep -E 'Test finished id:.*result:' "$logcat_file" 2>/dev/null || true)
 

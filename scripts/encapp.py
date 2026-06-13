@@ -762,11 +762,8 @@ def run_codec_tests_file(
 ):
     if debug > 0:
         log.debug("reading test: %s", protobuf_txt_filepath)
-    # In-memory expansion: read the input pbtxt → apply expansion (proxy
-    # vals, range expansion, etc.) → hand the resulting TestSuite to
-    # read_and_update_proto. Was a write+read disk roundtrip via
-    # create_tests_from_definition_expansionPath; now zero disk writes
-    # before read_and_update_proto runs.
+    # Expand the input pbtxt (proxy vals, range expansion, etc.) in
+    # memory, then hand the resulting TestSuite to read_and_update_proto.
     if not os.path.exists(local_workdir):
         os.mkdir(local_workdir)
     expanded_suite = create_tests_from_definition_expansion(
@@ -924,10 +921,7 @@ def run_codec_tests_file(
 
         else:
             # The canonical pbtxt write happens in run_codec_tests
-            # (writes <local_workdir>/encapp_test.pbtxt). The
-            # <test>_aggr.pbtxt write that used to live here was a dead
-            # local artifact — added to files_to_push, but the push loop
-            # explicitly skips .pbtxt entries.
+            # (writes <local_workdir>/encapp_test.pbtxt).
             if options.dry_run:
                 log.info("dry run — nothing to execute")
                 return None, None
@@ -947,15 +941,10 @@ def run_codec_tests_file(
                     options.split,
                     debug,
                 )
-                # Legacy fail-detection (counts ls output vs suite size, regex-
-                # matches output_filename naming). Now redundant on Android:
-                # the manifest oracle in run_codec_tests already classified
-                # every test and the synth tuple's bool (results[0]) carries
-                # the verdict. Also retires the hardcoded
-                # "bitrate_surface_transcoder_show.pbtxt.failed.csv" write in
-                # CWD that fired on every failure regardless of which pbtxt
-                # was actually run. Kept for iOS until the iOS app gets
-                # manifest support.
+                # iOS-only fail-detection (ls output vs suite size + regex
+                # match on output_filename). On Android the manifest oracle
+                # has already classified every test and results[0] carries
+                # the verdict.
                 if encapp_tool.adb_cmds.USE_IDB:
                     log.debug("verify result")
                     check = verify_test_result(results, test_suite, protobuf_txt_filepath)
@@ -1851,10 +1840,9 @@ def update_codec_testsuite(
 ):
     for test in test_suite.test:
         # Use keyword args — update_codec_test's 7th positional is
-        # is_parallel, not debug. Passing positional debug here used to
-        # silently set is_parallel=True whenever the user enabled debug
-        # mode, short-circuiting every bitrate/resolution/framerate
-        # CLI-override expansion path.
+        # is_parallel (not debug). Passing positional debug here would
+        # set is_parallel=True under debug mode and short-circuit the
+        # bitrate / resolution / framerate expansion paths.
         update_codec_test(
             test,
             updated_test_suite,
@@ -1901,8 +1889,8 @@ def run_codec_tests(
 
     # Session manifest: CLI generates a session_id, the app writes
     # <session_id>.session.jsonl into its workdir declaring every test
-    # boundary and output artifact. CLI threads session_id into every
-    # run_encapp_test() call site.
+    # boundary and output artifact. CLI uses the manifest as the
+    # authoritative success oracle (see _oracle_via_manifest).
     session_id = make_session_id()
     log.info("session_id: %s  manifest: %s/%s.session.jsonl",
              session_id, device_workdir, session_id)
@@ -2064,10 +2052,8 @@ def run_codec_tests(
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
             return None, None
-        # Legacy oracle path (logcat parse + regex-ls + verify). Skipped
-        # when session_id is set — the manifest path below is authoritative
-        # AND replaces the wait_for_exit/race-condition issues the legacy
-        # collect_results has (it relies on naming patterns + ls timing).
+        # iOS-only oracle path (logcat parse + regex-ls + verify). On
+        # Android the manifest path below is authoritative.
         if not (session_id and not encapp_tool.adb_cmds.USE_IDB):
             collected_results.extend(
                 collect_results(
@@ -2075,16 +2061,15 @@ def run_codec_tests(
                 )
             )
 
-    # New oracle path: poll the on-device session manifest, classify each
-    # test, pull declared artifacts. Replaces the legacy block above when
-    # active. Skipped on iOS — the iOS app doesn't write the manifest yet.
+    # Manifest oracle: poll the on-device session manifest, classify each
+    # test, pull declared artifacts. Skipped on iOS — the iOS app doesn't
+    # write the manifest yet.
     if session_id and not encapp_tool.adb_cmds.USE_IDB:
         synth = _oracle_via_manifest(
             test_suite, serial, device_workdir, local_workdir, session_id, debug
         )
-        # Synthesize the legacy collect_results shape so downstream
-        # verify_test_result is satisfied. Phase 5 cleanup will retire
-        # verify_test_result entirely.
+        # Synthesize the collect_results (bool, list) shape so the iOS-only
+        # verify path can keep reading results[0] / results[1].
         if synth is not None:
             collected_results.extend(synth)
 
@@ -2095,9 +2080,9 @@ def _oracle_via_manifest(
     test_suite, serial, device_workdir, local_workdir, session_id, debug
 ):
     """Pull and classify the session manifest, pull declared artifacts,
-    print a per-test verdict summary. Returns a list of (ok, json_paths)
-    tuples shaped like collect_results() so downstream legacy verifiers
-    keep working."""
+    print a per-test verdict summary. Returns a (ok, json_paths) tuple
+    shaped like collect_results() so the downstream verify path is
+    satisfied."""
     from encapp_tool import session_manifest
 
     expected_ids = []
@@ -2147,9 +2132,8 @@ def _oracle_via_manifest(
         is_alive_fn=_is_alive,
     )
 
-    # Pull every artifact the manifest declared. Duplicates with the
-    # legacy regex pull are absorbed by adb_pull (same file → overwritten
-    # in place).
+    # Pull every artifact the manifest declared. Duplicates are absorbed
+    # by adb_pull (same file → overwritten in place).
     json_paths = []
     all_pass = True
     for v in verdicts.tests.values():
@@ -2167,16 +2151,11 @@ def _oracle_via_manifest(
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
 
-    # Dump the encapp logcat slice for this session. The app's log lines
-    # were emitted between run_encapp_test's logcat reset (at am-start time)
-    # and now, so this captures every encapp line for the session in one
-    # go. Per-test slicing by timestamp is a follow-up.
-    #
-    # adb logcat -s tag:level matches a literal tag, but every file in the
-    # app uses a sub-tag like 'encapp.statistics' / 'encapp.main'. Filter
-    # device-side with grep -E '^[0-9-]+ +[0-9:.]+ +[0-9]+ +[0-9]+ +[A-Z] +encapp'
-    # so the file contains only encapp lines but with their original
-    # sub-tags preserved.
+    # Dump the encapp logcat slice for this session. logcat -c at am-start
+    # time scopes the buffer to this session. adb logcat -s tag:level
+    # matches a literal tag, but every file uses a sub-tag like
+    # 'encapp.statistics' / 'encapp.main', so we filter device-side with
+    # grep -E ' encapp(\.|:)' to preserve the original sub-tags.
     logcat_path = os.path.join(local_workdir, f"{session_id}.android_logcat.txt")
     try:
         ret, stdout, _ = encapp_tool.adb_cmds.run_cmd(
@@ -2195,8 +2174,7 @@ def _oracle_via_manifest(
     _print_manifest_summary(verdicts, session_id)
 
     # Write run_summary.json — machine-readable rollup of every test's
-    # verdict + artifact paths. Stable schema (versioned) for downstream
-    # tooling (CI dashboards, bisect scripts, ...).
+    # verdict + artifact paths. Versioned schema for downstream tooling.
     from encapp_tool import run_summary
     summary = run_summary.build_summary(
         session_id=session_id,
@@ -2209,8 +2187,8 @@ def _oracle_via_manifest(
     summary_path = run_summary.write_run_summary(local_workdir, summary)
     log.info(run_summary.format_summary_line(summary, report_path=summary_path))
 
-    # Shape: collect_results returns a (bool, list) tuple; collected_results
-    # then `extend`s it into a flat [bool, list, ...] sequence that
+    # collect_results returns a (bool, list) tuple; collected_results
+    # then extends it into a flat [bool, list, ...] sequence that
     # verify_test_result indexes with results[0] / results[1].
     return (all_pass, json_paths)
 
@@ -2336,7 +2314,7 @@ def list_codecs(
             )
 
             encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
-            wait_for_exit(serial, debug)
+            wait_for_exit(serial)
         adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
         assert ret, 'error getting codec list: "%s"' % stdout
@@ -3572,8 +3550,8 @@ def main(argv):
                 # back to internal storage if /sdcard isn't writable
                 # for it). Cache per-(serial, app_version) so the
                 # round-trip happens once per device per app upgrade.
-                # Fall back to the legacy get_workdir() if the probe
-                # itself fails (e.g. app not installed yet).
+                # Fall back to get_workdir() if the probe itself fails
+                # (e.g. app not installed yet).
                 from encapp_tool import workdir_probe
                 cache_dir = os.path.join(
                     os.environ.get("XDG_CACHE_HOME",
@@ -3590,7 +3568,7 @@ def main(argv):
                     )
                 except workdir_probe.ProbeFailed as e:
                     print(f"WARNING: workdir probe failed ({e}); "
-                          f"falling back to legacy auto-detect")
+                          f"falling back to auto-detect")
                     options.device_workdir = get_workdir(serial)
 
         if proto_options is not None and proto_options.device_workdir:
