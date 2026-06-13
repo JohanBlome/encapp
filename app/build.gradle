@@ -9,8 +9,8 @@ android {
         applicationId "com.facebook.encapp"
         minSdkVersion 27
         targetSdkVersion 31
-        versionCode 1
-        versionName "1.31"
+        versionCode 132
+        versionName "1.32"
         setProperty("archivesBaseName", applicationId + "-v" + versionName)
     }
 
