@@ -266,3 +266,6 @@ cython_debug/
 # Protoc binaries (downloaded by proto/Makefile)
 proto/protoc-*/
 proto/*.zip
+.encapp_run_history
+.gradle/
+.pytest_cache/

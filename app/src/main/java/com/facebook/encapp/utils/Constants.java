@@ -5,10 +5,6 @@ import com.facebook.encapp.BuildConfig;
 /**
  * Central log-tag + debug-gate constants for the encapp app.
  *
- * Today every class declares its own {@code String TAG = "encapp.<subtag>"}.
- * That works (grep with {@code adb logcat -s "encapp*"}) but makes the
- * subtag space unmanaged and per-class debug gating impossible.
- *
  * Recommended pattern for new code:
  * <pre>
  *   if (Constants.DEBUG) {
@@ -18,9 +14,9 @@ import com.facebook.encapp.BuildConfig;
  *   Log.e(Constants.TAG, "[my_subtag] " + msg);  // always-on
  * </pre>
  *
- * The 37 existing files that declare their own TAG are unchanged — a
- * mechanical sweep is queued as a follow-up task. New code should use
- * this class directly; old code can migrate incrementally.
+ * Subtags live in the message body in square brackets so a single
+ * {@code adb logcat -s encapp:V} shows the firehose while
+ * {@code grep '\[buffer_encoder\]'} narrows to one subsystem.
  */
 public final class Constants {
     private Constants() {}

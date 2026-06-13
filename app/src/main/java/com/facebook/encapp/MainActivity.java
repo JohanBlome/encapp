@@ -1707,4 +1707,20 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         //exit();
     }
 
+    @Override
+    protected void onDestroy() {
+        // Safety net: if the activity is killed before performAllTests'
+        // happy path closed the manifest, mark it aborted here. POSIX
+        // fsync-per-line still gives the CLI a parseable partial file.
+        if (mSessionManifest != null) {
+            try {
+                mSessionManifest.sessionEnd("aborted");
+            } finally {
+                mSessionManifest.close();
+                mSessionManifest = null;
+            }
+        }
+        super.onDestroy();
+    }
+
 }
