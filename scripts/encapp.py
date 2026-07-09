@@ -3542,7 +3542,20 @@ def main(argv):
         )
     # Default settings will be set where necessary unless it is already set.
     if options.device_workdir is None:
-        if "dry_run" in options and not options.dry_run and check_device_workdir:
+        # Resolve the device workdir via the probe for any command that
+        # actually drives the app and reads its artifacts back. `list` has
+        # no `dry_run` attribute (it's a run-only option), so the old
+        # `"dry_run" in options` guard silently skipped the probe for it and
+        # left device_workdir at the /sdcard default — wrong on devices where
+        # the app falls back to internal storage (e.g. root+permissive Meta
+        # devices where adb-shell writes /sdcard but the app uid cannot).
+        is_dry_run = getattr(options, "dry_run", False)
+        probe_commands = ("run", "list")
+        if (
+            not is_dry_run
+            and check_device_workdir
+            and options.func in probe_commands
+        ):
             # default, check if it works
             if not encapp_tool.adb_cmds.USE_IDB:
                 # Probe: launch the app with probe=true, read back the
