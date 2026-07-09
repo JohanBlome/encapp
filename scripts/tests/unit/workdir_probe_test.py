@@ -67,8 +67,14 @@ class TestProbeWorkdir(unittest.TestCase):
 
     def test_probe_polls_until_marker_appears(self):
         adb = FakeAdb()
-        # First two cat calls fail (marker not written yet), third succeeds.
-        adb.queue_cat(_fail("missing"), _fail("missing"), _ok("/sdcard"))
+        # Each poll reads TWO locations (/sdcard, then run-as app dir), so
+        # each failed poll consumes two queued replies. Fail both locations
+        # for polls 1 and 2 (4 fails), succeed on poll 3's /sdcard read.
+        adb.queue_cat(
+            _fail("missing"), _fail("missing"),   # poll 1: sdcard, run-as
+            _fail("missing"), _fail("missing"),   # poll 2: sdcard, run-as
+            _ok("/sdcard"),                        # poll 3: sdcard
+        )
         sleep_calls = []
         wd = workdir_probe.probe_workdir(
             serial="X", activity="x/.M",
@@ -77,6 +83,24 @@ class TestProbeWorkdir(unittest.TestCase):
         )
         self.assertEqual("/sdcard", wd)
         self.assertEqual(2, len(sleep_calls), "expected to sleep between polls")
+
+    def test_probe_reads_app_dir_via_runas(self):
+        # /sdcard read fails (app can't write it), app-private dir succeeds —
+        # the root+permissive case. Marker content = the app files dir.
+        adb = FakeAdb()
+        adb.queue_cat(
+            _fail("No such file"),                        # /sdcard cat
+            _ok("/data/data/com.facebook.encapp/files"),  # run-as cat
+        )
+        wd = workdir_probe.probe_workdir(
+            serial="X", activity="x/.M",
+            run_cmd_fn=adb, timeout_sec=2.0, poll_interval_sec=0.01,
+            _sleep_fn=lambda s: None,
+        )
+        self.assertEqual("/data/data/com.facebook.encapp/files", wd)
+        # Confirm a run-as read was actually attempted.
+        self.assertTrue(any("run-as" in c and " cat " in c for c in adb.calls),
+                        "expected a run-as cat fallback read")
 
     def test_probe_strips_trailing_slash(self):
         adb = FakeAdb()

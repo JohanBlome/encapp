@@ -8,10 +8,14 @@ When the app falls back to internal storage, the CLI's hardcoded
 This module discovers the app's actual workdir via a probe round-trip:
 
   1. CLI: `adb shell am start -e probe true com.facebook.encapp/.MainActivity`
-  2. App: probes writability, writes its chosen workdir to
-     /sdcard/encapp_workdir.txt, calls finish() without running tests.
-  3. CLI: `adb shell cat /sdcard/encapp_workdir.txt` → that's the
-     authoritative workdir for subsequent adb push/pull.
+  2. App: probes writability with a real write, writes its chosen workdir
+     into that workdir as encapp_workdir.txt, calls finish() without
+     running tests. (It also best-effort writes /sdcard/encapp_workdir.txt
+     when /sdcard is app-writable.)
+  3. CLI: reads the marker from /sdcard first, else from the app-private
+     files dir via `run-as` — whichever holds it. That's the authoritative
+     workdir for subsequent adb push/pull. This handles root+permissive
+     devices where adb-shell can write /sdcard but the app uid cannot.
 
 Result is cached per-(serial, app_version) so the round-trip happens
 once per device per app upgrade, not once per run.
@@ -25,8 +29,30 @@ from typing import Callable, Optional, Tuple
 log = logging.getLogger("encapp.workdir_probe")
 
 PROBE_MARKER_REMOTE = "/sdcard/encapp_workdir.txt"
+# App-private fallback: when /sdcard isn't app-writable (root+permissive
+# devices: adb-shell can write /sdcard but the app uid can't), the app
+# writes the marker into its resolved workdir — its internal files dir —
+# which we read back via run-as.
+APP_PACKAGE = "com.facebook.encapp"
+PROBE_MARKER_APP_REL = "files/encapp_workdir.txt"
 DEFAULT_TIMEOUT_SEC = 8.0
 DEFAULT_POLL_INTERVAL_SEC = 0.25
+
+
+def _read_marker(serial, run_cmd_fn):
+    """Return the marker contents from whichever location holds it —
+    /sdcard first (fast, no run-as), else the app-private files dir."""
+    ok, stdout, _ = run_cmd_fn(
+        f"adb -s {serial} shell cat {PROBE_MARKER_REMOTE}"
+    )
+    if ok and stdout.strip():
+        return stdout.strip()
+    ok, stdout, _ = run_cmd_fn(
+        f"adb -s {serial} shell run-as {APP_PACKAGE} cat {PROBE_MARKER_APP_REL}"
+    )
+    if ok and stdout.strip():
+        return stdout.strip()
+    return ""
 
 
 class ProbeFailed(RuntimeError):
@@ -49,8 +75,12 @@ def probe_workdir(
         In production this is encapp_tool.adb_cmds.run_cmd; in tests it's
         a mock so the module stays pure-Python and adb-free.
     """
-    # Remove any stale marker so the poll only succeeds on a fresh write.
+    # Remove any stale marker in BOTH locations so the poll only succeeds
+    # on a fresh write.
     run_cmd_fn(f"adb -s {serial} shell rm -f {PROBE_MARKER_REMOTE}")
+    run_cmd_fn(
+        f"adb -s {serial} shell run-as {APP_PACKAGE} rm -f {PROBE_MARKER_APP_REL}"
+    )
 
     ok, _stdout, stderr = run_cmd_fn(
         f"adb -s {serial} shell am start -e probe true {activity}"
@@ -59,21 +89,16 @@ def probe_workdir(
         raise ProbeFailed(f"am start failed: {stderr}")
 
     deadline = _time_fn() + timeout_sec
-    last_err = ""
     while _time_fn() < deadline:
-        ok, stdout, stderr = run_cmd_fn(
-            f"adb -s {serial} shell cat {PROBE_MARKER_REMOTE}"
-        )
-        if ok and stdout.strip():
-            workdir = stdout.strip()
+        workdir = _read_marker(serial, run_cmd_fn)
+        if workdir:
             # Strip any trailing slash for consistency with the rest of
             # the CLI's path handling.
             return workdir.rstrip("/") or "/"
-        last_err = stderr or stdout
         _sleep_fn(poll_interval_sec)
     raise ProbeFailed(
         f"timed out after {timeout_sec:.1f}s waiting for probe marker "
-        f"at {PROBE_MARKER_REMOTE}; last adb error: {last_err!r}"
+        f"at {PROBE_MARKER_REMOTE} or (run-as) {PROBE_MARKER_APP_REL}"
     )
 
 

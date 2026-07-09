@@ -386,15 +386,36 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         if (mExtraData != null
                 && "true".equalsIgnoreCase(mExtraData.getString(CliSettings.PROBE, ""))) {
             String wd = CliSettings.getWorkDir();
-            File marker = new File(CliSettings.PROBE_MARKER_PATH);
+            // Write the marker INTO the resolved workdir — that path is, by
+            // construction, one the app can actually write (isActuallyWritable
+            // picked it). Writing to a fixed /sdcard path fails on exactly the
+            // devices that fell back to internal storage (root+permissive:
+            // adb-shell can write /sdcard but the app uid can't). The CLI
+            // checks both /sdcard and the app-private dir for this file.
+            File marker = new File(wd, "encapp_workdir.txt");
+            boolean wrote = false;
             try (FileOutputStream fos = new FileOutputStream(marker)) {
                 fos.write(wd.getBytes(StandardCharsets.UTF_8));
                 fos.getFD().sync();
+                wrote = true;
                 Log.i(TAG, "probe: wrote " + marker.getAbsolutePath()
                         + " containing " + wd);
             } catch (IOException e) {
                 Log.e(TAG, "probe: failed to write marker at "
                         + marker.getAbsolutePath(), e);
+            }
+            // Best-effort: also drop it at the well-known /sdcard path when
+            // that happens to be writable, so the CLI's fast path works
+            // without run-as. Harmless if it fails.
+            if (!CliSettings.PROBE_MARKER_PATH.equals(marker.getAbsolutePath())) {
+                try (FileOutputStream fos =
+                             new FileOutputStream(CliSettings.PROBE_MARKER_PATH)) {
+                    fos.write(wd.getBytes(StandardCharsets.UTF_8));
+                    fos.getFD().sync();
+                } catch (IOException ignored) {
+                    // expected on locked-down /sdcard; the workdir marker above
+                    // is the authoritative one.
+                }
             }
             finish();
             return;
