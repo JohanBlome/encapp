@@ -5,6 +5,7 @@ import os
 import glob
 import hashlib
 import logging
+import shlex
 import subprocess
 import tempfile
 import time
@@ -19,6 +20,10 @@ USE_IDB = False
 IDB_BUNDLE_ID = "Meta.Encapp"
 IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
+ANDROID_APP_PRIVATE_PREFIXES = (
+    "/data/user/0/com.facebook.encapp",
+    "/data/data/com.facebook.encapp",
+)
 
 # size for split adb push
 MAX_SIZE_BYTES = sys.maxsize  # Can handle andy size
@@ -74,6 +79,28 @@ def run_cmd(
 
     return ret, stdstr, errstr
     # return ret, stdout.decode(), stderr.decode()
+
+
+def _is_app_private_path(path: str) -> bool:
+    return (
+        not USE_IDB
+        and path is not None
+        and any(path.startswith(prefix) for prefix in ANDROID_APP_PRIVATE_PREFIXES)
+    )
+
+
+def _app_relative_path(path: str) -> str:
+    for prefix in ANDROID_APP_PRIVATE_PREFIXES:
+        if path.startswith(prefix + "/"):
+            return path[len(prefix) + 1 :]
+        if path == prefix:
+            return "."
+    return path
+
+
+def _run_as_app(serial: str, inner_cmd: str, debug: int = 0):
+    cmd = f"adb -s {serial} shell run-as com.facebook.encapp {inner_cmd}"
+    return run_cmd(cmd, debug=debug)
 
 
 def get_device_info(
@@ -168,6 +195,11 @@ def list_files(serial: str, location: str, debug: int) -> str:
 
         return str(stdout)
     else:
+        if _is_app_private_path(location):
+            _, stdout, _ = _run_as_app(
+                serial, f"ls {shlex.quote(_app_relative_path(location))}/", debug=debug
+            )
+            return str(stdout)
         adb_cmd = f"adb -s {serial} shell ls {location}/"
         _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         return str(stdout)
@@ -200,13 +232,25 @@ def remove_files_using_regex(
             run_cmd(cmd, debug=debug)
             counter += 1
     else:
-        adb_cmd = f"adb -s {serial} shell ls {location}/"
-        _, stdout, _ = run_cmd(adb_cmd, debug=debug)
+        if _is_app_private_path(location):
+            _, stdout, _ = _run_as_app(
+                serial, f"ls {shlex.quote(_app_relative_path(location))}/", debug=debug
+            )
+        else:
+            adb_cmd = f"adb -s {serial} shell ls {location}/"
+            _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         for file in output_files:
             # remove the output
-            adb_cmd = f"adb -s {serial} shell rm {location}/{file}"
-            run_cmd(adb_cmd, debug=debug)
+            if _is_app_private_path(location):
+                _run_as_app(
+                    serial,
+                    f"rm {shlex.quote(_app_relative_path(os.path.join(location, file)))}",
+                    debug=debug,
+                )
+            else:
+                adb_cmd = f"adb -s {serial} shell rm {location}/{file}"
+                run_cmd(adb_cmd, debug=debug)
 
 
 def get_connected_devices(debug: int) -> typing.Dict:
@@ -584,16 +628,28 @@ def getprop(serial: str, debug=0) -> dict:
 
 def get_device_size(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(
-        f"adb -s {serial} shell test -e {filepath}", debug=debug
-    )
+    if _is_app_private_path(filepath):
+        ret, stdout, stderr = _run_as_app(
+            serial, f"test -e {shlex.quote(_app_relative_path(filepath))}", debug=debug
+        )
+    else:
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} shell test -e {filepath}", debug=debug
+        )
     if not ret:
         return -1
     # get the size in bytes
     try:
-        ret, stdout, stderr = run_cmd(
-            f'adb -s {serial} shell stat -c "%s" {filepath}', debug=debug
-        )
+        if _is_app_private_path(filepath):
+            ret, stdout, stderr = _run_as_app(
+                serial,
+                f'stat -L -c "%s" {shlex.quote(_app_relative_path(filepath))}',
+                debug=debug,
+            )
+        else:
+            ret, stdout, stderr = run_cmd(
+                f'adb -s {serial} shell stat -c "%s" {filepath}', debug=debug
+            )
         filesize = int(stdout)
     except:
         print(f"Failed to grap file size for {filepath}")
@@ -603,16 +659,26 @@ def get_device_size(serial, filepath, debug):
 
 def get_device_hash(serial, filepath, debug):
     # check if the file exists
-    ret, stdout, stderr = run_cmd(
-        f"adb -s {serial} shell test -e {filepath}", debug=debug
-    )
+    if _is_app_private_path(filepath):
+        ret, stdout, stderr = _run_as_app(
+            serial, f"test -e {shlex.quote(_app_relative_path(filepath))}", debug=debug
+        )
+    else:
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} shell test -e {filepath}", debug=debug
+        )
     if not ret:
         return -1
     # get a hash
     try:
-        ret, stdout, stderr = run_cmd(
-            f"adb -s {serial} shell md5sum {filepath}", debug=debug
-        )
+        if _is_app_private_path(filepath):
+            ret, stdout, stderr = _run_as_app(
+                serial, f"md5sum {shlex.quote(_app_relative_path(filepath))}", debug=debug
+            )
+        else:
+            ret, stdout, stderr = run_cmd(
+                f"adb -s {serial} shell md5sum {filepath}", debug=debug
+            )
         filehash = stdout.split()[0]
     except:
         print(f"Failed to calc hash for {filepath}")
@@ -706,6 +772,47 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
 def push_file_to_device_android(
     filepath, serial, device_workdir, debug, max_size_bytes=MAX_SIZE_BYTES
 ):
+    if _is_app_private_path(device_workdir):
+        basename = os.path.basename(filepath)
+        temp_path = f"/data/local/tmp/{basename}"
+        target_path = os.path.join(device_workdir, basename)
+        target_relpath = _app_relative_path(target_path)
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} push {filepath} {temp_path}", debug=debug
+        )
+        if not ret:
+            log.warning(
+                'cannot copy "%s" to temp path: stdout=%s stderr=%s',
+                filepath,
+                stdout,
+                stderr,
+            )
+            return ret
+        ret, stdout, stderr = _run_as_app(
+            serial,
+            f"cp {shlex.quote(temp_path)} {shlex.quote(target_relpath)}",
+            debug=debug,
+        )
+        run_cmd(f"adb -s {serial} shell rm {temp_path}", debug=debug)
+        if not ret:
+            log.warning(
+                'cannot move "%s" into app dir: stdout=%s stderr=%s',
+                filepath,
+                stdout,
+                stderr,
+            )
+            return ret
+        ret, stdout, stderr = _run_as_app(
+            serial, f"chmod 666 {shlex.quote(target_relpath)}", debug=debug
+        )
+        if not ret:
+            log.warning(
+                'cannot chmod "%s" in app dir: stdout=%s stderr=%s',
+                filepath,
+                stdout,
+                stderr,
+            )
+        return ret
     # 0. try a one-off copy. Limit this for devices that fail and reboot (or worse).
     ret = stdout = stderr = None
     if os.path.getsize(filepath) <= MAX_SIZE_BYTES:
@@ -795,17 +902,34 @@ def pull_files_from_device(
 
             run_cmd(cmd, debug=debug)
     else:
-        adb_cmd = f"adb -s {serial} shell ls {location}/"
-        _, stdout, _ = run_cmd(adb_cmd, debug=debug)
+        if _is_app_private_path(location):
+            _, stdout, _ = _run_as_app(
+                serial, f"ls {shlex.quote(_app_relative_path(location))}/", debug=debug
+            )
+        else:
+            adb_cmd = f"adb -s {serial} shell ls {location}/"
+            _, stdout, _ = run_cmd(adb_cmd, debug=debug)
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
+            if _is_app_private_path(location):
+                # App-private dirs are not readable by `adb pull`; stream the
+                # file out through `run-as` instead.
+                src = _app_relative_path(os.path.join(location, file))
+                adb_cmd = (
+                    f"adb -s {serial} exec-out run-as com.facebook.encapp "
+                    f"cat {shlex.quote(src)} > "
+                    f"{shlex.quote(os.path.join(destination, file))}"
+                )
+            else:
+                adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
             # Retry to absorb transient adb-pull failures (USB hiccups,
             # device-locked-screen restrictions on some OEMs, etc.). A pull
             # is considered successful when adb returns 0 AND the file lands
             # in destination — adb sometimes returns 0 even when nothing was
-            # transferred, so we verify both.
+            # transferred, so we verify both. The run-as variant needs the
+            # same check: a failing `cat` still creates an empty file via the
+            # shell redirect.
             local_path = os.path.join(destination, os.path.basename(file))
             ok = False
             last_err = ""
