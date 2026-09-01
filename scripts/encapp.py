@@ -519,14 +519,14 @@ def update_file_paths(test, device_workdir=default_values["device_workdir"]):
 
 def get_media_files(test, all_files):
     # TODO: remove?
-    if test.input.filepath != "camera" and not test.input.filepath.startswidth("fake_input"):
+    if test.input.filepath != "camera" and not test.input.filepath.startswith("fake_input"):
         name = os.path.basename(test.input.filepath)
         if name not in all_files:
             all_files.add(name)
     for subtest in test.parallel.test:
         if (
             subtest.input.filepath != "camera"
-            and not subtest.input.filepath.startswidth("fake_input")
+            and not subtest.input.filepath.startswith("fake_input")
         ):
             get_media_files(subtest, all_files)
     return
@@ -557,7 +557,7 @@ def update_media_files(test, options):
     for subtest in test.parallel.test:
         if (
             subtest.input.filepath != "camera"
-            and not subtest.input.filepath.startswidth("fake_input")
+            and not subtest.input.filepath.startswith("fake_input")
         ):
             update_media_files(subtest, options)
     return
