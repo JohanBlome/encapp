@@ -126,14 +126,6 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return mStable;
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        // Call the methods to check and request permissions
-        checkAndRequestWriteSettingsPermission();
-    }
-
     public static String getFilenameExtension(String filename) {
         int last_dot_location = filename.lastIndexOf('.');
         String extension = (last_dot_location == -1) ? "" : filename.substring(last_dot_location+1);
@@ -179,15 +171,24 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         return currentVersion;
     }
 
-    private void checkAndRequestWriteSettingsPermission() {
-        if (!Settings.System.canWrite(this)) {
-            // Request Write Settings permission
-            Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
-        } else {
-            Toast.makeText(this, "Write Settings permission already granted", Toast.LENGTH_SHORT).show();
+    private boolean ensureWriteSettingsPermission() {
+        if (Settings.System.canWrite(this)) {
+            return true;
         }
+
+        Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            Log.w(TAG, "WRITE_SETTINGS unavailable: no activity handles MANAGE_WRITE_SETTINGS");
+            return false;
+        }
+
+        try {
+            startActivity(intent);
+        } catch (android.content.ActivityNotFoundException e) {
+            Log.w(TAG, "WRITE_SETTINGS unavailable: failed to launch permission activity", e);
+        }
+        return false;
     }
     /**
      * Returns the {@link ComponentName} for our DeviceAdminReceiver — used by
@@ -779,17 +780,23 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 }
 
                 final boolean screenOff = test0.hasTestSetup() && test0.getTestSetup().getScreenOff();
+                final boolean batteryTest =
+                        test0.getConfigure().hasBatteryTest() && test0.getConfigure().getBatteryTest();
 
-                try {
-                    brightness = Settings.System.getInt(
-                            getContentResolver(),
-                            Settings.System.SCREEN_BRIGHTNESS
-                    );
-                } catch (Settings.SettingNotFoundException e) {
-                    e.printStackTrace();
-                }
-                if (!screenOff) {
-                    setScreenBrightness(1);
+                if (batteryTest && !screenOff) {
+                    try {
+                        brightness = Settings.System.getInt(
+                                getContentResolver(),
+                                Settings.System.SCREEN_BRIGHTNESS
+                        );
+                    } catch (Settings.SettingNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    if (ensureWriteSettingsPermission()) {
+                        setScreenBrightness(1);
+                    } else {
+                        Log.w(TAG, "Skipping brightness change for battery test: WRITE_SETTINGS unavailable");
+                    }
                 }
 
                 if (screenOff) {
@@ -809,18 +816,16 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     }
                 }
 
-                if (test0.getConfigure().hasBatteryTest()){
-                    if (test0.getConfigure().getBatteryTest()) {
-                        try {
-                            runOnUiThread(() -> {
-                                Log.d(TAG, "Prepare battery text");
-                                setContentView(R.layout.battery_test);
-                                mLogText = findViewById(R.id.logText);
-                            });
-                            Thread.sleep(30_000); // 30 seconds
-                        } catch (InterruptedException e) {
-                            Log.w("NullEncode", "Start delay interrupted", e);
-                        }
+                if (batteryTest) {
+                    try {
+                        runOnUiThread(() -> {
+                            Log.d(TAG, "Prepare battery text");
+                            setContentView(R.layout.battery_test);
+                            mLogText = findViewById(R.id.logText);
+                        });
+                        Thread.sleep(30_000); // 30 seconds
+                    } catch (InterruptedException e) {
+                        Log.w("NullEncode", "Start delay interrupted", e);
                     }
                 }
 
@@ -1456,7 +1461,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                     log("\nDone test: " + test.getCommon().getId());
                     if (stats != null) {
                         Log.d(TAG, "Done test: " + test.getCommon().getId() + " with stats: " + stats.getId() + ", to go: " + mInstancesRunning);
-                        setScreenBrightness(brightness);
+                        if (test.getConfigure().hasBatteryTest()
+                                && test.getConfigure().getBatteryTest()
+                                && Settings.System.canWrite(MainActivity.this)) {
+                            setScreenBrightness(brightness);
+                        }
                         wakeScreenUp();
                     } else {
                         Log.d(TAG, "Done test, stats failed, to go: " + mInstancesRunning);
