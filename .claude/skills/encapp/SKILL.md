@@ -180,6 +180,26 @@ Each test produces:
 - `encapp_<UUID>.json` - Test metadata, config, and performance metrics
 - `encapp_<UUID>.mp4` - Encoded video output
 
+For every encapp experiment, preserve the Android logcat slice from the run.
+This is mandatory for debugging device-specific codec issues. Encapp emits
+important details only in logcat, including selected codec, configured
+`MediaFormat`, color format, stride, slice height, crop rectangle, muxer state,
+and asynchronous buffer encoder progress. Keep the CLI-generated
+`*.android_logcat.txt` file with the output artifacts. If the CLI does not pull
+one, collect it manually with a filtered logcat command, for example:
+
+```bash
+adb -s <SERIAL> logcat -d -t 5000 \
+  | grep -Ei 'encapp|MediaCodec|codec|mux|stride|slice-height|crop|format|error|exception' \
+  > <local-workdir>/<test-id>.android_logcat.txt
+```
+
+When an output video looks corrupt, inspect logcat before changing encoder
+settings. Common clues are `stride`, `slice-height`, `crop-right`,
+`crop-bottom`, `color-format`, and the file reader pixel format. For example,
+a tightly packed 1080-wide NV12 input can be corrupted if the selected encoder
+expects stride 1088 and encapp reads the input without padding.
+
 ## Batch Mode vs Realtime Mode
 
 | Mode | Setting | Behavior |
@@ -199,6 +219,46 @@ Each test produces:
 ```
 
 ## Troubleshooting
+
+### Python/protobuf import failure on newer system Python
+
+Symptom:
+
+```text
+ImportError: cannot import name 'builder' from 'google.protobuf.internal'
+```
+
+This can happen when the host system Python/protobuf package is incompatible
+with the generated `scripts/proto/tests_pb2.py` checked into the encapp repo.
+On maggie this was observed with system Python 3.14 and the distro protobuf
+package: `encapp.py` failed before it could talk to adb or the device.
+
+Root cause: the generated protobuf bindings expect `google.protobuf.internal.builder`,
+but the protobuf module found on `sys.path` does not provide it. This is a
+host Python environment problem, not an Android device or encapp APK problem.
+
+Fix: run encapp from a repo-local or temporary virtualenv with a compatible
+protobuf package, then invoke encapp through that venv. Example:
+
+```bash
+cd ~/proj/encapp
+python3 -m venv /tmp/encapp-venv
+. /tmp/encapp-venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install 'protobuf>=6.30' humanfriendly argparse-formatter numpy pandas scipy matplotlib seaborn
+
+# Verify import path/version
+python -c 'import google.protobuf; print(google.protobuf.__version__, google.protobuf.__file__)'
+python scripts/encapp.py --help
+
+# Device wrapper aliases can still be used by calling the venv python explicitly
+mtk1 /tmp/encapp-venv/bin/python ~/proj/encapp/scripts/encapp.py list
+pixel8pro.fb2 /tmp/encapp-venv/bin/python ~/proj/encapp/scripts/encapp.py list
+```
+
+If `encapp.py list` still hangs after the venv import fix, continue with the
+APK/script version-coherence checks above; that is a separate issue from the
+Python import failure.
 
 ```bash
 # Check if encapp is installed
