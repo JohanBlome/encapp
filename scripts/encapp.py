@@ -330,7 +330,7 @@ def run_encapp_test(
             encapp_tool.adb_cmds.reset_logcat(serial)
             session_extra = f"-e session_id {session_id} " if session_id else ""
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"adb -s {serial} shell am start "
+                f"adb -s {serial} shell am start --activity-clear-task "
                 f"-e workdir {device_workdir} "
                 f"-e test {protobuf_txt_filepath} "
                 f"{session_extra}"
@@ -703,7 +703,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options,
     if options.dry_run:
         # Write and exit
         configfile_write(test_suite, protobuf_txt_filepath)
-        return test_suite, [], protobuf_txt_filepath
+        return test_suite, set(), protobuf_txt_filepath
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
@@ -2094,13 +2094,8 @@ def _oracle_via_manifest(
                 expected_ids.append(sub.common.id)
 
     def _pull(remote_path, local_dir):
-        encapp_tool.adb_cmds.run_cmd(
-            f"adb -s {serial} pull {remote_path} {local_dir}/",
-            ignore_errors=True,
-            debug=debug,
-        )
-        return os.path.exists(
-            os.path.join(local_dir, f"{session_id}.session.jsonl")
+        return encapp_tool.adb_cmds.pull_file_from_device(
+            serial, remote_path, local_dir, debug
         )
 
     def _force_stop():
@@ -2143,10 +2138,11 @@ def _oracle_via_manifest(
             path = art.get("path")
             if not path:
                 continue
-            encapp_tool.adb_cmds.run_cmd(
-                f"adb -s {serial} pull {device_workdir.rstrip('/')}/{path} {local_workdir}/",
-                ignore_errors=True,
-                debug=debug,
+            encapp_tool.adb_cmds.pull_file_from_device(
+                serial,
+                f"{device_workdir.rstrip('/')}/{path}",
+                local_workdir,
+                debug,
             )
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
@@ -2315,9 +2311,17 @@ def list_codecs(
 
             encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
             wait_for_exit(serial)
-        adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
-        assert ret, 'error getting codec list: "%s"' % stdout
+        destination = os.path.dirname(os.path.abspath(filename))
+        ret = encapp_tool.adb_cmds.pull_file_from_device(
+            serial,
+            f"{device_workdir.rstrip('/')}/codecs.txt",
+            destination,
+            debug,
+        )
+        assert ret, 'error getting codec list from "%s"' % device_workdir
+        pulled_file = os.path.join(destination, "codecs.txt")
+        if os.path.abspath(pulled_file) != os.path.abspath(filename):
+            os.replace(pulled_file, filename)
     return filename
 
 
