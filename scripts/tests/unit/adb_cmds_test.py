@@ -4,6 +4,7 @@ import unittest
 import unittest.mock
 import os
 import sys
+import tempfile
 
 MODULE_PATH = os.path.dirname(__file__)
 ENCAPP_SCRIPTS_ROOT_DIR = os.path.join(MODULE_PATH, os.pardir, os.pardir)
@@ -215,6 +216,46 @@ class TestAdbCommands(unittest.TestCase):
         mock_run.assert_called_with(expected_cmd, debug=0)
 
     @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_getprop_value_reads_single_property(self, mock_run):
+        mock_run.return_value = (True, "1\n", "")
+        value = encapp_tool.adb_cmds.getprop_value(
+            ADB_DEVICE_VALID_ID, "debug.stagefright.enableshaping", debug=0
+        )
+        self.assertEqual("1", value)
+        mock_run.assert_called_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} shell getprop debug.stagefright.enableshaping",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_setprop_value_writes_single_property(self, mock_run):
+        mock_run.return_value = (True, "", "")
+        encapp_tool.adb_cmds.setprop_value(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            "0",
+            debug=0,
+        )
+        mock_run.assert_called_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} shell setprop debug.stagefright.enableshaping 0",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.setprop_value")
+    def test_clearprop_value_uses_empty_string(self, mock_setprop):
+        encapp_tool.adb_cmds.clearprop_value(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            debug=0,
+        )
+        mock_setprop.assert_called_once_with(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            "",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
     def test_installed_apps_shall_list_pm_list_packages(self, mock_run):
         mock_run.return_value = (True, ADB_PM_LIST_OUT, "")
         result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, debug=0)
@@ -245,6 +286,79 @@ class TestAdbCommands(unittest.TestCase):
         )
         mock_run.assert_called_with(
             f"adb -s {ADB_DEVICE_VALID_ID} uninstall com.android.package.a", 1
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds._run_as_app")
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_push_private_file_streams_directly(self, mock_run, mock_run_as):
+        mock_run.return_value = (True, "", "")
+        mock_run_as.return_value = (True, "", "")
+        with tempfile.NamedTemporaryFile() as source:
+            result = encapp_tool.adb_cmds.push_file_to_device_android(
+                source.name,
+                ADB_DEVICE_VALID_ID,
+                "/data/user/0/com.facebook.encapp/files",
+                debug=1,
+            )
+            target = f"files/{os.path.basename(source.name)}"
+            remote_command = f"cat > {target}"
+            mock_run.assert_called_once_with(
+                f"adb -s {ADB_DEVICE_VALID_ID} exec-in run-as "
+                f"com.facebook.encapp sh -c '{remote_command}' < {source.name}",
+                debug=1,
+            )
+        mock_run_as.assert_called_once_with(
+            ADB_DEVICE_VALID_ID, "mkdir -p files", debug=1
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_pull_private_file_uses_run_as(self, mock_run):
+        mock_run.return_value = (True, "", "")
+        with tempfile.TemporaryDirectory() as destination:
+            local_path = os.path.join(destination, "artifact.json")
+            with open(local_path, "w") as output:
+                output.write("data")
+            result = encapp_tool.adb_cmds.pull_file_from_device(
+                ADB_DEVICE_VALID_ID,
+                "/data/user/0/com.facebook.encapp/files/artifact.json",
+                destination,
+                debug=1,
+            )
+        self.assertTrue(result)
+        mock_run.assert_has_calls(
+            [
+                unittest.mock.call(
+                    f"adb -s {ADB_DEVICE_VALID_ID} shell run-as "
+                    "com.facebook.encapp test -s files/artifact.json",
+                    debug=1,
+                ),
+                unittest.mock.call(
+                    f"adb -s {ADB_DEVICE_VALID_ID} exec-out run-as "
+                    "com.facebook.encapp cat files/artifact.json > "
+                    f"{local_path}",
+                    debug=1,
+                ),
+            ]
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_pull_public_file_uses_adb_pull(self, mock_run):
+        mock_run.return_value = (True, "", "")
+        with tempfile.TemporaryDirectory() as destination:
+            local_path = os.path.join(destination, "artifact.json")
+            with open(local_path, "w") as output:
+                output.write("data")
+            result = encapp_tool.adb_cmds.pull_file_from_device(
+                ADB_DEVICE_VALID_ID,
+                "/sdcard/artifact.json",
+                destination,
+                debug=1,
+            )
+        self.assertTrue(result)
+        mock_run.assert_called_once_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} pull /sdcard/artifact.json "
+            f"{destination}/ ",
+            debug=1,
         )
 
 

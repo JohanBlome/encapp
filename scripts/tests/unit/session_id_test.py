@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import unittest
+import unittest.mock
 
 MODULE_PATH = os.path.dirname(__file__)
 ENCAPP_SCRIPTS_ROOT_DIR = os.path.abspath(
@@ -28,6 +29,27 @@ class TestSessionId(unittest.TestCase):
         # realistic concurrent-runs cap.
         ids = {encapp.make_session_id() for _ in range(100)}
         self.assertEqual(100, len(ids), "session_id collision in 100 draws")
+    def test_android_launch_clears_stale_activity_task(self):
+        with unittest.mock.patch.object(
+            encapp.encapp_tool.adb_cmds, "reset_logcat"
+        ), unittest.mock.patch.object(
+            encapp.encapp_tool.adb_cmds,
+            "run_cmd",
+            return_value=(True, "", ""),
+        ) as run_cmd:
+            encapp.run_encapp_test(
+                "/sdcard/test.pbtxt",
+                "SERIAL",
+                "/sdcard",
+                session_id="SID",
+                debug=1,
+            )
+        run_cmd.assert_called_once_with(
+            "adb -s SERIAL shell am start --activity-clear-task "
+            "-e workdir /sdcard -e test /sdcard/test.pbtxt "
+            "-e session_id SID com.facebook.encapp/.MainActivity",
+            1,
+        )
 
 
 if __name__ == "__main__":

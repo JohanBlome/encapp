@@ -626,6 +626,42 @@ def getprop(serial: str, debug=0) -> dict:
         return parse_getprop(stdout)
 
 
+def getprop_value(serial: str, prop: str, debug=0) -> str:
+    """Read a single Android system property.
+
+    Returns the raw property string with trailing newlines removed. Unset
+    properties return the empty string.
+    """
+    if USE_IDB:
+        return ""
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell getprop {shlex.quote(prop)}",
+        debug=debug,
+    )
+    assert ret, f"error: failed to getprop {prop}: {stderr}"
+    return stdout.rstrip("\r\n")
+
+
+def setprop_value(serial: str, prop: str, value: str, debug=0):
+    """Write a single Android system property."""
+    if USE_IDB:
+        return
+    ret, _stdout, stderr = run_cmd(
+        f"adb -s {serial} shell setprop {shlex.quote(prop)} {shlex.quote(value)}",
+        debug=debug,
+    )
+    assert ret, f"error: failed to setprop {prop}={value}: {stderr}"
+
+
+def clearprop_value(serial: str, prop: str, debug=0):
+    """Clear a property by setting it to the empty string.
+
+    For debug-only shaping control props this restores default platform
+    behavior when the previous value was unset.
+    """
+    setprop_value(serial, prop, "", debug=debug)
+
+
 def get_device_size(serial, filepath, debug):
     # check if the file exists
     if _is_app_private_path(filepath):
@@ -774,44 +810,37 @@ def push_file_to_device_android(
 ):
     if _is_app_private_path(device_workdir):
         basename = os.path.basename(filepath)
-        temp_path = f"/data/local/tmp/{basename}"
         target_path = os.path.join(device_workdir, basename)
         target_relpath = _app_relative_path(target_path)
-        ret, stdout, stderr = run_cmd(
-            f"adb -s {serial} push {filepath} {temp_path}", debug=debug
-        )
-        if not ret:
-            log.warning(
-                'cannot copy "%s" to temp path: stdout=%s stderr=%s',
-                filepath,
-                stdout,
-                stderr,
+        target_dir = os.path.dirname(target_relpath)
+        if target_dir:
+            ret, stdout, stderr = _run_as_app(
+                serial,
+                f"mkdir -p {shlex.quote(target_dir)}",
+                debug=debug,
             )
-            return ret
-        ret, stdout, stderr = _run_as_app(
-            serial,
-            f"cp {shlex.quote(temp_path)} {shlex.quote(target_relpath)}",
+            if not ret:
+                log.warning(
+                    'cannot create app-private directory "%s": stdout=%s stderr=%s',
+                    target_dir,
+                    stdout,
+                    stderr,
+                )
+                return ret
+        remote_command = f"cat > {shlex.quote(target_relpath)}"
+        ret, stdout, stderr = run_cmd(
+            f"adb -s {serial} exec-in run-as com.facebook.encapp sh -c "
+            f"{shlex.quote(remote_command)} < {shlex.quote(filepath)}",
             debug=debug,
         )
-        run_cmd(f"adb -s {serial} shell rm {temp_path}", debug=debug)
         if not ret:
             log.warning(
-                'cannot move "%s" into app dir: stdout=%s stderr=%s',
+                'cannot stream "%s" into app dir: stdout=%s stderr=%s',
                 filepath,
                 stdout,
                 stderr,
             )
             return ret
-        ret, stdout, stderr = _run_as_app(
-            serial, f"chmod 666 {shlex.quote(target_relpath)}", debug=debug
-        )
-        if not ret:
-            log.warning(
-                'cannot chmod "%s" in app dir: stdout=%s stderr=%s',
-                filepath,
-                stdout,
-                stderr,
-            )
         return ret
     # 0. try a one-off copy. Limit this for devices that fail and reboot (or worse).
     ret = stdout = stderr = None
@@ -883,6 +912,51 @@ def push_file_to_device_android(
     return True
 
 
+def pull_file_from_device(
+    serial: str, remote_path: str, destination: str, debug: int
+) -> bool:
+    """Pull one device file, including files in Encapp's app-private directory."""
+    os.makedirs(destination, exist_ok=True)
+    local_path = os.path.join(destination, os.path.basename(remote_path))
+    is_private = _is_app_private_path(remote_path)
+    if is_private:
+        src = _app_relative_path(remote_path)
+        adb_cmd = (
+            f"adb -s {serial} exec-out run-as com.facebook.encapp "
+            f"cat {shlex.quote(src)} > {shlex.quote(local_path)}"
+        )
+    else:
+        src = None
+        adb_cmd = f"adb -s {serial} pull {remote_path} {destination}/ "
+
+    last_err = ""
+    for attempt in range(1, 4):
+        if is_private:
+            present, _, check_err = _run_as_app(
+                serial, f"test -s {shlex.quote(src)}", debug=debug
+            )
+            if not present:
+                ret, stderr = False, check_err or "remote file missing or empty"
+            else:
+                ret, _, stderr = run_cmd(adb_cmd, debug=debug)
+        else:
+            ret, _, stderr = run_cmd(adb_cmd, debug=debug)
+        if ret and os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+            return True
+        last_err = stderr.strip()
+        if attempt < 3:
+            print(
+                f"\nWARN: pull of {remote_path} failed (attempt {attempt}/3): "
+                f"{last_err or 'file missing/empty after pull'} — retrying"
+            )
+            time.sleep(1)
+    print(
+        f"\nERROR: failed to pull {remote_path} after 3 attempts: "
+        f"{last_err or 'file missing/empty after pull'}"
+    )
+    return False
+
+
 def pull_files_from_device(
     serial: str, regex_str: str, location: str, destination: str, debug: int
 ) -> None:
@@ -912,44 +986,12 @@ def pull_files_from_device(
         output_files = re.findall(regex_str, stdout, re.MULTILINE)
         for counter, file in enumerate(output_files):
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
-            if _is_app_private_path(location):
-                # App-private dirs are not readable by `adb pull`; stream the
-                # file out through `run-as` instead.
-                src = _app_relative_path(os.path.join(location, file))
-                adb_cmd = (
-                    f"adb -s {serial} exec-out run-as com.facebook.encapp "
-                    f"cat {shlex.quote(src)} > "
-                    f"{shlex.quote(os.path.join(destination, file))}"
-                )
-            else:
-                adb_cmd = f"adb -s {serial} pull {location}/{file} {destination}/ "
-            # Retry to absorb transient adb-pull failures (USB hiccups,
-            # device-locked-screen restrictions on some OEMs, etc.). A pull
-            # is considered successful when adb returns 0 AND the file lands
-            # in destination — adb sometimes returns 0 even when nothing was
-            # transferred, so we verify both. The run-as variant needs the
-            # same check: a failing `cat` still creates an empty file via the
-            # shell redirect.
-            local_path = os.path.join(destination, os.path.basename(file))
-            ok = False
-            last_err = ""
-            for attempt in range(1, 4):
-                ret, _, stderr = run_cmd(adb_cmd, debug=debug)
-                if ret and os.path.exists(local_path) and os.path.getsize(local_path) > 0:
-                    ok = True
-                    break
-                last_err = stderr.strip()
-                if attempt < 3:
-                    print(
-                        f"\nWARN: pull of {file} failed (attempt {attempt}/3): "
-                        f"{last_err or 'file missing/empty after pull'} — retrying"
-                    )
-                    time.sleep(1)
-            if not ok:
-                print(
-                    f"\nERROR: failed to pull {file} after 3 attempts: "
-                    f"{last_err or 'file missing/empty after pull'}"
-                )
+            pull_file_from_device(
+                serial,
+                os.path.join(location, file),
+                destination,
+                debug,
+            )
 
 
 def set_idb_mode(mode):

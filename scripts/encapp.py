@@ -46,6 +46,8 @@ import tests_pb2 as tests_definitions  # noqa: E402
 
 
 RD_RESULT_FILE_NAME = "rd_results.json"
+MEDIAFORMAT_SHAPING_PROP = "debug.stagefright.enableshaping"
+MEDIAFORMAT_SHAPING_METADATA_SUFFIX = "mediaformat_shaping.json"
 
 DEBUG = False
 QUIET = False
@@ -330,7 +332,7 @@ def run_encapp_test(
             encapp_tool.adb_cmds.reset_logcat(serial)
             session_extra = f"-e session_id {session_id} " if session_id else ""
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
-                f"adb -s {serial} shell am start "
+                f"adb -s {serial} shell am start --activity-clear-task "
                 f"-e workdir {device_workdir} "
                 f"-e test {protobuf_txt_filepath} "
                 f"{session_extra}"
@@ -703,7 +705,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options,
     if options.dry_run:
         # Write and exit
         configfile_write(test_suite, protobuf_txt_filepath)
-        return test_suite, [], protobuf_txt_filepath
+        return test_suite, set(), protobuf_txt_filepath
 
     # 2. get a list of all the media files that will need to be pushed
     files_to_push = set()
@@ -771,6 +773,9 @@ def run_codec_tests_file(
     )
     test_suite, files_to_push, protobuf_txt_filepath = read_and_update_proto(
         protobuf_txt_filepath, local_workdir, options, test_suite=expanded_suite
+    )
+    enable_mediaformat_shaping = _resolve_mediaformat_shaping_policy(
+        test_suite, options
     )
 
     # multiply tests per request
@@ -882,7 +887,8 @@ def run_codec_tests_file(
                     options.ignore_results,
                     options.fast_copy,
                     options.split,
-                    debug,
+                    debug=debug,
+                    enable_mediaformat_shaping=enable_mediaformat_shaping,
                 )
 
                 # Remove test files
@@ -939,7 +945,8 @@ def run_codec_tests_file(
                     options.ignore_results,
                     options.fast_copy,
                     options.split,
-                    debug,
+                    debug=debug,
+                    enable_mediaformat_shaping=enable_mediaformat_shaping,
                 )
                 # iOS-only fail-detection (ls output vs suite size + regex
                 # match on output_filename). On Android the manifest oracle
@@ -1639,6 +1646,7 @@ def update_codec_test(
         "internal_muxer",
         "internal_demuxer",
         "expand_all",
+        "enable_mediaformat_shaping",
     )
 
     for k1 in replace:
@@ -1698,8 +1706,7 @@ def update_codec_test(
                 or (k1 == "input" and k2 in INPUT_BOOL_KEYS)
                 or (k1 == "test_setup" and k2 in TEST_SETUP_BOOL_KEYS)
             ):
-                # force float value
-                val = bool(val)
+                val = parse_bool(val)
             # convert enum strings to integer
             if k1 == "input" and k2 == "pix_fmt":
                 val = tests_definitions.PixFmt.Value(val)
@@ -1865,6 +1872,131 @@ def get_valid_test_name(test: tests_definitions.TestSuite):
         return name
 
 
+def _iter_tests_recursive(test):
+    yield test
+    for subtest in test.parallel.test:
+        yield from _iter_tests_recursive(subtest)
+
+
+def _iter_all_tests(test_suite):
+    for test in test_suite.test:
+        yield from _iter_tests_recursive(test)
+
+
+def _suite_uses_vbr(test_suite) -> bool:
+    for test in _iter_all_tests(test_suite):
+        if (
+            test.HasField("configure")
+            and test.configure.HasField("bitrate_mode")
+            and test.configure.bitrate_mode == tests_definitions.Configure.vbr
+        ):
+            return True
+    return False
+
+
+def _resolve_mediaformat_shaping_policy(test_suite, options) -> bool:
+    cli_value = getattr(options, "enable_mediaformat_shaping", None)
+    if cli_value is not None:
+        return bool(cli_value)
+
+    proto_values = []
+    for test in _iter_all_tests(test_suite):
+        if (
+            test.HasField("test_setup")
+            and test.test_setup.HasField("enable_mediaformat_shaping")
+        ):
+            proto_values.append(bool(test.test_setup.enable_mediaformat_shaping))
+
+    if len(set(proto_values)) > 1:
+        raise AssertionError(
+            "error: inconsistent test_setup.enable_mediaformat_shaping values in suite"
+        )
+    if proto_values:
+        return proto_values[0]
+    return False
+
+
+def _mediaformat_shaping_metadata_path(local_workdir: str, session_id: str) -> str:
+    return os.path.join(
+        local_workdir, f"{session_id}.{MEDIAFORMAT_SHAPING_METADATA_SUFFIX}"
+    )
+
+
+def _write_mediaformat_shaping_metadata(local_workdir: str, session_id: str, state: dict):
+    os.makedirs(local_workdir, exist_ok=True)
+    path = _mediaformat_shaping_metadata_path(local_workdir, session_id)
+    with open(path, "w") as f:
+        json.dump(state, f, indent=2, sort_keys=False)
+        f.write("\n")
+    return path
+
+
+def _create_mediaformat_shaping_state(session_id: str, requested_enabled: bool) -> dict:
+    requested_value = "1" if requested_enabled else "0"
+    return {
+        "session_id": session_id,
+        "property": MEDIAFORMAT_SHAPING_PROP,
+        "requested_enabled": requested_enabled,
+        "requested_value": requested_value,
+        "original_value": None,
+        "effective_value": None,
+        "restored_value": None,
+        "restore_error": None,
+        "metadata_error": None,
+        "run_error": None,
+        "skipped": False,
+        "reason": None,
+    }
+
+
+def _configure_mediaformat_shaping(serial: str, state: dict, debug: int = 0):
+    if encapp_tool.adb_cmds.USE_IDB:
+        state["skipped"] = True
+        state["reason"] = "ios/idb target"
+        return
+
+    state["original_value"] = encapp_tool.adb_cmds.getprop_value(
+        serial, MEDIAFORMAT_SHAPING_PROP, debug=debug
+    )
+    encapp_tool.adb_cmds.setprop_value(
+        serial, MEDIAFORMAT_SHAPING_PROP, state["requested_value"], debug=debug
+    )
+    state["effective_value"] = encapp_tool.adb_cmds.getprop_value(
+        serial, MEDIAFORMAT_SHAPING_PROP, debug=debug
+    )
+    if state["effective_value"] != state["requested_value"]:
+        raise RuntimeError(
+            "failed to set "
+            f"{MEDIAFORMAT_SHAPING_PROP}={state['requested_value']}: "
+            f"effective value is {state['effective_value']!r}"
+        )
+
+
+def _restore_mediaformat_shaping(serial: str, state: dict, debug: int = 0):
+    if state.get("skipped") or state.get("original_value") is None:
+        return
+
+    original_value = state["original_value"]
+    if original_value == "":
+        encapp_tool.adb_cmds.clearprop_value(
+            serial, MEDIAFORMAT_SHAPING_PROP, debug=debug
+        )
+    else:
+        encapp_tool.adb_cmds.setprop_value(
+            serial, MEDIAFORMAT_SHAPING_PROP, original_value, debug=debug
+        )
+
+    state["restored_value"] = encapp_tool.adb_cmds.getprop_value(
+        serial, MEDIAFORMAT_SHAPING_PROP, debug=debug
+    )
+    if state["restored_value"] != original_value:
+        raise RuntimeError(
+            "failed to restore "
+            f"{MEDIAFORMAT_SHAPING_PROP} to {original_value!r}: "
+            f"effective value is {state['restored_value']!r}"
+        )
+
+
 def run_codec_tests(
     test_suite: tests_definitions.TestSuite,
     files_to_push: list[str],
@@ -1877,6 +2009,7 @@ def run_codec_tests(
     fast_copy: bool = False,
     split: bool = False,
     debug: int = 0,
+    enable_mediaformat_shaping: bool = False,
 ):
     """Run the testsuite.
     The testsuite will be written to a file for pushing along with files_to_push.
@@ -1895,55 +2028,155 @@ def run_codec_tests(
     log.info("session_id: %s  manifest: %s/%s.session.jsonl",
              session_id, device_workdir, session_id)
 
+    shaping_state = _create_mediaformat_shaping_state(
+        session_id=session_id,
+        requested_enabled=enable_mediaformat_shaping,
+    )
+    if enable_mediaformat_shaping and _suite_uses_vbr(test_suite):
+        log.warning(
+            "MediaFormat shaping is enabled for a VBR experiment; requested bitrate "
+            "may reflect Android quality policy rather than direct encoder behavior"
+        )
+    run_error = None
+    restore_error = None
+
     collected_results = []
-    # run the test(s)
-    if split:
-        # (a) one pbtxt file per subtest
-        # push just the files we need by looking up the name
-        tests_run = f"{local_workdir}/tests_run.log"
-        total_number = len(test_suite.test)
-        counter = 1
-        for test in test_suite.test:
-            print(
-                f"*** Running {counter}/{total_number} split test {test.common.id} **"
-            )
-            counter += 1
-            # Check last ran test
-            if os.path.exists(tests_run):
-                with open(tests_run, "r+") as passed:
-                    data = passed.read()
-                    if f"{get_valid_test_name(test)}.pbtxt" in data:
-                        print("Test already done, moving on.")
-                        ignore_results = True
-                        continue
-            ignore_results = False
-            files = set()
-            get_media_files(test, files)
-            for filepath in files:
-                if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{mediastore}/{filepath}", serial, device_workdir, fast_copy, debug
-                ):
-                    abort_test(local_workdir, f"Error copying {filepath} to {serial}")
-                if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{local_workdir}/{get_valid_test_name(test)}.pbtxt",
+    try:
+        _configure_mediaformat_shaping(serial, shaping_state, debug=debug)
+        log.info(
+            "MediaFormat shaping requested=%s original=%r effective=%r",
+            "enabled" if enable_mediaformat_shaping else "disabled",
+            shaping_state["original_value"],
+            shaping_state["effective_value"],
+        )
+
+        # run the test(s)
+        if split:
+            # (a) one pbtxt file per subtest
+            # push just the files we need by looking up the name
+            tests_run = f"{local_workdir}/tests_run.log"
+            total_number = len(test_suite.test)
+            counter = 1
+            for test in test_suite.test:
+                print(
+                    f"*** Running {counter}/{total_number} split test {test.common.id} **"
+                )
+                counter += 1
+                # Check last ran test
+                if os.path.exists(tests_run):
+                    with open(tests_run, "r+") as passed:
+                        data = passed.read()
+                        if f"{get_valid_test_name(test)}.pbtxt" in data:
+                            print("Test already done, moving on.")
+                            ignore_results = True
+                            continue
+                ignore_results = False
+                files = set()
+                get_media_files(test, files)
+                for filepath in files:
+                    if not encapp_tool.adb_cmds.push_file_to_device(
+                        f"{mediastore}/{filepath}", serial, device_workdir, fast_copy, debug
+                    ):
+                        abort_test(local_workdir, f"Error copying {filepath} to {serial}")
+                    if not encapp_tool.adb_cmds.push_file_to_device(
+                        f"{local_workdir}/{get_valid_test_name(test)}.pbtxt",
+                        serial,
+                        device_workdir,
+                        fast_copy,
+                        debug,
+                    ):
+                        abort_test(local_workdir, f"Error copying {filepath} to {serial}")
+
+                if encapp_tool.adb_cmds.USE_IDB:
+                    protobuf_txt_filepath = f"{get_valid_test_name(test)}.pbtxt"
+                else:
+                    protobuf_txt_filepath = (
+                        f"{device_workdir}/{get_valid_test_name(test)}.pbtxt"
+                    )
+
+                run_cmd = ""
+                if test.test_setup and test.test_setup.run_cmd:
+                    run_cmd = test.test_setup.run_cmd
+
+                run_encapp_test(
+                    protobuf_txt_filepath,
                     serial,
                     device_workdir,
-                    fast_copy,
-                    debug,
+                    run_cmd=run_cmd,
+                    session_id=session_id,
+                    debug=debug,
+                )
+                with open(tests_run, "a") as passed:
+                    passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
+
+                # Pull the log file (it will be overwritten otherwise)
+                if encapp_tool.adb_cmds.USE_IDB:
+                    print(
+                        "Currently filesystem synch on ios seems to be slow, sleep a little while"
+                    )
+                    time.sleep(1)
+
+                    encapp_tool.adb_cmds.pull_files_from_device(
+                        serial, "encapp.log", device_workdir, local_workdir, debug
+                    )
+                    try:
+                        os.rename(
+                            f"{local_workdir}/encapp.log",
+                            f"{local_workdir}/{test.common.id}.log",
+                        )
+                    except:
+                        print("Changing name on the ios log file")
+                collected_results.extend(
+                    collect_results(
+                        local_workdir,
+                        protobuf_txt_filepath,
+                        serial,
+                        device_workdir,
+                    )
+                )
+
+        else:
+            # (b) one pbtxt for all tests
+            # push all the files to the device workdir
+            if encapp_tool.adb_cmds.USE_IDB:
+                print("IOS Launch")
+                cmd = (
+                    f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+                )
+                encapp_tool.adb_cmds.run_cmd(cmd)
+
+            protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
+            with open(protobuf_txt_filepath, "w") as f:
+                f.write(text_format.MessageToString(test_suite))
+            if not encapp_tool.adb_cmds.push_file_to_device(
+                protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
+            ):
+                abort_test(
+                    local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
+                )
+
+            for filepath in files_to_push:
+                # Ignore pbtxt, only the test_suite based one will be used.
+                fc = fast_copy
+                if filepath.endswith("pbtxt"):
+                    continue
+                if not encapp_tool.adb_cmds.push_file_to_device(
+                    filepath, serial, device_workdir, fc, debug
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
 
+            basename = os.path.basename(protobuf_txt_filepath)
             if encapp_tool.adb_cmds.USE_IDB:
-                protobuf_txt_filepath = f"{get_valid_test_name(test)}.pbtxt"
+                protobuf_txt_filepath = f"{basename}"
             else:
-                protobuf_txt_filepath = (
-                    f"{device_workdir}/{get_valid_test_name(test)}.pbtxt"
-                )
+                protobuf_txt_filepath = f"{device_workdir}/{basename}"
 
+            if encapp_tool.adb_cmds.USE_IDB:
+                encapp_tool.app_utils.force_stop(serial, debug)
             run_cmd = ""
+            test = test_suite.test[0]
             if test.test_setup and test.test_setup.run_cmd:
                 run_cmd = test.test_setup.run_cmd
-
             run_encapp_test(
                 protobuf_txt_filepath,
                 serial,
@@ -1952,9 +2185,8 @@ def run_codec_tests(
                 session_id=session_id,
                 debug=debug,
             )
-            with open(tests_run, "a") as passed:
-                passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
 
+            # collect the test results
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
                 print(
@@ -1968,112 +2200,62 @@ def run_codec_tests(
                 try:
                     os.rename(
                         f"{local_workdir}/encapp.log",
-                        f"{local_workdir}/{test.common.id}.log",
+                        f"{local_workdir}/{basename}.log",
                     )
-                except:
-                    print("Changing name on the ios log file")
-            collected_results.extend(
-                collect_results(
-                    local_workdir,
-                    protobuf_txt_filepath,
-                    serial,
-                    device_workdir,
+                except Exception as ex:
+                    print(f"ERROR: Changing name on the ios log file: {ex}")
+            if ignore_results:
+                return None, None
+            # iOS-only oracle path (logcat parse + regex-ls + verify). On
+            # Android the manifest path below is authoritative.
+            if not (session_id and not encapp_tool.adb_cmds.USE_IDB):
+                collected_results.extend(
+                    collect_results(
+                        local_workdir, protobuf_txt_filepath, serial, device_workdir
+                    )
                 )
+
+        # Manifest oracle: poll the on-device session manifest, classify each
+        # test, pull declared artifacts. Skipped on iOS — the iOS app doesn't
+        # write the manifest yet.
+        if session_id and not encapp_tool.adb_cmds.USE_IDB:
+            synth = _oracle_via_manifest(
+                test_suite, serial, device_workdir, local_workdir, session_id, debug
             )
+            # Synthesize the collect_results (bool, list) shape so the iOS-only
+            # verify path can keep reading results[0] / results[1].
+            if synth is not None:
+                collected_results.extend(synth)
 
-    else:
-        # (b) one pbtxt for all tests
-        # push all the files to the device workdir
-        if encapp_tool.adb_cmds.USE_IDB:
-            print("IOS Launch")
-            cmd = (
-                f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} standby",
+        return collected_results
+    except BaseException as exc:
+        run_error = exc
+        shaping_state["run_error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        try:
+            _restore_mediaformat_shaping(serial, shaping_state, debug=debug)
+        except Exception as exc:
+            restore_error = exc
+            shaping_state["restore_error"] = f"{type(exc).__name__}: {exc}"
+            log.error("MediaFormat shaping restore failed: %s", exc)
+
+        metadata_error = None
+        try:
+            metadata_path = _write_mediaformat_shaping_metadata(
+                local_workdir, session_id, shaping_state
             )
-            encapp_tool.adb_cmds.run_cmd(cmd)
+            log.info("MediaFormat shaping metadata: %s", metadata_path)
+        except Exception as exc:
+            metadata_error = exc
+            shaping_state["metadata_error"] = f"{type(exc).__name__}: {exc}"
+            log.error("MediaFormat shaping metadata write failed: %s", exc)
 
-        protobuf_txt_filepath = f"{local_workdir}/encapp_test.pbtxt"
-        with open(protobuf_txt_filepath, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
-        if not encapp_tool.adb_cmds.push_file_to_device(
-            protobuf_txt_filepath, serial, device_workdir, fast_copy=False, debug=debug
-        ):
-            abort_test(
-                local_workdir, f"Error copying {protobuf_txt_filepath} to {serial}"
-            )
-
-        for filepath in files_to_push:
-            # Ignore pbtxt, only the test_suite based one will be used.
-            fc = fast_copy
-            if filepath.endswith("pbtxt"):
-                continue
-            if not encapp_tool.adb_cmds.push_file_to_device(
-                filepath, serial, device_workdir, fc, debug
-            ):
-                abort_test(local_workdir, f"Error copying {filepath} to {serial}")
-
-        basename = os.path.basename(protobuf_txt_filepath)
-        if encapp_tool.adb_cmds.USE_IDB:
-            protobuf_txt_filepath = f"{basename}"
-        else:
-            protobuf_txt_filepath = f"{device_workdir}/{basename}"
-
-        if encapp_tool.adb_cmds.USE_IDB:
-            encapp_tool.app_utils.force_stop(serial, debug)
-        run_cmd = ""
-        test = test_suite.test[0]
-        if test.test_setup and test.test_setup.run_cmd:
-            run_cmd = test.test_setup.run_cmd
-        run_encapp_test(
-            protobuf_txt_filepath,
-            serial,
-            device_workdir,
-            run_cmd=run_cmd,
-            session_id=session_id,
-            debug=debug,
-        )
-
-        # collect the test results
-        # Pull the log file (it will be overwritten otherwise)
-        if encapp_tool.adb_cmds.USE_IDB:
-            print(
-                "Currently filesystem synch on ios seems to be slow, sleep a little while"
-            )
-            time.sleep(1)
-
-            encapp_tool.adb_cmds.pull_files_from_device(
-                serial, "encapp.log", device_workdir, local_workdir, debug
-            )
-            try:
-                os.rename(
-                    f"{local_workdir}/encapp.log",
-                    f"{local_workdir}/{basename}.log",
-                )
-            except Exception as ex:
-                print(f"ERROR: Changing name on the ios log file: {ex}")
-        if ignore_results:
-            return None, None
-        # iOS-only oracle path (logcat parse + regex-ls + verify). On
-        # Android the manifest path below is authoritative.
-        if not (session_id and not encapp_tool.adb_cmds.USE_IDB):
-            collected_results.extend(
-                collect_results(
-                    local_workdir, protobuf_txt_filepath, serial, device_workdir
-                )
-            )
-
-    # Manifest oracle: poll the on-device session manifest, classify each
-    # test, pull declared artifacts. Skipped on iOS — the iOS app doesn't
-    # write the manifest yet.
-    if session_id and not encapp_tool.adb_cmds.USE_IDB:
-        synth = _oracle_via_manifest(
-            test_suite, serial, device_workdir, local_workdir, session_id, debug
-        )
-        # Synthesize the collect_results (bool, list) shape so the iOS-only
-        # verify path can keep reading results[0] / results[1].
-        if synth is not None:
-            collected_results.extend(synth)
-
-    return collected_results
+        if run_error is None:
+            if restore_error is not None:
+                raise restore_error
+            if metadata_error is not None:
+                raise metadata_error
 
 
 def _oracle_via_manifest(
@@ -2094,13 +2276,8 @@ def _oracle_via_manifest(
                 expected_ids.append(sub.common.id)
 
     def _pull(remote_path, local_dir):
-        encapp_tool.adb_cmds.run_cmd(
-            f"adb -s {serial} pull {remote_path} {local_dir}/",
-            ignore_errors=True,
-            debug=debug,
-        )
-        return os.path.exists(
-            os.path.join(local_dir, f"{session_id}.session.jsonl")
+        return encapp_tool.adb_cmds.pull_file_from_device(
+            serial, remote_path, local_dir, debug
         )
 
     def _force_stop():
@@ -2143,10 +2320,11 @@ def _oracle_via_manifest(
             path = art.get("path")
             if not path:
                 continue
-            encapp_tool.adb_cmds.run_cmd(
-                f"adb -s {serial} pull {device_workdir.rstrip('/')}/{path} {local_workdir}/",
-                ignore_errors=True,
-                debug=debug,
+            encapp_tool.adb_cmds.pull_file_from_device(
+                serial,
+                f"{device_workdir.rstrip('/')}/{path}",
+                local_workdir,
+                debug,
             )
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
@@ -2315,9 +2493,17 @@ def list_codecs(
 
             encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
             wait_for_exit(serial)
-        adb_cmd = f"adb -s {serial} pull {device_workdir}/codecs.txt {filename}"
-        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(adb_cmd, debug=debug)
-        assert ret, 'error getting codec list: "%s"' % stdout
+        destination = os.path.dirname(os.path.abspath(filename))
+        ret = encapp_tool.adb_cmds.pull_file_from_device(
+            serial,
+            f"{device_workdir.rstrip('/')}/codecs.txt",
+            destination,
+            debug,
+        )
+        assert ret, 'error getting codec list from "%s"' % device_workdir
+        pulled_file = os.path.join(destination, "codecs.txt")
+        if os.path.abspath(pulled_file) != os.path.abspath(filename):
+            os.replace(pulled_file, filename)
     return filename
 
 
@@ -2358,6 +2544,18 @@ def parse_magnitude(value):
             # not a valid number
             raise AssertionError(f"invalid range: {value}")
     return int(float(value[0:index]) * mul)
+
+
+def parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("1", "true", "yes", "on"):
+            return True
+        if lowered in ("0", "false", "no", "off"):
+            return False
+    return bool(value)
 
 
 # convert a value (in either time or frame units) into frame units
@@ -2889,6 +3087,19 @@ input_args = {
             "dest": "device_workdir",
             "metavar": "local directory",
             "help": "work (storage) directory on device",
+        },
+    },
+    "enable_mediaformat_shaping": {
+        "func": "run",
+        "long": "--enable-mediaformat-shaping",
+        "args": {
+            "action": "store_true",
+            "default": None,
+            "help": (
+                "Leave Android MediaFormat shaping enabled for this run. "
+                "By default encapp disables shaping so codec experiments "
+                "reflect the requested settings directly."
+            ),
         },
     },
     "run-cmd": {
