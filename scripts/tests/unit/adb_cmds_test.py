@@ -216,6 +216,46 @@ class TestAdbCommands(unittest.TestCase):
         mock_run.assert_called_with(expected_cmd, debug=0)
 
     @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_getprop_value_reads_single_property(self, mock_run):
+        mock_run.return_value = (True, "1\n", "")
+        value = encapp_tool.adb_cmds.getprop_value(
+            ADB_DEVICE_VALID_ID, "debug.stagefright.enableshaping", debug=0
+        )
+        self.assertEqual("1", value)
+        mock_run.assert_called_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} shell getprop debug.stagefright.enableshaping",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_setprop_value_writes_single_property(self, mock_run):
+        mock_run.return_value = (True, "", "")
+        encapp_tool.adb_cmds.setprop_value(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            "0",
+            debug=0,
+        )
+        mock_run.assert_called_with(
+            f"adb -s {ADB_DEVICE_VALID_ID} shell setprop debug.stagefright.enableshaping 0",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.setprop_value")
+    def test_clearprop_value_uses_empty_string(self, mock_setprop):
+        encapp_tool.adb_cmds.clearprop_value(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            debug=0,
+        )
+        mock_setprop.assert_called_once_with(
+            ADB_DEVICE_VALID_ID,
+            "debug.stagefright.enableshaping",
+            "",
+            debug=0,
+        )
+
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
     def test_installed_apps_shall_list_pm_list_packages(self, mock_run):
         mock_run.return_value = (True, ADB_PM_LIST_OUT, "")
         result = encapp_tool.adb_cmds.installed_apps(ADB_DEVICE_VALID_ID, debug=0)
