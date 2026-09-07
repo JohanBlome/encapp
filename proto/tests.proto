@@ -74,6 +74,11 @@ message TestSetup {
   // within this window, the CLI force-stops the app and marks the test
   // status as "timeout". If unset, CLI uses a heuristic default.
   optional int32 timeout_sec = 17;
+  // Host-side override for Android MediaFormat shaping. Encapp disables
+  // shaping by default for run experiments so requested encoder behavior is
+  // not silently rewritten by platform quality policy. Set this true only
+  // when an experiment intentionally wants stock shaping enabled.
+  optional bool enable_mediaformat_shaping = 18;
 }
 
 message Common {

@@ -626,6 +626,42 @@ def getprop(serial: str, debug=0) -> dict:
         return parse_getprop(stdout)
 
 
+def getprop_value(serial: str, prop: str, debug=0) -> str:
+    """Read a single Android system property.
+
+    Returns the raw property string with trailing newlines removed. Unset
+    properties return the empty string.
+    """
+    if USE_IDB:
+        return ""
+    ret, stdout, stderr = run_cmd(
+        f"adb -s {serial} shell getprop {shlex.quote(prop)}",
+        debug=debug,
+    )
+    assert ret, f"error: failed to getprop {prop}: {stderr}"
+    return stdout.rstrip("\r\n")
+
+
+def setprop_value(serial: str, prop: str, value: str, debug=0):
+    """Write a single Android system property."""
+    if USE_IDB:
+        return
+    ret, _stdout, stderr = run_cmd(
+        f"adb -s {serial} shell setprop {shlex.quote(prop)} {shlex.quote(value)}",
+        debug=debug,
+    )
+    assert ret, f"error: failed to setprop {prop}={value}: {stderr}"
+
+
+def clearprop_value(serial: str, prop: str, debug=0):
+    """Clear a property by setting it to the empty string.
+
+    For debug-only shaping control props this restores default platform
+    behavior when the previous value was unset.
+    """
+    setprop_value(serial, prop, "", debug=debug)
+
+
 def get_device_size(serial, filepath, debug):
     # check if the file exists
     if _is_app_private_path(filepath):
