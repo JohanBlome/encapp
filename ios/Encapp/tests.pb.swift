@@ -15,12 +15,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-enum DataValueType: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum DataValueType: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
   case stringType = 0
   case intType = 1
   case floatType = 2
@@ -32,7 +32,7 @@ enum DataValueType: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PixFmt: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PixFmt: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
   case yuv420P = 0
   case yvu420P = 1
   case nv12 = 2
@@ -46,35 +46,35 @@ enum PixFmt: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-struct ProxyVal: Sendable {
+nonisolated struct ProxyVal: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var id: String {
-    get {return _id ?? String()}
+    get {_id ?? String()}
     set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
+  var hasID: Bool {self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   mutating func clearID() {self._id = nil}
 
   var type: DataValueType {
-    get {return _type ?? .stringType}
+    get {_type ?? .stringType}
     set {_type = newValue}
   }
   /// Returns true if `type` has been explicitly set.
-  var hasType: Bool {return self._type != nil}
+  var hasType: Bool {self._type != nil}
   /// Clears the value of `type`. Subsequent reads from it will return its default value.
   mutating func clearType() {self._type = nil}
 
   var value: String {
-    get {return _value ?? String()}
+    get {_value ?? String()}
     set {_value = newValue}
   }
   /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return self._value != nil}
+  var hasValue: Bool {self._value != nil}
   /// Clears the value of `value`. Subsequent reads from it will return its default value.
   mutating func clearValue() {self._value = nil}
 
@@ -87,46 +87,46 @@ struct ProxyVal: Sendable {
   fileprivate var _value: String? = nil
 }
 
-struct TestSetup: @unchecked Sendable {
+nonisolated struct TestSetup: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Instead of setting device workdir on the cli it can be defined here
   var deviceWorkdir: String {
-    get {return _storage._deviceWorkdir ?? String()}
+    get {_storage._deviceWorkdir ?? String()}
     set {_uniqueStorage()._deviceWorkdir = newValue}
   }
   /// Returns true if `deviceWorkdir` has been explicitly set.
-  var hasDeviceWorkdir: Bool {return _storage._deviceWorkdir != nil}
+  var hasDeviceWorkdir: Bool {_storage._deviceWorkdir != nil}
   /// Clears the value of `deviceWorkdir`. Subsequent reads from it will return its default value.
   mutating func clearDeviceWorkdir() {_uniqueStorage()._deviceWorkdir = nil}
 
   var localWorkdir: String {
-    get {return _storage._localWorkdir ?? String()}
+    get {_storage._localWorkdir ?? String()}
     set {_uniqueStorage()._localWorkdir = newValue}
   }
   /// Returns true if `localWorkdir` has been explicitly set.
-  var hasLocalWorkdir: Bool {return _storage._localWorkdir != nil}
+  var hasLocalWorkdir: Bool {_storage._localWorkdir != nil}
   /// Clears the value of `localWorkdir`. Subsequent reads from it will return its default value.
   mutating func clearLocalWorkdir() {_uniqueStorage()._localWorkdir = nil}
 
   var serial: String {
-    get {return _storage._serial ?? String()}
+    get {_storage._serial ?? String()}
     set {_uniqueStorage()._serial = newValue}
   }
   /// Returns true if `serial` has been explicitly set.
-  var hasSerial: Bool {return _storage._serial != nil}
+  var hasSerial: Bool {_storage._serial != nil}
   /// Clears the value of `serial`. Subsequent reads from it will return its default value.
   mutating func clearSerial() {_uniqueStorage()._serial = nil}
 
   /// Default is adb, set it to idb for Apple
   var deviceCmd: String {
-    get {return _storage._deviceCmd ?? String()}
+    get {_storage._deviceCmd ?? String()}
     set {_uniqueStorage()._deviceCmd = newValue}
   }
   /// Returns true if `deviceCmd` has been explicitly set.
-  var hasDeviceCmd: Bool {return _storage._deviceCmd != nil}
+  var hasDeviceCmd: Bool {_storage._deviceCmd != nil}
   /// Clears the value of `deviceCmd`. Subsequent reads from it will return its default value.
   mutating func clearDeviceCmd() {_uniqueStorage()._deviceCmd = nil}
 
@@ -134,91 +134,91 @@ struct TestSetup: @unchecked Sendable {
   /// e.g. "appXYZ -r " + "DEF.pbtxt"
   /// "Needs to be self contained, i.e. paths etc, defined in the protobuf
   var runCmd: String {
-    get {return _storage._runCmd ?? String()}
+    get {_storage._runCmd ?? String()}
     set {_uniqueStorage()._runCmd = newValue}
   }
   /// Returns true if `runCmd` has been explicitly set.
-  var hasRunCmd: Bool {return _storage._runCmd != nil}
+  var hasRunCmd: Bool {_storage._runCmd != nil}
   /// Clears the value of `runCmd`. Subsequent reads from it will return its default value.
   mutating func clearRunCmd() {_uniqueStorage()._runCmd = nil}
 
   var separateSources: Bool {
-    get {return _storage._separateSources ?? false}
+    get {_storage._separateSources ?? false}
     set {_uniqueStorage()._separateSources = newValue}
   }
   /// Returns true if `separateSources` has been explicitly set.
-  var hasSeparateSources: Bool {return _storage._separateSources != nil}
+  var hasSeparateSources: Bool {_storage._separateSources != nil}
   /// Clears the value of `separateSources`. Subsequent reads from it will return its default value.
   mutating func clearSeparateSources() {_uniqueStorage()._separateSources = nil}
 
   /// Place to store temporary files
   var mediastore: String {
-    get {return _storage._mediastore ?? String()}
+    get {_storage._mediastore ?? String()}
     set {_uniqueStorage()._mediastore = newValue}
   }
   /// Returns true if `mediastore` has been explicitly set.
-  var hasMediastore: Bool {return _storage._mediastore != nil}
+  var hasMediastore: Bool {_storage._mediastore != nil}
   /// Clears the value of `mediastore`. Subsequent reads from it will return its default value.
   mutating func clearMediastore() {_uniqueStorage()._mediastore = nil}
 
   /// Root directory for sources.
   /// If not set the input.filepath wll be absolute or relative from the current
   var sourceDir: String {
-    get {return _storage._sourceDir ?? String()}
+    get {_storage._sourceDir ?? String()}
     set {_uniqueStorage()._sourceDir = newValue}
   }
   /// Returns true if `sourceDir` has been explicitly set.
-  var hasSourceDir: Bool {return _storage._sourceDir != nil}
+  var hasSourceDir: Bool {_storage._sourceDir != nil}
   /// Clears the value of `sourceDir`. Subsequent reads from it will return its default value.
   mutating func clearSourceDir() {_uniqueStorage()._sourceDir = nil}
 
   var firstFrameFastRead: Bool {
-    get {return _storage._firstFrameFastRead ?? false}
+    get {_storage._firstFrameFastRead ?? false}
     set {_uniqueStorage()._firstFrameFastRead = newValue}
   }
   /// Returns true if `firstFrameFastRead` has been explicitly set.
-  var hasFirstFrameFastRead: Bool {return _storage._firstFrameFastRead != nil}
+  var hasFirstFrameFastRead: Bool {_storage._firstFrameFastRead != nil}
   /// Clears the value of `firstFrameFastRead`. Subsequent reads from it will return its default value.
   mutating func clearFirstFrameFastRead() {_uniqueStorage()._firstFrameFastRead = nil}
 
   /// If set the 20%-80% power lvel rules will be ignored and the test will run until power is out.
   /// Useful for devices with problem in the power reporting.
   var ignorePowerStatus: Bool {
-    get {return _storage._ignorePowerStatus ?? false}
+    get {_storage._ignorePowerStatus ?? false}
     set {_uniqueStorage()._ignorePowerStatus = newValue}
   }
   /// Returns true if `ignorePowerStatus` has been explicitly set.
-  var hasIgnorePowerStatus: Bool {return _storage._ignorePowerStatus != nil}
+  var hasIgnorePowerStatus: Bool {_storage._ignorePowerStatus != nil}
   /// Clears the value of `ignorePowerStatus`. Subsequent reads from it will return its default value.
   mutating func clearIgnorePowerStatus() {_uniqueStorage()._ignorePowerStatus = nil}
 
   /// Add a delay before exiting the app. Can be usefull for identifying back to back runs.
   var uiholdSec: Int32 {
-    get {return _storage._uiholdSec ?? 0}
+    get {_storage._uiholdSec ?? 0}
     set {_uniqueStorage()._uiholdSec = newValue}
   }
   /// Returns true if `uiholdSec` has been explicitly set.
-  var hasUiholdSec: Bool {return _storage._uiholdSec != nil}
+  var hasUiholdSec: Bool {_storage._uiholdSec != nil}
   /// Clears the value of `uiholdSec`. Subsequent reads from it will return its default value.
   mutating func clearUiholdSec() {_uniqueStorage()._uiholdSec = nil}
 
   /// Use internal Java muxer instead of Android MediaMuxer
   /// Note: HEIC output always uses internal muxer (MediaMuxer doesn't support HEIC)
   var internalMuxer: Bool {
-    get {return _storage._internalMuxer ?? false}
+    get {_storage._internalMuxer ?? false}
     set {_uniqueStorage()._internalMuxer = newValue}
   }
   /// Returns true if `internalMuxer` has been explicitly set.
-  var hasInternalMuxer: Bool {return _storage._internalMuxer != nil}
+  var hasInternalMuxer: Bool {_storage._internalMuxer != nil}
   /// Clears the value of `internalMuxer`. Subsequent reads from it will return its default value.
   mutating func clearInternalMuxer() {_uniqueStorage()._internalMuxer = nil}
 
   var internalDemuxer: Bool {
-    get {return _storage._internalDemuxer ?? false}
+    get {_storage._internalDemuxer ?? false}
     set {_uniqueStorage()._internalDemuxer = newValue}
   }
   /// Returns true if `internalDemuxer` has been explicitly set.
-  var hasInternalDemuxer: Bool {return _storage._internalDemuxer != nil}
+  var hasInternalDemuxer: Bool {_storage._internalDemuxer != nil}
   /// Clears the value of `internalDemuxer`. Subsequent reads from it will return its default value.
   mutating func clearInternalDemuxer() {_uniqueStorage()._internalDemuxer = nil}
 
@@ -237,7 +237,7 @@ struct TestSetup: @unchecked Sendable {
   ///config.quality: "-100"
   /// The id can be anything and if matching the value will be expanded.
   var proxyVal: [ProxyVal] {
-    get {return _storage._proxyVal}
+    get {_storage._proxyVal}
     set {_uniqueStorage()._proxyVal = newValue}
   }
 
@@ -245,11 +245,11 @@ struct TestSetup: @unchecked Sendable {
   /// This is not default since we may end up in a situatin were settings may clash
   /// with some other intent
   var expandAll: Bool {
-    get {return _storage._expandAll ?? false}
+    get {_storage._expandAll ?? false}
     set {_uniqueStorage()._expandAll = newValue}
   }
   /// Returns true if `expandAll` has been explicitly set.
-  var hasExpandAll: Bool {return _storage._expandAll != nil}
+  var hasExpandAll: Bool {_storage._expandAll != nil}
   /// Clears the value of `expandAll`. Subsequent reads from it will return its default value.
   mutating func clearExpandAll() {_uniqueStorage()._expandAll = nil}
 
@@ -259,11 +259,11 @@ struct TestSetup: @unchecked Sendable {
   /// dominate consumption. The app process stays in the foreground so the encoder
   /// continues to run.
   var screenOff: Bool {
-    get {return _storage._screenOff ?? false}
+    get {_storage._screenOff ?? false}
     set {_uniqueStorage()._screenOff = newValue}
   }
   /// Returns true if `screenOff` has been explicitly set.
-  var hasScreenOff: Bool {return _storage._screenOff != nil}
+  var hasScreenOff: Bool {_storage._screenOff != nil}
   /// Clears the value of `screenOff`. Subsequent reads from it will return its default value.
   mutating func clearScreenOff() {_uniqueStorage()._screenOff = nil}
 
@@ -271,13 +271,26 @@ struct TestSetup: @unchecked Sendable {
   /// within this window, the CLI force-stops the app and marks the test
   /// status as "timeout". If unset, CLI uses a heuristic default.
   var timeoutSec: Int32 {
-    get {return _storage._timeoutSec ?? 0}
+    get {_storage._timeoutSec ?? 0}
     set {_uniqueStorage()._timeoutSec = newValue}
   }
   /// Returns true if `timeoutSec` has been explicitly set.
-  var hasTimeoutSec: Bool {return _storage._timeoutSec != nil}
+  var hasTimeoutSec: Bool {_storage._timeoutSec != nil}
   /// Clears the value of `timeoutSec`. Subsequent reads from it will return its default value.
   mutating func clearTimeoutSec() {_uniqueStorage()._timeoutSec = nil}
+
+  /// Host-side override for Android MediaFormat shaping. Encapp disables
+  /// shaping by default for run experiments so requested encoder behavior is
+  /// not silently rewritten by platform quality policy. Set this true only
+  /// when an experiment intentionally wants stock shaping enabled.
+  var enableMediaformatShaping: Bool {
+    get {_storage._enableMediaformatShaping ?? false}
+    set {_uniqueStorage()._enableMediaformatShaping = newValue}
+  }
+  /// Returns true if `enableMediaformatShaping` has been explicitly set.
+  var hasEnableMediaformatShaping: Bool {_storage._enableMediaformatShaping != nil}
+  /// Clears the value of `enableMediaformatShaping`. Subsequent reads from it will return its default value.
+  mutating func clearEnableMediaformatShaping() {_uniqueStorage()._enableMediaformatShaping = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -286,44 +299,44 @@ struct TestSetup: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct Common: Sendable {
+nonisolated struct Common: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var id: String {
-    get {return _id ?? String()}
+    get {_id ?? String()}
     set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
+  var hasID: Bool {self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   mutating func clearID() {self._id = nil}
 
   var description_p: String {
-    get {return _description_p ?? String()}
+    get {_description_p ?? String()}
     set {_description_p = newValue}
   }
   /// Returns true if `description_p` has been explicitly set.
-  var hasDescription_p: Bool {return self._description_p != nil}
+  var hasDescription_p: Bool {self._description_p != nil}
   /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
   mutating func clearDescription_p() {self._description_p = nil}
 
   var operation: String {
-    get {return _operation ?? String()}
+    get {_operation ?? String()}
     set {_operation = newValue}
   }
   /// Returns true if `operation` has been explicitly set.
-  var hasOperation: Bool {return self._operation != nil}
+  var hasOperation: Bool {self._operation != nil}
   /// Clears the value of `operation`. Subsequent reads from it will return its default value.
   mutating func clearOperation() {self._operation = nil}
 
   var start: String {
-    get {return _start ?? String()}
+    get {_start ?? String()}
     set {_start = newValue}
   }
   /// Returns true if `start` has been explicitly set.
-  var hasStart: Bool {return self._start != nil}
+  var hasStart: Bool {self._start != nil}
   /// Clears the value of `start`. Subsequent reads from it will return its default value.
   mutating func clearStart() {self._start = nil}
 
@@ -333,11 +346,11 @@ struct Common: Sendable {
   /// X is a substitution marker for A random hex number (1-f)
   /// If not set the filename will be encapp_uuid
   var outputFilename: String {
-    get {return _outputFilename ?? String()}
+    get {_outputFilename ?? String()}
     set {_outputFilename = newValue}
   }
   /// Returns true if `outputFilename` has been explicitly set.
-  var hasOutputFilename: Bool {return self._outputFilename != nil}
+  var hasOutputFilename: Bool {self._outputFilename != nil}
   /// Clears the value of `outputFilename`. Subsequent reads from it will return its default value.
   mutating func clearOutputFilename() {self._outputFilename = nil}
 
@@ -352,45 +365,45 @@ struct Common: Sendable {
   fileprivate var _outputFilename: String? = nil
 }
 
-struct Parameter: Sendable {
+nonisolated struct Parameter: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var key: String {
-    get {return _key ?? String()}
+    get {_key ?? String()}
     set {_key = newValue}
   }
   /// Returns true if `key` has been explicitly set.
-  var hasKey: Bool {return self._key != nil}
+  var hasKey: Bool {self._key != nil}
   /// Clears the value of `key`. Subsequent reads from it will return its default value.
   mutating func clearKey() {self._key = nil}
 
   var type: DataValueType {
-    get {return _type ?? .stringType}
+    get {_type ?? .stringType}
     set {_type = newValue}
   }
   /// Returns true if `type` has been explicitly set.
-  var hasType: Bool {return self._type != nil}
+  var hasType: Bool {self._type != nil}
   /// Clears the value of `type`. Subsequent reads from it will return its default value.
   mutating func clearType() {self._type = nil}
 
   var value: String {
-    get {return _value ?? String()}
+    get {_value ?? String()}
     set {_value = newValue}
   }
   /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return self._value != nil}
+  var hasValue: Bool {self._value != nil}
   /// Clears the value of `value`. Subsequent reads from it will return its default value.
   mutating func clearValue() {self._value = nil}
 
   /// For runtime purposes
   var framenum: Int64 {
-    get {return _framenum ?? 0}
+    get {_framenum ?? 0}
     set {_framenum = newValue}
   }
   /// Returns true if `framenum` has been explicitly set.
-  var hasFramenum: Bool {return self._framenum != nil}
+  var hasFramenum: Bool {self._framenum != nil}
   /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
   mutating func clearFramenum() {self._framenum = nil}
 
@@ -404,119 +417,119 @@ struct Parameter: Sendable {
   fileprivate var _framenum: Int64? = nil
 }
 
-struct Input: Sendable {
+nonisolated struct Input: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var filepath: String {
-    get {return _filepath ?? String()}
+    get {_filepath ?? String()}
     set {_filepath = newValue}
   }
   /// Returns true if `filepath` has been explicitly set.
-  var hasFilepath: Bool {return self._filepath != nil}
+  var hasFilepath: Bool {self._filepath != nil}
   /// Clears the value of `filepath`. Subsequent reads from it will return its default value.
   mutating func clearFilepath() {self._filepath = nil}
 
   var resolution: String {
-    get {return _resolution ?? String()}
+    get {_resolution ?? String()}
     set {_resolution = newValue}
   }
   /// Returns true if `resolution` has been explicitly set.
-  var hasResolution: Bool {return self._resolution != nil}
+  var hasResolution: Bool {self._resolution != nil}
   /// Clears the value of `resolution`. Subsequent reads from it will return its default value.
   mutating func clearResolution() {self._resolution = nil}
 
   var pixFmt: PixFmt {
-    get {return _pixFmt ?? .yuv420P}
+    get {_pixFmt ?? .yuv420P}
     set {_pixFmt = newValue}
   }
   /// Returns true if `pixFmt` has been explicitly set.
-  var hasPixFmt: Bool {return self._pixFmt != nil}
+  var hasPixFmt: Bool {self._pixFmt != nil}
   /// Clears the value of `pixFmt`. Subsequent reads from it will return its default value.
   mutating func clearPixFmt() {self._pixFmt = nil}
 
   var framerate: Float {
-    get {return _framerate ?? 0}
+    get {_framerate ?? 0}
     set {_framerate = newValue}
   }
   /// Returns true if `framerate` has been explicitly set.
-  var hasFramerate: Bool {return self._framerate != nil}
+  var hasFramerate: Bool {self._framerate != nil}
   /// Clears the value of `framerate`. Subsequent reads from it will return its default value.
   mutating func clearFramerate() {self._framerate = nil}
 
   var playoutFrames: Int32 {
-    get {return _playoutFrames ?? 0}
+    get {_playoutFrames ?? 0}
     set {_playoutFrames = newValue}
   }
   /// Returns true if `playoutFrames` has been explicitly set.
-  var hasPlayoutFrames: Bool {return self._playoutFrames != nil}
+  var hasPlayoutFrames: Bool {self._playoutFrames != nil}
   /// Clears the value of `playoutFrames`. Subsequent reads from it will return its default value.
   mutating func clearPlayoutFrames() {self._playoutFrames = nil}
 
   var pursuit: Int32 {
-    get {return _pursuit ?? 0}
+    get {_pursuit ?? 0}
     set {_pursuit = newValue}
   }
   /// Returns true if `pursuit` has been explicitly set.
-  var hasPursuit: Bool {return self._pursuit != nil}
+  var hasPursuit: Bool {self._pursuit != nil}
   /// Clears the value of `pursuit`. Subsequent reads from it will return its default value.
   mutating func clearPursuit() {self._pursuit = nil}
 
   var realtime: Bool {
-    get {return _realtime ?? false}
+    get {_realtime ?? false}
     set {_realtime = newValue}
   }
   /// Returns true if `realtime` has been explicitly set.
-  var hasRealtime: Bool {return self._realtime != nil}
+  var hasRealtime: Bool {self._realtime != nil}
   /// Clears the value of `realtime`. Subsequent reads from it will return its default value.
   mutating func clearRealtime() {self._realtime = nil}
 
   var stoptimeSec: Float {
-    get {return _stoptimeSec ?? 0}
+    get {_stoptimeSec ?? 0}
     set {_stoptimeSec = newValue}
   }
   /// Returns true if `stoptimeSec` has been explicitly set.
-  var hasStoptimeSec: Bool {return self._stoptimeSec != nil}
+  var hasStoptimeSec: Bool {self._stoptimeSec != nil}
   /// Clears the value of `stoptimeSec`. Subsequent reads from it will return its default value.
   mutating func clearStoptimeSec() {self._stoptimeSec = nil}
 
   var show: Bool {
-    get {return _show ?? false}
+    get {_show ?? false}
     set {_show = newValue}
   }
   /// Returns true if `show` has been explicitly set.
-  var hasShow: Bool {return self._show != nil}
+  var hasShow: Bool {self._show != nil}
   /// Clears the value of `show`. Subsequent reads from it will return its default value.
   mutating func clearShow() {self._show = nil}
 
   var deviceDecode: Bool {
-    get {return _deviceDecode ?? false}
+    get {_deviceDecode ?? false}
     set {_deviceDecode = newValue}
   }
   /// Returns true if `deviceDecode` has been explicitly set.
-  var hasDeviceDecode: Bool {return self._deviceDecode != nil}
+  var hasDeviceDecode: Bool {self._deviceDecode != nil}
   /// Clears the value of `deviceDecode`. Subsequent reads from it will return its default value.
   mutating func clearDeviceDecode() {self._deviceDecode = nil}
 
   /// This is the area containing actual video data, wxh
   var cropArea: String {
-    get {return _cropArea ?? String()}
+    get {_cropArea ?? String()}
     set {_cropArea = newValue}
   }
   /// Returns true if `cropArea` has been explicitly set.
-  var hasCropArea: Bool {return self._cropArea != nil}
+  var hasCropArea: Bool {self._cropArea != nil}
   /// Clears the value of `cropArea`. Subsequent reads from it will return its default value.
   mutating func clearCropArea() {self._cropArea = nil}
 
   /// Restamp input frame timestamps according to the framerate set
   /// in the nput or dynamic upates
   var restamp: Bool {
-    get {return _restamp ?? false}
+    get {_restamp ?? false}
     set {_restamp = newValue}
   }
   /// Returns true if `restamp` has been explicitly set.
-  var hasRestamp: Bool {return self._restamp != nil}
+  var hasRestamp: Bool {self._restamp != nil}
   /// Clears the value of `restamp`. Subsequent reads from it will return its default value.
   mutating func clearRestamp() {self._restamp = nil}
 
@@ -538,212 +551,212 @@ struct Input: Sendable {
   fileprivate var _restamp: Bool? = nil
 }
 
-struct Configure: @unchecked Sendable {
+nonisolated struct Configure: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var parameter: [Parameter] {
-    get {return _storage._parameter}
+    get {_storage._parameter}
     set {_uniqueStorage()._parameter = newValue}
   }
 
   /// known shortcuts
   var codec: String {
-    get {return _storage._codec ?? String()}
+    get {_storage._codec ?? String()}
     set {_uniqueStorage()._codec = newValue}
   }
   /// Returns true if `codec` has been explicitly set.
-  var hasCodec: Bool {return _storage._codec != nil}
+  var hasCodec: Bool {_storage._codec != nil}
   /// Clears the value of `codec`. Subsequent reads from it will return its default value.
   mutating func clearCodec() {_uniqueStorage()._codec = nil}
 
   var encode: Bool {
-    get {return _storage._encode ?? false}
+    get {_storage._encode ?? false}
     set {_uniqueStorage()._encode = newValue}
   }
   /// Returns true if `encode` has been explicitly set.
-  var hasEncode: Bool {return _storage._encode != nil}
+  var hasEncode: Bool {_storage._encode != nil}
   /// Clears the value of `encode`. Subsequent reads from it will return its default value.
   mutating func clearEncode() {_uniqueStorage()._encode = nil}
 
   var surface: Bool {
-    get {return _storage._surface ?? false}
+    get {_storage._surface ?? false}
     set {_uniqueStorage()._surface = newValue}
   }
   /// Returns true if `surface` has been explicitly set.
-  var hasSurface: Bool {return _storage._surface != nil}
+  var hasSurface: Bool {_storage._surface != nil}
   /// Clears the value of `surface`. Subsequent reads from it will return its default value.
   mutating func clearSurface() {_uniqueStorage()._surface = nil}
 
   var mime: String {
-    get {return _storage._mime ?? String()}
+    get {_storage._mime ?? String()}
     set {_uniqueStorage()._mime = newValue}
   }
   /// Returns true if `mime` has been explicitly set.
-  var hasMime: Bool {return _storage._mime != nil}
+  var hasMime: Bool {_storage._mime != nil}
   /// Clears the value of `mime`. Subsequent reads from it will return its default value.
   mutating func clearMime() {_uniqueStorage()._mime = nil}
 
   var bitrate: String {
-    get {return _storage._bitrate ?? String()}
+    get {_storage._bitrate ?? String()}
     set {_uniqueStorage()._bitrate = newValue}
   }
   /// Returns true if `bitrate` has been explicitly set.
-  var hasBitrate: Bool {return _storage._bitrate != nil}
+  var hasBitrate: Bool {_storage._bitrate != nil}
   /// Clears the value of `bitrate`. Subsequent reads from it will return its default value.
   mutating func clearBitrate() {_uniqueStorage()._bitrate = nil}
 
   var bitrateMode: Configure.BitrateMode {
-    get {return _storage._bitrateMode ?? .cq}
+    get {_storage._bitrateMode ?? .cq}
     set {_uniqueStorage()._bitrateMode = newValue}
   }
   /// Returns true if `bitrateMode` has been explicitly set.
-  var hasBitrateMode: Bool {return _storage._bitrateMode != nil}
+  var hasBitrateMode: Bool {_storage._bitrateMode != nil}
   /// Clears the value of `bitrateMode`. Subsequent reads from it will return its default value.
   mutating func clearBitrateMode() {_uniqueStorage()._bitrateMode = nil}
 
   var durationUs: UInt64 {
-    get {return _storage._durationUs ?? 0}
+    get {_storage._durationUs ?? 0}
     set {_uniqueStorage()._durationUs = newValue}
   }
   /// Returns true if `durationUs` has been explicitly set.
-  var hasDurationUs: Bool {return _storage._durationUs != nil}
+  var hasDurationUs: Bool {_storage._durationUs != nil}
   /// Clears the value of `durationUs`. Subsequent reads from it will return its default value.
   mutating func clearDurationUs() {_uniqueStorage()._durationUs = nil}
 
   var resolution: String {
-    get {return _storage._resolution ?? String()}
+    get {_storage._resolution ?? String()}
     set {_uniqueStorage()._resolution = newValue}
   }
   /// Returns true if `resolution` has been explicitly set.
-  var hasResolution: Bool {return _storage._resolution != nil}
+  var hasResolution: Bool {_storage._resolution != nil}
   /// Clears the value of `resolution`. Subsequent reads from it will return its default value.
   mutating func clearResolution() {_uniqueStorage()._resolution = nil}
 
   var colorFormat: Int32 {
-    get {return _storage._colorFormat ?? 0}
+    get {_storage._colorFormat ?? 0}
     set {_uniqueStorage()._colorFormat = newValue}
   }
   /// Returns true if `colorFormat` has been explicitly set.
-  var hasColorFormat: Bool {return _storage._colorFormat != nil}
+  var hasColorFormat: Bool {_storage._colorFormat != nil}
   /// Clears the value of `colorFormat`. Subsequent reads from it will return its default value.
   mutating func clearColorFormat() {_uniqueStorage()._colorFormat = nil}
 
   var colorStandard: Configure.ColorStandard {
-    get {return _storage._colorStandard ?? .bt601Pal}
+    get {_storage._colorStandard ?? .bt601Pal}
     set {_uniqueStorage()._colorStandard = newValue}
   }
   /// Returns true if `colorStandard` has been explicitly set.
-  var hasColorStandard: Bool {return _storage._colorStandard != nil}
+  var hasColorStandard: Bool {_storage._colorStandard != nil}
   /// Clears the value of `colorStandard`. Subsequent reads from it will return its default value.
   mutating func clearColorStandard() {_uniqueStorage()._colorStandard = nil}
 
   var colorRange: Configure.ColorRange {
-    get {return _storage._colorRange ?? .full}
+    get {_storage._colorRange ?? .full}
     set {_uniqueStorage()._colorRange = newValue}
   }
   /// Returns true if `colorRange` has been explicitly set.
-  var hasColorRange: Bool {return _storage._colorRange != nil}
+  var hasColorRange: Bool {_storage._colorRange != nil}
   /// Clears the value of `colorRange`. Subsequent reads from it will return its default value.
   mutating func clearColorRange() {_uniqueStorage()._colorRange = nil}
 
   var colorTransfer: Configure.ColorTransfer {
-    get {return _storage._colorTransfer ?? .linear}
+    get {_storage._colorTransfer ?? .linear}
     set {_uniqueStorage()._colorTransfer = newValue}
   }
   /// Returns true if `colorTransfer` has been explicitly set.
-  var hasColorTransfer: Bool {return _storage._colorTransfer != nil}
+  var hasColorTransfer: Bool {_storage._colorTransfer != nil}
   /// Clears the value of `colorTransfer`. Subsequent reads from it will return its default value.
   mutating func clearColorTransfer() {_uniqueStorage()._colorTransfer = nil}
 
   var colorTransferRequest: String {
-    get {return _storage._colorTransferRequest ?? String()}
+    get {_storage._colorTransferRequest ?? String()}
     set {_uniqueStorage()._colorTransferRequest = newValue}
   }
   /// Returns true if `colorTransferRequest` has been explicitly set.
-  var hasColorTransferRequest: Bool {return _storage._colorTransferRequest != nil}
+  var hasColorTransferRequest: Bool {_storage._colorTransferRequest != nil}
   /// Clears the value of `colorTransferRequest`. Subsequent reads from it will return its default value.
   mutating func clearColorTransferRequest() {_uniqueStorage()._colorTransferRequest = nil}
 
   var framerate: Float {
-    get {return _storage._framerate ?? 0}
+    get {_storage._framerate ?? 0}
     set {_uniqueStorage()._framerate = newValue}
   }
   /// Returns true if `framerate` has been explicitly set.
-  var hasFramerate: Bool {return _storage._framerate != nil}
+  var hasFramerate: Bool {_storage._framerate != nil}
   /// Clears the value of `framerate`. Subsequent reads from it will return its default value.
   mutating func clearFramerate() {_uniqueStorage()._framerate = nil}
 
   var iFrameInterval: Int32 {
-    get {return _storage._iFrameInterval ?? 0}
+    get {_storage._iFrameInterval ?? 0}
     set {_uniqueStorage()._iFrameInterval = newValue}
   }
   /// Returns true if `iFrameInterval` has been explicitly set.
-  var hasIFrameInterval: Bool {return _storage._iFrameInterval != nil}
+  var hasIFrameInterval: Bool {_storage._iFrameInterval != nil}
   /// Clears the value of `iFrameInterval`. Subsequent reads from it will return its default value.
   mutating func clearIFrameInterval() {_uniqueStorage()._iFrameInterval = nil}
 
   var intraRefreshPeriod: Int32 {
-    get {return _storage._intraRefreshPeriod ?? 0}
+    get {_storage._intraRefreshPeriod ?? 0}
     set {_uniqueStorage()._intraRefreshPeriod = newValue}
   }
   /// Returns true if `intraRefreshPeriod` has been explicitly set.
-  var hasIntraRefreshPeriod: Bool {return _storage._intraRefreshPeriod != nil}
+  var hasIntraRefreshPeriod: Bool {_storage._intraRefreshPeriod != nil}
   /// Clears the value of `intraRefreshPeriod`. Subsequent reads from it will return its default value.
   mutating func clearIntraRefreshPeriod() {_uniqueStorage()._intraRefreshPeriod = nil}
 
   var latency: Int32 {
-    get {return _storage._latency ?? 0}
+    get {_storage._latency ?? 0}
     set {_uniqueStorage()._latency = newValue}
   }
   /// Returns true if `latency` has been explicitly set.
-  var hasLatency: Bool {return _storage._latency != nil}
+  var hasLatency: Bool {_storage._latency != nil}
   /// Clears the value of `latency`. Subsequent reads from it will return its default value.
   mutating func clearLatency() {_uniqueStorage()._latency = nil}
 
   var repeatPreviousFrameAfter: Int64 {
-    get {return _storage._repeatPreviousFrameAfter ?? 0}
+    get {_storage._repeatPreviousFrameAfter ?? 0}
     set {_uniqueStorage()._repeatPreviousFrameAfter = newValue}
   }
   /// Returns true if `repeatPreviousFrameAfter` has been explicitly set.
-  var hasRepeatPreviousFrameAfter: Bool {return _storage._repeatPreviousFrameAfter != nil}
+  var hasRepeatPreviousFrameAfter: Bool {_storage._repeatPreviousFrameAfter != nil}
   /// Clears the value of `repeatPreviousFrameAfter`. Subsequent reads from it will return its default value.
   mutating func clearRepeatPreviousFrameAfter() {_uniqueStorage()._repeatPreviousFrameAfter = nil}
 
   var tsSchema: String {
-    get {return _storage._tsSchema ?? String()}
+    get {_storage._tsSchema ?? String()}
     set {_uniqueStorage()._tsSchema = newValue}
   }
   /// Returns true if `tsSchema` has been explicitly set.
-  var hasTsSchema: Bool {return _storage._tsSchema != nil}
+  var hasTsSchema: Bool {_storage._tsSchema != nil}
   /// Clears the value of `tsSchema`. Subsequent reads from it will return its default value.
   mutating func clearTsSchema() {_uniqueStorage()._tsSchema = nil}
 
   var quality: Int32 {
-    get {return _storage._quality ?? 0}
+    get {_storage._quality ?? 0}
     set {_uniqueStorage()._quality = newValue}
   }
   /// Returns true if `quality` has been explicitly set.
-  var hasQuality: Bool {return _storage._quality != nil}
+  var hasQuality: Bool {_storage._quality != nil}
   /// Clears the value of `quality`. Subsequent reads from it will return its default value.
   mutating func clearQuality() {_uniqueStorage()._quality = nil}
 
   var complexity: Int32 {
-    get {return _storage._complexity ?? 0}
+    get {_storage._complexity ?? 0}
     set {_uniqueStorage()._complexity = newValue}
   }
   /// Returns true if `complexity` has been explicitly set.
-  var hasComplexity: Bool {return _storage._complexity != nil}
+  var hasComplexity: Bool {_storage._complexity != nil}
   /// Clears the value of `complexity`. Subsequent reads from it will return its default value.
   mutating func clearComplexity() {_uniqueStorage()._complexity = nil}
 
   var decodeDump: Bool {
-    get {return _storage._decodeDump ?? false}
+    get {_storage._decodeDump ?? false}
     set {_uniqueStorage()._decodeDump = newValue}
   }
   /// Returns true if `decodeDump` has been explicitly set.
-  var hasDecodeDump: Bool {return _storage._decodeDump != nil}
+  var hasDecodeDump: Bool {_storage._decodeDump != nil}
   /// Clears the value of `decodeDump`. Subsequent reads from it will return its default value.
   mutating func clearDecodeDump() {_uniqueStorage()._decodeDump = nil}
 
@@ -751,20 +764,20 @@ struct Configure: @unchecked Sendable {
   /// When set, input frames are split into tiles of the specified size
   /// If only one dimension is set, tiles are square
   var tileWidth: Int32 {
-    get {return _storage._tileWidth ?? 0}
+    get {_storage._tileWidth ?? 0}
     set {_uniqueStorage()._tileWidth = newValue}
   }
   /// Returns true if `tileWidth` has been explicitly set.
-  var hasTileWidth: Bool {return _storage._tileWidth != nil}
+  var hasTileWidth: Bool {_storage._tileWidth != nil}
   /// Clears the value of `tileWidth`. Subsequent reads from it will return its default value.
   mutating func clearTileWidth() {_uniqueStorage()._tileWidth = nil}
 
   var tileHeight: Int32 {
-    get {return _storage._tileHeight ?? 0}
+    get {_storage._tileHeight ?? 0}
     set {_uniqueStorage()._tileHeight = newValue}
   }
   /// Returns true if `tileHeight` has been explicitly set.
-  var hasTileHeight: Bool {return _storage._tileHeight != nil}
+  var hasTileHeight: Bool {_storage._tileHeight != nil}
   /// Clears the value of `tileHeight`. Subsequent reads from it will return its default value.
   mutating func clearTileHeight() {_uniqueStorage()._tileHeight = nil}
 
@@ -775,35 +788,35 @@ struct Configure: @unchecked Sendable {
   /// resolution. This represents the actual encoded/cropped output dimensions.
   /// NOTE: This only works for the internal muxer
   var cropArea: String {
-    get {return _storage._cropArea ?? String()}
+    get {_storage._cropArea ?? String()}
     set {_uniqueStorage()._cropArea = newValue}
   }
   /// Returns true if `cropArea` has been explicitly set.
-  var hasCropArea: Bool {return _storage._cropArea != nil}
+  var hasCropArea: Bool {_storage._cropArea != nil}
   /// Clears the value of `cropArea`. Subsequent reads from it will return its default value.
   mutating func clearCropArea() {_uniqueStorage()._cropArea = nil}
 
   var nullEncode: Bool {
-    get {return _storage._nullEncode ?? false}
+    get {_storage._nullEncode ?? false}
     set {_uniqueStorage()._nullEncode = newValue}
   }
   /// Returns true if `nullEncode` has been explicitly set.
-  var hasNullEncode: Bool {return _storage._nullEncode != nil}
+  var hasNullEncode: Bool {_storage._nullEncode != nil}
   /// Clears the value of `nullEncode`. Subsequent reads from it will return its default value.
   mutating func clearNullEncode() {_uniqueStorage()._nullEncode = nil}
 
   var batteryTest: Bool {
-    get {return _storage._batteryTest ?? false}
+    get {_storage._batteryTest ?? false}
     set {_uniqueStorage()._batteryTest = newValue}
   }
   /// Returns true if `batteryTest` has been explicitly set.
-  var hasBatteryTest: Bool {return _storage._batteryTest != nil}
+  var hasBatteryTest: Bool {_storage._batteryTest != nil}
   /// Clears the value of `batteryTest`. Subsequent reads from it will return its default value.
   mutating func clearBatteryTest() {_uniqueStorage()._batteryTest = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum BitrateMode: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+  nonisolated enum BitrateMode: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
     case cq = 0
     case vbr = 1
     case cbr = 2
@@ -815,7 +828,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorStandard: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+  nonisolated enum ColorStandard: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
     case bt601Pal = 2
     case bt601Ntsc = 4
     case bt709 = 1
@@ -827,7 +840,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorRange: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+  nonisolated enum ColorRange: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
     case full = 1
     case limited = 2
 
@@ -837,7 +850,7 @@ struct Configure: @unchecked Sendable {
 
   }
 
-  enum ColorTransfer: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
+  nonisolated enum ColorTransfer: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
     case linear = 1
     case sdrVideo = 3
     case st2084 = 6
@@ -854,7 +867,7 @@ struct Configure: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct Runtime: Sendable {
+nonisolated struct Runtime: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -872,27 +885,27 @@ struct Runtime: Sendable {
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// known shortcuts
-  struct VideoBitrateParameter: Sendable {
+  nonisolated struct VideoBitrateParameter: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
     var framenum: Int64 {
-      get {return _framenum ?? 0}
+      get {_framenum ?? 0}
       set {_framenum = newValue}
     }
     /// Returns true if `framenum` has been explicitly set.
-    var hasFramenum: Bool {return self._framenum != nil}
+    var hasFramenum: Bool {self._framenum != nil}
     /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
     mutating func clearFramenum() {self._framenum = nil}
 
     ///can be just a figure in bps or with prefix, k or M
     var bitrate: String {
-      get {return _bitrate ?? String()}
+      get {_bitrate ?? String()}
       set {_bitrate = newValue}
     }
     /// Returns true if `bitrate` has been explicitly set.
-    var hasBitrate: Bool {return self._bitrate != nil}
+    var hasBitrate: Bool {self._bitrate != nil}
     /// Clears the value of `bitrate`. Subsequent reads from it will return its default value.
     mutating func clearBitrate() {self._bitrate = nil}
 
@@ -904,26 +917,26 @@ struct Runtime: Sendable {
     fileprivate var _bitrate: String? = nil
   }
 
-  struct DynamicFramerateParameter: Sendable {
+  nonisolated struct DynamicFramerateParameter: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
     var framenum: Int64 {
-      get {return _framenum ?? 0}
+      get {_framenum ?? 0}
       set {_framenum = newValue}
     }
     /// Returns true if `framenum` has been explicitly set.
-    var hasFramenum: Bool {return self._framenum != nil}
+    var hasFramenum: Bool {self._framenum != nil}
     /// Clears the value of `framenum`. Subsequent reads from it will return its default value.
     mutating func clearFramenum() {self._framenum = nil}
 
     var framerate: Float {
-      get {return _framerate ?? 0}
+      get {_framerate ?? 0}
       set {_framerate = newValue}
     }
     /// Returns true if `framerate` has been explicitly set.
-    var hasFramerate: Bool {return self._framerate != nil}
+    var hasFramerate: Bool {self._framerate != nil}
     /// Clears the value of `framerate`. Subsequent reads from it will return its default value.
     mutating func clearFramerate() {self._framerate = nil}
 
@@ -938,7 +951,7 @@ struct Runtime: Sendable {
   init() {}
 }
 
-struct DecoderConfigure: Sendable {
+nonisolated struct DecoderConfigure: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -946,11 +959,11 @@ struct DecoderConfigure: Sendable {
   var parameter: [Parameter] = []
 
   var codec: String {
-    get {return _codec ?? String()}
+    get {_codec ?? String()}
     set {_codec = newValue}
   }
   /// Returns true if `codec` has been explicitly set.
-  var hasCodec: Bool {return self._codec != nil}
+  var hasCodec: Bool {self._codec != nil}
   /// Clears the value of `codec`. Subsequent reads from it will return its default value.
   mutating func clearCodec() {self._codec = nil}
 
@@ -961,7 +974,7 @@ struct DecoderConfigure: Sendable {
   fileprivate var _codec: String? = nil
 }
 
-struct DecoderRuntime: Sendable {
+nonisolated struct DecoderRuntime: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -973,7 +986,7 @@ struct DecoderRuntime: Sendable {
   init() {}
 }
 
-struct Parallel: Sendable {
+nonisolated struct Parallel: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -985,80 +998,80 @@ struct Parallel: Sendable {
   init() {}
 }
 
-struct Test: @unchecked Sendable {
+nonisolated struct Test: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var common: Common {
-    get {return _storage._common ?? Common()}
+    get {_storage._common ?? Common()}
     set {_uniqueStorage()._common = newValue}
   }
   /// Returns true if `common` has been explicitly set.
-  var hasCommon: Bool {return _storage._common != nil}
+  var hasCommon: Bool {_storage._common != nil}
   /// Clears the value of `common`. Subsequent reads from it will return its default value.
   mutating func clearCommon() {_uniqueStorage()._common = nil}
 
   var input: Input {
-    get {return _storage._input ?? Input()}
+    get {_storage._input ?? Input()}
     set {_uniqueStorage()._input = newValue}
   }
   /// Returns true if `input` has been explicitly set.
-  var hasInput: Bool {return _storage._input != nil}
+  var hasInput: Bool {_storage._input != nil}
   /// Clears the value of `input`. Subsequent reads from it will return its default value.
   mutating func clearInput() {_uniqueStorage()._input = nil}
 
   var configure: Configure {
-    get {return _storage._configure ?? Configure()}
+    get {_storage._configure ?? Configure()}
     set {_uniqueStorage()._configure = newValue}
   }
   /// Returns true if `configure` has been explicitly set.
-  var hasConfigure: Bool {return _storage._configure != nil}
+  var hasConfigure: Bool {_storage._configure != nil}
   /// Clears the value of `configure`. Subsequent reads from it will return its default value.
   mutating func clearConfigure() {_uniqueStorage()._configure = nil}
 
   var runtime: Runtime {
-    get {return _storage._runtime ?? Runtime()}
+    get {_storage._runtime ?? Runtime()}
     set {_uniqueStorage()._runtime = newValue}
   }
   /// Returns true if `runtime` has been explicitly set.
-  var hasRuntime: Bool {return _storage._runtime != nil}
+  var hasRuntime: Bool {_storage._runtime != nil}
   /// Clears the value of `runtime`. Subsequent reads from it will return its default value.
   mutating func clearRuntime() {_uniqueStorage()._runtime = nil}
 
   var decoderConfigure: DecoderConfigure {
-    get {return _storage._decoderConfigure ?? DecoderConfigure()}
+    get {_storage._decoderConfigure ?? DecoderConfigure()}
     set {_uniqueStorage()._decoderConfigure = newValue}
   }
   /// Returns true if `decoderConfigure` has been explicitly set.
-  var hasDecoderConfigure: Bool {return _storage._decoderConfigure != nil}
+  var hasDecoderConfigure: Bool {_storage._decoderConfigure != nil}
   /// Clears the value of `decoderConfigure`. Subsequent reads from it will return its default value.
   mutating func clearDecoderConfigure() {_uniqueStorage()._decoderConfigure = nil}
 
   var decoderRuntime: DecoderRuntime {
-    get {return _storage._decoderRuntime ?? DecoderRuntime()}
+    get {_storage._decoderRuntime ?? DecoderRuntime()}
     set {_uniqueStorage()._decoderRuntime = newValue}
   }
   /// Returns true if `decoderRuntime` has been explicitly set.
-  var hasDecoderRuntime: Bool {return _storage._decoderRuntime != nil}
+  var hasDecoderRuntime: Bool {_storage._decoderRuntime != nil}
   /// Clears the value of `decoderRuntime`. Subsequent reads from it will return its default value.
   mutating func clearDecoderRuntime() {_uniqueStorage()._decoderRuntime = nil}
 
   var parallel: Parallel {
-    get {return _storage._parallel ?? Parallel()}
+    get {_storage._parallel ?? Parallel()}
     set {_uniqueStorage()._parallel = newValue}
   }
   /// Returns true if `parallel` has been explicitly set.
-  var hasParallel: Bool {return _storage._parallel != nil}
+  var hasParallel: Bool {_storage._parallel != nil}
   /// Clears the value of `parallel`. Subsequent reads from it will return its default value.
   mutating func clearParallel() {_uniqueStorage()._parallel = nil}
 
   var testSetup: TestSetup {
-    get {return _storage._testSetup ?? TestSetup()}
+    get {_storage._testSetup ?? TestSetup()}
     set {_uniqueStorage()._testSetup = newValue}
   }
   /// Returns true if `testSetup` has been explicitly set.
-  var hasTestSetup: Bool {return _storage._testSetup != nil}
+  var hasTestSetup: Bool {_storage._testSetup != nil}
   /// Clears the value of `testSetup`. Subsequent reads from it will return its default value.
   mutating func clearTestSetup() {_uniqueStorage()._testSetup = nil}
 
@@ -1069,7 +1082,7 @@ struct Test: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct TestSuite: Sendable {
+nonisolated struct TestSuite: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1084,15 +1097,15 @@ struct TestSuite: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-extension DataValueType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension DataValueType: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0stringType\0\u{1}intType\0\u{1}floatType\0\u{1}longType\0")
 }
 
-extension PixFmt: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PixFmt: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0yuv420p\0\u{1}yvu420p\0\u{1}nv12\0\u{1}nv21\0\u{1}rgba\0\u{2}2p010le\0")
 }
 
-extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "ProxyVal"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}type\0\u{1}value\0")
 
@@ -1136,9 +1149,9 @@ extension ProxyVal: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSetup"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0\u{3}screen_off\0\u{3}timeout_sec\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_workdir\0\u{3}local_workdir\0\u{1}serial\0\u{3}device_cmd\0\u{3}run_cmd\0\u{3}separate_sources\0\u{1}mediastore\0\u{3}source_dir\0\u{3}first_frame_fast_read\0\u{3}ignore_power_status\0\u{3}uihold_sec\0\u{3}internal_demuxer\0\u{3}proxy_val\0\u{3}internal_muxer\0\u{3}expand_all\0\u{3}screen_off\0\u{3}timeout_sec\0\u{3}enable_mediaformat_shaping\0")
 
   fileprivate class _StorageClass {
     var _deviceWorkdir: String? = nil
@@ -1158,6 +1171,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _expandAll: Bool? = nil
     var _screenOff: Bool? = nil
     var _timeoutSec: Int32? = nil
+    var _enableMediaformatShaping: Bool? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1185,6 +1199,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _expandAll = source._expandAll
       _screenOff = source._screenOff
       _timeoutSec = source._timeoutSec
+      _enableMediaformatShaping = source._enableMediaformatShaping
     }
   }
 
@@ -1220,6 +1235,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         case 15: try { try decoder.decodeSingularBoolField(value: &_storage._expandAll) }()
         case 16: try { try decoder.decodeSingularBoolField(value: &_storage._screenOff) }()
         case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._timeoutSec) }()
+        case 18: try { try decoder.decodeSingularBoolField(value: &_storage._enableMediaformatShaping) }()
         default: break
         }
       }
@@ -1283,6 +1299,9 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._timeoutSec {
         try visitor.visitSingularInt32Field(value: v, fieldNumber: 17)
       } }()
+      try { if let v = _storage._enableMediaformatShaping {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 18)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1309,6 +1328,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._expandAll != rhs_storage._expandAll {return false}
         if _storage._screenOff != rhs_storage._screenOff {return false}
         if _storage._timeoutSec != rhs_storage._timeoutSec {return false}
+        if _storage._enableMediaformatShaping != rhs_storage._enableMediaformatShaping {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1318,7 +1338,7 @@ extension TestSetup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Common"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}description\0\u{1}operation\0\u{1}start\0\u{3}output_filename\0")
 
@@ -1372,7 +1392,7 @@ extension Common: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Parameter"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}type\0\u{1}value\0\u{1}framenum\0")
 
@@ -1421,7 +1441,7 @@ extension Parameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Input"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}filepath\0\u{1}resolution\0\u{3}pix_fmt\0\u{1}framerate\0\u{3}playout_frames\0\u{1}pursuit\0\u{1}realtime\0\u{3}stoptime_sec\0\u{1}show\0\u{3}device_decode\0\u{3}crop_area\0\u{1}restamp\0")
 
@@ -1510,7 +1530,7 @@ extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
   }
 }
 
-extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0\u{1}nullEncode\0\u{3}battery_test\0")
 
@@ -1769,23 +1789,23 @@ extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension Configure.BitrateMode: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Configure.BitrateMode: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0cq\0\u{1}vbr\0\u{1}cbr\0\u{1}cbr_fd\0")
 }
 
-extension Configure.ColorStandard: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Configure.ColorStandard: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}bt709\0\u{1}bt601_pal\0\u{2}\u{2}bt601_ntsc\0\u{2}\u{2}bt2020\0")
 }
 
-extension Configure.ColorRange: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Configure.ColorRange: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}full\0\u{1}limited\0")
 }
 
-extension Configure.ColorTransfer: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Configure.ColorTransfer: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}linear\0\u{2}\u{2}sdr_video\0\u{2}\u{3}st2084\0\u{1}hlg\0")
 }
 
-extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Runtime"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{3}video_bitrate\0\u{1}drop\0\u{3}dynamic_framerate\0\u{3}request_sync\0")
 
@@ -1835,7 +1855,7 @@ extension Runtime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension Runtime.VideoBitrateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Runtime.VideoBitrateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = Runtime.protoMessageName + ".VideoBitrateParameter"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framenum\0\u{1}bitrate\0")
 
@@ -1874,7 +1894,7 @@ extension Runtime.VideoBitrateParameter: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension Runtime.DynamicFramerateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Runtime.DynamicFramerateParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = Runtime.protoMessageName + ".DynamicFramerateParameter"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framenum\0\u{1}framerate\0")
 
@@ -1913,7 +1933,7 @@ extension Runtime.DynamicFramerateParameter: SwiftProtobuf.Message, SwiftProtobu
   }
 }
 
-extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "DecoderConfigure"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0")
 
@@ -1952,7 +1972,7 @@ extension DecoderConfigure: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "DecoderRuntime"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0")
 
@@ -1982,7 +2002,7 @@ extension DecoderRuntime: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension Parallel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Parallel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Parallel"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}test\0")
 
@@ -2012,7 +2032,7 @@ extension Parallel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Test"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}common\0\u{1}input\0\u{1}configure\0\u{1}runtime\0\u{3}decoder_configure\0\u{3}decoder_runtime\0\u{1}parallel\0\u{3}test_setup\0")
 
@@ -2131,7 +2151,7 @@ extension Test: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase,
   }
 }
 
-extension TestSuite: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension TestSuite: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "TestSuite"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}test\0")
 
