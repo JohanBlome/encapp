@@ -1199,6 +1199,13 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         Log.d(TAG, "Start test: " + test.getCommon().getDescription());
 
         increaseTestsInflight();
+        if (test.getInput().getFilepath().equalsIgnoreCase("camera")) {
+            String cameraError = CameraSource.getAvailabilityError(this);
+            if (cameraError != null) {
+                Log.e(TAG, "Camera test rejected before start: " + cameraError);
+                return failTest(test, cameraError);
+            }
+        }
         Thread t = PerformTest(test);
 
         if (test.hasParallel()) {
@@ -1232,6 +1239,48 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 decreaseTestsInflight();
             }
         }, "Skip " + test.getCommon().getId());
+        t.start();
+        return t;
+    }
+
+    public Thread failTest(Test test, String logMessage) {
+        Thread t = new Thread(() -> {
+            String status = logMessage != null ? logMessage : "test failed";
+            final String testId = test.getCommon().getId();
+            Log.e(TAG, "Failing test before start: " + testId + " reason: " + status);
+            com.facebook.encapp.utils.TestLogWriter testLog = null;
+            try {
+                testLog = new com.facebook.encapp.utils.TestLogWriter(
+                        testId, CliSettings.getWorkDir());
+                testLog.info("test_start",
+                        "pid=" + android.os.Process.myPid()
+                                + " codec=" + test.getConfigure().getCodec()
+                                + " bitrate=" + test.getConfigure().getBitrate());
+            } catch (IOException e) {
+                Log.e(TAG, "TestLogWriter open failed for " + testId, e);
+                testLog = null;
+            }
+            if (mSessionManifest != null) {
+                mSessionManifest.testStart(testId, android.os.Process.myPid());
+            }
+            report_result(testId, "unknown", "error", status);
+            if (testLog != null) {
+                testLog.error("encoder_error", status);
+                testLog.info("test_end", "status=error");
+                String logFilename = com.facebook.encapp.utils.TestLogWriter.filename(testId);
+                long logBytes = testLog.size();
+                testLog.close();
+                if (mSessionManifest != null && logBytes > 0) {
+                    mSessionManifest.artifact(testId, "log", logFilename, logBytes);
+                }
+            }
+            if (mSessionManifest != null) {
+                recordTestArtifactsAndEnd(testId, null, null, status, null);
+            }
+            Log.e(TAG, "Failing test after cleanup: " + testId + " reason: " + status);
+            mPursuitOver = true;
+            decreaseTestsInflight();
+        }, "Fail " + test.getCommon().getId());
         t.start();
         return t;
     }

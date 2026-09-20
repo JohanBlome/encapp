@@ -88,6 +88,22 @@ public class CameraSource {
         mContext = context;
     }
 
+    public static String getAvailabilityError(Context context) {
+        CameraManager cameraManager = (CameraManager) context.getSystemService(CAMERA_SERVICE);
+        if (cameraManager == null) {
+            return "Camera service unavailable";
+        }
+        try {
+            String[] cameraIdList = cameraManager.getCameraIdList();
+            if (cameraIdList == null || cameraIdList.length == 0) {
+                return "No Camera2 devices exposed by this system";
+            }
+        } catch (CameraAccessException e) {
+            return "Failed to query Camera2 devices: " + e.getMessage();
+        }
+        return null;
+    }
+
     public void closeCamera() {
         synchronized (mCameraSource) {
             mClients -= 1;
@@ -121,6 +137,10 @@ public class CameraSource {
 
         try {
             String[] cameraIdList = mCameraManager.getCameraIdList();
+            if (cameraIdList == null || cameraIdList.length == 0) {
+                Log.e(TAG, "No Camera2 devices exposed by this system");
+                return false;
+            }
             StringBuffer camera_characteristics_info = new StringBuffer();
 
             // Select the very first first
