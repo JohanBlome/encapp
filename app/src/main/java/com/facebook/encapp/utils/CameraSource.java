@@ -78,6 +78,12 @@ public class CameraSource {
         return mCameraSource;
     }
 
+    public static CameraSource getExistingCamera() {
+        synchronized (lock) {
+            return mCameraSource;
+        }
+    }
+
     private CameraSource(Context context) {
         mContext = context;
     }
@@ -273,6 +279,9 @@ public class CameraSource {
     }
 
     Object mRequestLock = new Object();
+    private final Object mFrameLock = new Object();
+    private long mLatestFrameTimestampNs = -1;
+    private long mDeliveredFrameCount = 0;
 
     class CamState extends CameraCaptureSession.StateCallback {
         public CamState() {
@@ -420,6 +429,11 @@ public class CameraSource {
         @Override
         public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest captureRequest, long timestamp, long frameNumber) {
             super.onCaptureStarted(session, captureRequest, timestamp, frameNumber);
+            synchronized (mFrameLock) {
+                mLatestFrameTimestampNs = timestamp;
+                mDeliveredFrameCount++;
+                mFrameLock.notifyAll();
+            }
         }
 
         @Override
@@ -487,5 +501,30 @@ public class CameraSource {
     public void setSensitivity(int iso) {
         mManualSettings = true;
         mSensitivityTarget = iso;
+    }
+
+    public long awaitNewFrame(long previousFrameCount) {
+        synchronized (mFrameLock) {
+            long deadlineMs = SystemClock.elapsedRealtime() + WAIT_TIME_SHORT_MS;
+            while (mDeliveredFrameCount <= previousFrameCount) {
+                long remainingMs = deadlineMs - SystemClock.elapsedRealtime();
+                if (remainingMs <= 0) {
+                    return -1;
+                }
+                try {
+                    mFrameLock.wait(remainingMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return -1;
+                }
+            }
+            return mLatestFrameTimestampNs;
+        }
+    }
+
+    public long getDeliveredFrameCount() {
+        synchronized (mFrameLock) {
+            return mDeliveredFrameCount;
+        }
     }
 }
