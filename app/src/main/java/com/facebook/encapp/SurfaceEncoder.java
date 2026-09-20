@@ -16,6 +16,7 @@ import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
 
 import androidx.annotation.NonNull;
 
@@ -23,6 +24,7 @@ import com.facebook.encapp.proto.PixFmt;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.ClockTimes;
+import com.facebook.encapp.utils.CameraSource;
 import com.facebook.encapp.utils.FakeGLRenderer;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
@@ -60,6 +62,8 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
     FakeGLRenderer.PatternType mFakeInputPatternType = FakeGLRenderer.PatternType.TEXTURE;  // Default pattern
     boolean mUseCameraTimestamp = true;
     OutputMultiplier mOutputMult;
+    Surface mDirectCameraInputSurface;
+    boolean mUseDirectCameraSurface = false;
     Bundle mKeyFrameBundle;
     private Allocation mYuvIn;
     private Allocation mYuvOut;
@@ -124,6 +128,7 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
             Log.d(TAG, "Using fake input with GL rendering, pattern: " + mFakeInputPatternType);
         } else if (mTest.getInput().getFilepath().equals("camera")) {
             mIsCameraSource = true;
+            mUseDirectCameraSurface = !mTest.getInput().getShow();
             //TODO: handle other fps (i.e. try to set lower or higher fps)
             // Need to check what frame rate is actually set unless real frame time is being used
             mReferenceFrameRate = 30; //We strive for this at least
@@ -183,8 +188,9 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
         MediaFormat format;
 
         try {
-            // Surface encoding requires OutputMultiplier - create one if not provided
-            if (mOutputMult == null) {
+            // Camera capture without UI preview can feed the encoder surface directly
+            // and avoids the EGL-based OutputMultiplier path entirely.
+            if (!mUseDirectCameraSurface && mOutputMult == null) {
                 Log.d(TAG, "Creating OutputMultiplier for surface encoding (no display output)");
                 mOutputMult = new OutputMultiplier(mVsyncHandler);
             }
@@ -221,8 +227,13 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                     MediaCodec.CONFIGURE_FLAG_ENCODE);
             mStats.pushTimestamp("encoder.config");
             logMediaFormat(mCodec.getInputFormat());
-            mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
-            setupOutputMult(width, height);
+            if (mUseDirectCameraSurface) {
+                mDirectCameraInputSurface = mCodec.createInputSurface();
+                Log.d(TAG, "Using direct camera surface path (no OutputMultiplier)");
+            } else {
+                mFrameSwapSurface = mOutputMult.addSurface(mCodec.createInputSurface());
+                setupOutputMult(width, height);
+            }
 
             mStats.setEncoderMediaFormat(mCodec.getInputFormat());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -320,7 +331,21 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                         if (done) {
                             Log.e(TAG, mTest.getCommon().getId() + " - Oh no. We are done!");
                         }
-                        long timestampUsec = mOutputMult.awaitNewImage() / 1000;  //To Usec
+                        long timestampNs;
+                        if (mUseDirectCameraSurface) {
+                            CameraSource cameraSource = CameraSource.getExistingCamera();
+                            if (cameraSource == null) {
+                                throw new IllegalStateException("CameraSource not initialized");
+                            }
+                            long previousFrameCount = cameraSource.getDeliveredFrameCount();
+                            timestampNs = cameraSource.awaitNewFrame(previousFrameCount);
+                        } else {
+                            timestampNs = mOutputMult.awaitNewImage();
+                        }
+                        if (timestampNs < 0) {
+                            throw new IllegalStateException("Timed out waiting for camera frame");
+                        }
+                        long timestampUsec = timestampNs / 1000;  //To Usec
                         if (!MainActivity.isStable()) {
                             if (!mFpsMeasure.isStable()) {
                                 mFpsMeasure.addPtsUsec(timestampUsec);
@@ -343,11 +368,15 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
                             mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                             updateDynamicFramerate(mInFramesCount);
                             if (mDropNext) {
-                                mFrameSwapSurface.dropNext(true);
-                                mSkipped++;
+                                if (mFrameSwapSurface != null) {
+                                    mFrameSwapSurface.dropNext(true);
+                                    mSkipped++;
+                                }
                                 mDropNext = false;
                             } else {
-                                mFrameSwapSurface.dropNext(false);
+                                if (mFrameSwapSurface != null) {
+                                    mFrameSwapSurface.dropNext(false);
+                                }
                                 long ptsUsec = 0;
                                 if (mUseCameraTimestamp && mIsCameraSource) {
                                     // Use the camera provided timestamp
@@ -709,6 +738,14 @@ class SurfaceEncoder extends Encoder implements VsyncListener {
 
     public OutputMultiplier getOutputMultiplier() {
         return mOutputMult;
+    }
+
+    public boolean usesDirectCameraInputSurface() {
+        return mUseDirectCameraSurface;
+    }
+
+    public Surface getDirectCameraInputSurface() {
+        return mDirectCameraInputSurface;
     }
 
     @Override

@@ -912,7 +912,19 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                             if (mCameraCount > 0 && !cameraStarted) {
                                 Log.d(TAG, "Start cameras");
                                 Surface outputSurface = null;
-                                while (outputSurface == null) {
+                                for (Encoder enc : mEncoderList) {
+                                    if (enc instanceof SurfaceEncoder) {
+                                        SurfaceEncoder surfaceEncoder = (SurfaceEncoder) enc;
+                                        if (surfaceEncoder.usesDirectCameraInputSurface()) {
+                                            outputSurface = surfaceEncoder.getDirectCameraInputSurface();
+                                            if (outputSurface != null) {
+                                                Log.d(TAG, "Using direct camera input surface from encoder");
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                while (outputSurface == null && mCameraSourceMultiplier != null) {
                                     Log.d(TAG, "Wait for input surface");
 
                                     outputSurface = mCameraSourceMultiplier.getInputSurface();
@@ -921,6 +933,10 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                     }
+                                }
+                                if (outputSurface == null) {
+                                    Log.e(TAG, "No camera input surface became available");
+                                    break;
                                 }
                                 //Use max size, get from camera or test
                                 mCameraSource.registerSurface(outputSurface, 1280, 720);
@@ -1565,7 +1581,7 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
     public void setupCamera(OutputAndTexture ot) {
         Log.d(TAG, "Setup camera");
         mCameraSource = CameraSource.getCamera(this);
-        if (mCameraSourceMultiplier == null) {
+        if (ot != null && mCameraSourceMultiplier == null) {
             Log.d(TAG, "Create outputmult");
             mCameraSourceMultiplier = new OutputMultiplier(mVsyncHandler);
             mCameraSourceMultiplier.confirmSize(mCameraMaxWidth, mCameraMaxHeight);
