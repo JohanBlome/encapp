@@ -89,10 +89,10 @@ public class OutputMultiplier {
     private SurfaceTexture mInputTexture;
     private FullFrameRect mFullFrameBlit;
     private FullFrameRect mBitmapBlit;  // Separate blit for 2D textures (bitmaps)
-    private Surface mInputSurface;
+    private volatile Surface mInputSurface;
     private int mTextureId;
     private int mBitmapTextureId = -1;  // Separate 2D texture for bitmap input
-    private FrameswapControl mMasterSurface = null;
+    private volatile FrameswapControl mMasterSurface = null;
     private String mName = "OutputMultiplier";
     private int mWidth = -1;
     private int mHeight = -1;
@@ -343,12 +343,18 @@ public class OutputMultiplier {
 
         public FrameswapControl setup() {
             this.start();
-            while (mMasterSurface == null) {
+            long deadlineMs = ClockTimes.currentTimeMs() + WAIT_TIME_SHORT_MS;
+            while ((mMasterSurface == null || mInputSurface == null)
+                    && ClockTimes.currentTimeMs() < deadlineMs) {
                 try {
                     sleep(50);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+            }
+            if (mMasterSurface == null || mInputSurface == null) {
+                Log.e(TAG, "Renderer setup timed out: masterSurface="
+                        + mMasterSurface + " inputSurface=" + mInputSurface);
             }
             return mMasterSurface;
         }

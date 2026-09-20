@@ -75,7 +75,7 @@ public abstract class Encoder {
     boolean mNullEncode = false;
     int mOutFramesCount = 0;
     int mInFramesCount = 0;
-    boolean mInitDone = false;
+    volatile boolean mInitDone = false;
     DataWriter mDataWriter;
     FpsMeasure mFpsMeasure;
     boolean mStable = true;
