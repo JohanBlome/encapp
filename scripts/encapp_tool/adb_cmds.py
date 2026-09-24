@@ -973,9 +973,15 @@ def pull_files_from_device(
             print(f"Pulling {counter}/{len(output_files)}", end="\r")
 
             cmd = (
-                f"xcrun devicectl device copy to --device {serial} "
+                # Three bugs lived here: this pulled with "copy to" rather
+                # than "copy from", so it pushed instead of fetching; the
+                # source path had a literal "file" instead of the loop
+                # variable, so every iteration named the same nonexistent
+                # path; and devicectl needs --user for the app container.
+                f"xcrun devicectl device copy from --device {serial} "
                 f"--domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID} "
-                f"--source {location}/file --destination {destination} "
+                f"--user mobile "
+                f"--source {location}/{file} --destination {destination}/{file} "
             )
 
             run_cmd(cmd, debug=debug)
