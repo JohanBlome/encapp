@@ -791,11 +791,15 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         ret, stdout, _ = run_cmd(
             f"xcrun devicectl device copy to --device {serial} "
             f"--domain-type appDataContainer  --domain-identifier {IDB_BUNDLE_ID} "
-            f"--source {filepath} --destination {device_workdir}/ ",
+            # The destination must name the file explicitly. A trailing slash
+            # makes devicectl treat the directory itself as the destination
+            # file and overwrite it, which silently destroys Documents/ and
+            # makes every later read fail with CoreDeviceError 7000.
+            f"--source {filepath} --destination {device_filepath} ",
             debug=debug,
         )
         if not ret:
-            print(f'error: copying "{filepath}" to  {device_workdir}/ : {stdout}')
+            print(f'error: copying "{filepath}" to  {device_filepath} : {stdout}')
     else:
         device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
