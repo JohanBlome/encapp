@@ -739,8 +739,13 @@ def file_exists_in_device(filename, serial, debug=False):
 
 
 def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, debug):
-    # Do not check .pbtxt files
-    if host_filepath[-6] == ".pbtxt":
+    # Do not check .pbtxt files: they are rewritten for every test, and a
+    # stale one on the device silently re-runs the previous test.
+    # This was `host_filepath[-6] == ".pbtxt"`, which indexes a single
+    # character rather than slicing, so it compared "t" against ".pbtxt" and
+    # was never true. On iOS the check below matches by basename alone, so the
+    # pbtxt was always considered present and never pushed.
+    if host_filepath.endswith(".pbtxt"):
         return False
 
     if USE_IDB:  # ???? and fast_copy:
