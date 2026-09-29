@@ -676,9 +676,11 @@ public class MediaCodecInfoHelper {
             json.put("is_vendor", media_codec_info.isVendor());
         }
         String[] media_types = media_codec_info.getSupportedTypes();
+        JSONArray media_types_json = new JSONArray();
         for (String media_type : media_types) {
-            json.put("media_type", codecCapabilitiesToJson(media_codec_info, media_type));
+            media_types_json.put(codecCapabilitiesToJson(media_codec_info, media_type));
         }
+        json.put("media_types", media_types_json);
         if (Build.VERSION.SDK_INT >= 31) {
                 try {
                     MediaCodec codec = MediaCodec.createByCodecName(media_codec_info.getName());
