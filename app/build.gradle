@@ -105,6 +105,7 @@ dependencies {
     // Unit tests (JVM, no Android runtime). Run with:
     //   ./gradlew :app:testDefaultDebugUnitTest
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 
     lcevcImplementation 'com.vnova.lcevc:eil:3.14.7'
     lcevcImplementation 'com.vnova.lcevc.eilp:mediacodec:3.14.7'

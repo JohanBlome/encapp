@@ -376,11 +376,13 @@ public class MediaCodecInfoHelper {
     }
 
 
-    public static JSONObject profileLevelsToJson(MediaCodecInfo.CodecProfileLevel[] color_profile_level) throws JSONException {
-        JSONObject json = new JSONObject();
-        for (MediaCodecInfo.CodecProfileLevel profile_level : color_profile_level) {
-            json.put("profile" , profile_level.profile);
-            json.put("level", profile_level.level);
+    public static JSONArray profileLevelsToJson(MediaCodecInfo.CodecProfileLevel[] codec_profile_levels) throws JSONException {
+        JSONArray json = new JSONArray();
+        for (MediaCodecInfo.CodecProfileLevel profile_level : codec_profile_levels) {
+            JSONObject entry = new JSONObject();
+            entry.put("profile", profile_level.profile);
+            entry.put("level", profile_level.level);
+            json.put(entry);
         }
         return json;
     }
