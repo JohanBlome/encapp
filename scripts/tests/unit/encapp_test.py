@@ -105,5 +105,32 @@ class EncappTest(unittest.TestCase):
             )
 
 
+    def testCodecMediaTypesPrefersCompleteList(self):
+        codec = {
+            "media_type": {"mime_type": "video/avc"},
+            "media_types": [
+                {"mime_type": "video/avc"},
+                {"mime_type": "video/hevc"},
+            ],
+        }
+        self.assertEqual(codec["media_types"], encapp.get_media_types(codec))
+
+    def testCodecMediaTypesSupportsLegacySingularField(self):
+        media_type = {"mime_type": "audio/opus"}
+        self.assertEqual([media_type], encapp.get_media_types({"media_type": media_type}))
+        self.assertTrue(encapp.has_audio_media_type({"media_type": media_type}))
+        self.assertTrue(encapp.is_audio_only_codec({"media_type": media_type}))
+
+    def testCodecMediaTypesDoesNotTreatMixedCodecAsAudioOnly(self):
+        codec = {
+            "media_types": [
+                {"mime_type": "video/avc"},
+                {"mime_type": "audio/opus"},
+            ]
+        }
+        self.assertTrue(encapp.has_audio_media_type(codec))
+        self.assertFalse(encapp.is_audio_only_codec(codec))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3546,6 +3546,35 @@ def is_hardware_accelerated(codec: dict) -> bool:
     return True
 
 
+def get_media_types(codec: dict) -> list[dict]:
+    """Return every advertised media type, including legacy codec-list JSON."""
+    media_types = codec.get("media_types")
+    if isinstance(media_types, list):
+        return [media_type for media_type in media_types if isinstance(media_type, dict)]
+
+    media_type = codec.get("media_type")
+    if isinstance(media_type, dict):
+        return [media_type]
+    return []
+
+
+def has_audio_media_type(codec: dict) -> bool:
+    """Return true when any advertised MIME type is audio."""
+    return any(
+        media_type.get("mime_type", "").startswith("audio/")
+        for media_type in get_media_types(codec)
+    )
+
+
+def is_audio_only_codec(codec: dict) -> bool:
+    """Return true when the codec advertises media types and all are audio."""
+    media_types = get_media_types(codec)
+    return bool(media_types) and all(
+        media_type.get("mime_type", "").startswith("audio/")
+        for media_type in media_types
+    )
+
+
 def find_codecs(
     codecs: dict,
     codec_name: str,
@@ -3560,11 +3589,8 @@ def find_codecs(
                 continue
             if not decoder and "is_encoder" in codec and not codec["is_encoder"]:
                 continue
-            if "media_type" in codec and "mime_type" in codec["media_type"]:
-                mime = codec["media_type"]["mime_type"]
-                # We do not look at audio (for mime)
-                if "audio" in mime:
-                    continue
+            if is_audio_only_codec(codec):
+                continue
             m = re.find("is_hardware_accelerated|IsHardwareAccelerates", codec)
             if m:
                 key = m.group(1)
@@ -3592,12 +3618,10 @@ def print_codec_info(codec: dict, options: argparse.Namespace) -> None:
         return
     if options.decoders and is_encoder(codec):
         return
-    if "media_type" in codec and "mime_type" in codec["media_type"].keys():
-        mime = codec["media_type"]["mime_type"]
-        if not options.audio and "audio" in mime:
-            return
-        if options.audio and not "audio" in mime:
-            return
+    if not options.audio and is_audio_only_codec(codec):
+        return
+    if options.audio and not has_audio_media_type(codec):
+        return
     if options.hw and not is_hardware_accelerated(codec):
         return
     if options.sw and is_hardware_accelerated(codec):
