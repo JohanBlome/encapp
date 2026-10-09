@@ -150,6 +150,7 @@ def wait_for_session(
     timeout_sec: float,
     on_timeout: Optional[Callable[[], None]] = None,
     is_alive_fn: Optional[Callable[[], bool]] = None,
+    progress_fn: Optional[Callable[[], object]] = None,
     poll_interval: float = 1.0,
     _time_fn: Callable[[], float] = time.monotonic,
     _sleep_fn: Callable[[float], None] = time.sleep,
@@ -161,10 +162,14 @@ def wait_for_session(
         now present locally. Called with the absolute device path of the
         manifest and the local workdir.
     on_timeout()
-        Optional callback invoked when the wall-clock deadline expires
-        (CLI typically force-stops the app here). Always called BEFORE
-        the final manifest pull, so any in-flight test_end events that
-        the app writes during shutdown are captured.
+        Optional callback invoked after timeout_sec with no manifest or encoder
+        progress (CLI typically force-stops the app here). Always called BEFORE
+        the final manifest pull, so any in-flight test_end events that the app
+        writes during shutdown are captured.
+    progress_fn() -> object
+        Optional callback returning a comparable progress token. Any token
+        change resets the inactivity deadline, so slow runs continue while
+        fake-input preparation or encoding is demonstrably advancing.
     is_alive_fn() -> bool
         Optional callback: True if the app process is still alive. When
         provided, the poll exits early once the app has died and the
@@ -184,12 +189,23 @@ def wait_for_session(
     remote_path = f"{device_workdir.rstrip('/')}/{session_id}.session.jsonl"
     local_path = os.path.join(local_workdir, f"{session_id}.session.jsonl")
     deadline = _time_fn() + timeout_sec
+    last_activity = None
     expected_set = set(expected_test_ids)
     terminal_alive = (Status.PASS, Status.FAIL, Status.TIMEOUT, Status.SKIPPED)
     terminal_dead = terminal_alive + (Status.CRASH,)
 
     while True:
         pull_fn(remote_path, local_workdir)
+        try:
+            manifest_bytes = os.path.getsize(local_path)
+        except OSError:
+            manifest_bytes = 0
+        external_progress = progress_fn() if progress_fn is not None else None
+        activity = (manifest_bytes, external_progress)
+        now = _time_fn()
+        if activity != last_activity:
+            deadline = now + timeout_sec
+            last_activity = activity
         sv = _read_local(local_path, expected_test_ids)
         if sv.session_completed:
             return sv
@@ -207,8 +223,8 @@ def wait_for_session(
             pull_fn(remote_path, local_workdir)
             return _read_local(local_path, expected_test_ids)
 
-        if _time_fn() >= deadline:
-            log.warning("manifest poll timed out after %.1fs, session_id=%s",
+        if now >= deadline:
+            log.warning("manifest poll saw no progress for %.1fs, session_id=%s",
                         timeout_sec, session_id)
             if on_timeout is not None:
                 on_timeout()
@@ -221,7 +237,8 @@ def wait_for_session(
                 if v.status == Status.CRASH:
                     sv.tests[tid] = TestVerdict(
                         tid, Status.TIMEOUT,
-                        reason=f"CLI timeout after {timeout_sec:.0f}s, app force-stopped",
+                        reason=(f"CLI saw no progress for {timeout_sec:.0f}s; "
+                                "app force-stopped"),
                         artifacts=v.artifacts, raw_events=v.raw_events,
                     )
             return sv

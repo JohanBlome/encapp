@@ -137,6 +137,50 @@ class TestWaitForSession(unittest.TestCase):
             self.assertTrue(sv.session_completed)
             self.assertEqual(Status.PASS, sv.tests["t1"].status)
 
+    def test_progress_resets_inactivity_timeout_for_slow_run(self):
+        """Total runtime may exceed timeout while encoder progress continues."""
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [0.0]
+            pulls = [0]
+            progress = [0]
+            timeout_calls = []
+            in_progress = "\n".join([
+                _line({"event": "session_start", "session_id": "S1"}),
+                _line({"event": "test_start", "session_id": "S1",
+                       "test_id": "t1", "pid": 1234}),
+            ])
+
+            def pull(remote, local_dir):
+                pulls[0] += 1
+                text = HAPPY_PATH if pulls[0] >= 5 else in_progress
+                with open(os.path.join(local_dir, "S1.session.jsonl"), "w") as f:
+                    f.write(text)
+                if pulls[0] < 5:
+                    progress[0] += 1
+                return True
+
+            def sleep(seconds):
+                now[0] += seconds
+
+            sv = wait_for_session(
+                pull_fn=pull,
+                device_workdir="/sdcard",
+                local_workdir=tmp,
+                session_id="S1",
+                expected_test_ids=["t1"],
+                timeout_sec=2.0,
+                on_timeout=lambda: timeout_calls.append(True),
+                is_alive_fn=lambda: True,
+                progress_fn=lambda: progress[0],
+                poll_interval=1.0,
+                _time_fn=lambda: now[0],
+                _sleep_fn=sleep,
+            )
+            self.assertGreater(now[0], 2.0)
+            self.assertEqual([], timeout_calls)
+            self.assertTrue(sv.session_completed)
+            self.assertEqual(Status.PASS, sv.tests["t1"].status)
+
     def test_timeout_force_stop_when_app_hangs_with_no_events(self):
         """App hung — session_start written but no test_start ever
         appeared (encoder stalled before announcing). Timeout fires,

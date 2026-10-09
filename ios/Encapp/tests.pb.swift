@@ -814,6 +814,19 @@ nonisolated struct Configure: @unchecked Sendable {
   /// Clears the value of `batteryTest`. Subsequent reads from it will return its default value.
   mutating func clearBatteryTest() {_uniqueStorage()._batteryTest = nil}
 
+  /// When true, MuxerWrapper writes <session_id>.nal.json next to the encoded
+  /// file. The sidecar records per-frame NAL units (type, offset, size, first
+  /// 64 bytes hex) — consumed by Python-side capability verifiers for
+  /// per-slice QP, LTR events, recovery_point SEI, temporal_id, etc.
+  var nalLog: Bool {
+    get {return _storage._nalLog ?? false}
+    set {_uniqueStorage()._nalLog = newValue}
+  }
+  /// Returns true if `nalLog` has been explicitly set.
+  var hasNalLog: Bool {return _storage._nalLog != nil}
+  /// Clears the value of `nalLog`. Subsequent reads from it will return its default value.
+  mutating func clearNalLog() {_uniqueStorage()._nalLog = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   nonisolated enum BitrateMode: Int, SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -1532,7 +1545,7 @@ nonisolated extension Input: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "Configure"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0\u{1}nullEncode\0\u{3}battery_test\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}parameter\0\u{1}codec\0\u{1}encode\0\u{1}surface\0\u{1}mime\0\u{1}bitrate\0\u{3}bitrate_mode\0\u{1}durationUs\0\u{1}resolution\0\u{3}color_format\0\u{3}color_standard\0\u{3}color_range\0\u{3}color_transfer\0\u{3}color_transfer_request\0\u{1}framerate\0\u{3}i_frame_interval\0\u{3}intra_refresh_period\0\u{1}latency\0\u{3}repeat_previous_frame_after\0\u{3}ts_schema\0\u{1}quality\0\u{1}complexity\0\u{3}decode_dump\0\u{3}tile_width\0\u{3}tile_height\0\u{3}crop_area\0\u{1}nullEncode\0\u{3}battery_test\0\u{3}nal_log\0")
 
   fileprivate class _StorageClass {
     var _parameter: [Parameter] = []
@@ -1563,6 +1576,7 @@ nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     var _cropArea: String? = nil
     var _nullEncode: Bool? = nil
     var _batteryTest: Bool? = nil
+    var _nalLog: Bool? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1601,6 +1615,7 @@ nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       _cropArea = source._cropArea
       _nullEncode = source._nullEncode
       _batteryTest = source._batteryTest
+      _nalLog = source._nalLog
     }
   }
 
@@ -1647,6 +1662,7 @@ nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         case 26: try { try decoder.decodeSingularStringField(value: &_storage._cropArea) }()
         case 27: try { try decoder.decodeSingularBoolField(value: &_storage._nullEncode) }()
         case 28: try { try decoder.decodeSingularBoolField(value: &_storage._batteryTest) }()
+        case 29: try { try decoder.decodeSingularBoolField(value: &_storage._nalLog) }()
         default: break
         }
       }
@@ -1743,6 +1759,9 @@ nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       try { if let v = _storage._batteryTest {
         try visitor.visitSingularBoolField(value: v, fieldNumber: 28)
       } }()
+      try { if let v = _storage._nalLog {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 29)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1780,6 +1799,7 @@ nonisolated extension Configure: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         if _storage._cropArea != rhs_storage._cropArea {return false}
         if _storage._nullEncode != rhs_storage._nullEncode {return false}
         if _storage._batteryTest != rhs_storage._batteryTest {return false}
+        if _storage._nalLog != rhs_storage._nalLog {return false}
         return true
       }
       if !storagesAreEqual {return false}

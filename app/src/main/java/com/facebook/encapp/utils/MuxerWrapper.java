@@ -23,6 +23,11 @@ public class MuxerWrapper {
     private boolean mStarted;
     private int mVideoTrack = -1;
 
+    // Optional NAL sidecar writer — populated when configure.nal_log=true.
+    // Hooked here (rather than inside either mux backend) so both stock
+    // MediaMuxer and internal Muxer paths get identical coverage.
+    private NalLogWriter mNalLogWriter;
+
     /**
      * Create a muxer wrapper.
      *
@@ -86,6 +91,13 @@ public class MuxerWrapper {
         Log.d(TAG, "mUseInternalMuxer: " + mUseInternalMuxer);
         Log.d(TAG, "mInternalMuxer: " + (mInternalMuxer != null ? "not null" : "null"));
         Log.d(TAG, "MediaFormat: " + format);
+
+        // Tell the optional NAL sidecar writer which codec we're on — before
+        // ANY writeSampleData call, since scanning depends on the AVC-vs-HEVC
+        // NAL header size.
+        if (mNalLogWriter != null) {
+            mNalLogWriter.setCodecMime(format.getString(MediaFormat.KEY_MIME));
+        }
 
         if (mUseInternalMuxer && mInternalMuxer != null) {
             // Get codec-specific data from MediaFormat
@@ -233,16 +245,24 @@ public class MuxerWrapper {
      * @param bufferInfo Buffer info with size, timestamp, flags
      */
     public void writeSampleData(int trackIndex, ByteBuffer encodedData, MediaCodec.BufferInfo bufferInfo) {
-        if (mUseInternalMuxer && mInternalMuxer != null) {
-            // Extract frame data
-            byte[] frameData = new byte[bufferInfo.size];
+        // Extract frame bytes once — used by the NAL sidecar writer (when
+        // enabled) AND by the internal Muxer backend. Stock MediaMuxer takes
+        // the ByteBuffer directly, so we only pay the copy cost when either
+        // the sidecar or the internal muxer needs it.
+        byte[] frameData = null;
+        if (mNalLogWriter != null || (mUseInternalMuxer && mInternalMuxer != null)) {
+            frameData = new byte[bufferInfo.size];
             encodedData.position(bufferInfo.offset);
             encodedData.get(frameData);
+        }
 
-            // Check if this is a keyframe
+        if (mNalLogWriter != null && frameData != null) {
+            mNalLogWriter.recordFrame(
+                    bufferInfo.presentationTimeUs, bufferInfo.flags, frameData);
+        }
+
+        if (mUseInternalMuxer && mInternalMuxer != null) {
             boolean isKeyFrame = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
-
-            // Add frame to internal muxer
             boolean success = mInternalMuxer.addFrame(frameData, bufferInfo.presentationTimeUs, isKeyFrame);
         } else if (mMediaMuxer != null) {
             mMediaMuxer.writeSampleData(trackIndex, encodedData, bufferInfo);
@@ -286,6 +306,20 @@ public class MuxerWrapper {
             Log.d(TAG, "MediaMuxer released");
             mMediaMuxer = null;
         }
+        if (mNalLogWriter != null) {
+            Log.d(TAG, "Flushing NAL log sidecar to " + mNalLogWriter.getOutputPath());
+            mNalLogWriter.close();
+            mNalLogWriter = null;
+        }
+    }
+
+    /**
+     * Attach an optional NAL sidecar writer. Call once, before any frames
+     * are muxed (typically right after construction and before addTrack).
+     * Passing null disables sidecar writing.
+     */
+    public void setNalLogWriter(NalLogWriter writer) {
+        mNalLogWriter = writer;
     }
 
     /**

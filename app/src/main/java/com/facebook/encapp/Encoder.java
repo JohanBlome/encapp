@@ -313,6 +313,15 @@ public abstract class Encoder {
         mMuxerWrapper = new MuxerWrapper(fullFilename, useInternalMuxer, width, height,
                                         frameRate, isHEVC, isImageOutput);
 
+        // Opt-in NAL sidecar (configure.nal_log). Consumed by Python-side
+        // capability verifiers for per-slice QP, LTR, SEI, temporal_id, etc.
+        if (mTest.hasConfigure() && mTest.getConfigure().getNalLog()) {
+            String sidecarPath = CliSettings.getWorkDir() + "/" + mStats.getId() + ".nal.json";
+            Log.d(TAG, "NAL sidecar enabled: " + sidecarPath);
+            mMuxerWrapper.setNalLogWriter(
+                    new com.facebook.encapp.utils.NalLogWriter(mStats.getId(), sidecarPath));
+        }
+
         mStats.setEncodedfile(mFilename);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && encoder != null) {
             mStats.setEncoderIsHardwareAccelerated(encoder.getCodecInfo().isHardwareAccelerated());

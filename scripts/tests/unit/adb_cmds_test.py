@@ -241,17 +241,17 @@ class TestAdbCommands(unittest.TestCase):
             debug=0,
         )
 
-    @unittest.mock.patch("encapp_tool.adb_cmds.setprop_value")
-    def test_clearprop_value_uses_empty_string(self, mock_setprop):
+    @unittest.mock.patch("encapp_tool.adb_cmds.run_cmd")
+    def test_clearprop_value_preserves_empty_remote_argument(self, mock_run):
+        mock_run.return_value = (True, "", "")
         encapp_tool.adb_cmds.clearprop_value(
             ADB_DEVICE_VALID_ID,
             "debug.stagefright.enableshaping",
             debug=0,
         )
-        mock_setprop.assert_called_once_with(
-            ADB_DEVICE_VALID_ID,
-            "debug.stagefright.enableshaping",
-            "",
+        mock_run.assert_called_once_with(
+            f'adb -s {ADB_DEVICE_VALID_ID} shell '
+            '"setprop debug.stagefright.enableshaping \'\'"',
             debug=0,
         )
 

@@ -654,12 +654,18 @@ def setprop_value(serial: str, prop: str, value: str, debug=0):
 
 
 def clearprop_value(serial: str, prop: str, debug=0):
-    """Clear a property by setting it to the empty string.
+    """Clear a property by passing an explicit empty value to the device shell.
 
-    For debug-only shaping control props this restores default platform
-    behavior when the previous value was unset.
+    The quoting must survive both the host shell and adb's remote shell. Calling
+    ``setprop_value(..., "")`` loses the empty argv element on some adb builds.
     """
-    setprop_value(serial, prop, "", debug=debug)
+    if USE_IDB:
+        return
+    ret, _stdout, stderr = run_cmd(
+        f'adb -s {shlex.quote(serial)} shell "setprop {shlex.quote(prop)} \'\'"',
+        debug=debug,
+    )
+    assert ret, f"error: failed to clearprop {prop}: {stderr}"
 
 
 def get_device_size(serial, filepath, debug):

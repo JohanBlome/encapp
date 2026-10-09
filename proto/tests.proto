@@ -198,6 +198,11 @@ message Configure {
   optional string crop_area = 26;
   optional bool nullEncode = 27;
   optional bool battery_test = 28;
+  // When true, MuxerWrapper writes <session_id>.nal.json next to the encoded
+  // file. The sidecar records per-frame NAL units (type, offset, size, first
+  // 64 bytes hex) — consumed by Python-side capability verifiers for
+  // per-slice QP, LTR events, recovery_point SEI, temporal_id, etc.
+  optional bool nal_log = 29 [default = false];
 }
 
 message Runtime {
@@ -216,6 +221,14 @@ message Runtime {
   }
   repeated DynamicFramerateParameter dynamic_framerate = 4;
   repeated int64 request_sync = 5;
+
+  // Deterministic fake-input complexity schedule consumed by
+  // FakeInputReader. Values are LOW, MID, or HIGH.
+  message FakeInputComplexityParameter {
+    optional int64 framenum = 1;
+    optional string complexity = 2;
+  }
+  repeated FakeInputComplexityParameter fake_input_complexity = 7;
 }
 
 message DecoderConfigure {

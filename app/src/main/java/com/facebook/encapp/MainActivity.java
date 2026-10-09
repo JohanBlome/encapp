@@ -1148,6 +1148,11 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
                 mSessionManifest.artifact(testId, "video", basename,
                         abs.exists() ? abs.length() : -1L);
             }
+            String nalFilename = stats.getId() + ".nal.json";
+            File nal = new File(CliSettings.getWorkDir(), nalFilename);
+            if (nal.exists()) {
+                mSessionManifest.artifact(testId, "nal", nalFilename, nal.length());
+            }
         }
 
         // Verdict + error block.
@@ -1541,21 +1546,25 @@ public class MainActivity extends AppCompatActivity implements BatteryStatusList
         }, "TestRunner_" + coder_.mTest.getCommon().getId());
         t.start();
 
-        int waitTime = 10000; //ms
-        int waitForPrevious = 50; //todo: make configurable
+        final int waitForPreviousMs = 50; // TODO: make configurable.
+        final long initWaitStartedMs = android.os.SystemClock.elapsedRealtime();
+        long nextInitStatusMs = initWaitStartedMs + 10000;
         while (!coder_.initDone() && t.isAlive()) {
             try {
-                // If we do not wait for the init to de done before starting next
-                // transcoder_ there may be issue in the surface handling on lower levels
-                // on certain hw (not thread safe)
-                Log.d(TAG, "Sleep while waiting for init to be done");
-                Thread.sleep(waitForPrevious);
-                waitTime -= waitForPrevious;
-                if (waitTime < 0) {
-                    Log.e(TAG, "Init not ready within " + waitTime + " ms, probably failure");
+                // If we do not wait for init before starting the next coder,
+                // lower-level surface handling can race on some hardware.
+                Thread.sleep(waitForPreviousMs);
+                long nowMs = android.os.SystemClock.elapsedRealtime();
+                if (nowMs >= nextInitStatusMs) {
+                    Log.i(TAG, "Encoder initialization still progressing after "
+                            + (nowMs - initWaitStartedMs) + " ms; worker_state="
+                            + t.getState());
+                    nextInitStatusMs = nowMs + 5000;
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+                Log.w(TAG, "Interrupted while waiting for encoder initialization", e);
+                break;
             }
         }
 

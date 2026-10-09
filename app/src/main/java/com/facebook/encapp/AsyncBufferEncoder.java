@@ -6,6 +6,7 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
 
@@ -54,6 +55,15 @@ public class AsyncBufferEncoder extends Encoder {
     private final AtomicBoolean mInputDone = new AtomicBoolean(false);
     private final AtomicBoolean mOutputDone = new AtomicBoolean(false);
     
+    // Input feeder pacing evidence. Lag compares wall elapsed time to the PTS
+    // timeline; gap excess catches short stalls that whole-run averages hide.
+    private long mFirstInputWallUs = -1;
+    private long mFirstInputPtsUs = -1;
+    private long mLastInputWallUs = -1;
+    private long mLastInputPtsUs = -1;
+    private long mMaxInputLagUs = 0;
+    private long mMaxInputGapExcessUs = 0;
+
     // Input feeder thread
     private InputFeederThread mInputFeeder;
     
@@ -76,6 +86,12 @@ public class AsyncBufferEncoder extends Encoder {
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
         mSkipped = 0;
         mFramesAdded = 0;
+        mFirstInputWallUs = -1;
+        mFirstInputPtsUs = -1;
+        mLastInputWallUs = -1;
+        mLastInputPtsUs = -1;
+        mMaxInputLagUs = 0;
+        mMaxInputGapExcessUs = 0;
         
         mSourceResolution = SizeUtils.parseXString(mTest.getInput().getResolution());
         int width = mSourceResolution.getWidth();
@@ -89,6 +105,12 @@ public class AsyncBufferEncoder extends Encoder {
         String filepath = mTest.getInput().getFilepath();
         if (filepath.startsWith("fake_input")) {
             mFakeInputReader = new FakeInputReader();
+            mFakeInputReader.setMediaType(mTest.getConfigure().getMime());
+            mFakeInputReader.setCodecAdaptiveNoise(!filepath.startsWith("fake_input_rc"));
+            if (mTest.hasRuntime()) {
+                mFakeInputReader.setComplexitySchedule(
+                        mTest.getRuntime().getFakeInputComplexityList());
+            }
             if (!mFakeInputReader.openFile(filepath, inputFmt, width, height)) {
                 return "Could not initialize fake input";
             }
@@ -380,6 +402,14 @@ public class AsyncBufferEncoder extends Encoder {
             if (mInputDone.getAndSet(true)) {
                 return; // Already sent EOS
             }
+            long wallDurationUs = (mFirstInputWallUs >= 0 && mLastInputWallUs >= 0)
+                    ? Math.max(0L, mLastInputWallUs - mFirstInputWallUs) : 0L;
+            long timelineDurationUs = (mFirstInputPtsUs >= 0 && mLastInputPtsUs >= 0)
+                    ? Math.max(0L, mLastInputPtsUs - mFirstInputPtsUs) : 0L;
+            Log.i(TAG, "Input pacing wall_duration_us=" + wallDurationUs
+                    + " timeline_duration_us=" + timelineDurationUs
+                    + " max_lag_us=" + mMaxInputLagUs
+                    + " max_gap_excess_us=" + mMaxInputGapExcessUs);
             
             // Wait for a buffer to send EOS - with timeout
             Integer bufferIndex = null;
@@ -419,6 +449,22 @@ public class AsyncBufferEncoder extends Encoder {
                 }
             }
         }
+    }
+
+    private void recordInputPacing(long ptsUs) {
+        long wallUs = SystemClock.elapsedRealtimeNanos() / 1000L;
+        if (mFirstInputWallUs < 0) {
+            mFirstInputWallUs = wallUs;
+            mFirstInputPtsUs = ptsUs;
+        } else {
+            long lagUs = (wallUs - mFirstInputWallUs) - (ptsUs - mFirstInputPtsUs);
+            mMaxInputLagUs = Math.max(mMaxInputLagUs, Math.max(0L, lagUs));
+            long gapExcessUs = (wallUs - mLastInputWallUs) - (ptsUs - mLastInputPtsUs);
+            mMaxInputGapExcessUs = Math.max(
+                    mMaxInputGapExcessUs, Math.max(0L, gapExcessUs));
+        }
+        mLastInputWallUs = wallUs;
+        mLastInputPtsUs = ptsUs;
     }
 
     /**
@@ -480,6 +526,10 @@ public class AsyncBufferEncoder extends Encoder {
                 return -2;
             }
             
+            // Record actual submission pacing only for frames delivered to the
+            // codec; omitted inputs remain represented by their PTS gap.
+            recordInputPacing(pts);
+
             // Start encoding measurement
             mStats.startEncodingFrame(pts, mInFramesCount);
             

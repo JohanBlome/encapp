@@ -68,6 +68,16 @@ class BufferEncoder extends Encoder {
             mIsFakeInput = true;
             Log.d(TAG, "Using fake input for performance testing");
             mFakeInputReader = new FakeInputReader();
+            mFakeInputReader.setMediaType(mTest.getConfigure().getMime());
+            // The rate-control probe must feed identical bytes to every codec.
+            // Keep legacy codec-adaptive fake_input behavior for existing tests,
+            // but disable it for the explicit fake_input_rc source.
+            mFakeInputReader.setCodecAdaptiveNoise(
+                    !mTest.getInput().getFilepath().startsWith("fake_input_rc"));
+            if (mTest.hasRuntime()) {
+                mFakeInputReader.setComplexitySchedule(
+                        mTest.getRuntime().getFakeInputComplexityList());
+            }
             if (!mFakeInputReader.openFile(mTest.getInput().getFilepath(), mTest.getInput().getPixFmt(),
                     sourceResolution.getWidth(), sourceResolution.getHeight())) {
                 return "Could not initialize fake input";

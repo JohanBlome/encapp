@@ -3,6 +3,8 @@
 import unittest
 import os
 import sys
+import tempfile
+from unittest import mock
 
 MODULE_PATH = os.path.dirname(__file__)
 ENCAPP_SCRIPTS_ROOT_DIR = os.path.join(MODULE_PATH, os.pardir, os.pardir)
@@ -104,6 +106,53 @@ class EncappTest(unittest.TestCase):
                 msg=(f'{msg} {test_case["bitrate_list"]} != ' f"{bitrate_list}"),
             )
 
+
+    def testStreamingLogcatPreservesCompleteBuffer(self):
+        complete_log = (
+            "01-01 00:00:00.000 1 2 D encapp.main: started\n"
+            "01-01 00:00:00.001 1 2 I encapp.fakeinput: "
+            "Generated fake input pattern: 2368x1728\n"
+            "01-01 00:00:00.002 3 4 E CCodec: vendor configure failed\n"
+            "01-01 00:00:00.003 5 6 E AndroidRuntime: fatal detail\n")
+        process = mock.Mock()
+        process.communicate.return_value = ("", "")
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(
+                encapp.subprocess, "Popen", return_value=process) as popen:
+            capture = encapp.AndroidLogcatCapture(td, "S1", "SERIAL")
+            capture.start()
+            capture._file.write(complete_log)
+            capture._file.flush()
+            self.assertEqual(1, capture.progress_token())
+            extra_log = (
+                "01-01 00:00:00.004 1 2 D encapp.main: "
+                "Sleep while waiting for init to be done\n"
+                "01-01 00:00:00.005 1 3 D encapp.async_buffer_encoder: "
+                "case - AsyncBufferEncoder: frames: 500 outframes: 499\n")
+            capture._file.write(extra_log)
+            capture._file.flush()
+            self.assertEqual(2, capture.progress_token())
+            path = capture.stop()
+            with open(path) as handle:
+                self.assertEqual(handle.read(), complete_log + extra_log)
+        popen.assert_called_once_with(
+            ["adb", "-s", "SERIAL", "logcat", "-v", "threadtime"],
+            stdout=mock.ANY, stderr=encapp.subprocess.PIPE, text=True)
+        process.terminate.assert_called_once_with()
+
+    def testDumpSessionLogcatPreservesCompleteBuffer(self):
+        complete_log = (
+            "01-01 00:00:00.000 1 2 D encapp.main: started\n"
+            "01-01 00:00:00.001 3 4 E CCodec: vendor configure failed\n"
+            "01-01 00:00:00.002 5 6 E AndroidRuntime: fatal detail\n")
+        with tempfile.TemporaryDirectory() as td, mock.patch.object(
+                encapp.encapp_tool.adb_cmds, "run_cmd",
+                return_value=(True, complete_log, "")) as run_cmd:
+            path = encapp.dump_session_logcat(td, "S1", "SERIAL")
+            with open(path) as handle:
+                self.assertEqual(handle.read(), complete_log)
+        run_cmd.assert_called_once_with(
+            "adb -s SERIAL logcat -d -v threadtime",
+            ignore_errors=True, debug=0)
 
     def testCodecMediaTypesPrefersCompleteList(self):
         codec = {

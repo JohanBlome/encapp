@@ -17,6 +17,7 @@ import pprint
 import random
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -298,7 +299,8 @@ def valid_path(text):
 
 
 def run_encapp_test(
-    protobuf_txt_filepath, serial, device_workdir, run_cmd="", session_id=None, debug=0
+    protobuf_txt_filepath, serial, device_workdir, run_cmd="", session_id=None,
+    debug=0, logcat_capture=None
 ):
     log.debug(
         "running test: %s serial=%s device_workdir=%s run_cmd=%r session_id=%s",
@@ -308,6 +310,8 @@ def run_encapp_test(
     if len(run_cmd) > 0:
         # TODO: can we assume adb?
         encapp_tool.adb_cmds.reset_logcat(serial)
+        if logcat_capture is not None:
+            logcat_capture.start()
         cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug=debug)
 
@@ -328,8 +332,11 @@ def run_encapp_test(
                 debug=debug,
             )
         else:
-            # clean the logcat first
+            # Clean the buffer, then attach a streaming reader before launch so
+            # high-volume sessions cannot wrap away their initialization logs.
             encapp_tool.adb_cmds.reset_logcat(serial)
+            if logcat_capture is not None:
+                logcat_capture.start()
             session_extra = f"-e session_id {session_id} " if session_id else ""
             ret, _, stderr = encapp_tool.adb_cmds.run_cmd(
                 f"adb -s {serial} shell am start --activity-clear-task "
@@ -1997,6 +2004,122 @@ def _restore_mediaformat_shaping(serial: str, state: dict, debug: int = 0):
         )
 
 
+class AndroidLogcatCapture:
+    """Stream one Android session's complete logcat to a host file."""
+
+    def __init__(self, local_workdir, session_id, serial):
+        self.path = os.path.join(
+            local_workdir, f"{session_id}.android_logcat.txt")
+        self.serial = serial
+        self._file = None
+        self._process = None
+        self._captured_path = ""
+        self._progress_offset = 0
+        self._progress_token = 0
+        self._progress_remainder = ""
+
+    def start(self):
+        """Start once, after logcat clear and immediately before app launch."""
+        if self._process is not None:
+            return
+        self._file = open(self.path, "w")
+        try:
+            self._process = subprocess.Popen(
+                ["adb", "-s", self.serial, "logcat", "-v", "threadtime"],
+                stdout=self._file,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except BaseException:
+            self._file.close()
+            self._file = None
+            raise
+
+    def progress_token(self):
+        """Return a counter advanced only by meaningful encoder progress."""
+        markers = (
+            "Prewarmed fake input noise",
+            "Generated fake input pattern",
+            "Create codec by name",
+            "Created component [",
+            "Encoding complete:",
+            "Input pacing ",
+            "Queued EOS",
+            "Output EOS received",
+        )
+        try:
+            with open(self.path, "r", errors="replace") as handle:
+                handle.seek(self._progress_offset)
+                chunk = handle.read()
+                self._progress_offset = handle.tell()
+        except OSError:
+            return self._progress_token
+        chunk = self._progress_remainder + chunk
+        if chunk and not chunk.endswith(("\n", "\r")):
+            lines = chunk.splitlines()
+            self._progress_remainder = lines.pop() if lines else chunk
+        else:
+            lines = chunk.splitlines()
+            self._progress_remainder = ""
+        for line in lines:
+            if (any(marker in line for marker in markers)
+                    or ("encapp.async_buffer_encoder:" in line
+                        and " frames:" in line)):
+                self._progress_token += 1
+        return self._progress_token
+
+    def stop(self):
+        """Stop the stream and return its path, or empty string on failure."""
+        if self._process is None:
+            return self._captured_path
+        process = self._process
+        self._process = None
+        process.terminate()
+        try:
+            _stdout, stderr = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            _stdout, stderr = process.communicate()
+        finally:
+            if self._file is not None:
+                self._file.flush()
+                self._file.close()
+                self._file = None
+        try:
+            size = os.path.getsize(self.path)
+        except OSError:
+            size = 0
+        if not size:
+            log.warning("complete streaming logcat capture was empty: %s", stderr)
+            return ""
+        log.debug("wrote complete streaming session logcat to %s (%d bytes)",
+                  self.path, size)
+        self._captured_path = self.path
+        return self._captured_path
+
+
+def dump_session_logcat(local_workdir, session_id, serial):
+    """Best-effort fallback when streaming logcat could not be captured."""
+    logcat_path = os.path.join(local_workdir, f"{session_id}.android_logcat.txt")
+    try:
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
+            f"adb -s {serial} logcat -d -v threadtime",
+            ignore_errors=True,
+            debug=0,
+        )
+        if stdout:
+            with open(logcat_path, "w") as f:
+                f.write(stdout)
+            log.debug("wrote complete session logcat to %s (%d bytes)",
+                      logcat_path, len(stdout))
+            return logcat_path
+        if not ret:
+            log.warning("complete logcat dump failed: %s", stderr)
+    except Exception as e:
+        log.warning("complete logcat dump failed: %s", e)
+    return ""
+
+
 def run_codec_tests(
     test_suite: tests_definitions.TestSuite,
     files_to_push: list[str],
@@ -2025,6 +2148,8 @@ def run_codec_tests(
     # boundary and output artifact. CLI uses the manifest as the
     # authoritative success oracle (see _oracle_via_manifest).
     session_id = make_session_id()
+    logcat_capture = None if encapp_tool.adb_cmds.USE_IDB else AndroidLogcatCapture(
+        local_workdir, session_id, serial)
     log.info("session_id: %s  manifest: %s/%s.session.jsonl",
              session_id, device_workdir, session_id)
 
@@ -2105,6 +2230,7 @@ def run_codec_tests(
                     run_cmd=run_cmd,
                     session_id=session_id,
                     debug=debug,
+                    logcat_capture=logcat_capture,
                 )
                 with open(tests_run, "a") as passed:
                     passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
@@ -2184,6 +2310,7 @@ def run_codec_tests(
                 run_cmd=run_cmd,
                 session_id=session_id,
                 debug=debug,
+                logcat_capture=logcat_capture,
             )
 
             # collect the test results
@@ -2220,7 +2347,8 @@ def run_codec_tests(
         # write the manifest yet.
         if session_id and not encapp_tool.adb_cmds.USE_IDB:
             synth = _oracle_via_manifest(
-                test_suite, serial, device_workdir, local_workdir, session_id, debug
+                test_suite, serial, device_workdir, local_workdir, session_id,
+                debug, logcat_capture=logcat_capture
             )
             # Synthesize the collect_results (bool, list) shape so the iOS-only
             # verify path can keep reading results[0] / results[1].
@@ -2233,6 +2361,13 @@ def run_codec_tests(
         shaping_state["run_error"] = f"{type(exc).__name__}: {exc}"
         raise
     finally:
+        if logcat_capture is not None:
+            try:
+                if not logcat_capture.stop():
+                    dump_session_logcat(local_workdir, session_id, serial)
+            except Exception as exc:
+                log.warning("streaming logcat finalization failed: %s", exc)
+                dump_session_logcat(local_workdir, session_id, serial)
         try:
             _restore_mediaformat_shaping(serial, shaping_state, debug=debug)
         except Exception as exc:
@@ -2259,7 +2394,8 @@ def run_codec_tests(
 
 
 def _oracle_via_manifest(
-    test_suite, serial, device_workdir, local_workdir, session_id, debug
+    test_suite, serial, device_workdir, local_workdir, session_id, debug,
+    logcat_capture=None
 ):
     """Pull and classify the session manifest, pull declared artifacts,
     print a per-test verdict summary. Returns a (ok, json_paths) tuple
@@ -2307,6 +2443,8 @@ def _oracle_via_manifest(
         timeout_sec=timeout_sec,
         on_timeout=_force_stop,
         is_alive_fn=_is_alive,
+        progress_fn=(logcat_capture.progress_token
+                     if logcat_capture is not None else None),
     )
 
     # Pull every artifact the manifest declared. Duplicates are absorbed
@@ -2328,26 +2466,6 @@ def _oracle_via_manifest(
             )
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
-
-    # Dump the encapp logcat slice for this session. logcat -c at am-start
-    # time scopes the buffer to this session. adb logcat -s tag:level
-    # matches a literal tag, but every file uses a sub-tag like
-    # 'encapp.statistics' / 'encapp.main', so we filter device-side with
-    # grep -E ' encapp(\.|:)' to preserve the original sub-tags.
-    logcat_path = os.path.join(local_workdir, f"{session_id}.android_logcat.txt")
-    try:
-        ret, stdout, _ = encapp_tool.adb_cmds.run_cmd(
-            f"adb -s {serial} shell \"logcat -d | grep -E ' encapp(\\.|:)' || true\"",
-            ignore_errors=True,
-            debug=0,
-        )
-        if ret and stdout:
-            with open(logcat_path, "w") as f:
-                f.write(stdout)
-            log.debug("wrote session logcat to %s (%d bytes)",
-                      logcat_path, len(stdout))
-    except Exception as e:
-        log.warning("logcat dump failed: %s", e)
 
     _print_manifest_summary(verdicts, session_id)
 

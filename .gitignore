@@ -263,6 +263,9 @@ cython_debug/
 *.yuv
 *.ivf
 
+# Local codec capability dumps
+codecs_*.txt
+
 # Protoc binaries (downloaded by proto/Makefile)
 proto/protoc-*/
 proto/*.zip
