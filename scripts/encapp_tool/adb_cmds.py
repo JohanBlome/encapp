@@ -28,6 +28,7 @@ ANDROID_APP_PRIVATE_PREFIXES = (
 # size for split adb push
 MAX_SIZE_BYTES = sys.maxsize  # Can handle andy size
 SPLIT_SIZE_BYTES = int(20e6)  # 20MB
+PACE_FILE_TRANSFERS = False  # Explicit Android-only opt-in.
 
 
 def run_cmd(
@@ -813,6 +814,8 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
             print(f'error: copying "{filepath}" to  {device_filepath} : {stdout}')
     else:
         device_filepath = os.path.join(device_workdir, os.path.basename(filepath))
+        if PACE_FILE_TRANSFERS:
+            return push_file_to_device_android(filepath, serial, device_workdir, debug)
         if file_already_in_device(filepath, serial, device_filepath, fast_copy, debug):
             return True
         # push the file
@@ -823,6 +826,8 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
 def push_file_to_device_android(
     filepath, serial, device_workdir, debug, max_size_bytes=MAX_SIZE_BYTES
 ):
+    if PACE_FILE_TRANSFERS:
+        return _push_file_to_device_android_paced(filepath, serial, device_workdir, debug)
     if _is_app_private_path(device_workdir):
         basename = os.path.basename(filepath)
         target_path = os.path.join(device_workdir, basename)
@@ -927,12 +932,116 @@ def push_file_to_device_android(
     return True
 
 
+def _push_file_to_device_android_paced(filepath, serial, device_workdir, debug):
+    from . import adb_payload
+
+    destination = os.path.join(device_workdir, os.path.basename(filepath))
+    size = os.path.getsize(filepath)
+    digest = get_host_hash(filepath, debug)
+    if (not filepath.endswith(".pbtxt")
+            and adb_payload.remote_size(serial, destination, debug) == size
+            and adb_payload.remote_hash(serial, destination, debug) == digest):
+        return True
+    ok, _, error = adb_payload.shell(
+        serial, f"mkdir -p -- {adb_payload._path(device_workdir)}",
+        device_workdir, debug)
+    if not ok:
+        log.error("cannot create payload directory: %s", error)
+        return False
+    if size <= MAX_SIZE_BYTES:
+        return adb_payload.push(serial, filepath, destination, debug)
+    if SPLIT_SIZE_BYTES <= 0:
+        raise ValueError("file split size must be positive")
+
+    try:
+        with adb_payload.split_budget(serial, device_workdir, digest, SPLIT_SIZE_BYTES):
+            return _push_file_to_device_android_split_paced(
+                filepath, serial, device_workdir, destination, size, digest, debug)
+    except (OSError, adb_payload.PayloadTransferError) as error:
+        log.error("split staging lock failed: %s", error)
+        return False
+
+
+def _push_file_to_device_android_split_paced(
+    filepath, serial, device_workdir, destination, size, digest, debug
+):
+    from . import adb_payload
+
+    # Stable names enable hash-verified reuse on an explicitly repeated call.
+    # Unique local staging avoids deleting any other caller's parts.
+    staging = tempfile.mkdtemp(prefix="encapp-split.")
+    parts = []
+    complete = False
+    try:
+        with open(filepath, "rb") as source:
+            index = 0
+            while source.tell() < size:
+                name = f"encapp-part.{digest}.{SPLIT_SIZE_BYTES}.{index:08d}"
+                local_part = os.path.join(staging, name)
+                with open(local_part, "wb") as output:
+                    remaining = min(SPLIT_SIZE_BYTES, size - source.tell())
+                    while remaining:
+                        data = source.read(min(65536, remaining))
+                        if not data:
+                            raise adb_payload.PayloadTransferError("source shrank while splitting")
+                        output.write(data)
+                        remaining -= len(data)
+                remote_part = os.path.join(device_workdir, name)
+                part_size = os.path.getsize(local_part)
+                part_hash = get_host_hash(local_part, debug)
+                if not (adb_payload.remote_size(serial, remote_part, debug) == part_size
+                        and adb_payload.remote_hash(serial, remote_part, debug) == part_hash):
+                    if not adb_payload.push(serial, local_part, remote_part, debug):
+                        return False
+                parts.append(remote_part)
+                index += 1
+            if source.read(1):
+                raise adb_payload.PayloadTransferError("source grew while splitting")
+
+        assembly = destination + ".assembly.partial." + os.urandom(16).hex()
+        ok, _, error = adb_payload.shell(
+            serial, f"set -C; : > {adb_payload._path(assembly)}", assembly, debug)
+        if not ok:
+            raise adb_payload.PayloadTransferError(f"cannot create assembly: {error}")
+        for command in adb_payload.file_commands(serial, parts, "cat", assembly):
+            ok, _, error = run_cmd(command, debug=debug)
+            if not ok:
+                raise adb_payload.PayloadTransferError(f"assembly failed: {error}; {assembly}")
+        if (adb_payload.remote_size(serial, assembly, debug) != size
+                or adb_payload.remote_hash(serial, assembly, debug) != digest):
+            raise adb_payload.PayloadTransferError(f"assembly size/hash mismatch: {assembly}")
+        ok, _, error = adb_payload.shell(
+            serial, f"mv -f -- {adb_payload._path(assembly)} {adb_payload._path(destination)}",
+            assembly, debug)
+        if not ok:
+            raise adb_payload.PayloadTransferError(f"assembly rename failed: {error}; {assembly}")
+        for command in adb_payload.file_commands(serial, parts, "rm"):
+            ok, _, error = run_cmd(command, debug=debug)
+            if not ok:
+                raise adb_payload.PayloadTransferError(f"split cleanup failed: {error}")
+        complete = True
+        return True
+    except (OSError, ValueError, adb_payload.PayloadTransferError) as error:
+        log.error("split transfer stopped without retry: %s", error)
+        return False
+    finally:
+        if complete:
+            for name in os.listdir(staging):
+                os.remove(os.path.join(staging, name))
+            os.rmdir(staging)
+        else:
+            log.error("split source parts retained at %s; remote parts retained", staging)
+
+
 def pull_file_from_device(
     serial: str, remote_path: str, destination: str, debug: int
 ) -> bool:
     """Pull one device file, including files in Encapp's app-private directory."""
     os.makedirs(destination, exist_ok=True)
     local_path = os.path.join(destination, os.path.basename(remote_path))
+    if PACE_FILE_TRANSFERS and not USE_IDB:
+        from . import adb_payload
+        return adb_payload.pull(serial, remote_path, local_path, debug=debug)
     is_private = _is_app_private_path(remote_path)
     if is_private:
         src = _app_relative_path(remote_path)
