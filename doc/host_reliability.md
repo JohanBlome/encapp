@@ -79,8 +79,10 @@ poll into an oversized immutable transfer. Short transfers, extra bytes and
 nonzero exits still fail; a failed existing payload raises out of the poll
 rather than being silently retried. Only an explicit absence marker,
 confirmed in a searchable/listable parent with no matching directory entry,
-is a normal poll miss. Permission, run-as, transport and malformed-stat
-errors raise with their diagnostic instead of looking like missing files.
+is a normal poll miss. If an entry appears after the initial absence check,
+the same bounded control makes one `stat -L -c %s` read and strictly validates
+its result. Permission, run-as, transport and malformed-stat errors still
+raise with their diagnostic instead of looking like missing files.
 Successful snapshots atomically replace the previous host snapshot and
 cannot claim a whole-file hash of the growing source.
 
@@ -131,7 +133,8 @@ PYTHONPATH=scripts python -m pytest \
   scripts/tests/unit/adb_payload_test.py \
   scripts/tests/unit/growing_manifest_snapshot_test.py \
   scripts/tests/unit/logcat_options_test.py \
-  scripts/tests/unit/reliability_review_test.py
+  scripts/tests/unit/reliability_review_test.py \
+  scripts/tests/unit/manifest_creation_race_test.py
 ```
 
 These tests replace adb with owned local fixtures and fake subprocesses;
