@@ -39,8 +39,24 @@ def shell_command(serial, inner, path):
             + shlex.quote(_remote_command(inner, path)))
 
 
-def shell(serial, inner, path, debug=0):
-    return adb_cmds.run_cmd(shell_command(serial, inner, path), debug=debug)
+def shell(serial, inner, path, debug=0, portable=False):
+    if not portable:
+        return adb_cmds.run_cmd(shell_command(serial, inner, path), debug=debug)
+    # No host shell, fcntl or pipe selector on the unpaced control path.
+    process = subprocess.Popen(
+        ["adb", "-s", serial, "shell", _remote_command(inner, path)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    try:
+        output, error = process.communicate(timeout=IO_TIMEOUT)
+        return (process.returncode == 0, output.decode(errors="replace"),
+                error.decode(errors="replace"))
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=IO_TIMEOUT)
+        process.stdout.close()
+        process.stderr.close()
 
 
 def _path(path):
@@ -49,26 +65,8 @@ def _path(path):
 
 
 def remote_size(serial, path, debug=0, portable=False):
-    inner = f"stat -L -c %s -- {_path(path)}"
-    if portable:
-        # No host shell, fcntl or pipe selector is needed for a control
-        # snapshot on an otherwise unpaced host (including Windows).
-        process = subprocess.Popen(
-            ["adb", "-s", serial, "shell", _remote_command(inner, path)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        )
-        try:
-            output, _ = process.communicate(timeout=IO_TIMEOUT)
-            output = output.decode(errors="replace")
-            ok = process.returncode == 0
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.communicate(timeout=IO_TIMEOUT)
-            process.stdout.close()
-            process.stderr.close()
-    else:
-        ok, output, _ = shell(serial, inner, path, debug)
+    ok, output, _ = shell(serial, f"stat -L -c %s -- {_path(path)}", path, debug,
+                          portable=portable)
     try:
         size = int(output.strip()) if ok else -1
         return size if size >= 0 else None
@@ -76,8 +74,9 @@ def remote_size(serial, path, debug=0, portable=False):
         return None
 
 
-def remote_hash(serial, path, debug=0):
-    ok, output, _ = shell(serial, f"md5sum -- {_path(path)}", path, debug)
+def remote_hash(serial, path, debug=0, portable=False):
+    ok, output, _ = shell(serial, f"md5sum -- {_path(path)}", path, debug,
+                          portable=portable)
     digest = output.split()[0] if ok and output.split() else ""
     if len(digest) != 32 or any(c not in "0123456789abcdef" for c in digest):
         return None
@@ -258,10 +257,10 @@ def pull(serial, source, destination, debug=0, verify_hash=True, paced=True,
     partial_path = None
     try:
         with payload_budget(paced) as admit:
-            size = remote_size(serial, source, debug, portable=snapshot and not paced)
+            size = remote_size(serial, source, debug, portable=not paced)
             if size is None:
                 return False
-            digest = remote_hash(serial, source, debug) if verify_hash else None
+            digest = remote_hash(serial, source, debug, portable=not paced) if verify_hash else None
             if verify_hash and digest is None:
                 raise PayloadTransferError("cannot obtain remote hash")
             parent = os.path.dirname(os.path.abspath(destination))
@@ -273,7 +272,7 @@ def pull(serial, source, destination, debug=0, verify_hash=True, paced=True,
                 inner = (f"dd if={_path(source)} bs=1 count={size} 2>/dev/null"
                          if snapshot else f"cat -- {_path(source)}")
                 _stream(serial, source, inner, local, size, False, admit,
-                        direct_download=snapshot and not paced)
+                        direct_download=not paced)
                 local.flush()
                 os.fsync(local.fileno())
             if (os.path.getsize(partial_path) != size or

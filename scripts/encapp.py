@@ -300,7 +300,7 @@ def valid_path(text):
 
 def run_encapp_test(
     protobuf_txt_filepath, serial, device_workdir, run_cmd="", session_id=None,
-    debug=0, logcat_capture=None
+    debug=0, logcat_capture=None, preserve_logcat=False
 ):
     log.debug(
         "running test: %s serial=%s device_workdir=%s run_cmd=%r session_id=%s",
@@ -309,7 +309,8 @@ def run_encapp_test(
     # TODO: add special exec command here.
     if len(run_cmd) > 0:
         # TODO: can we assume adb?
-        encapp_tool.adb_cmds.reset_logcat(serial)
+        if encapp_tool.adb_cmds.USE_IDB or not preserve_logcat:
+            encapp_tool.adb_cmds.reset_logcat(serial)
         if logcat_capture is not None:
             logcat_capture.start()
         cmd = f"adb -s {serial} shell {run_cmd} {protobuf_txt_filepath}"
@@ -332,9 +333,9 @@ def run_encapp_test(
                 debug=debug,
             )
         else:
-            # Clean the buffer, then attach a streaming reader before launch so
-            # high-volume sessions cannot wrap away their initialization logs.
-            encapp_tool.adb_cmds.reset_logcat(serial)
+            # Attach the upstream stream before launch, with or without clear.
+            if not preserve_logcat:
+                encapp_tool.adb_cmds.reset_logcat(serial)
             if logcat_capture is not None:
                 logcat_capture.start()
             session_extra = f"-e session_id {session_id} " if session_id else ""
@@ -896,6 +897,8 @@ def run_codec_tests_file(
                     options.split,
                     debug=debug,
                     enable_mediaformat_shaping=enable_mediaformat_shaping,
+                    preserve_logcat=getattr(options, "preserve_logcat", False),
+                    full_logcat=getattr(options, "full_logcat", False),
                 )
 
                 # Remove test files
@@ -954,6 +957,8 @@ def run_codec_tests_file(
                     options.split,
                     debug=debug,
                     enable_mediaformat_shaping=enable_mediaformat_shaping,
+                    preserve_logcat=getattr(options, "preserve_logcat", False),
+                    full_logcat=getattr(options, "full_logcat", False),
                 )
                 # iOS-only fail-detection (ls output vs suite size + regex
                 # match on output_filename). On Android the manifest oracle
@@ -2120,6 +2125,43 @@ def dump_session_logcat(local_workdir, session_id, serial):
     return ""
 
 
+def _capture_full_session_logcat(serial, device_workdir, local_workdir, session_id, debug=0):
+    """Keep an extra bounded epoch snapshot without replacing upstream logs."""
+    from encapp_tool import adb_payload
+
+    filename = f"{session_id}.android_logcat.full.txt"
+    local_path = os.path.join(local_workdir, filename)
+    remote_path = (f"{device_workdir.rstrip('/')}/{filename}.stage."
+                   + os.urandom(16).hex())
+    producer = "logcat -d -b main -b system -v epoch -t 20000 '*:V'"
+    if encapp_tool.adb_cmds._is_app_private_path(remote_path):
+        # Read all tags as shell, then write as the app. Running logcat itself
+        # under run-as would restrict records to the app's UID. pipefail is
+        # essential: a successful sink must not hide a failed logcat producer.
+        sink = adb_payload._remote_command(
+            f"set -C; cat > {adb_payload._path(remote_path)}", remote_path)
+        inner = f"set -o pipefail; {producer} | {sink}"
+    else:
+        inner = f"set -C; {producer} > {adb_payload._path(remote_path)}"
+    staged, _, error = adb_payload.shell(
+        serial, inner, "/", debug, portable=not encapp_tool.adb_cmds.PACE_FILE_TRANSFERS)
+    if not staged:
+        raise adb_payload.PayloadTransferError(
+            f"logcat staging failed: {error}; remote stage retained: {remote_path}")
+    if not adb_payload.pull(serial, remote_path, local_path, debug=debug,
+                            paced=encapp_tool.adb_cmds.PACE_FILE_TRANSFERS):
+        raise adb_payload.PayloadTransferError(
+            f"logcat download failed; remote stage retained: {remote_path}")
+    removed, _, error = adb_payload.shell(
+        serial, f"rm -f -- {adb_payload._path(remote_path)}", remote_path, debug,
+        portable=not encapp_tool.adb_cmds.PACE_FILE_TRANSFERS)
+    if not removed:
+        raise adb_payload.PayloadTransferError(
+            f"logcat cleanup failed: {error}; local snapshot: {local_path}; "
+            f"remote stage retained: {remote_path}")
+    return local_path
+
+
 def run_codec_tests(
     test_suite: tests_definitions.TestSuite,
     files_to_push: list[str],
@@ -2133,6 +2175,8 @@ def run_codec_tests(
     split: bool = False,
     debug: int = 0,
     enable_mediaformat_shaping: bool = False,
+    preserve_logcat: bool = False,
+    full_logcat: bool = False,
 ):
     """Run the testsuite.
     The testsuite will be written to a file for pushing along with files_to_push.
@@ -2231,6 +2275,7 @@ def run_codec_tests(
                     session_id=session_id,
                     debug=debug,
                     logcat_capture=logcat_capture,
+                    preserve_logcat=preserve_logcat,
                 )
                 with open(tests_run, "a") as passed:
                     passed.write(f"{get_valid_test_name(test)}.pbtxt\n")
@@ -2311,6 +2356,7 @@ def run_codec_tests(
                 session_id=session_id,
                 debug=debug,
                 logcat_capture=logcat_capture,
+                preserve_logcat=preserve_logcat,
             )
 
             # collect the test results
@@ -2368,6 +2414,14 @@ def run_codec_tests(
             except Exception as exc:
                 log.warning("streaming logcat finalization failed: %s", exc)
                 dump_session_logcat(local_workdir, session_id, serial)
+        if full_logcat and not encapp_tool.adb_cmds.USE_IDB:
+            try:
+                _capture_full_session_logcat(serial, device_workdir, local_workdir,
+                                             session_id, debug)
+            except Exception as exc:
+                # Diagnostic collection must not mask run/shaping failures or
+                # become a new measurement-aborting gate.
+                log.warning("bounded full logcat collection failed: %s", exc)
         try:
             _restore_mediaformat_shaping(serial, shaping_state, debug=debug)
         except Exception as exc:
@@ -3169,6 +3223,24 @@ input_args = {
                 "Per-module log-level overrides, e.g. "
                 "'encapp.adb=DEBUG,encapp.manifest=WARNING'."
             ),
+        },
+    },
+    "preserve-logcat": {
+        "func": "run",
+        "long": "--preserve-logcat",
+        "args": {
+            "action": "store_true",
+            "help": "Do not clear Android logcat before launch; keep upstream streaming capture.",
+        },
+    },
+    "full-logcat": {
+        "func": "run",
+        "long": "--full-logcat",
+        "args": {
+            "action": "store_true",
+            "help": "Save an additional all-tag main/system epoch logcat snapshot "
+            "(last 20000 records) using the selected payload path. May include "
+            "pre-existing records; does not enable vendor logging.",
         },
     },
     "serial": {
