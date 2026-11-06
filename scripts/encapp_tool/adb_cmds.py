@@ -1034,11 +1034,16 @@ def _push_file_to_device_android_split_paced(
 
 
 def pull_file_from_device(
-    serial: str, remote_path: str, destination: str, debug: int
+    serial: str, remote_path: str, destination: str, debug: int, snapshot: bool = False
 ) -> bool:
-    """Pull one device file, including files in Encapp's app-private directory."""
+    """Pull one device file, optionally snapshotting an append-only control file."""
     os.makedirs(destination, exist_ok=True)
     local_path = os.path.join(destination, os.path.basename(remote_path))
+    if snapshot and not USE_IDB:
+        from . import adb_payload
+        return adb_payload.pull(serial, remote_path, local_path, debug=debug,
+                                verify_hash=False, paced=PACE_FILE_TRANSFERS,
+                                snapshot=True, raise_errors=True)
     if PACE_FILE_TRANSFERS and not USE_IDB:
         from . import adb_payload
         return adb_payload.pull(serial, remote_path, local_path, debug=debug)

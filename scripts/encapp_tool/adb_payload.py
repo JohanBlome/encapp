@@ -48,8 +48,27 @@ def _path(path):
                        if adb_cmds._is_app_private_path(path) else path)
 
 
-def remote_size(serial, path, debug=0):
-    ok, output, _ = shell(serial, f"stat -L -c %s -- {_path(path)}", path, debug)
+def remote_size(serial, path, debug=0, portable=False):
+    inner = f"stat -L -c %s -- {_path(path)}"
+    if portable:
+        # No host shell, fcntl or pipe selector is needed for a control
+        # snapshot on an otherwise unpaced host (including Windows).
+        process = subprocess.Popen(
+            ["adb", "-s", serial, "shell", _remote_command(inner, path)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        try:
+            output, _ = process.communicate(timeout=IO_TIMEOUT)
+            output = output.decode(errors="replace")
+            ok = process.returncode == 0
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.communicate(timeout=IO_TIMEOUT)
+            process.stdout.close()
+            process.stderr.close()
+    else:
+        ok, output, _ = shell(serial, inner, path, debug)
     try:
         size = int(output.strip()) if ok else -1
         return size if size >= 0 else None
@@ -171,18 +190,20 @@ def _copy_pipe(stream, local, size, upload, admit):
                 raise PayloadTransferError("adb exceeded observed size")
 
 
-def _stream(serial, path, inner, local, size, upload, admit):
+def _stream(serial, path, inner, local, size, upload, admit, direct_download=False):
     process = subprocess.Popen(
         ["adb", "-s", serial, "exec-in" if upload else "exec-out",
          _remote_command(inner, path)],
         stdin=subprocess.PIPE if upload else subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL if upload else subprocess.PIPE,
+        stdout=(subprocess.DEVNULL if upload else
+                local if direct_download else subprocess.PIPE),
         stderr=subprocess.PIPE, bufsize=0,
     )
     tail = _StderrTail(process.stderr)
     stream = process.stdin if upload else process.stdout
     try:
-        _copy_pipe(stream, local, size, upload, admit)
+        if not direct_download:
+            _copy_pipe(stream, local, size, upload, admit)
         if upload:
             stream.close()
         code = process.wait(timeout=IO_TIMEOUT)
@@ -193,7 +214,8 @@ def _stream(serial, path, inner, local, size, upload, admit):
         if process.poll() is None:
             process.kill()
         process.wait(timeout=IO_TIMEOUT)
-        stream.close()
+        if stream is not None:
+            stream.close()
         tail.finish()
         process.stderr.close()
 
@@ -223,12 +245,20 @@ def push(serial, source, destination, debug=0):
         return False
 
 
-def pull(serial, source, destination, debug=0, verify_hash=True, paced=True):
-    """Strict immutable file download into a unique retained local partial."""
+def pull(serial, source, destination, debug=0, verify_hash=True, paced=True,
+         snapshot=False, raise_errors=False):
+    """Publish a strict immutable download or an observed-length prefix.
+
+    Snapshots of append-only control files cannot claim whole-file hashes.
+    An unpaced snapshot uses a bounded remote producer and direct file output
+    instead of POSIX pipe selectors. Every mode still checks exact size/exit.
+    """
+    if snapshot and verify_hash:
+        raise ValueError("a growing-file snapshot cannot verify a whole-file hash")
     partial_path = None
     try:
         with payload_budget(paced) as admit:
-            size = remote_size(serial, source, debug)
+            size = remote_size(serial, source, debug, portable=snapshot and not paced)
             if size is None:
                 return False
             digest = remote_hash(serial, source, debug) if verify_hash else None
@@ -240,8 +270,10 @@ def pull(serial, source, destination, debug=0, verify_hash=True, paced=True):
                     prefix=os.path.basename(destination) + ".partial.",
                     dir=parent, delete=False) as local:
                 partial_path = local.name
-                _stream(serial, source, f"cat -- {_path(source)}",
-                        local, size, False, admit)
+                inner = (f"dd if={_path(source)} bs=1 count={size} 2>/dev/null"
+                         if snapshot else f"cat -- {_path(source)}")
+                _stream(serial, source, inner, local, size, False, admit,
+                        direct_download=snapshot and not paced)
                 local.flush()
                 os.fsync(local.fileno())
             if (os.path.getsize(partial_path) != size or
@@ -253,6 +285,8 @@ def pull(serial, source, destination, debug=0, verify_hash=True, paced=True):
     except (OSError, ValueError, subprocess.SubprocessError,
             PayloadTransferError) as error:
         log.error("payload download failed: %s; local partial: %s", error, partial_path)
+        if raise_errors:
+            raise PayloadTransferError(f"{error}; local partial: {partial_path}") from error
         return False
 
 

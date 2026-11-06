@@ -49,6 +49,24 @@ followed by part cleanup. A cleanup failure is reported even if the final
 file was already published. Inactivity/process-exit waits are bounded to
 30 seconds; waiting for another enabled transfer's advisory lock is not.
 
+## Growing manifest snapshots
+
+Android manifest polling reads **exactly the byte prefix observed by stat**,
+using a bounded remote `dd` producer. Appends after stat do not turn a valid
+poll into an oversized immutable transfer. Short transfers, extra bytes and
+nonzero exits still fail; a failed existing payload raises out of the poll
+rather than being silently retried. A not-yet-present manifest remains a
+normal poll miss. Successful snapshots atomically replace the previous
+host snapshot and cannot claim a whole-file hash of the growing source.
+
+This fix is used with or without `--pace-file-transfers`. The unpaced path
+writes directly to a host partial, with no POSIX selectors or `fcntl`
+requirement. iOS and ordinary immutable transfers keep their existing paths.
+Only manifests request snapshot mode; completed artifact downloads remain
+strict immutable transfers. A prefix may end in an incomplete JSONL record;
+the existing parser skips it and waits for later events. Snapshot validity
+is not proof of a completed session or a consistent arbitrary mutable file.
+
 ## Host-only regressions
 
 ```sh
