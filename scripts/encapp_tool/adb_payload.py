@@ -100,7 +100,9 @@ def remote_size(serial, path, debug=0, portable=False):
         'ls -a -- "$d" >/dev/null || exit 1; '
         'for entry in "$d"/* "$d"/.[!.]* "$d"/..?*; do '
         f'if [ "${{entry##*/}}" = {basename} ]; then '
-        'echo "file entry exists but cannot be statted" >&2; exit 1; fi; done; '
+        # Creation can race the initial absence check. Re-stat a matching
+        # entry within this same bounded control; genuine stat errors survive.
+        'stat -L -c %s -- "$p"; exit $?; fi; done; '
         f"printf '%s\\n' {ABSENT_MARKER}; "
         'else echo "cannot inspect source parent directory" >&2; exit 1; fi'
     )
