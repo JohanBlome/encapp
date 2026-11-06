@@ -67,10 +67,40 @@ strict immutable transfers. A prefix may end in an incomplete JSONL record;
 the existing parser skips it and waits for later events. Snapshot validity
 is not proof of a completed session or a consistent arbitrary mutable file.
 
+## Opt-in Android logcat controls
+
+`--preserve-logcat` skips the pre-launch Android logcat clear, including
+custom run-command launches. It does not disable the upstream live stream,
+encoder-progress tracking, or fallback capture. Without this flag the
+existing clear-before-launch behavior remains unchanged.
+
+`--full-logcat` adds `<session_id>.android_logcat.full.txt`, a frozen
+all-tag snapshot of the last 20000 **records** from the main/system buffers
+with epoch timestamps (`logcat -d -b main -b system -v epoch -t 20000 '*:V'`).
+This is a record bound, not a hard byte or physical-line bound: messages
+may contain newlines. It may include pre-existing records and can wrap
+away early records. Use session IDs and timestamps to identify the run.
+No vendor logging, buffer resizing, extra buffers or device settings are
+enabled. The flags are independent and ignored by the normal iOS path.
+
+The additional snapshot does **not** replace or truncate the upstream
+`<session_id>.android_logcat.txt` complete live threadtime capture. Its
+unique remote stage is size/hash verified through the selected payload
+path before publication, then removed only after success. Without pacing,
+its host subprocesses need neither `fcntl` nor POSIX pipe selectors.
+App-private staging reads logcat as shell and writes the stage via `run-as`;
+this requires a debuggable app and a device shell supporting `pipefail`.
+If staging, download or cleanup fails, the stage is retained and a warning
+names the evidence. Diagnostic failure does not mask a run/shaping error
+or become a new measurement-aborting gate. It does not prove complete logs.
+
 ## Host-only regressions
 
 ```sh
-PYTHONPATH=scripts python -m pytest scripts/tests/unit/adb_payload_test.py
+PYTHONPATH=scripts python -m pytest \
+  scripts/tests/unit/adb_payload_test.py \
+  scripts/tests/unit/growing_manifest_snapshot_test.py \
+  scripts/tests/unit/logcat_options_test.py
 ```
 
 These tests replace adb with owned local fixtures and fake subprocesses;

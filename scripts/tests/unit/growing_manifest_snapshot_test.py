@@ -63,7 +63,8 @@ class GrowingManifestSnapshotTest(FakeAdbTest):
         self.assertEqual([], self.processes)
 
     def test_snapshot_never_queries_whole_file_hash(self):
-        with mock.patch.object(adb_payload, "remote_hash", side_effect=AssertionError("whole-file hash")):
+        with mock.patch.object(
+                adb_payload, "remote_hash", side_effect=AssertionError("whole-file hash")):
             self.assertTrue(self.pull())
 
     def test_empty_snapshot_is_exactly_empty(self):
@@ -86,7 +87,8 @@ class GrowingManifestSnapshotTest(FakeAdbTest):
         remote = "/data/data/com.facebook.encapp/files/live.jsonl"
         (self.app / "files" / "live.jsonl").write_bytes(b"prefix\nappended\n")
         for paced in (True, False):
-            with self.subTest(paced=paced), mock.patch.object(adb_payload, "remote_size", return_value=7):
+            with self.subTest(paced=paced), mock.patch.object(
+                    adb_payload, "remote_size", return_value=7):
                 self.assertTrue(adb_payload.pull(
                     "Device A", remote, str(self.destination), verify_hash=False,
                     snapshot=True, paced=paced))
@@ -133,7 +135,8 @@ class GrowingManifestSnapshotTest(FakeAdbTest):
             self.assertEqual(capture.progress_token, kwargs["progress_fn"])
             return verdict
 
-        with mock.patch.object(session_manifest, "wait_for_session", side_effect=poll), mock.patch.object(
+        with mock.patch.object(
+                session_manifest, "wait_for_session", side_effect=poll), mock.patch.object(
                 adb_cmds, "pull_file_from_device", return_value=True) as pull:
             self.assertEqual((True, [str(self.root / "stats.json")]), encapp._oracle_via_manifest(
                 suite, "DeviceA", "/owned", str(self.root), "S1", 0, logcat_capture=capture))
@@ -150,7 +153,8 @@ class GrowingManifestSnapshotTest(FakeAdbTest):
             {"event": "artifact", "test_id": "case", "kind": "stats", "path": "stats.json"},
             {"event": "test_end", "test_id": "case", "status": "ok"},
         ], ["case"])
-        with mock.patch.object(session_manifest, "wait_for_session", return_value=verdict), mock.patch.object(
+        with mock.patch.object(
+                session_manifest, "wait_for_session", return_value=verdict), mock.patch.object(
                 adb_cmds, "pull_file_from_device", return_value=False):
             with self.assertRaises(adb_payload.PayloadTransferError):
                 encapp._oracle_via_manifest(suite, "DeviceA", "/owned", str(self.root), "S1", 0)
