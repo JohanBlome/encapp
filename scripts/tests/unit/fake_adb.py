@@ -23,7 +23,12 @@ if mode == "stderr":
 if mode == "fail":
     sys.stderr.write("injected transport failure")
     sys.exit(7)
-sys.exit(subprocess.call(command, shell=True, cwd=os.environ["FAKE_APP_ROOT"]))
+code = subprocess.call(command, shell=True, cwd=os.environ["FAKE_APP_ROOT"])
+if mode == "extra":
+    sys.stdout.buffer.write(b"unexpected extra byte")
+if mode == "exit_after":
+    sys.exit(7)
+sys.exit(code)
 '''
 
 
@@ -73,8 +78,9 @@ class FakeAdbTest(unittest.TestCase):
 
     def transport(self, argv, **kwargs):
         self.assertEqual(argv[:2], ["adb", "-s"])
-        self.assertIn(argv[3], ["exec-in", "exec-out"])
+        self.assertIn(argv[3], ["shell", "exec-in", "exec-out"])
         process = REAL_POPEN([sys.executable, "-c", TRANSPORT, self.inner(argv[4])],
                              **kwargs)
-        self.processes.append(process)
+        if argv[3] != "shell":
+            self.processes.append(process)
         return process

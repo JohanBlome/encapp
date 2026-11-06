@@ -2413,7 +2413,7 @@ def _oracle_via_manifest(
 
     def _pull(remote_path, local_dir):
         return encapp_tool.adb_cmds.pull_file_from_device(
-            serial, remote_path, local_dir, debug
+            serial, remote_path, local_dir, debug, snapshot=True
         )
 
     def _force_stop():
