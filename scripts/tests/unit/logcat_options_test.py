@@ -134,7 +134,7 @@ class FullLogcatCollectionTest(FakeAdbTest):
         self.controls = []
         self.original_shell = adb_payload.shell
 
-    def stage(self, serial, inner, path, debug=0, portable=False):
+    def stage(self, serial, inner, path, debug=0, portable=False, timeout=None):
         self.controls.append((inner, path, portable))
         if "logcat -d" in inner:
             argv = shlex.split(inner)
@@ -145,7 +145,7 @@ class FullLogcatCollectionTest(FakeAdbTest):
             remote.write_bytes(self.log)
             self.stages.append(remote)
             return True, "", ""
-        return self.original_shell(serial, inner, path, debug, portable=portable)
+        return self.original_shell(serial, inner, path, debug, portable=portable, timeout=timeout)
 
     def collect(self, device_workdir=None):
         return encapp._capture_full_session_logcat(
@@ -201,10 +201,10 @@ class FullLogcatCollectionTest(FakeAdbTest):
         self.assertFalse(any("rm -f" in command for command, _, _ in self.controls))
 
     def test_cleanup_failure_reports_local_and_remote_evidence(self):
-        def fail_cleanup(serial, inner, path, debug=0, portable=False):
+        def fail_cleanup(serial, inner, path, debug=0, portable=False, timeout=None):
             if inner.startswith("rm -f"):
                 return False, "", "injected cleanup failure"
-            return self.stage(serial, inner, path, debug, portable)
+            return self.stage(serial, inner, path, debug, portable, timeout)
 
         with mock.patch.object(adb_payload, "shell", side_effect=fail_cleanup):
             with self.assertRaisesRegex(adb_payload.PayloadTransferError, "local snapshot"):

@@ -14,7 +14,7 @@ REAL_POPEN = subprocess.Popen
 TRANSPORT = r'''
 import os, subprocess, sys, time
 command = sys.argv[1]
-mode = os.environ.get("FAKE_PAYLOAD_MODE", "")
+mode = os.environ.get("FAKE_CONTROL_MODE" if sys.argv[2] == "shell" else "FAKE_PAYLOAD_MODE", "")
 if mode == "stall":
     time.sleep(5)
     sys.exit(0)
@@ -79,8 +79,12 @@ class FakeAdbTest(unittest.TestCase):
     def transport(self, argv, **kwargs):
         self.assertEqual(argv[:2], ["adb", "-s"])
         self.assertIn(argv[3], ["shell", "exec-in", "exec-out"])
-        process = REAL_POPEN([sys.executable, "-c", TRANSPORT, self.inner(argv[4])],
-                             **kwargs)
+        if argv[3] == "shell" and not os.environ.get("FAKE_CONTROL_MODE"):
+            self.commands.append(shlex.join(argv))
+            process = REAL_POPEN(["sh", "-c", self.inner(argv[4])], cwd=self.app, **kwargs)
+        else:
+            process = REAL_POPEN([sys.executable, "-c", TRANSPORT,
+                                 self.inner(argv[4]), argv[3]], **kwargs)
         if argv[3] != "shell":
             self.processes.append(process)
         return process

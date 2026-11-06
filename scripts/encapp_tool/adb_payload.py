@@ -22,6 +22,15 @@ log = logging.getLogger("encapp.adb")
 RATE_BYTES = 2 * 1024 * 1024
 BLOCK_BYTES = 4096
 IO_TIMEOUT = 30
+CONTROL_TIMEOUT = 30
+BULK_MIN_TIMEOUT = 120
+BULK_BYTES_PER_SECOND = 4 * 1024 * 1024
+ABSENT_MARKER = "ENCAPP_FILE_ABSENT"
+
+
+def bulk_timeout(size):
+    """Allow slow on-device hash/assembly work without an unbounded wait."""
+    return max(BULK_MIN_TIMEOUT, 60 + size / BULK_BYTES_PER_SECOND)
 
 
 class PayloadTransferError(RuntimeError):
@@ -39,24 +48,37 @@ def shell_command(serial, inner, path):
             + shlex.quote(_remote_command(inner, path)))
 
 
-def shell(serial, inner, path, debug=0, portable=False):
-    if not portable:
-        return adb_cmds.run_cmd(shell_command(serial, inner, path), debug=debug)
-    # No host shell, fcntl or pipe selector on the unpaced control path.
-    process = subprocess.Popen(
-        ["adb", "-s", serial, "shell", _remote_command(inner, path)],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
+def control(command, timeout=None, debug=0):
+    """Bound every new control client; kill/reap only that owned subprocess."""
+    timeout = CONTROL_TIMEOUT if timeout is None else timeout
+    argv = shlex.split(command) if isinstance(command, str) else command
+    if debug:
+        log.debug("payload control timeout=%s argv=%r", timeout, argv)
+    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
-        output, error = process.communicate(timeout=IO_TIMEOUT)
+        try:
+            output, error = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            output, error = process.communicate(timeout=IO_TIMEOUT)
+            raise PayloadTransferError(
+                f"control timed out after {timeout}s: {error.decode(errors='replace').strip()}; "
+                "remote outcome unknown, no retry")
         return (process.returncode == 0, output.decode(errors="replace"),
                 error.decode(errors="replace"))
     finally:
         if process.poll() is None:
             process.kill()
-            process.communicate(timeout=IO_TIMEOUT)
+            process.wait(timeout=IO_TIMEOUT)
         process.stdout.close()
         process.stderr.close()
+
+
+def shell(serial, inner, path, debug=0, portable=False, timeout=None):
+    # All new controls avoid host shells and legacy unbounded run_cmd.
+    # Keep portable as a compatibility keyword; both paths are now identical.
+    return control(["adb", "-s", serial, "shell", _remote_command(inner, path)],
+                   timeout=timeout, debug=debug)
 
 
 def _path(path):
@@ -65,22 +87,61 @@ def _path(path):
 
 
 def remote_size(serial, path, debug=0, portable=False):
-    ok, output, _ = shell(serial, f"stat -L -c %s -- {_path(path)}", path, debug,
-                          portable=portable)
-    try:
-        size = int(output.strip()) if ok else -1
-        return size if size >= 0 else None
-    except ValueError:
+    parent = _path(os.path.dirname(path) or ".")
+    basename = shlex.quote(os.path.basename(path))
+    # A failed stat is NOT an absent file. Confirm that the parent can be
+    # searched/listed and that no directory entry names this file before
+    # emitting the sole normal-miss marker. Permission/run-as/transport and
+    # malformed-stat errors stay errors, including dangling symlinks.
+    inner = (
+        f"p={_path(path)}; d={parent}; "
+        'if [ -e "$p" ] || [ -L "$p" ]; then stat -L -c %s -- "$p"; '
+        'elif [ -d "$d" ] && [ -x "$d" ] && [ -r "$d" ]; then '
+        'ls -a -- "$d" >/dev/null || exit 1; '
+        'for entry in "$d"/* "$d"/.[!.]* "$d"/..?*; do '
+        f'if [ "${{entry##*/}}" = {basename} ]; then '
+        'echo "file entry exists but cannot be statted" >&2; exit 1; fi; done; '
+        f"printf '%s\\n' {ABSENT_MARKER}; "
+        'else echo "cannot inspect source parent directory" >&2; exit 1; fi'
+    )
+    ok, output, error = shell(serial, inner, path, debug, portable=portable)
+    if not ok:
+        raise PayloadTransferError(f"file size probe failed for {path}: {error.strip()}")
+    if output.strip() == ABSENT_MARKER:
         return None
+    value = output.strip()
+    if value and all(character in "0123456789" for character in value):
+        return int(value)
+    raise PayloadTransferError(f"malformed file size for {path}: {output!r}; {error.strip()}")
 
 
-def remote_hash(serial, path, debug=0, portable=False):
-    ok, output, _ = shell(serial, f"md5sum -- {_path(path)}", path, debug,
-                          portable=portable)
+def remote_hash(serial, path, debug=0, portable=False, size=None):
+    size = remote_size(serial, path, debug, portable=portable) if size is None else size
+    if size is None:
+        return None
+    ok, output, error = shell(serial, f"md5sum -- {_path(path)}", path, debug,
+                              portable=portable, timeout=bulk_timeout(size))
     digest = output.split()[0] if ok and output.split() else ""
-    if len(digest) != 32 or any(c not in "0123456789abcdef" for c in digest):
-        return None
+    if not ok or len(digest) != 32 or any(c not in "0123456789abcdef" for c in digest):
+        raise PayloadTransferError(
+            f"file hash probe failed for {path}: {error.strip()}; {output!r}")
     return digest
+
+
+def publish(serial, partial, destination, size, digest, debug=0):
+    """Require no-directory-target rename and verify the exact published file."""
+    target = _path(destination)
+    inner = (f"if [ -d {target} ]; then echo 'destination is a directory' >&2; exit 1; fi; "
+             f"mv -fT -- {_path(partial)} {target}")
+    ok, _, error = shell(serial, inner, partial, debug)
+    if not ok:
+        raise PayloadTransferError(
+            f"no-directory-target rename failed (mv -T required, no fallback): {error.strip()}")
+    ok, _, error = shell(serial, f"test -f {target} && test ! -L {target}", destination, debug)
+    if (not ok or remote_size(serial, destination, debug) != size
+            or remote_hash(serial, destination, debug, size=size) != digest):
+        raise PayloadTransferError(
+            f"published destination verification failed: {destination}; {error.strip()}")
 
 
 @contextlib.contextmanager
@@ -230,13 +291,9 @@ def push(serial, source, destination, debug=0):
             with open(source, "rb") as local:
                 _stream(serial, partial, inner, local, size, True, admit)
             if (remote_size(serial, partial, debug) != size
-                    or remote_hash(serial, partial, debug) != digest):
+                    or remote_hash(serial, partial, debug, size=size) != digest):
                 raise PayloadTransferError("remote partial size/hash mismatch")
-            ok, _, error = shell(
-                serial, f"mv -f -- {_path(partial)} {_path(destination)}",
-                partial, debug)
-            if not ok:
-                raise PayloadTransferError(f"remote rename failed: {error}")
+            publish(serial, partial, destination, size, digest, debug)
         return True
     except (OSError, ValueError, subprocess.SubprocessError,
             PayloadTransferError) as error:
@@ -260,7 +317,8 @@ def pull(serial, source, destination, debug=0, verify_hash=True, paced=True,
             size = remote_size(serial, source, debug, portable=not paced)
             if size is None:
                 return False
-            digest = remote_hash(serial, source, debug, portable=not paced) if verify_hash else None
+            digest = (remote_hash(serial, source, debug, portable=not paced, size=size)
+                      if verify_hash else None)
             if verify_hash and digest is None:
                 raise PayloadTransferError("cannot obtain remote hash")
             parent = os.path.dirname(os.path.abspath(destination))
