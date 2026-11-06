@@ -263,6 +263,9 @@ $ python3 -m pytest PATH_TO_REPO/encapp/scripts/tests/
 * Test individual components and functions in isolation
 * Fast execution
 
+See [Android host transfer reliability](doc/host_reliability.md) for the
+opt-in paced payload path and its host-only regression tests.
+
 ### System Tests
 * **Require a device connected**
 * Test end-to-end functionality with actual hardware

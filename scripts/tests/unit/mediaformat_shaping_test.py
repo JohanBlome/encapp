@@ -34,6 +34,13 @@ def _make_suite(vbr=False, shaping_override=None):
 
 
 class MediaFormatShapingTest(unittest.TestCase):
+    def setUp(self):
+        # The run's finally block may dump logcat even when launch was mocked.
+        # Keep these policy/restoration unit tests entirely device-free.
+        patch = unittest.mock.patch("encapp.dump_session_logcat", return_value="")
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def test_resolve_policy_defaults_to_disabled(self):
         options = unittest.mock.Mock(enable_mediaformat_shaping=None)
         self.assertFalse(

@@ -2458,12 +2458,15 @@ def _oracle_via_manifest(
             path = art.get("path")
             if not path:
                 continue
-            encapp_tool.adb_cmds.pull_file_from_device(
+            pulled = encapp_tool.adb_cmds.pull_file_from_device(
                 serial,
                 f"{device_workdir.rstrip('/')}/{path}",
                 local_workdir,
                 debug,
             )
+            if not pulled and encapp_tool.adb_cmds.PACE_FILE_TRANSFERS:
+                from encapp_tool.adb_payload import PayloadTransferError
+                raise PayloadTransferError(f"artifact transfer failed: {path}")
             if art.get("kind") == "stats":
                 json_paths.append(os.path.join(local_workdir, path))
 
@@ -3064,6 +3067,13 @@ def add_args(parser):
         help="Shuffle multi tests so each run will execute the tests in a different order.",
     )
     parser.add_argument(
+        "--pace-file-transfers",
+        action="store_true",
+        help="Opt in to verified Android payload transfers at 2 MiB/s host "
+        "admission, in 4 KiB blocks. POSIX hosts only; no automatic retry. "
+        "Does not throttle live logcat or guarantee USB packet timing.",
+    )
+    parser.add_argument(
         "--file-transfer-limit",
         dest="file_transfer_limit",
         default=encapp_tool.adb_cmds.MAX_SIZE_BYTES,
@@ -3378,6 +3388,9 @@ def get_options(argv: list) -> argparse.Namespace:
     if func in FUNC_CHOICES:
         add_func_arg(func, parser)
     options = parser.parse_args(argv[1:])
+    if (getattr(options, "pace_file_transfers", False)
+            and not options.idb and os.name != "posix"):
+        parser.error("--pace-file-transfers requires a POSIX host for Android")
     options.desc = "testing"
     if options.version:
         return options
@@ -4044,6 +4057,7 @@ def main(argv):
             dt_string = now.strftime("%Y%m%d_%H%M%S")
             cmdfile.write(f"{now}: " + " ".join(argv) + "\n")
 
+        encapp_tool.adb_cmds.PACE_FILE_TRANSFERS = options.pace_file_transfers
         encapp_tool.adb_cmds.MAX_SIZE_BYTES = parse_magnitude(
             options.file_transfer_limit
         )
