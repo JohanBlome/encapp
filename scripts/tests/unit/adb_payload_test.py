@@ -132,13 +132,13 @@ class PayloadTransferTest(FakeAdbTest):
         self.assertEqual([], self.processes)
 
     def test_atomic_rename_failure_preserves_partial(self):
-        original = self.control
+        original = adb_payload.shell
 
-        def fail_rename(command, **kwargs):
-            if "mv -f" in command:
+        def fail_rename(serial, inner, path, debug=0, **kwargs):
+            if "mv -fT" in inner:
                 return False, "", "injected rename failure"
-            return original(command, **kwargs)
-        with mock.patch.object(adb_cmds, "run_cmd", side_effect=fail_rename):
+            return original(serial, inner, path, debug, **kwargs)
+        with mock.patch.object(adb_payload, "shell", side_effect=fail_rename):
             self.assertFalse(adb_payload.push("Device A", str(self.source), str(self.destination)))
         self.assertFalse(self.destination.exists())
         self.assertEqual(1, len(list(self.root.glob("received.bin.partial.*"))))
@@ -188,8 +188,9 @@ class SplitTransferTest(FakeAdbTest):
     def test_assembly_mismatch_does_not_publish_or_clean_parts(self):
         original = adb_payload.remote_hash
 
-        def wrong_assembly(serial, path, debug=0):
-            return "0" * 32 if ".assembly.partial." in path else original(serial, path, debug)
+        def wrong_assembly(serial, path, debug=0, **kwargs):
+            return ("0" * 32 if ".assembly.partial." in path else
+                    original(serial, path, debug, **kwargs))
         with mock.patch.object(adb_payload, "remote_hash", side_effect=wrong_assembly):
             self.assertFalse(self.push())
         self.assertFalse((self.remote / self.source.name).exists())

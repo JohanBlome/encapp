@@ -827,7 +827,12 @@ def push_file_to_device_android(
     filepath, serial, device_workdir, debug, max_size_bytes=MAX_SIZE_BYTES
 ):
     if PACE_FILE_TRANSFERS:
-        return _push_file_to_device_android_paced(filepath, serial, device_workdir, debug)
+        from . import adb_payload
+        try:
+            return _push_file_to_device_android_paced(filepath, serial, device_workdir, debug)
+        except (OSError, adb_payload.PayloadTransferError) as error:
+            log.error("paced upload control failed without retry: %s", error)
+            return False
     if _is_app_private_path(device_workdir):
         basename = os.path.basename(filepath)
         target_path = os.path.join(device_workdir, basename)
@@ -938,16 +943,19 @@ def _push_file_to_device_android_paced(filepath, serial, device_workdir, debug):
     destination = os.path.join(device_workdir, os.path.basename(filepath))
     size = os.path.getsize(filepath)
     digest = get_host_hash(filepath, debug)
-    if (not filepath.endswith(".pbtxt")
-            and adb_payload.remote_size(serial, destination, debug) == size
-            and adb_payload.remote_hash(serial, destination, debug) == digest):
-        return True
     ok, _, error = adb_payload.shell(
         serial, f"mkdir -p -- {adb_payload._path(device_workdir)}",
         device_workdir, debug)
     if not ok:
         log.error("cannot create payload directory: %s", error)
         return False
+    regular, _, _ = adb_payload.shell(
+        serial, f"test -f {adb_payload._path(destination)} && "
+        f"test ! -L {adb_payload._path(destination)}", destination, debug)
+    if (regular and not filepath.endswith(".pbtxt")
+            and adb_payload.remote_size(serial, destination, debug) == size
+            and adb_payload.remote_hash(serial, destination, debug, size=size) == digest):
+        return True
     if size <= MAX_SIZE_BYTES:
         return adb_payload.push(serial, filepath, destination, debug)
     if SPLIT_SIZE_BYTES <= 0:
@@ -990,7 +998,8 @@ def _push_file_to_device_android_split_paced(
                 part_size = os.path.getsize(local_part)
                 part_hash = get_host_hash(local_part, debug)
                 if not (adb_payload.remote_size(serial, remote_part, debug) == part_size
-                        and adb_payload.remote_hash(serial, remote_part, debug) == part_hash):
+                        and adb_payload.remote_hash(serial, remote_part, debug,
+                                                    size=part_size) == part_hash):
                     if not adb_payload.push(serial, local_part, remote_part, debug):
                         return False
                 parts.append(remote_part)
@@ -1004,19 +1013,16 @@ def _push_file_to_device_android_split_paced(
         if not ok:
             raise adb_payload.PayloadTransferError(f"cannot create assembly: {error}")
         for command in adb_payload.file_commands(serial, parts, "cat", assembly):
-            ok, _, error = run_cmd(command, debug=debug)
+            ok, _, error = adb_payload.control(
+                command, timeout=adb_payload.bulk_timeout(size), debug=debug)
             if not ok:
                 raise adb_payload.PayloadTransferError(f"assembly failed: {error}; {assembly}")
         if (adb_payload.remote_size(serial, assembly, debug) != size
-                or adb_payload.remote_hash(serial, assembly, debug) != digest):
+                or adb_payload.remote_hash(serial, assembly, debug, size=size) != digest):
             raise adb_payload.PayloadTransferError(f"assembly size/hash mismatch: {assembly}")
-        ok, _, error = adb_payload.shell(
-            serial, f"mv -f -- {adb_payload._path(assembly)} {adb_payload._path(destination)}",
-            assembly, debug)
-        if not ok:
-            raise adb_payload.PayloadTransferError(f"assembly rename failed: {error}; {assembly}")
+        adb_payload.publish(serial, assembly, destination, size, digest, debug)
         for command in adb_payload.file_commands(serial, parts, "rm"):
-            ok, _, error = run_cmd(command, debug=debug)
+            ok, _, error = adb_payload.control(command, debug=debug)
             if not ok:
                 raise adb_payload.PayloadTransferError(f"split cleanup failed: {error}")
         complete = True

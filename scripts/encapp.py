@@ -2407,44 +2407,56 @@ def run_codec_tests(
         shaping_state["run_error"] = f"{type(exc).__name__}: {exc}"
         raise
     finally:
-        if logcat_capture is not None:
-            try:
-                if not logcat_capture.stop():
-                    dump_session_logcat(local_workdir, session_id, serial)
-            except Exception as exc:
-                log.warning("streaming logcat finalization failed: %s", exc)
-                dump_session_logcat(local_workdir, session_id, serial)
-        if full_logcat and not encapp_tool.adb_cmds.USE_IDB:
-            try:
-                _capture_full_session_logcat(serial, device_workdir, local_workdir,
-                                             session_id, debug)
-            except Exception as exc:
-                # Diagnostic collection must not mask run/shaping failures or
-                # become a new measurement-aborting gate.
-                log.warning("bounded full logcat collection failed: %s", exc)
-        try:
-            _restore_mediaformat_shaping(serial, shaping_state, debug=debug)
-        except Exception as exc:
-            restore_error = exc
-            shaping_state["restore_error"] = f"{type(exc).__name__}: {exc}"
-            log.error("MediaFormat shaping restore failed: %s", exc)
-
+        # Critical restoration/metadata precede diagnostics: even a diagnostic
+        # lock wait or KeyboardInterrupt cannot defer or skip these steps.
         metadata_error = None
         try:
-            metadata_path = _write_mediaformat_shaping_metadata(
-                local_workdir, session_id, shaping_state
-            )
-            log.info("MediaFormat shaping metadata: %s", metadata_path)
-        except Exception as exc:
-            metadata_error = exc
-            shaping_state["metadata_error"] = f"{type(exc).__name__}: {exc}"
-            log.error("MediaFormat shaping metadata write failed: %s", exc)
+            try:
+                _restore_mediaformat_shaping(serial, shaping_state, debug=debug)
+            except BaseException as exc:
+                restore_error = exc
+                shaping_state["restore_error"] = f"{type(exc).__name__}: {exc}"
+                log.error("MediaFormat shaping restore failed: %s", exc)
+        finally:
+            try:
+                metadata_path = _write_mediaformat_shaping_metadata(
+                    local_workdir, session_id, shaping_state
+                )
+                log.info("MediaFormat shaping metadata: %s", metadata_path)
+            except BaseException as exc:
+                metadata_error = exc
+                shaping_state["metadata_error"] = f"{type(exc).__name__}: {exc}"
+                log.error("MediaFormat shaping metadata write failed: %s", exc)
 
+        diagnostic_error = None
+        try:
+            if logcat_capture is not None:
+                try:
+                    if not logcat_capture.stop():
+                        dump_session_logcat(local_workdir, session_id, serial)
+                except Exception as exc:
+                    log.warning("streaming logcat finalization failed: %s", exc)
+                    dump_session_logcat(local_workdir, session_id, serial)
+            if full_logcat and not encapp_tool.adb_cmds.USE_IDB:
+                try:
+                    _capture_full_session_logcat(serial, device_workdir, local_workdir,
+                                                 session_id, debug)
+                except Exception as exc:
+                    log.warning("bounded full logcat collection failed: %s", exc)
+        except BaseException as exc:
+            diagnostic_error = exc
+            log.error("diagnostic finalization interrupted after critical cleanup: %s; "
+                      "original run failure=%r", exc, run_error)
+
+        # Never replace an already-pending run failure. Cancellation is still
+        # re-raised after cleanup when no original run failure takes precedence.
         if run_error is None:
             if restore_error is not None:
                 raise restore_error
             if metadata_error is not None:
                 raise metadata_error
+            if diagnostic_error is not None:
+                raise diagnostic_error
 
 
 def _oracle_via_manifest(
@@ -3121,13 +3133,6 @@ def add_args(parser):
         help="Shuffle multi tests so each run will execute the tests in a different order.",
     )
     parser.add_argument(
-        "--pace-file-transfers",
-        action="store_true",
-        help="Opt in to verified Android payload transfers at 2 MiB/s host "
-        "admission, in 4 KiB blocks. POSIX hosts only; no automatic retry. "
-        "Does not throttle live logcat or guarantee USB packet timing.",
-    )
-    parser.add_argument(
         "--file-transfer-limit",
         dest="file_transfer_limit",
         default=encapp_tool.adb_cmds.MAX_SIZE_BYTES,
@@ -3223,6 +3228,16 @@ input_args = {
                 "Per-module log-level overrides, e.g. "
                 "'encapp.adb=DEBUG,encapp.manifest=WARNING'."
             ),
+        },
+    },
+    "pace-file-transfers": {
+        "func": "run",
+        "long": "--pace-file-transfers",
+        "args": {
+            "action": "store_true",
+            "help": "Opt in to verified Android payload transfers at 2 MiB/s host "
+            "admission, in 4 KiB blocks. POSIX hosts only; no automatic retry. "
+            "Does not throttle live logcat or guarantee USB packet timing.",
         },
     },
     "preserve-logcat": {
