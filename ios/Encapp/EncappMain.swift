@@ -19,9 +19,12 @@ class EncappMain {
     func run() {
         log.info("Starting encapp: \(CommandLine.arguments)")
         if CommandLine.arguments.count < 2 {
-            log.error("No commands")
-            log.info("No command given")
-            exit(1)
+            // Launched from the home screen: stay in standby. ContentView has
+            // already disabled the idle timer, so the screen does not lock
+            // while the app is in the foreground.
+            log.info("No command given, entering standby")
+            overview.updateTestsLog(text: "Standby: keeping the screen on")
+            return
         }
 
         // We are assuming things about the arguments depending on type
