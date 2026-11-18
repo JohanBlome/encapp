@@ -11,10 +11,10 @@ jobs:
         python-version: ["3.9", "3.11"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -28,7 +28,7 @@ jobs:
           pylint scripts --ignore scripts/proto --errors-only --exit-zero
           pylint scripts --ignore scripts/proto --exit-zero
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: 'temurin'
